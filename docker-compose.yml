@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+services:
+  phecloud:
+    build: .
+    image: phe-cloud:dev
+    container_name: phe-cloud
+    cpus: 2
+    mem_limit: 2g
+    shm_size: 512m
+    ports:
+      - "7400:7400"
+    volumes:
+      - phecloud-data:/data
+    restart: unless-stopped
+volumes:
+  phecloud-data:
