@@ -70,11 +70,12 @@ type Hello struct {
 }
 
 type Welcome struct {
-	T      string `cbor:"t"`
-	Dev    string `cbor:"dev"`
-	Key    []byte `cbor:"key,omitempty"` // only in reply to pair
-	Server string `cbor:"server"`
-	Admin  bool   `cbor:"admin,omitempty"` // this device may list and revoke devices
+	T        string   `cbor:"t"`
+	Dev      string   `cbor:"dev"`
+	Key      []byte   `cbor:"key,omitempty"` // only in reply to pair
+	Server   string   `cbor:"server"`
+	Admin    bool     `cbor:"admin,omitempty"`    // this device may list and revoke devices
+	Features []string `cbor:"features,omitempty"` // optional capabilities of this server (none yet; "zoom" = renders at a requested scale)
 }
 
 type Error struct {

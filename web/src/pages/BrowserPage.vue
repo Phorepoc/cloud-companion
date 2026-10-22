@@ -6,6 +6,8 @@
       <q-btn flat round dense icon="arrow_back" :disable="!state.page.back" data-test="back" @click="api.action('back')" />
       <q-btn flat round dense icon="arrow_forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')" />
       <q-btn flat round dense icon="refresh" data-test="reload" @click="api.action('reload')" />
+      <q-btn flat round dense icon="zoom_out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
+      <q-btn flat round dense icon="zoom_in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
       <q-input v-model="urlInput" dense outlined class="col" placeholder="Search or enter a web address" data-test="url"
                @keyup.enter="go" @focus="editing = true" @blur="editing = false" />
       <q-btn flat round dense icon="arrow_forward_ios" data-test="go" @click="go" />
@@ -132,7 +134,9 @@ function onEnter(e) {
 }
 
 const selOptions = computed(() => (selRegion.value ? selRegion.value.opts.map((o, i) => ({ label: o.l || '(empty)', value: i })) : []))
-function pickSelect() { api.select(selRegion.value.id, selIndex.value) }
+function pickSelect() {
+  api.select(selRegion.value.id, selIndex.value)
+}
 
 onMounted(async () => {
   renderer = new Renderer(cv.value)
@@ -145,12 +149,14 @@ onMounted(async () => {
   // test/debug hook: screen position (client coordinates) of a region by label
   window.__phe = Object.assign(window.__phe || {}, {
     renderer,
-    regionClientPos(label) {
-      const r = state.regions.find((q) => (q.label || '').includes(label))
+    // client coordinates of a region's centre; match by label text (or name / placeholder), optionally restricted to a kind
+    regionClientPos(q, kind) {
+      const r = state.regions.find((g) => (!kind || g.kind === kind) && (!q || (g.label || '').includes(q) || g.name === q || g.ph === q))
       if (!r) return null
       const sr = renderer.screenRect(r)
       const b = cv.value.getBoundingClientRect()
-      return { x: b.left + sr.x + sr.w / 2, y: b.top + sr.y + sr.h / 2, scrollY: renderer.view.scrollY }
+      const k = b.width / 360
+      return { x: b.left + (sr.x + sr.w / 2) * k, y: b.top + (sr.y + sr.h / 2) * k, scrollY: renderer.view.scrollY, zoom: renderer.view.zoom }
     },
   })
   if (creds.value && state.status === 'offline') {

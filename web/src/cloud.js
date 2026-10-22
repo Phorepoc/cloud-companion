@@ -21,6 +21,7 @@ export const state = reactive({
   downloadNote: '',
   deviceList: [],
   adminError: '',
+  features: [],             // optional server features from the welcome frame ("zoom": render at the requested scale)
   settings: { q: 70, gray: false },
 })
 
@@ -89,6 +90,7 @@ function onFrame(f) {
 async function finishConnect(w) {
   state.dev = w.dev
   state.admin = !!w.admin
+  state.features = w.features || []
   state.status = 'online'
   state.error = ''
   client.onframe = onFrame
@@ -148,6 +150,7 @@ export const api = {
   text: (id, t, r) => client && client.text(id, t, r),
   key: (k) => client && client.key(k),
   select: (id, i) => client && client.select(id, i),
+  zoom: (s) => client && client.send({ t: 'zoom', scale: s }),
   settings(q, gray) {
     state.settings.q = q
     state.settings.gray = gray

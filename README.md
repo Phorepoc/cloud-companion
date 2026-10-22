@@ -73,8 +73,22 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
   notice.
 - **Devices page** (admin only): list and revoke (`devices` / `revoke` frames, checked on the server).
 - **Settings page**: JPEG quality slider and grayscale (the per-device byte budget), forget this device.
-- Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use a TLS reverse proxy for anything but localhost, or
+- Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use the Caddy profile below for anything but localhost, or
   `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).
+- **Zoom**: pinch (two pointers), ctrl + wheel, or the zoom buttons scale the cached tiles locally (1x to 3x, pan and scroll in
+  page units, hit-testing and the keyboard overlay follow). The cloud renders at a fixed 360 css px, so zoomed text is the
+  1x bitmap scaled; when a server advertises the `zoom` feature in its welcome frame the view sends a `zoom` frame after the
+  gesture settles so it can re-render at the new scale (no server does yet).
+- **HTTPS** (`docker compose --profile tls up -d`): a Caddy container (`deploy/Caddyfile`) terminates TLS and proxies HTTPS and
+  WebSocket to the web port. For a public host set `PHECLOUD_DOMAIN=cloud.example.org` (DNS pointing here, ports 80/443
+  open): Caddy gets and renews a Let's Encrypt certificate by itself. For a LAN use
+  `CADDYFILE=./deploy/Caddyfile.local PHECLOUD_DOMAIN=<lan name or ip>`: Caddy's internal CA signs the certificate (trust its root,
+  `docker exec phe-caddy cat /data/caddy/pki/authorities/local/root.crt`, or accept the warning). `PHECLOUD_HTTPS_PORT` changes the
+  published port (default 443). Keep the phone port (7400, TLS 1.3 with a pinned certificate) as it is; the proxy is only for browsers.
+- Tests (`sh web/test/run.sh`): besides the pairing/tap/back/devices/settings/reload path, Playwright covers zoom (hit-test and tap
+  under 1.56x, ctrl+wheel), the keyboard overlay (typing and Backspace reach the field on the server), the select chooser, alert,
+  confirm (cancel and ok) and prompt dialogs, HTTP auth (a wrong password is asked again, the right one accepted), and, through
+  Caddy, pair + tap over HTTPS/wss.
 - Smoke test: `sh web/test/run.sh` (Docker, from the repo root) builds everything, starts the server and runs Playwright (Chromium
   in a container) through: pair, key stored in IndexedDB, open example.com, scroll the canvas, tap the link on the canvas,
   assert the title "Example Domains", back button, devices page, settings, reload authenticates from the stored key.

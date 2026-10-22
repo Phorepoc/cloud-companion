@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Public deployment: set PHECLOUD_DOMAIN to a DNS name that points at this host (ports 80 and 443 reachable). Caddy gets
+# and renews a Let's Encrypt certificate by itself and proxies HTTPS and WebSocket to the phecloud web port.
+{$PHECLOUD_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy phecloud:8080
+}

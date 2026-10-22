@@ -15,5 +15,23 @@ services:
     restart: unless-stopped
     # environment:
     #   PHECLOUD_PLAIN_LISTEN: ":7401"   # development only: plain TCP for client/test/run.sh
+  # TLS reverse proxy for the web app: docker compose --profile tls up -d   (see README, "HTTPS")
+  caddy:
+    profiles: ["tls"]
+    image: caddy:2
+    container_name: phe-caddy
+    cpus: 1
+    mem_limit: 256m
+    environment:
+      PHECLOUD_DOMAIN: ${PHECLOUD_DOMAIN:-localhost}
+    ports:
+      - "${PHECLOUD_HTTPS_PORT:-443}:443"
+    volumes:
+      - ${CADDYFILE:-./deploy/Caddyfile.local}:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - phecloud
+    restart: unless-stopped
 volumes:
+  caddy-data:
   phecloud-data:

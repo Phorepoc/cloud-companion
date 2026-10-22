@@ -17,10 +17,10 @@ export function layerScreenY(l, scroll, viewH = VIEW_H) {
 }
 
 // lscroll: {layerId: {x, y}} local scroll of scroll layers
-export function hitTest(layers, regions, scroll, lscroll, sx, sy) {
+export function hitTest(layers, regions, scroll, lscroll, sx, sy, viewH = VIEW_H) {
   let top = null
   for (const l of layers) {
-    const y = layerScreenY(l, scroll)
+    const y = layerScreenY(l, scroll, viewH)
     if (sx < l.x || sx >= l.x + l.w || sy < y || sy >= y + l.h) continue
     if (!top || l.z > top.z || (l.z === top.z && l.id > top.id)) top = l
   }
@@ -28,7 +28,7 @@ export function hitTest(layers, regions, scroll, lscroll, sx, sy) {
   if (top) {
     layer = top.id
     lx = sx - top.x
-    ly = sy - layerScreenY(top, scroll)
+    ly = sy - layerScreenY(top, scroll, viewH)
     if (top.kind === 'scroll') {
       const s = lscroll[top.id] || { x: top.sx || 0, y: top.sy || 0 }
       lx += s.x; ly += s.y
@@ -45,11 +45,11 @@ export function hitTest(layers, regions, scroll, lscroll, sx, sy) {
 }
 
 // screen rectangle of a region (for the keyboard overlay and the tap highlight)
-export function regionScreenRect(layers, r, scroll, lscroll) {
+export function regionScreenRect(layers, r, scroll, lscroll, viewH = VIEW_H) {
   if (r.layer === 0) return { x: r.x, y: r.y - scroll, w: r.w, h: r.h }
   const l = layers.find((q) => q.id === r.layer)
   if (!l) return null
-  const sy = layerScreenY(l, scroll)
+  const sy = layerScreenY(l, scroll, viewH)
   if (l.kind === 'scroll') {
     const s = lscroll[l.id] || { x: l.sx || 0, y: l.sy || 0 }
     return { x: l.x + r.x - s.x, y: sy + r.y - s.y, w: r.w, h: r.h }

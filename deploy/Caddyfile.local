@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Local/LAN deployment and the test: Caddy's own internal CA signs the certificate (browsers warn until the CA is trusted).
+# Set PHECLOUD_DOMAIN to the host name clients use (a LAN name, an IP, or localhost).
+{$PHECLOUD_DOMAIN:localhost} {
+	tls internal
+	reverse_proxy phecloud:8080
+}
