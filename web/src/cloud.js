@@ -6,6 +6,7 @@
 import { reactive, shallowRef } from 'vue'
 import { PheClient } from './pheclient.js'
 import { idbGet, idbSet, idbDel } from './idb.js'
+import { brand } from './brand.js'
 
 export const state = reactive({
   status: 'offline',        // offline | connecting | online
@@ -73,7 +74,7 @@ function onFrame(f) {
       Object.assign(state.page, { pid: f.pid, zoom: newZ, url: f.url, title: f.title, w: f.w, h: f.h, back: !!f.back, fwd: !!f.fwd, trunc: !!f.trunc })
       if (newPage && hooks.onNewPage) hooks.onNewPage(f.pid)
       else if (f.reset && hooks.onRescale) hooks.onRescale(oldZ, newZ) // same page at another render scale
-      document.title = f.title ? f.title + ' - Phecloud' : 'Phecloud'
+      document.title = f.title ? f.title + ' - ' + brand.name : brand.name
       state.loading = true
       break
     }

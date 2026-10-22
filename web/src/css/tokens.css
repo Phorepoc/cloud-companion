@@ -1,0 +1,112 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Design tokens (see web/STYLE.md). Everything visual is a token: components never hard-code a colour, size or duration.
+ * Light is the default; dark applies under Quasar's `body.body--dark` (follows the system unless the user chose a theme).
+ * Contrast ratios are recorded in STYLE.md and were computed, not guessed.
+ */
+:root {
+  /* colour: surfaces and text */
+  --ph-bg: #f6f7f8;            /* the page behind everything */
+  --ph-surface: #ffffff;       /* cards, app bar, dialogs */
+  --ph-surface-2: #eceff2;     /* inputs at rest, selected rows, chips */
+  --ph-divider: #d9dde2;       /* hairlines (decorative: not required to reach 3:1) */
+  --ph-border: #7a838e;        /* control outlines (needs 3:1 against the surface) */
+  --ph-text: #1a1d21;
+  --ph-text-muted: #4a525c;
+  /* colour: accent and status */
+  --ph-accent: #0b5cad;
+  --ph-on-accent: #ffffff;
+  --ph-accent-soft: #e4effa;   /* the selected navigation item */
+  --ph-positive: #17663a;
+  --ph-warning: #8a4b00;
+  --ph-negative: #b3261e;
+  --ph-focus: #0b5cad;         /* the focus ring */
+
+  /* type */
+  --ph-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --ph-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --ph-text-caption: 0.8125rem;   /* 13 px */
+  --ph-text-small: 0.875rem;      /* 14 px */
+  --ph-text-body: 1rem;           /* 16 px: never smaller for text a person reads or types (no iOS zoom on focus) */
+  --ph-text-title-s: 1.125rem;    /* 18 */
+  --ph-text-title: 1.375rem;      /* 22 */
+  --ph-text-headline: 1.75rem;    /* 28 */
+  --ph-line: 1.5;
+  --ph-line-tight: 1.25;
+
+  /* space (4 px grid) */
+  --ph-s1: 4px;
+  --ph-s2: 8px;
+  --ph-s3: 12px;
+  --ph-s4: 16px;
+  --ph-s6: 24px;
+  --ph-s8: 32px;
+  --ph-s12: 48px;
+  --ph-tap: 44px;                /* minimum touch target, both dimensions */
+  --ph-content-max: 960px;
+
+  /* shape and elevation */
+  --ph-r-control: 8px;
+  --ph-r-card: 12px;
+  --ph-r-sheet: 20px;
+  --ph-r-pill: 999px;
+  --ph-elev-0: none;
+  --ph-elev-1: 0 1px 2px rgba(16, 24, 40, 0.08), 0 1px 1px rgba(16, 24, 40, 0.04);
+  --ph-elev-2: 0 4px 12px rgba(16, 24, 40, 0.12);
+  --ph-elev-3: 0 12px 32px rgba(16, 24, 40, 0.18);
+
+  /* motion */
+  --ph-dur-1: 120ms;             /* hover, press, small state changes */
+  --ph-dur-2: 200ms;             /* panels, dialogs */
+  --ph-dur-3: 300ms;             /* page-level changes */
+  --ph-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Quasar brand variables map onto the tokens */
+  --q-primary: var(--ph-accent);
+  --q-secondary: #0f766e;
+  --q-accent: var(--ph-accent);
+  --q-positive: var(--ph-positive);
+  --q-negative: var(--ph-negative);
+  --q-info: var(--ph-accent);
+  --q-warning: var(--ph-warning);
+  --q-dark: #181c22;
+  --q-dark-page: #101317;
+}
+
+body.body--dark {
+  --ph-bg: #101317;
+  --ph-surface: #181c22;
+  --ph-surface-2: #222831;
+  --ph-divider: #2c333c;
+  --ph-border: #6b7480;
+  --ph-text: #e8eaed;
+  --ph-text-muted: #aab1bb;
+  --ph-accent: #8ab4f8;
+  --ph-on-accent: #0b1220;
+  --ph-accent-soft: #1f2d42;
+  --ph-positive: #7bd9a0;
+  --ph-warning: #f2c36b;
+  --ph-negative: #f2a19b;
+  --ph-focus: #8ab4f8;
+  /* dark surfaces separate by lightness and a hairline, not by shadow */
+  --ph-elev-1: 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --ph-elev-2: 0 0 0 1px rgba(255, 255, 255, 0.08);
+  --ph-elev-3: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.5);
+  /* custom properties resolve where they are declared, so the Quasar mapping is repeated for the dark theme */
+  --q-primary: var(--ph-accent);
+  --q-accent: var(--ph-accent);
+  --q-positive: var(--ph-positive);
+  --q-negative: var(--ph-negative);
+  --q-info: var(--ph-accent);
+  --q-warning: var(--ph-warning);
+  --q-secondary: #5eead4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ph-dur-1: 0.01ms;
+    --ph-dur-2: 0.01ms;
+    --ph-dur-3: 0.01ms;
+  }
+}

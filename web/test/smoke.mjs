@@ -228,14 +228,14 @@ try {
   await page.waitForFunction(() => window.__phe.state.activeView === 1 && window.__phe.state.page.url.includes('httpbin.org'), null, { timeout: 20000 })
   await page.click('[data-test=tab-3]')
   await waitTitle('WebGaps')
-  await page.locator('[data-test=tab-2] .q-chip__icon--remove').click()
+  await page.click('[data-test=tab-close-2]')
   await page.waitForFunction(() => window.__phe.state.tabs.length === 2)
   await page.click('[data-test=tab-new]')
   await page.waitForFunction(() => window.__phe.state.tabs.length === 3)
   step('tabs: three tabs, fourth refused, switching re-shows each page, close and new work')
 
   // 8. devices page (the first/--admin device)
-  await page.click('[data-test=tab-devices]')
+  await page.click('[data-test=nav-devices]')
   await page.waitForSelector('[data-test=device-list] .q-item')
   const n = await page.locator('[data-test=device-list] .q-item').count()
   assert(n >= 1, 'the device list must show this browser')
@@ -243,11 +243,16 @@ try {
   await page.screenshot({ path: OUT + '/web-devices.png' })
 
   // 9. settings: set a byte budget
-  await page.click('[data-test=tab-settings]')
+  await page.click('[data-test=nav-settings]')
   await page.click('[data-test=gray]')
   await page.click('[data-test=apply]')
   await page.waitForSelector('[data-test=saved]')
   step('settings applied')
+  // dark mode: the toggle in settings, and the choice sticks
+  await page.locator('[data-test=theme]').getByRole('button', { name: 'Dark', exact: true }).click()
+  await page.waitForFunction(() => document.body.classList.contains('body--dark'))
+  await page.locator('[data-test=theme]').getByRole('button', { name: 'Match system', exact: true }).click()
+  step('theme toggle: dark mode applies and system mode restores')
 
   // 10. reload: the stored key authenticates without pairing again
   await page.goto(BASE + '/#/browse')

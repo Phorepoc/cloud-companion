@@ -73,6 +73,13 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
   notice.
 - **Devices page** (admin only): list and revoke (`devices` / `revoke` frames, checked on the server).
 - **Settings page**: JPEG quality slider and grayscale (the per-device byte budget), forget this device.
+- **Style guide** (`web/STYLE.md`): principles (calm, content first, phone first, 44 px targets, WCAG AA, keyboard, reduced motion), design
+  tokens (`web/src/css/tokens.css`: light and dark palettes with computed contrast ratios, system font scale, 4 px spacing, radii, elevation,
+  motion), the app shell (bottom bar on a phone, icon rail on a tablet, labelled drawer on a desktop; sections Browser, Chats, Mail, Calendar,
+  Contacts, Files, Devices, Settings from `web/src/nav.js`, placeholders for those not built yet), component rules, Material Symbols icons
+  (Apache-2.0) and the writing style. Dark mode follows the system and has a toggle in Settings. The product name and logo are one replaceable
+  token (`web/src/brand.js`: it feeds the page title, the manifest and the icon). Before/after screenshots (light and dark, 390 px and
+  1280 px) are in `web/test/screenshots/before` and `.../after` (`sh web/test/shots.sh before|after`).
 - Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use the Caddy profile below for anything but localhost, or
   `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).
 - **Zoom** (pinch with two pointers, ctrl + wheel, or the zoom buttons): the cached tiles scale locally while the gesture runs; when it

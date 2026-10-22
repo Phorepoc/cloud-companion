@@ -1,0 +1,69 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Global rules built on tokens.css: base type, touch targets, focus ring, Quasar component overrides. Page-specific rules live in
+ * the page's own <style scoped>.
+ */
+html { font-size: 100%; }
+body {
+  font-family: var(--ph-font);
+  font-size: var(--ph-text-body);
+  line-height: var(--ph-line);
+  color: var(--ph-text);
+  background: var(--ph-bg);
+  -webkit-font-smoothing: antialiased;
+}
+.q-layout, .q-page { background: var(--ph-bg); color: var(--ph-text); }
+h1, h2, h3 { line-height: var(--ph-line-tight); margin: 0; font-weight: 600; }
+h1 { font-size: var(--ph-text-headline); }
+h2 { font-size: var(--ph-text-title); }
+h3 { font-size: var(--ph-text-title-s); }
+.ph-muted { color: var(--ph-text-muted); }
+.ph-small { font-size: var(--ph-text-small); }
+.ph-page { padding: var(--ph-s4); max-width: var(--ph-content-max); margin: 0 auto; }
+@media (max-width: 599px) { .ph-page { padding: var(--ph-s3); } }
+.ph-card {
+  background: var(--ph-surface);
+  border: 1px solid var(--ph-divider);
+  border-radius: var(--ph-r-card);
+  box-shadow: var(--ph-elev-1);
+  padding: var(--ph-s4);
+}
+
+/* touch targets: every control is at least 44 x 44 css px */
+.q-btn { min-height: var(--ph-tap); border-radius: var(--ph-r-control); font-weight: 600; letter-spacing: 0; text-transform: none; }
+.q-btn--round { min-width: var(--ph-tap); min-height: var(--ph-tap); border-radius: 50%; }
+.q-btn.bg-primary { color: var(--ph-on-accent) !important; }
+.q-btn:not(.q-btn--flat):not(.q-btn--outline).bg-primary { background: var(--ph-accent) !important; }
+.q-toggle__inner, .q-checkbox__inner, .q-radio__inner { min-width: var(--ph-tap); min-height: var(--ph-tap); }
+.q-field--outlined .q-field__control { min-height: var(--ph-tap); border-radius: var(--ph-r-control); }
+.q-field__native, .q-field__input { font-size: var(--ph-text-body); }
+.q-field--outlined .q-field__control:before { border-color: var(--ph-border); }
+.q-item { min-height: var(--ph-tap); }
+
+/* a visible focus ring for keyboard use, never removed */
+:focus-visible { outline: 3px solid var(--ph-focus); outline-offset: 2px; }
+.q-btn:focus-visible, .q-item:focus-visible { outline-offset: 0; }
+
+/* dialogs and menus */
+.q-dialog__inner > .q-card, .q-menu { border-radius: var(--ph-r-card); box-shadow: var(--ph-elev-3); background: var(--ph-surface); color: var(--ph-text); }
+.q-dialog__inner--minimized > div { max-width: 480px; }
+.q-dialog__backdrop { background: rgba(8, 12, 18, 0.55); }
+.q-banner { border-radius: var(--ph-r-control); }
+
+/* Quasar transitions follow the motion tokens */
+.q-transition--fade-enter-active, .q-transition--fade-leave-active, .q-transition--scale-enter-active, .q-transition--scale-leave-active,
+.q-transition--slide-up-enter-active, .q-transition--slide-up-leave-active, .q-transition--jump-up-enter-active, .q-transition--jump-up-leave-active {
+  transition-duration: var(--ph-dur-2) !important;
+  transition-timing-function: var(--ph-ease) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* skip link: the first thing keyboard users reach */
+.ph-skip { position: absolute; left: var(--ph-s2); top: -100px; z-index: 10000; background: var(--ph-surface); color: var(--ph-text); padding: var(--ph-s3) var(--ph-s4); border-radius: var(--ph-r-control); border: 2px solid var(--ph-focus); }
+.ph-skip:focus { top: var(--ph-s2); }
+.text-on-accent { color: var(--ph-on-accent) !important; }
+.bg-surface-2 { background: var(--ph-surface-2) !important; }
+.text-ph { color: var(--ph-text) !important; }

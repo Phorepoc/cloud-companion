@@ -1,73 +1,84 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
-  <q-page class="column items-center q-pa-sm">
-    <div class="row items-center no-wrap q-gutter-xs q-mb-xs" style="width:100%;max-width:720px;overflow-x:auto" data-test="tab-strip">
-      <q-chip v-for="t in state.tabs" :key="t.v" clickable removable dense :color="t.v === state.activeView ? 'primary' : 'grey-3'"
-              :text-color="t.v === state.activeView ? 'white' : 'black'" :data-test="'tab-' + t.v" @click="api.tab('switch', t.v)" @remove="api.tab('close', t.v)">
-        <span class="ellipsis" style="max-width:130px">{{ t.title || t.url || 'New tab' }}</span>
-      </q-chip>
-      <q-btn flat round dense icon="add" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')">
-        <q-tooltip>New tab (at most 3)</q-tooltip>
+  <q-page class="ph-browse">
+    <div class="ph-tabs" data-test="tab-strip" role="tablist" aria-label="Open tabs">
+      <div v-for="t in state.tabs" :key="t.v" class="ph-tab" :class="{ 'is-active': t.v === state.activeView }" role="presentation">
+        <button type="button" class="ph-tab-main" role="tab" :aria-selected="t.v === state.activeView" :data-test="'tab-' + t.v" @click="api.tab('switch', t.v)">
+          {{ t.title || t.url || 'New tab' }}
+        </button>
+        <button type="button" class="ph-tab-close" :data-test="'tab-close-' + t.v" :aria-label="'Close ' + (t.title || 'tab')" @click="api.tab('close', t.v)">
+          <q-icon name="sym_o_close" size="20px" aria-hidden="true" />
+        </button>
+      </div>
+      <q-btn flat round icon="sym_o_add" aria-label="New tab" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')">
+        <q-tooltip>New tab (up to 3)</q-tooltip>
       </q-btn>
     </div>
-    <div class="row items-center no-wrap q-gutter-xs" style="width:100%;max-width:720px">
-      <q-btn flat round dense icon="arrow_back" :disable="!state.page.back" data-test="back" @click="api.action('back')" />
-      <q-btn flat round dense icon="arrow_forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')" />
-      <q-btn flat round dense icon="refresh" data-test="reload" @click="api.action('reload')" />
-      <q-btn flat round dense icon="zoom_out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
-      <q-btn flat round dense icon="zoom_in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
-      <q-input v-model="urlInput" dense outlined class="col" placeholder="Search or enter a web address" data-test="url"
-               @keyup.enter="go" @focus="editing = true" @blur="editing = false" />
-      <q-btn flat round dense icon="arrow_forward_ios" data-test="go" @click="go" />
-      <q-spinner v-if="state.loading" size="22px" color="primary" data-test="spinner" />
+
+    <div class="ph-address" role="search">
+      <q-btn flat round icon="sym_o_arrow_back" aria-label="Back" :disable="!state.page.back" data-test="back" @click="api.action('back')" />
+      <q-btn flat round icon="sym_o_arrow_forward" aria-label="Forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')" />
+      <q-btn flat round icon="sym_o_refresh" aria-label="Reload" data-test="reload" @click="api.action('reload')" />
+      <q-input v-model="urlInput" outlined class="col ph-url" placeholder="Search or enter a web address" aria-label="Address" inputmode="url"
+               autocomplete="off" data-test="url" @keyup.enter="go" @focus="editing = true" @blur="editing = false">
+        <template #append><q-spinner v-if="state.loading" size="20px" color="primary" aria-label="Loading" data-test="spinner" /></template>
+      </q-input>
     </div>
-    <div class="text-caption text-grey-8 q-my-xs ellipsis" style="max-width:720px" data-test="title">{{ state.page.title }}</div>
-    <q-banner v-if="state.error" dense class="bg-red-1 text-red-9 q-mb-xs" style="max-width:720px">
+    <div class="ph-page-title ph-small ph-muted" data-test="title">{{ state.page.title }}</div>
+
+    <q-banner v-if="state.error" class="ph-note is-error" rounded role="alert">
+      <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
       {{ state.error }}
-      <template #action><q-btn flat dense label="dismiss" @click="state.error = ''" /></template>
+      <template #action><q-btn flat label="Dismiss" @click="state.error = ''" /></template>
     </q-banner>
-    <q-banner v-if="state.downloadNote" dense class="bg-amber-1 q-mb-xs" style="max-width:720px">
+    <q-banner v-if="state.downloadNote" class="ph-note" rounded role="status">
+      <template #avatar><q-icon name="sym_o_download" aria-hidden="true" /></template>
       {{ state.downloadNote }}
-      <template #action><q-btn flat dense label="ok" @click="state.downloadNote = ''" /></template>
+      <template #action><q-btn flat label="OK" @click="state.downloadNote = ''" /></template>
     </q-banner>
 
-    <div class="viewport" :style="{ width: '360px', height: '640px' }">
-      <canvas ref="cv" data-test="canvas" style="width:360px;height:640px;touch-action:none;display:block;border:1px solid #cfd8dc;background:#fff" />
+    <div class="viewport">
+      <canvas ref="cv" data-test="canvas" class="ph-canvas" aria-label="Web page" />
       <textarea v-if="overlayRect && state.focus.kind === 'textarea'" ref="ov" v-model="ovValue" class="overlay" :style="overlayRect"
-                data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
+                aria-label="Text field" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
       <input v-else-if="overlayRect" ref="ov" v-model="ovValue" :type="inputType" class="overlay" :style="overlayRect"
-             :inputmode="state.focus.im || undefined" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
+             aria-label="Text field" :inputmode="state.focus.im || undefined" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
     </div>
-    <div v-if="state.page.trunc" class="text-caption text-grey-7 q-mt-xs">The page continues on the desktop version.</div>
+    <div class="ph-zoom" role="group" aria-label="Zoom">
+      <q-btn flat round icon="sym_o_zoom_out" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
+      <span class="ph-small ph-muted" aria-live="polite">{{ state.page.zoom || 100 }}%</span>
+      <q-btn flat round icon="sym_o_zoom_in" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+    </div>
+    <div v-if="state.page.trunc" class="ph-small ph-muted">The rest of this page is not shown. Open it on a larger screen to read on.</div>
 
     <q-dialog :model-value="!!dlg" persistent>
-      <q-card v-if="dlg" style="min-width:300px" data-test="dialog">
+      <q-card v-if="dlg" class="ph-dialog" data-test="dialog" role="alertdialog" :aria-label="dlgTitle">
         <q-card-section>
-          <div class="text-h6">{{ dlgTitle }}</div>
-          <div class="q-mt-sm" style="white-space:pre-wrap">{{ dlg.message }}</div>
-          <q-input v-if="dlg.kind === 'prompt'" v-model="dlgText" autofocus dense class="q-mt-sm" data-test="dialog-text" />
+          <h2>{{ dlgTitle }}</h2>
+          <p class="ph-dialog-text">{{ dlg.message }}</p>
+          <q-input v-if="dlg.kind === 'prompt'" v-model="dlgText" autofocus outlined aria-label="Your answer" data-test="dialog-text" />
           <template v-if="dlg.kind === 'auth'">
-            <q-input v-model="dlgText" label="User name" autofocus dense class="q-mt-sm" data-test="dialog-user" />
-            <q-input v-model="dlgPass" label="Password" type="password" dense class="q-mt-sm" data-test="dialog-pass" />
+            <q-input v-model="dlgText" label="User name" autofocus outlined class="q-mb-sm" autocomplete="username" data-test="dialog-user" />
+            <q-input v-model="dlgPass" label="Password" type="password" outlined autocomplete="current-password" data-test="dialog-pass" />
           </template>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn v-if="dlg.kind !== 'alert'" flat :label="dlg.kind === 'cert' ? 'Stop' : 'Cancel'" data-test="dialog-cancel" @click="reply(false)" />
-          <q-btn flat color="primary" :label="dlg.kind === 'cert' ? 'Continue anyway' : 'OK'" data-test="dialog-ok" @click="reply(true)" />
+          <q-btn v-if="dlg.kind !== 'alert'" flat :label="dlg.kind === 'cert' ? 'Go back' : 'Cancel'" data-test="dialog-cancel" @click="reply(false)" />
+          <q-btn unelevated color="primary" :label="dlg.kind === 'cert' ? 'Continue anyway' : dlg.kind === 'auth' ? 'Sign in' : 'OK'" data-test="dialog-ok" @click="reply(true)" />
         </q-card-actions>
       </q-card>
     </q-dialog>
 
     <q-dialog v-model="selOpen">
-      <q-card v-if="selRegion" style="min-width:280px" data-test="select-dialog">
-        <q-card-section class="q-pb-none"><div class="text-h6">{{ selRegion.label || 'Choose' }}</div></q-card-section>
+      <q-card v-if="selRegion" class="ph-dialog" data-test="select-dialog">
+        <q-card-section class="q-pb-none"><h2>{{ selRegion.label || 'Choose an option' }}</h2></q-card-section>
         <q-card-section>
           <q-option-group v-model="selIndex" type="radio" :options="selOptions" />
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat label="Cancel" v-close-popup />
-          <q-btn flat color="primary" label="OK" v-close-popup data-test="select-ok" @click="pickSelect" />
+          <q-btn unelevated color="primary" label="OK" v-close-popup data-test="select-ok" @click="pickSelect" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -93,7 +104,7 @@ let renderer = null
 let typeTimer = 0
 
 const dlg = computed(() => state.dialogs[0] || null)
-const dlgTitle = computed(() => ({ alert: 'Alert', confirm: 'Confirm', prompt: 'Prompt', beforeunload: 'Leave this page?', auth: 'Sign in', cert: 'Certificate error' })[dlg.value?.kind] || 'Message')
+const dlgTitle = computed(() => ({ alert: 'This page says', confirm: 'This page asks', prompt: 'This page asks', beforeunload: 'Leave this page?', auth: 'Sign in to continue', cert: 'This connection is not secure' })[dlg.value?.kind] || 'Message')
 watch(dlg, (d) => { dlgText.value = d ? d.def || '' : ''; dlgPass.value = '' })
 
 function reply(ok) {
@@ -176,6 +187,25 @@ onBeforeUnmount(() => renderer && renderer.detach())
 </script>
 
 <style scoped>
-.viewport { position: relative; }
-.overlay { position: absolute; box-sizing: border-box; font: 15px sans-serif; border: 2px solid #1976d2; border-radius: 3px; padding: 2px 6px; background: #fff; }
+.ph-browse { display: flex; flex-direction: column; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3); }
+.ph-tabs, .ph-address { width: 100%; max-width: 720px; display: flex; align-items: center; gap: var(--ph-s1); }
+.ph-address { gap: var(--ph-s1); }
+.ph-url { flex: 1 1 0; min-width: 0; }
+.ph-tabs { overflow-x: auto; }
+.ph-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; height: var(--ph-tap); border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); background: var(--ph-surface); }
+.ph-tab.is-active { border-color: var(--ph-accent); background: var(--ph-accent-soft); }
+.ph-tab-main { flex: 1; min-width: 0; height: 100%; padding: 0 var(--ph-s2) 0 var(--ph-s3); background: none; border: 0; text-align: left; color: var(--ph-text); font: inherit; font-size: var(--ph-text-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ph-tab.is-active .ph-tab-main { font-weight: 600; }
+.ph-tab-close { flex: none; width: var(--ph-tap); height: var(--ph-tap); display: grid; place-items: center; background: none; border: 0; color: var(--ph-text-muted); cursor: pointer; border-radius: var(--ph-r-control); }
+.ph-page-title { max-width: 720px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.5em; }
+.ph-note { width: 100%; max-width: 720px; background: var(--ph-surface-2); color: var(--ph-text); border: 1px solid var(--ph-divider); }
+.ph-note.is-error { border-color: var(--ph-negative); }
+.ph-note.is-error :deep(.q-icon) { color: var(--ph-negative); }
+.viewport { position: relative; width: 360px; height: 640px; max-width: 100%; }
+.ph-canvas { width: 360px; height: 640px; display: block; touch-action: none; background: #fff; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); box-shadow: var(--ph-elev-1); }
+.ph-zoom { display: flex; align-items: center; gap: var(--ph-s2); }
+.overlay { position: absolute; box-sizing: border-box; font: inherit; font-size: var(--ph-text-body); color: #1a1d21; border: 2px solid var(--ph-focus); border-radius: var(--ph-r-control); padding: 2px 8px; background: #fff; }
+.ph-dialog { width: min(92vw, 420px); }
+.ph-dialog h2 { margin-bottom: var(--ph-s2); }
+.ph-dialog-text { white-space: pre-wrap; margin: 0 0 var(--ph-s3); overflow-wrap: anywhere; }
 </style>
