@@ -159,5 +159,15 @@ leaves room for several devices. (`bash client/test/memory.sh [urls]` repeats th
 ## Layout
 `web/` (the Quasar web app), `cmd/phecloud` (server + admin CLI), `cmd/phecloud-client` (test client, `-summary` for machine-readable output), `client/` (the C core), `internal/{proto,store,server,browser,tiles,tlsutil}`.
 
+## Hub (mail, calendar, contacts for old phones; server side of phases P0/P1)
+`docker compose --profile hub up -d` (after `sh deploy/hub/hub-init.sh`) adds two AGPL-3.0 servers as separate containers: **Stalwart**
+(IMAP, SMTP, CalDAV, CardDAV, JMAP; pinned `v0.16.27`) and **Z-Push 2.7.7** (an Exchange ActiveSync endpoint that reads and writes Stalwart
+through IMAP, CalDAV and CardDAV). One instance serves one person: one Stalwart account, and every device gets its own revocable app password
+(`phecloud hub apppw add|list|revoke`). Behind Caddy (`--profile tls`, `deploy/hub/Caddyfile.hub`) the endpoints are `/Microsoft-Server-ActiveSync`,
+`/dav/...` with the `/.well-known/caldav` and `/.well-known/carddav` redirects, and JMAP. A phone with an old TLS stack cannot use Caddy's TLS 1.2+
+listener: use the tunnel (plain HTTP inside it) or the optional TLS 1.0 listener (`--profile hub-legacy`). Tested: 25 of 25 checks (ActiveSync
+Provision, FolderSync, Sync of contacts, calendar and mail, SendMail, push; CalDAV/CardDAV with vdirsyncer), about 170 MiB idle.
+Licences, exact phone settings, TLS details, numbers and open issues: [docs/hub.md](docs/hub.md).
+
 ## License
 Apache-2.0, see `LICENSE`.

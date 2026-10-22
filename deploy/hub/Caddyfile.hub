@@ -3,6 +3,10 @@
 # Public host: replace "tls internal" by nothing and set PHECLOUD_DOMAIN to a DNS name (Let's Encrypt).
 # Caddy's TLS defaults: TLS 1.2 and 1.3, ECDHE key exchange, AEAD ciphers only (AES-GCM, ChaCha20). No TLS 1.0/1.1, no RSA key
 # exchange, no CBC. A phone with an OpenSSL 0.9.8-era stack cannot talk to it: use the phetail tunnel or the legacy listener.
+{
+	# clients that connect to an IP address send no SNI (old phones, curl): serve the one certificate anyway
+	default_sni {$PHECLOUD_DOMAIN:localhost}
+}
 {$PHECLOUD_DOMAIN:localhost} {
 	tls internal
 	# Exchange ActiveSync (Z-Push). Long-poll Ping/Sync requests stay open for minutes: no buffering, long timeouts.

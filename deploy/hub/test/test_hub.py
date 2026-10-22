@@ -38,6 +38,18 @@ EVENTS = [("Dentist", "20261105T090000Z", "20261105T100000Z", "Clinic"), ("Team 
 MAILS = [("Hello from the hub", "first test message"), ("Second message", "body two"), ("Third message", "body three")]
 
 
+MIME_TEMPLATE = """From: {user}
+To: {user}
+Subject: Sent from the EAS test
+Message-ID: <eas-test-1@hub.lan>
+Date: Thu, 22 Oct 2026 12:30:00 +0000
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+hello from the phone
+"""
+
+
 def seed():
     for i, (fn, ln, em, tel) in enumerate(CONTACTS):
         vc = (f"BEGIN:VCARD\r\nVERSION:3.0\r\nUID:phe-test-c{i}\r\nFN:{fn} {ln}\r\nN:{ln};{fn};;;\r\nEMAIL;TYPE=INTERNET:{em}\r\n"
@@ -81,7 +93,7 @@ def eas_test():
             tls=os.environ.get("EAS_TLS") == "1", hostheader=os.environ.get("EAS_HOSTHEADER"))
     st, hdr = e.options()
     vers = hdr.get("ms-asprotocolversions", "")
-    check("OPTIONS: 200 and protocol 14.1 offered", st == 200 and "14.1" in vers, f"{st} {vers}")
+    check("OPTIONS: 200 and 12.1 offered (Z-Push with DAV/IMAP backends tops out at 14.0)", st == 200 and "12.1" in vers, f"{st} {vers}")
     e.provision()
     check("Provision (2 phases) gave a policy key", e.policykey not in ("", "0"), e.policykey)
     key, folders, status = e.foldersync()
@@ -111,7 +123,12 @@ def eas_test():
     _, items = e.pull_all(inbox["ServerId"], body=True)
     subs = sorted(a.get("Subject", "") for _, a in items)
     print("  mail:", subs)
-    check("3 seeded mails arrive via EAS", all(s in subs for s, _ in MAILS), str(subs))
+    check("2 appended mails arrive in the inbox via EAS", all(s in subs for s, _ in MAILS[:2]), str(subs))
+    junk = next((f for f in folders if f["Type"] == "12"), None)
+    _, items = e.pull_all(junk["ServerId"], body=True) if junk else (None, [])
+    subs = sorted(a.get("Subject", "") for _, a in items)
+    check("the SMTP-delivered mail (Stalwart's spam filter puts an unsigned outside sender in Junk) arrives via EAS",
+          MAILS[2][0] in subs, str(subs))
     # EAS -> server: add a contact, then see it over CardDAV
     k, _ = e.pull_all(con["ServerId"])
     add = N(0, "Add", N(0, "ClientId", "c1"), N(0, "ApplicationData", N(1, "FirstName", "Eas"), N(1, "LastName", "Created"),
@@ -126,6 +143,44 @@ def eas_test():
                    b'<c:addressbook-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:carddav"><d:prop><d:getetag/><c:address-data/></d:prop></c:addressbook-query>',
                    {"Depth": "1", "Content-Type": "application/xml"})
     check("the EAS-created contact is in CardDAV", st == 207 and b"Created" in body and b"+10005550100" in body, str(st))
+    # EAS -> server mail: SendMail to the owner; Z-Push hands it to Stalwart's SMTP (465, authenticated as the owner)
+    mime = MIME_TEMPLATE.format(user=USER).replace(chr(10), chr(13) + chr(10)).encode()
+    try:
+        e.sendmail(mime)
+        ok = True
+    except Exception as ex:
+        ok, info = False, str(ex)
+    check("EAS SendMail accepted", ok, "" if ok else info)
+    time.sleep(3)
+    sent = next((f for f in folders if f["Type"] == "5"), None)
+    _, items = e.pull_all(sent["ServerId"], body=True)
+    check("a copy is in Sent Items", any(a.get("Subject") == "Sent from the EAS test" for _, a in items))
+    _, items = e.pull_all(inbox["ServerId"], body=True)
+    check("and it was delivered to the inbox", any(a.get("Subject") == "Sent from the EAS test" for _, a in items))
+    # push: a Ping on the inbox must return "changes" soon after a message arrives (Z-Push polls IMAP every 30 s)
+    import threading
+    res = {}
+
+    def do_ping():
+        t0 = time.time()
+        res["r"] = e.ping(inbox["ServerId"], "Email", 120)
+        res["t"] = time.time() - t0
+
+    th = threading.Thread(target=do_ping)
+    th.start()
+    time.sleep(4)
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    m = imaplib.IMAP4_SSL(os.environ.get("HUB_IMAP", "stalwart"), 993, ssl_context=ctx)
+    m.login(USER, PW)
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = "sender@example.org", USER, "Push test"
+    msg.set_content("push")
+    m.append("INBOX", None, None, msg.as_bytes())
+    m.logout()
+    th.join(150)
+    check("Ping (push) reports the new inbox mail", res.get("r", (None,))[0] == "2", f"{res.get('r')} after {res.get('t', 0):.1f} s")
     return e, (inbox, cal, con)
 
 

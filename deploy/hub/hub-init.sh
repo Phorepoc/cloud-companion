@@ -44,13 +44,21 @@ cli update Authentication --field maxAppPasswords=50 >/dev/null
 {
   echo "STALWART_ADMIN_USER=$ADMIN_USER"
   echo "STALWART_ADMIN_PASSWORD=$ADMIN_PW"
-  echo "HUB_INITIALISED=1"
-} >> "$ENVF"
-{
-  echo "PHECLOUD_HUB_URL=http://stalwart:8080"
-  echo "PHECLOUD_HUB_DOMAIN=$DOMAIN"
   echo "PHECLOUD_HUB_OWNER=$OWNER@$DOMAIN"
   echo "PHECLOUD_HUB_OWNER_PASSWORD=$OWNER_PW"
-} > deploy/hub/.env.phecloud
+  echo "HUB_INITIALISED=1"
+} >> "$ENVF"
+# phecloud's own CLI gets an API key of the owner account instead of the owner password (it can create and revoke app passwords,
+# nothing else; revoke it in Stalwart to cut phecloud off)
+U="$OWNER@$DOMAIN" P="$OWNER_PW"
+TOKEN=$(cli create ApiKey --field description=phecloud | sed -n 's/.*Secret: *//p')
+[ -n "$TOKEN" ] || { echo "no API key secret"; exit 1; }
+# the part phecloud's own CLI needs (read by the phecloud container through env_file), without the admin secrets
+cat > deploy/hub/.env.phecloud <<ENV
+PHECLOUD_HUB_URL=http://stalwart:8080
+PHECLOUD_HUB_DOMAIN=$DOMAIN
+PHECLOUD_HUB_OWNER=$OWNER@$DOMAIN
+PHECLOUD_HUB_TOKEN=$TOKEN
+ENV
 dc up -d --build zpush
 echo "hub ready: owner $OWNER@$DOMAIN (secrets in $ENVF). Next: phecloud hub apppw add 'my phone'"

@@ -12,7 +12,8 @@ package main
 //	phecloud hub apppw list                  list them (secrets are never shown again)
 //	phecloud hub apppw revoke <id>           revoke one: that device can no longer log in to mail, calendar, contacts or ActiveSync
 //
-// Environment: PHECLOUD_HUB_URL (http://stalwart:8080), PHECLOUD_HUB_OWNER (owner@hub.lan), PHECLOUD_HUB_OWNER_PASSWORD,
+// Environment: PHECLOUD_HUB_URL (http://stalwart:8080), PHECLOUD_HUB_TOKEN (an API key of the owner account, made by hub-init.sh; or
+// PHECLOUD_HUB_OWNER + PHECLOUD_HUB_OWNER_PASSWORD for a Basic login), PHECLOUD_HUB_OWNER (owner@hub.lan, shown in the output),
 // PHECLOUD_HUB_DOMAIN (host name shown in the phone settings).
 
 import (
@@ -26,12 +27,12 @@ import (
 	"time"
 )
 
-type hubClient struct{ url, user, pass string }
+type hubClient struct{ url, user, pass, token string }
 
 func hubFromEnv() (*hubClient, error) {
-	h := &hubClient{url: env("PHECLOUD_HUB_URL", "http://stalwart:8080"), user: os.Getenv("PHECLOUD_HUB_OWNER"), pass: os.Getenv("PHECLOUD_HUB_OWNER_PASSWORD")}
-	if h.user == "" || h.pass == "" {
-		return nil, fmt.Errorf("PHECLOUD_HUB_OWNER and PHECLOUD_HUB_OWNER_PASSWORD are not set (run deploy/hub/hub-init.sh; docker compose reads deploy/hub/.env.phecloud)")
+	h := &hubClient{url: env("PHECLOUD_HUB_URL", "http://stalwart:8080"), user: os.Getenv("PHECLOUD_HUB_OWNER"), pass: os.Getenv("PHECLOUD_HUB_OWNER_PASSWORD"), token: os.Getenv("PHECLOUD_HUB_TOKEN")}
+	if h.token == "" && (h.user == "" || h.pass == "") {
+		return nil, fmt.Errorf("PHECLOUD_HUB_TOKEN (or PHECLOUD_HUB_OWNER and PHECLOUD_HUB_OWNER_PASSWORD) is not set (run deploy/hub/hub-init.sh; docker compose reads deploy/hub/.env.phecloud)")
 	}
 	return h, nil
 }
@@ -43,7 +44,11 @@ func (h *hubClient) call(calls ...[]any) ([]json.RawMessage, error) {
 		"methodCalls": calls,
 	})
 	req, _ := http.NewRequest("POST", h.url+"/jmap", bytes.NewReader(body))
-	req.SetBasicAuth(h.user, h.pass)
+	if h.token != "" {
+		req.Header.Set("Authorization", "Bearer "+h.token)
+	} else {
+		req.SetBasicAuth(h.user, h.pass)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := (&http.Client{Timeout: 20 * time.Second}).Do(req)
 	if err != nil {

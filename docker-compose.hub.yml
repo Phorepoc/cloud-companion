@@ -34,8 +34,12 @@ services:
       - zpush-state:/var/lib/z-push
     depends_on:
       - stalwart
+    # Plain-HTTP ActiveSync for a tunnel (WireGuard / phetail) ONLY. Set PHECLOUD_EAS_PLAIN_BIND to the tunnel address; the default
+    # keeps it on the host's loopback. Never bind it to a LAN or public address: Basic auth travels in the clear.
+    ports:
+      - "${PHECLOUD_EAS_PLAIN_BIND:-127.0.0.1}:8081:80"
     restart: unless-stopped
-  # Optional: a TLS 1.0-capable listener for a phone whose native stack cannot do TLS 1.2 (README, "Old phones and TLS").
+  # Optional (start with both profiles: --profile hub --profile hub-legacy): a TLS 1.0-capable listener for a phone whose native stack cannot do TLS 1.2 (README, "Old phones and TLS").
   legacytls:
     profiles: ["hub-legacy"]
     build: ./deploy/hub/legacytls
@@ -49,8 +53,6 @@ services:
       - "${PHECLOUD_LEGACY_TLS_PORT:-8443}:8443"
     volumes:
       - legacytls-data:/data
-    depends_on:
-      - zpush
     restart: unless-stopped
 volumes:
   stalwart-data:

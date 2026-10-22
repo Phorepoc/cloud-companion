@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """A small Exchange ActiveSync 14.1 test client (stdlib only): WBXML encode/decode for the code pages the hub test needs,
-Provision / FolderSync / Sync. Written from the public MS-ASWBXML and MS-ASCMD documents; not a general client."""
-import base64, http.client, ssl, urllib.parse
+Provision / FolderSync / Sync (protocol 12.1 by default, EAS_VER to change). Written from the public MS-ASWBXML and MS-ASCMD documents; not a general client."""
+import base64, http.client, os, ssl, urllib.parse
 
 # page -> token -> name. Only the pages used by the tests; unknown tokens decode as "p<page>:0x<tok>".
 PAGES = {
@@ -20,8 +20,10 @@ PAGES = {
     7: {0x05: "Folders", 0x06: "Folder", 0x07: "DisplayName", 0x08: "ServerId", 0x09: "ParentId", 0x0A: "Type",
         0x0C: "Status", 0x0E: "Changes", 0x0F: "Add", 0x10: "Remove", 0x11: "Update", 0x12: "SyncKey", 0x16: "FolderSync",
         0x17: "Count"},
+    13: {0x05: "Ping", 0x07: "Status", 0x08: "HeartbeatInterval", 0x09: "Folders", 0x0A: "Folder", 0x0B: "Id", 0x0C: "Class"},
     14: {0x05: "Provision", 0x06: "Policies", 0x07: "Policy", 0x08: "PolicyType", 0x09: "PolicyKey", 0x0A: "Data",
          0x0B: "Status", 0x0C: "RemoteWipe", 0x0D: "EASProvisionDoc"},
+    21: {0x05: "SendMail", 0x08: "SaveInSentItems", 0x10: "Mime", 0x11: "ClientId"},
     17: {0x05: "BodyPreference", 0x06: "Type", 0x07: "TruncationSize", 0x08: "AllOrNone", 0x0A: "Body", 0x0B: "Data",
          0x0C: "EstimatedDataSize", 0x0D: "Truncated"},
 }
@@ -67,9 +69,20 @@ def encode(root):
             out.extend([0x00, n.page])
             cur[0] = n.page
         tok = NAME2TOK[(n.page, n.name)]
-        has = n.text is not None or n.kids
+        has = n.text is not None or n.kids or n.opaque is not None
         out.append(tok | (0x40 if has else 0))
-        if n.text is not None:
+        if n.opaque is not None:
+            out.append(0xC3)
+            ln = len(n.opaque)
+            mb = [ln & 0x7F]
+            ln >>= 7
+            while ln:
+                mb.insert(0, (ln & 0x7F) | 0x80)
+                ln >>= 7
+            out.extend(mb)
+            out.extend(n.opaque)
+            out.append(0x01)
+        elif n.text is not None:
             out.append(0x03)
             out.extend(n.text.encode())
             out.append(0)
@@ -125,7 +138,7 @@ def decode(b):
 
 
 class Eas:
-    def __init__(self, host, port, user, password, tls=False, device="PHETEST0001", dtype="SymbianTest", ver="14.1",
+    def __init__(self, host, port, user, password, tls=False, device="PHETEST0001", dtype="SymbianTest", ver=os.environ.get("EAS_VER", "12.1"),
                  hostheader=None, min_tls=None):
         self.host, self.port, self.user, self.pw, self.tls = host, port, user, password, tls
         self.device, self.dtype, self.ver = device, dtype, ver
@@ -164,6 +177,19 @@ class Eas:
         if r.status != 200:
             raise RuntimeError(f"{name}: HTTP {r.status} {body[:200]!r}")
         return decode(body)
+
+    def ping(self, folder_id, cls, heartbeat=60):
+        """Push: blocks until a change (Status 2), the heartbeat (Status 1) or an error."""
+        r = self.cmd("Ping", N(13, "Ping", N(13, "HeartbeatInterval", str(heartbeat)),
+                               N(13, "Folders", N(13, "Folder", N(13, "Id", folder_id), N(13, "Class", cls)))))
+        return r.get("Status"), [f.text for f in (r.find("Folders").kids if r.find("Folders") else [])]
+
+    def sendmail(self, mime, save=True):
+        """SendMail (12.x/14.x wbxml form: Mime as opaque). A 200 with an empty body is success."""
+        m = N(21, "Mime")
+        m.opaque = mime
+        kids = [N(21, "ClientId", "pheeas1")] + ([N(21, "SaveInSentItems")] if save else []) + [m]
+        return self.cmd("SendMail", N(21, "SendMail", *kids))
 
     def provision(self):
         pt = N(14, "PolicyType", "MS-EAS-Provisioning-WBXML")
