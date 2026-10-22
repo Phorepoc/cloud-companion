@@ -34,13 +34,15 @@ func Open(path string) (*Store, error) {
 			return nil, err
 		}
 	}
+	db.Exec(`ALTER TABLE devices ADD COLUMN admin INTEGER DEFAULT 0`) // errors (column exists) are fine
+	db.Exec(`ALTER TABLE pair_codes ADD COLUMN admin INTEGER DEFAULT 0`)
 	return &Store{db}, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }
 
 // NewPairCode makes a single-use short code (8 chars, 10 minutes).
-func (s *Store) NewPairCode(ttl time.Duration) (string, error) {
+func (s *Store) NewPairCode(ttl time.Duration, admin bool) (string, error) {
 	b := make([]byte, 8)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -50,48 +52,60 @@ func (s *Store) NewPairCode(ttl time.Duration) (string, error) {
 		c[i] = alphabet[int(b[i])%len(alphabet)]
 	}
 	code := string(c[:4]) + "-" + string(c[4:])
-	_, err := s.db.Exec(`INSERT INTO pair_codes(code,expires) VALUES(?,?)`, code, time.Now().Add(ttl).Unix())
+	a := 0
+	if admin {
+		a = 1
+	}
+	_, err := s.db.Exec(`INSERT INTO pair_codes(code,expires,admin) VALUES(?,?,?)`, code, time.Now().Add(ttl).Unix(), a)
 	return code, err
 }
 
 var ErrBadCode = errors.New("invalid or expired pairing code")
 
 // Pair consumes a code and creates a device with a fresh 32-byte key.
-func (s *Store) Pair(code, name string) (id string, key []byte, err error) {
+func (s *Store) Pair(code, name string) (id string, key []byte, admin bool, err error) {
 	tx, err := s.db.Begin()
 	if err != nil {
-		return "", nil, err
+		return "", nil, false, err
 	}
 	defer tx.Rollback()
-	res, err := tx.Exec(`UPDATE pair_codes SET used=1 WHERE code=? AND used=0 AND expires>?`, code, time.Now().Unix())
-	if err != nil {
-		return "", nil, err
+	var codeAdmin int
+	if err := tx.QueryRow(`SELECT admin FROM pair_codes WHERE code=? AND used=0 AND expires>?`, code, time.Now().Unix()).Scan(&codeAdmin); err != nil {
+		return "", nil, false, ErrBadCode
 	}
-	if n, _ := res.RowsAffected(); n != 1 {
-		return "", nil, ErrBadCode
+	if _, err := tx.Exec(`UPDATE pair_codes SET used=1 WHERE code=?`, code); err != nil {
+		return "", nil, false, err
 	}
+	var n int
+	tx.QueryRow(`SELECT COUNT(*) FROM devices`).Scan(&n)
+	admin = codeAdmin != 0 || n == 0 // the first paired device is the admin
 	ib := make([]byte, 8)
 	key = make([]byte, 32)
 	rand.Read(ib)
 	rand.Read(key)
 	id = hex.EncodeToString(ib)
-	if _, err = tx.Exec(`INSERT INTO devices(id,name,key,created) VALUES(?,?,?,?)`, id, name, key, time.Now().Unix()); err != nil {
-		return "", nil, err
+	a := 0
+	if admin {
+		a = 1
 	}
-	return id, key, tx.Commit()
+	if _, err = tx.Exec(`INSERT INTO devices(id,name,key,created,admin) VALUES(?,?,?,?,?)`, id, name, key, time.Now().Unix(), a); err != nil {
+		return "", nil, false, err
+	}
+	return id, key, admin, tx.Commit()
 }
 
 var ErrUnknown = errors.New("unknown or revoked device")
 
-func (s *Store) Key(id string) ([]byte, error) {
+// Key returns the device key and whether the device is an admin (may list and revoke devices).
+func (s *Store) Key(id string) ([]byte, bool, error) {
 	var key []byte
-	var revoked int
-	err := s.db.QueryRow(`SELECT key,revoked FROM devices WHERE id=?`, id).Scan(&key, &revoked)
+	var revoked, admin int
+	err := s.db.QueryRow(`SELECT key,revoked,admin FROM devices WHERE id=?`, id).Scan(&key, &revoked, &admin)
 	if err != nil || revoked != 0 {
-		return nil, ErrUnknown
+		return nil, false, ErrUnknown
 	}
 	s.db.Exec(`UPDATE devices SET last_seen=? WHERE id=?`, time.Now().Unix(), id)
-	return key, nil
+	return key, admin != 0, nil
 }
 
 func (s *Store) Revoke(id string) error {
@@ -103,10 +117,11 @@ type Device struct {
 	ID, Name      string
 	Created, Seen int64
 	Revoked       bool
+	Admin         bool
 }
 
 func (s *Store) List() ([]Device, error) {
-	rows, err := s.db.Query(`SELECT id,COALESCE(name,''),created,COALESCE(last_seen,0),revoked FROM devices ORDER BY created`)
+	rows, err := s.db.Query(`SELECT id,COALESCE(name,''),created,COALESCE(last_seen,0),revoked,admin FROM devices ORDER BY created`)
 	if err != nil {
 		return nil, err
 	}
@@ -114,11 +129,11 @@ func (s *Store) List() ([]Device, error) {
 	var out []Device
 	for rows.Next() {
 		var d Device
-		var r int
-		if err := rows.Scan(&d.ID, &d.Name, &d.Created, &d.Seen, &r); err != nil {
+		var r, a int
+		if err := rows.Scan(&d.ID, &d.Name, &d.Created, &d.Seen, &r, &a); err != nil {
 			return nil, err
 		}
-		d.Revoked = r != 0
+		d.Revoked, d.Admin = r != 0, a != 0
 		out = append(out, d)
 	}
 	return out, rows.Err()

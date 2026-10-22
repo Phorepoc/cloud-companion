@@ -5,3 +5,9 @@
 /.testrun/
 /client/build/
 /.deps/
+/internal/webui/dist/*
+!/internal/webui/dist/placeholder.txt
+/web/node_modules/
+/web/dist/
+/web/test/out/
+/web/test/node_modules/

@@ -1,0 +1,1 @@
+phecloud web app is built here by the Dockerfile (web/ -> npm run build).

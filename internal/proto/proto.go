@@ -42,6 +42,9 @@ const (
 	TDialogReply = "dialogreply" // C->S
 	TDownload    = "download"    // S->C  a download was refused
 	TSettings    = "settings"    // C->S  per-device byte budget: JPEG quality, grayscale
+	TDevices     = "devices"     // C->S  (admin) list devices
+	TDeviceList  = "devicelist"  // S->C
+	TRevoke      = "revoke"      // C->S  (admin) revoke a device
 )
 
 type Header struct {
@@ -71,6 +74,7 @@ type Welcome struct {
 	Dev    string `cbor:"dev"`
 	Key    []byte `cbor:"key,omitempty"` // only in reply to pair
 	Server string `cbor:"server"`
+	Admin  bool   `cbor:"admin,omitempty"` // this device may list and revoke devices
 }
 
 type Error struct {
@@ -296,4 +300,33 @@ type Settings struct {
 	T       string `cbor:"t"`
 	Quality int    `cbor:"q,omitempty"`
 	Gray    bool   `cbor:"gray,omitempty"`
+}
+
+type DeviceInfo struct {
+	ID      string `cbor:"id"`
+	Name    string `cbor:"name"`
+	Created int64  `cbor:"created"`
+	Seen    int64  `cbor:"seen"`
+	Revoked bool   `cbor:"revoked,omitempty"`
+	Admin   bool   `cbor:"admin,omitempty"`
+}
+
+type DeviceList struct {
+	T    string       `cbor:"t"`
+	List []DeviceInfo `cbor:"list"`
+}
+
+type Revoke struct {
+	T  string `cbor:"t"`
+	ID string `cbor:"id"`
+}
+
+// Marshal encodes one frame without the TCP length prefix (a WebSocket message is one frame).
+func Marshal(v any) ([]byte, error) { return cbor.Marshal(v) }
+
+// TypeOf returns the "t" of an encoded frame.
+func TypeOf(b []byte) (string, error) {
+	var h Header
+	err := cbor.Unmarshal(b, &h)
+	return h.T, err
 }

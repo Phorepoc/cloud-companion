@@ -59,6 +59,27 @@ with a fixed header, a sticky bar, a fixed footer and an input, for the layers.
   `auth`, reply `text` = user and `pass`) and certificate errors (`dialog` kind `cert`; OK = load once with errors ignored); a
   per-device byte budget (`settings`: JPEG quality, grayscale), applied to every later tile.
 
+## Web app (`web/`)
+A Quasar v2 PWA (Vue 3, Vite; direct dependencies all MIT: vue, vue-router, quasar, @quasar/extras, cbor-x, @noble/hashes) served
+by the Go server (the built `dist` is embedded into the binary; the Dockerfile builds it in a `node` stage). The web is just
+another device type: it speaks the same CBOR frames as the phones, as binary WebSocket messages on `/ws`, with the same
+pairing code and HMAC authentication; the device key is kept in IndexedDB.
+- **Pairing page**: enter the code from `phecloud paircode` (`--admin` makes the new device an admin; the first paired device
+  is always admin).
+- **Browser page**: tiles on a canvas with local scrolling (wheel and drag), layers drawn on top (fixed, sticky, inner scroll
+  boxes that scroll locally), tap -> hit-test -> region -> `input tap` frame with a short local highlight, the `focus` frame
+  opens a real `<input>`/`<textarea>` over the field (typed text is sent as `text` frames, Enter as a key), JS dialogs, HTTP
+  auth and certificate errors as Quasar dialogs, a `<select>` chooser, back/forward/reload, an address bar, refused-download
+  notice.
+- **Devices page** (admin only): list and revoke (`devices` / `revoke` frames, checked on the server).
+- **Settings page**: JPEG quality slider and grayscale (the per-device byte budget), forget this device.
+- Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use a TLS reverse proxy for anything but localhost, or
+  `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).
+- Smoke test: `sh web/test/run.sh` (Docker, from the repo root) builds everything, starts the server and runs Playwright (Chromium
+  in a container) through: pair, key stored in IndexedDB, open example.com, scroll the canvas, tap the link on the canvas,
+  assert the title "Example Domains", back button, devices page, settings, reload authenticates from the stored key.
+  Screenshots go to `web/test/out/` (a copy of a run is in `web/test/screenshots/`).
+
 ## Measured (2026-10-22, round 2: event-driven settle, TLS 1.3, warm tab pool; Ryzen server container, 2 CPUs, loopback)
 Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done on the server (navigation, settle, screenshots, tiling, encoding). Round 1 (fixed sleeps) in brackets.
 
@@ -97,7 +118,7 @@ Byte budget (`settings` frame, per device, stored by the server): a gradient tes
 - Wide sticky elements (e.g. JSON viewers) are not clamped to the viewport width.
 
 ## Layout
-`cmd/phecloud` (server + admin CLI), `cmd/phecloud-client` (test client, `-summary` for machine-readable output), `client/` (the C core), `internal/{proto,store,server,browser,tiles,tlsutil}`.
+`web/` (the Quasar web app), `cmd/phecloud` (server + admin CLI), `cmd/phecloud-client` (test client, `-summary` for machine-readable output), `client/` (the C core), `internal/{proto,store,server,browser,tiles,tlsutil}`.
 
 ## License
 Apache-2.0, see `LICENSE`.

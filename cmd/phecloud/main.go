@@ -4,7 +4,7 @@
 // Command phecloud: the Phecloud server.
 //
 //	phecloud serve              run the phone-protocol server (and the cloud browser)
-//	phecloud paircode           print a single-use pairing code (valid 10 minutes)
+//	phecloud paircode [--admin] print a single-use pairing code (valid 10 minutes); --admin: the new device may manage devices
 //	phecloud devices            list paired devices
 //	phecloud revoke <id>        revoke a device
 //
@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -25,6 +26,7 @@ import (
 	"github.com/phorepoc/phecloud/internal/server"
 	"github.com/phorepoc/phecloud/internal/store"
 	"github.com/phorepoc/phecloud/internal/tlsutil"
+	"github.com/phorepoc/phecloud/internal/webui"
 )
 
 func env(k, d string) string {
@@ -47,7 +49,7 @@ func main() {
 	defer st.Close()
 	switch os.Args[1] {
 	case "paircode":
-		code, err := st.NewPairCode(10 * time.Minute)
+		code, err := st.NewPairCode(10*time.Minute, len(os.Args) > 2 && os.Args[2] == "--admin")
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
@@ -97,6 +99,23 @@ func main() {
 			}
 			log.Warn("PLAIN (no TLS) listener enabled, development only", "addr", pln.Addr().String())
 			go srv.Serve(pln)
+		}
+		if hl := env("PHECLOUD_HTTP_LISTEN", ":8080"); hl != "" && hl != "off" {
+			// the web app and its WebSocket. Plain HTTP by default: put it behind a TLS reverse proxy for anything but
+			// localhost, or set PHECLOUD_HTTP_TLS=1 to use the same self-signed certificate as the phone port.
+			var hln net.Listener
+			var herr error
+			if os.Getenv("PHECLOUD_HTTP_TLS") == "1" {
+				hln, herr = tls.Listen("tcp", hl, tcfg)
+			} else {
+				hln, herr = net.Listen("tcp", hl)
+			}
+			if herr != nil {
+				log.Error("http listen", "err", herr)
+				os.Exit(1)
+			}
+			log.Info("web app listening", "addr", hln.Addr().String())
+			go http.Serve(hln, webui.Handler(srv))
 		}
 		log.Error("serve", "err", srv.Serve(ln))
 	default:

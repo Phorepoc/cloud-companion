@@ -39,6 +39,7 @@ type session struct {
 	log     *slog.Logger
 
 	dev    string
+	admin  bool
 	br     browser.Session
 	pid    int
 	seq    int
@@ -77,6 +78,28 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		s.srv.Store.SaveSettings(s.dev, b)
 		s.cache = nil // re-send every tile with the new budget on the next update
 		return nil
+	case proto.TDevices:
+		if !s.admin {
+			return errors.New("admin only")
+		}
+		ds, err := s.srv.Store.List()
+		if err != nil {
+			return err
+		}
+		var out []proto.DeviceInfo
+		for _, d := range ds {
+			out = append(out, proto.DeviceInfo{ID: d.ID, Name: d.Name, Created: d.Created, Seen: d.Seen, Revoked: d.Revoked, Admin: d.Admin})
+		}
+		return s.c.send(proto.DeviceList{T: proto.TDeviceList, List: out})
+	case proto.TRevoke:
+		if !s.admin {
+			return errors.New("admin only")
+		}
+		var r proto.Revoke
+		if err := proto.Decode(raw, &r); err != nil {
+			return err
+		}
+		return s.srv.Store.Revoke(r.ID)
 	case proto.TPing:
 		return s.c.send(proto.Header{T: proto.TPong})
 	case proto.TOpen:

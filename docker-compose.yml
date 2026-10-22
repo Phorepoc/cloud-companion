@@ -9,6 +9,7 @@ services:
     shm_size: 512m
     ports:
       - "7400:7400"
+      - "8080:8080"
     volumes:
       - phecloud-data:/data
     restart: unless-stopped

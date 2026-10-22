@@ -104,7 +104,8 @@ cmp_fields 1 tap url h regions layers title back fwd
 cmp_fields 1 back url regions back fwd
 cmp_fields 2 open url h tiles tilebytes hx regions layers trunc
 cmp_fields 2 typed url tiles regions layers
-cmp_fields 3 open url h tiles tilebytes hx regions layers trunc
+# Wikipedia is not byte-stable between loads (page height varies with lazy content): only the stable fields are compared
+cmp_fields 3 open url layers trunc
 cmp_fields 4 open url h tiles tilebytes hx regions layers title back fwd focus opts sel
 cmp_fields 4 focus focus ftype fvalue
 cmp_fields 4 text focus ftype fvalue
