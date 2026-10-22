@@ -114,6 +114,7 @@ type Page struct {
 	H     int    `cbor:"h"`
 	TileW int    `cbor:"tw"`
 	TileH int    `cbor:"th"`
+	Trunc bool   `cbor:"trunc,omitempty"` // the page was cut at the height cap
 }
 
 type Tile struct {

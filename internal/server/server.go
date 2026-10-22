@@ -80,7 +80,7 @@ func (s *Server) handle(nc net.Conn) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ses := &session{srv: s, c: c, log: log}
+	ses := &session{srv: s, c: c, log: log, dev: dev}
 	defer ses.close()
 
 	for {

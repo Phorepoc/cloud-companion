@@ -26,6 +26,7 @@ func Open(path string) (*Store, error) {
 	db.SetMaxOpenConns(1)
 	for _, q := range []string{
 		`CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT, key BLOB NOT NULL, created INTEGER, revoked INTEGER DEFAULT 0, last_seen INTEGER)`,
+		`CREATE TABLE IF NOT EXISTS cookies(dev TEXT PRIMARY KEY, data BLOB, updated INTEGER)`,
 		`CREATE TABLE IF NOT EXISTS pair_codes(code TEXT PRIMARY KEY, expires INTEGER NOT NULL, used INTEGER DEFAULT 0)`,
 	} {
 		if _, err := db.Exec(q); err != nil {
@@ -120,4 +121,16 @@ func (s *Store) List() ([]Device, error) {
 		out = append(out, d)
 	}
 	return out, rows.Err()
+}
+
+// SaveCookies / LoadCookies keep one opaque cookie jar (JSON) per device.
+func (s *Store) SaveCookies(dev string, data []byte) error {
+	_, err := s.db.Exec(`INSERT INTO cookies(dev,data,updated) VALUES(?,?,?) ON CONFLICT(dev) DO UPDATE SET data=excluded.data,updated=excluded.updated`, dev, data, time.Now().Unix())
+	return err
+}
+
+func (s *Store) LoadCookies(dev string) []byte {
+	var b []byte
+	s.db.QueryRow(`SELECT data FROM cookies WHERE dev=?`, dev).Scan(&b)
+	return b
 }

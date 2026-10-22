@@ -26,6 +26,9 @@ type Session interface {
 	// Text focuses region id, inserts text, optionally presses Enter.
 	Text(ctx context.Context, id int, text string, submit bool) error
 	ScrollTo(ctx context.Context, y int) error
+	// Cookies exports the tab's cookie jar (JSON); SetCookies imports one.
+	Cookies(ctx context.Context) ([]byte, error)
+	SetCookies(ctx context.Context, data []byte) error
 	// Snapshot renders the whole page (height capped) as one image, with fixed/sticky elements cut out into layers.
 	Snapshot(ctx context.Context) (*Snapshot, error)
 	Close()

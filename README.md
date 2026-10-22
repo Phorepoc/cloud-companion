@@ -10,7 +10,7 @@ browser v1 backend, a test client). Apache-2.0. Chromium is an external runtime 
   with the code and gets a per-device 32-byte key; later connections authenticate with HMAC-SHA256(key, nonce)
   against a server challenge (the key never crosses the wire again). SQLite (`devices`, `pair_codes`);
   `phecloud devices`, `phecloud revoke <id>`.
-- **Phone protocol** (`internal/proto`): one TCP connection (plain TCP on :7400 for v0, TLS to come), frames =
+- **Phone protocol** (`internal/proto`): one TCP connection (TLS 1.3 on :7400), frames =
   4-byte big-endian length + CBOR map with a `"t"` type key. Frames: `challenge`, `pair`/`hello`, `welcome`,
   `error`, `open`, `navigate` (url | back | forward | reload), `input` (tap / scroll / text), `page`, `layers`, `tile`,
   `regions`, `done`.
@@ -22,6 +22,7 @@ browser v1 backend, a test client). Apache-2.0. Chromium is an external runtime 
   `position:fixed` and `position:sticky` elements are cut out as separate layer images (and hidden while the page
   is captured); links, buttons, inputs, selects and textareas become tap regions with ids and rects (relative to
   the layer they sit in).
+- **Round 2:** settle is event-driven (CDP Network events: nothing in flight for 60 ms, load, two animation frames; no sleeps); the lazy scroll pass runs only if the page has lazy images; a pool of 2 warm tabs, each in its own browser context (isolated cookies); the cookie jar is saved per device in SQLite after every update and restored on the next open (verified: a cookie set in one connection is sent in the next); the `page` frame carries `trunc` when the page was cut at the height cap; the phone port is TLS 1.3 only, with a self-signed ECDSA certificate created at first start in `/data`. `phecloud paircode` prints the code (stdout) and the certificate fingerprint (stderr); the client pins the fingerprint at pairing (`-fp` to check it, else trust on first use) and refuses a changed certificate afterwards.
 - **Input and updates**: a tap, scroll or text input goes back through CDP; the server re-renders, hashes every
   tile (FNV-64a of the pixels) and sends only tiles whose hash changed. A URL change starts a new page id.
 - **`phecloud-client`** (`cmd/phecloud-client`): pairs, opens URLs, saves the tiles, prints byte totals and timing.
@@ -38,30 +39,26 @@ docker run --rm --network host -v $PWD/run:/w -w /w --entrypoint phecloud-client
 Tiles land in `tiles/p<N>/L<layer>_y<row>_x<col>.png|jpg`. `testdata/layers.html` (+ `.url`, a `data:` URL) is a page
 with a fixed header, a sticky bar, a fixed footer and an input, for the layers.
 
-## Measured (2026-10-22, Ryzen server container, 2 CPUs, LAN loopback, cold Chromium tab per connection)
-Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done on the server: navigation, lazy
-pass, screenshots, tiling and encoding.
+## Measured (2026-10-22, round 2: event-driven settle, TLS 1.3, warm tab pool; Ryzen server container, 2 CPUs, loopback)
+Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done on the server (navigation, settle, screenshots, tiling, encoding). Round 1 (fixed sleeps) in brackets.
 
 | page | page size | tiles (png / jpeg) | tile bytes | wire bytes | regions | render |
 |---|---|---|---|---|---|---|
-| https://example.com | 360x918 | 4 (4 / 0) | 32 KB | 32.9 KB | 1 | 1.25-1.3 s |
-| https://en.m.wikipedia.org/wiki/Nokia (redirects to the responsive site) | 360x5576 | 21 (19 / 2) | 446 KB | 474 KB | 253 | 5.4 s |
-| https://news.ycombinator.com | 360x(1793-2048) | 8 (8 / 0) | 303 KB | 330 KB | 230 | 2.2 s |
-| tap "Learn more" on example.com (new page, iana.org) | 360x1303 | 6 (5 / 1) | 59 KB | 62.6 KB | 31 | 1.6 s |
-| type text into an input (layers page) | 360x1711 | 1 changed | 4.8 KB | 8.3 KB | 4 | 1.0 s |
-| `testdata/layers.html` first load | 360x1711 | 10 + 3 layers | 20.7 KB | 24.8 KB | 4 | 1.4 s |
+| https://example.com | 360x918 | 4 (4 / 0) | 32 KB | 32.9 KB | 1 | **0.40-0.50 s** [1.3 s] |
+| https://en.m.wikipedia.org/wiki/Nokia (redirects to the responsive site) | 360x5576 | 21 (19 / 2) | 446 KB | 474 KB | 253 | 5.1 s [5.4 s] |
+| https://news.ycombinator.com | 360x(1793-2048) | 8 (8 / 0) | 303 KB | 330 KB | 230 | 1.5 s [2.2 s] |
+| tap "Learn more" on example.com (new page, iana.org) | 360x1303 | 6 (5 / 1) | 59 KB | 62.6 KB | 31 | 1.05 s [1.6 s] |
+| type text into an input (layers page) | 360x1711 | 1 changed | 4.8 KB | 8.3 KB | 4 | **0.33 s** [1.0 s] |
+| `testdata/layers.html` first load | 360x1711 | 10 + 3 layers | 20.7 KB | 24.8 KB | 4 | 0.45 s [1.4 s] |
 
-Idle server: 16 MiB (plus Chromium once a tab is open). Repeating a load gives the same byte counts (the
-rendering is deterministic). Fixed costs per update: about 0.5 s in Snapshot even for a tiny page (the lazy scroll
-pass, 100 ms settle, 250 ms + 250 ms in `settle`); these are the first things to tune.
+Per-update fixed cost is now: Snapshot about 70-110 ms (screenshots + tiling) plus one 60 ms network-quiet window and two animation frames. The rest of a load is Chromium fetching the page; Wikipedia is dominated by about 5000 px of lazy images (the scroll pass only runs when the page has lazy images). Idle server 16 MiB plus Chromium (2 warm tabs).
 
 ## Not done yet (next)
-- TLS on the phone port; scopes and token expiry; a web admin/login (passkeys).
+- Scopes and token expiry; a web admin/login (passkeys); the pinning-mismatch refusal path is coded but not yet tested.
 - Incremental updates without a full re-screenshot (MutationObserver dirty rects), image/video elements, popups and
-  new tabs, pinch/zoom (dpr is fixed at 1), cookies/session persistence between connections.
-- A longer page than 8192 px is truncated (`Truncated` is not yet sent to the client).
+  new tabs, pinch/zoom (dpr is fixed at 1).
 - Sticky layers: only their natural position at scroll 0 is sent, plus the CSS `top`/`bottom` offset.
-- Tune the fixed per-update delays; keep one warm Chromium tab pool.
+- Wide sticky elements (e.g. JSON viewers) are not clamped to the viewport width.
 
 ## Layout
 `cmd/phecloud` (server + admin CLI), `cmd/phecloud-client` (test client), `internal/{proto,store,server,browser,tiles}`.

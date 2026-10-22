@@ -13,9 +13,9 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log/slog"
-	"net"
 	"os"
 	"strconv"
 	"time"
@@ -23,6 +23,7 @@ import (
 	"github.com/phorepoc/phecloud/internal/browser"
 	"github.com/phorepoc/phecloud/internal/server"
 	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/phecloud/internal/tlsutil"
 )
 
 func env(k, d string) string {
@@ -51,6 +52,9 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(code)
+		if fp, err := tlsutil.FingerprintFile(env("PHECLOUD_TLSDIR", "/data")); err == nil {
+			fmt.Fprintln(os.Stderr, "server certificate fingerprint (sha256):", fp)
+		}
 	case "devices":
 		ds, _ := st.List()
 		for _, d := range ds {
@@ -67,10 +71,16 @@ func main() {
 		}
 	case "serve":
 		maxH, _ := strconv.Atoi(env("PHECLOUD_MAX_PAGE_H", "8192"))
-		br := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH)
+		br := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH, 2)
 		defer br.Close()
 		log := slog.Default()
-		ln, err := net.Listen("tcp", env("PHECLOUD_LISTEN", ":7400"))
+		tcfg, fp, err := tlsutil.LoadOrCreate(env("PHECLOUD_TLSDIR", "/data"))
+		if err != nil {
+			log.Error("tls", "err", err)
+			os.Exit(1)
+		}
+		log.Info("TLS 1.3 certificate", "fingerprint", fp)
+		ln, err := tls.Listen("tcp", env("PHECLOUD_LISTEN", ":7400"), tcfg)
 		if err != nil {
 			log.Error("listen", "err", err)
 			os.Exit(1)

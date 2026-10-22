@@ -8,9 +8,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/storage"
 	"image"
 	"image/draw"
 	"image/png"
+	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/emulation"
@@ -24,14 +28,22 @@ const mobileUA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (K
 
 const viewH = 640
 
-// CDP is the chromedp-based Factory: one headless Chromium, one tab per Session.
+// CDP is the chromedp-based Factory: one headless Chromium; each Session is a tab in its own browser context
+// (isolated cookies); a small pool of warm tabs is kept ready.
 type CDP struct {
-	allocCtx context.Context
-	cancel   context.CancelFunc
-	MaxH     int
+	rootCtx context.Context // holds the browser connection; tabs derive from it
+	cancel  context.CancelFunc
+	MaxH    int
+	pool    chan *tab
 }
 
-func NewCDP(chromePath string, maxH int) *CDP {
+type tab struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	ns     *netState
+}
+
+func NewCDP(chromePath string, maxH, poolSize int) *CDP {
 	opts := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
 	opts = append(opts,
 		chromedp.NoSandbox,
@@ -47,23 +59,106 @@ func NewCDP(chromePath string, maxH int) *CDP {
 	if maxH <= 0 {
 		maxH = 8192
 	}
-	return &CDP{allocCtx: ctx, cancel: cancel, MaxH: maxH}
+	rootCtx, rootCancel := chromedp.NewContext(ctx)
+	chromedp.Run(rootCtx) // start the browser process
+	c := &CDP{rootCtx: rootCtx, cancel: func() { rootCancel(); cancel() }, MaxH: maxH, pool: make(chan *tab, max(poolSize, 1))}
+	for i := 0; i < poolSize; i++ {
+		c.refill()
+	}
+	return c
 }
 
-func (c *CDP) New(ctx context.Context) (Session, error) {
-	tctx, cancel := chromedp.NewContext(c.allocCtx)
-	if err := chromedp.Run(tctx); err != nil { // start the tab
+func (c *CDP) newTab() (*tab, error) {
+	tctx, cancel := chromedp.NewContext(c.rootCtx, chromedp.WithNewBrowserContext())
+	ns := newNetState()
+	chromedp.ListenTarget(tctx, ns.handle)
+	if err := chromedp.Run(tctx, network.Enable()); err != nil { // also starts the tab
 		cancel()
 		return nil, err
 	}
-	return &cdpSession{ctx: tctx, cancel: cancel, maxH: c.MaxH}, nil
+	return &tab{tctx, cancel, ns}, nil
+}
+
+// refill warms one more tab in the background (dropped if the pool is already full).
+func (c *CDP) refill() {
+	go func() {
+		t, err := c.newTab()
+		if err != nil {
+			return
+		}
+		select {
+		case c.pool <- t:
+		default:
+			t.cancel()
+		}
+	}()
+}
+
+func (c *CDP) New(ctx context.Context) (Session, error) {
+	var t *tab
+	select {
+	case t = <-c.pool:
+	default:
+		var err error
+		if t, err = c.newTab(); err != nil {
+			return nil, err
+		}
+	}
+	c.refill()
+	return &cdpSession{ctx: t.ctx, cancel: t.cancel, ns: t.ns, maxH: c.MaxH}, nil
 }
 
 func (c *CDP) Close() { c.cancel() }
 
+// netState counts in-flight requests so that "settled" is event-driven: no requests in flight and a short quiet time.
+type netState struct {
+	mu       sync.Mutex
+	inflight map[network.RequestID]struct{}
+	last     time.Time
+	ch       chan struct{}
+}
+
+func newNetState() *netState {
+	return &netState{inflight: map[network.RequestID]struct{}{}, last: time.Now(), ch: make(chan struct{}, 1)}
+}
+
+func (n *netState) touch() {
+	n.mu.Lock()
+	n.last = time.Now()
+	n.mu.Unlock()
+}
+
+func (n *netState) handle(ev any) {
+	n.mu.Lock()
+	switch e := ev.(type) {
+	case *network.EventRequestWillBeSent:
+		if e.Type == network.ResourceTypeWebSocket || e.Type == network.ResourceTypeEventSource || e.Type == network.ResourceTypePing {
+			n.mu.Unlock()
+			return
+		}
+		n.inflight[e.RequestID] = struct{}{}
+	case *network.EventLoadingFinished:
+		delete(n.inflight, e.RequestID)
+	case *network.EventLoadingFailed:
+		delete(n.inflight, e.RequestID)
+	default:
+		n.mu.Unlock()
+		return
+	}
+	n.last = time.Now()
+	n.mu.Unlock()
+	select {
+	case n.ch <- struct{}{}:
+	default:
+	}
+}
+
+const quiet = 60 * time.Millisecond
+
 type cdpSession struct {
 	ctx    context.Context
 	cancel context.CancelFunc
+	ns     *netState
 	maxH   int
 	width  int
 	dpr    float64
@@ -85,6 +180,7 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 		width = 360
 	}
 	s.width, s.dpr = width, 1 // v1: tiles are in CSS px, dpr is fixed at 1
+	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
 		emulation.SetUserAgentOverride(mobileUA),
 		emulation.SetDeviceMetricsOverride(int64(width), viewH, 1, true),
@@ -97,18 +193,69 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	return s.settle(ctx)
 }
 
+const frameJS = `new Promise(r=>{const f=()=>requestAnimationFrame(()=>requestAnimationFrame(r));
+ if(document.readyState==='complete')f();else addEventListener('load',f,{once:true});setTimeout(r,1500)})`
+
+// settle waits until no request is in flight and none finished in the last 60 ms, the page has loaded, and two
+// animation frames have run. Capped at 15 s.
 func (s *cdpSession) settle(ctx context.Context) error {
-	time.Sleep(250 * time.Millisecond)
-	deadline := time.Now().Add(10 * time.Second)
+	s.ns.touch()
+	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		var st string
-		if err := s.run(ctx, 5*time.Second, chromedp.Evaluate(`document.readyState`, &st)); err == nil && st == "complete" {
-			break
+		s.ns.mu.Lock()
+		busy, last := len(s.ns.inflight) > 0, s.ns.last
+		s.ns.mu.Unlock()
+		wait := time.Until(deadline)
+		if !busy {
+			if w := quiet - time.Since(last); w <= 0 {
+				break
+			} else {
+				wait = w
+			}
 		}
-		time.Sleep(100 * time.Millisecond)
+		select {
+		case <-s.ns.ch:
+		case <-time.After(wait):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
-	time.Sleep(250 * time.Millisecond)
+	s.run(ctx, 5*time.Second, chromedp.Evaluate(frameJS, nil, func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) }))
 	return nil
+}
+
+// Cookies exports the tab's cookie jar as JSON; SetCookies imports one.
+func (s *cdpSession) Cookies(ctx context.Context) ([]byte, error) {
+	var cs []*network.Cookie
+	err := s.run(ctx, 5*time.Second, chromedp.ActionFunc(func(c context.Context) error {
+		var err error
+		cs, err = storage.GetCookies().WithBrowserContextID(s.bcid()).Do(s.browserCtx(c))
+		return err
+	}))
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(cs)
+}
+
+func (s *cdpSession) SetCookies(ctx context.Context, data []byte) error {
+	var cs []*network.Cookie
+	if err := json.Unmarshal(data, &cs); err != nil || len(cs) == 0 {
+		return err
+	}
+	var ps []*network.CookieParam
+	for _, c := range cs {
+		p := &network.CookieParam{Name: c.Name, Value: c.Value, Domain: c.Domain, Path: c.Path, Secure: c.Secure,
+			HTTPOnly: c.HTTPOnly, SameSite: c.SameSite}
+		if c.Expires > 0 && !c.Session {
+			t := cdp.TimeSinceEpoch(time.Unix(int64(c.Expires), 0))
+			p.Expires = &t
+		}
+		ps = append(ps, p)
+	}
+	return s.run(ctx, 5*time.Second, chromedp.ActionFunc(func(c context.Context) error {
+		return storage.SetCookies(ps).WithBrowserContextID(s.bcid()).Do(s.browserCtx(c))
+	}))
 }
 
 func (s *cdpSession) Navigate(ctx context.Context, url, action string) error {
@@ -221,13 +368,16 @@ type jsInfo struct {
 	Regions []jsRegion `json:"regions"`
 }
 
+// lazyJS scrolls through the page once to trigger lazy loading, but only when the page can have lazy content.
 const lazyJS = `(async()=>{
  const H=Math.min(Math.max(document.documentElement.scrollHeight,document.body?document.body.scrollHeight:0),%d);
- for(let y=0;y<H;y+=%d){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,60));}
+ const lazy=[...document.images].some(i=>!i.complete||i.loading==='lazy')||document.querySelector('[data-src],[data-lazy-src],[data-srcset]');
+ if(H<=%d||!lazy){window.scrollTo(0,0);return false;}
+ for(let y=0;y<H;y+=%d){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,40));}
  window.scrollTo(0,0);
  const imgs=[...document.images].filter(i=>!i.complete);
  await Promise.race([Promise.all(imgs.map(i=>new Promise(r=>{i.addEventListener('load',r);i.addEventListener('error',r);}))),new Promise(r=>setTimeout(r,2500))]);
- await new Promise(r=>setTimeout(r,100));
+ await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
  return true;})()`
 
 // extractJS runs at scroll 0. It tags layer roots with data-phe-layer and every tap target with data-phe-id.
@@ -313,7 +463,7 @@ func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
 	keepSY := s.sy
 	// 1. trigger lazy loading, return to the top.
 	var done bool
-	if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH, viewH), &done,
+	if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH, viewH, viewH), &done,
 		func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) })); err != nil {
 		return nil, fmt.Errorf("lazy pass: %w", err)
 	}
@@ -366,4 +516,13 @@ func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
 		s.ScrollTo(ctx, keepSY)
 	}
 	return sn, nil
+}
+
+func (s *cdpSession) bcid() cdp.BrowserContextID {
+	return chromedp.FromContext(s.ctx).BrowserContextID
+}
+
+// browserCtx makes c address the Browser target: storage.* calls with a browserContextId are browser-level.
+func (s *cdpSession) browserCtx(c context.Context) context.Context {
+	return cdp.WithExecutor(c, chromedp.FromContext(s.ctx).Browser)
 }

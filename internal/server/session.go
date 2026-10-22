@@ -27,6 +27,7 @@ type session struct {
 	c   *conn
 	log *slog.Logger
 
+	dev    string
 	br     browser.Session
 	pid    int
 	seq    int
@@ -57,6 +58,11 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 				return err
 			}
 			s.br = b
+			if ck := s.srv.Store.LoadCookies(s.dev); len(ck) > 0 {
+				if err := b.SetCookies(ctx, ck); err != nil {
+					s.log.Warn("restore cookies", "err", err)
+				}
+			}
 		}
 		if err := s.br.Open(ctx, o.URL, o.Width, o.DPR); err != nil {
 			return err
@@ -137,7 +143,7 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 	s.seq++
 	s.layers = sn.Layers
 	if err := s.c.send(proto.Page{T: proto.TPage, PID: s.pid, Seq: s.seq, URL: sn.URL, Title: sn.Title, W: sn.W, H: sn.H,
-		TileW: tiles.TileW, TileH: tiles.TileH}); err != nil {
+		TileW: tiles.TileW, TileH: tiles.TileH, Trunc: sn.Truncated}); err != nil {
 		return err
 	}
 	var ll []proto.Layer
@@ -185,6 +191,12 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 	}
 	if err := s.c.send(proto.Regions{T: proto.TRegions, PID: s.pid, Seq: s.seq, List: rr}); err != nil {
 		return err
+	}
+	if ck, err := s.br.Cookies(ctx); err != nil {
+		s.log.Warn("cookies export", "err", err)
+	} else {
+		s.srv.Store.SaveCookies(s.dev, ck)
+		s.log.Debug("cookies saved", "bytes", len(ck))
 	}
 	ms := int(time.Since(start).Milliseconds())
 	s.log.Info("update", "pid", s.pid, "seq", s.seq, "url", func() string {

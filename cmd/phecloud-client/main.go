@@ -10,16 +10,18 @@ import (
 	"bufio"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/phecloud/internal/tlsutil"
 )
 
 type urls []string
@@ -30,6 +32,7 @@ func (u *urls) Set(s string) error { *u = append(*u, s); return nil }
 type state struct {
 	Dev string `json:"dev"`
 	Key []byte `json:"key"`
+	FP  string `json:"fp"` // pinned server certificate fingerprint (sha256 hex)
 }
 
 type counter struct {
@@ -50,12 +53,32 @@ func main() {
 	stf := flag.String("state", "client-state.json", "saved device key")
 	out := flag.String("out", "tiles", "output dir")
 	tap := flag.Bool("tap-first-link", false, "after the first page, tap the first link and report the update")
+	fp := flag.String("fp", "", "expected server certificate fingerprint at pairing (else trust on first use)")
 	typ := flag.String("type", "", "after the first page, type this text into the first input")
 	var us urls
 	flag.Var(&us, "url", "URL to open (repeatable)")
 	flag.Parse()
 
-	nc, err := net.Dial("tcp", *addr)
+	var st state
+	if b, err := os.ReadFile(*stf); err == nil {
+		json.Unmarshal(b, &st)
+	}
+	var seenFP string
+	cfg := &tls.Config{
+		MinVersion:         tls.VersionTLS13,
+		InsecureSkipVerify: true, // we pin the certificate fingerprint instead
+		VerifyPeerCertificate: func(raw [][]byte, _ [][]*x509.Certificate) error {
+			seenFP = tlsutil.Fingerprint(raw[0])
+			switch {
+			case st.Dev != "" && st.FP != "" && seenFP != st.FP:
+				return fmt.Errorf("server certificate changed: %s (pinned %s)", seenFP, st.FP)
+			case st.Dev == "" && *fp != "" && !strings.EqualFold(seenFP, *fp):
+				return fmt.Errorf("server certificate %s does not match -fp", seenFP)
+			}
+			return nil
+		},
+	}
+	nc, err := tls.Dial("tcp", *addr, cfg)
 	if err != nil {
 		fatal(err)
 	}
@@ -69,10 +92,6 @@ func main() {
 	var ch proto.Challenge
 	proto.Decode(raw, &ch)
 
-	var st state
-	if b, err := os.ReadFile(*stf); err == nil {
-		json.Unmarshal(b, &st)
-	}
 	if st.Dev == "" {
 		if *code == "" {
 			fatal(fmt.Errorf("not paired: pass -code"))
@@ -96,10 +115,10 @@ func main() {
 	var w proto.Welcome
 	proto.Decode(raw, &w)
 	if len(w.Key) > 0 {
-		st = state{w.Dev, w.Key}
+		st = state{w.Dev, w.Key, seenFP}
 		b, _ := json.Marshal(st)
 		os.WriteFile(*stf, b, 0o600)
-		fmt.Println("paired as", w.Dev)
+		fmt.Println("paired as", w.Dev, "pinned certificate", seenFP)
 	} else {
 		fmt.Println("authenticated as", w.Dev)
 	}
@@ -211,7 +230,7 @@ func (s *summary) print(label string, wire int64) {
 	for _, r := range s.regions {
 		kinds[r.Kind]++
 	}
-	fmt.Printf("== %s\n   title %q  page %dx%d  url %s\n", label, s.page.Title, s.page.W, s.page.H, s.page.URL)
+	fmt.Printf("== %s\n   title %q  page %dx%d  url %s\n", cut(label), s.page.Title, s.page.W, s.page.H, cut(s.page.URL))
 	fmt.Printf("   tiles %d (png %d = %d B, jpeg %d = %d B)  tile bytes %d  wire bytes %d\n",
 		s.tiles, s.png, s.pngB, s.jpg, s.jpgB, s.pngB+s.jpgB, wire)
 	fmt.Printf("   layers %d  regions %d %v\n", s.layers, len(s.regions), kinds)
