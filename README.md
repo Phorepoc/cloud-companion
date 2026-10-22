@@ -46,7 +46,7 @@ pass, screenshots, tiling and encoding.
 |---|---|---|---|---|---|---|
 | https://example.com | 360x918 | 4 (4 / 0) | 32 KB | 32.9 KB | 1 | 1.25-1.3 s |
 | https://en.m.wikipedia.org/wiki/Nokia (redirects to the responsive site) | 360x5576 | 21 (19 / 2) | 446 KB | 474 KB | 253 | 5.4 s |
-| https://news.ycombinator.com | 360x2000 | 8 (8 / 0) | 303 KB | 330 KB | 230 | 2.2 s |
+| https://news.ycombinator.com | 360x(1793-2048) | 8 (8 / 0) | 303 KB | 330 KB | 230 | 2.2 s |
 | tap "Learn more" on example.com (new page, iana.org) | 360x1303 | 6 (5 / 1) | 59 KB | 62.6 KB | 31 | 1.6 s |
 | type text into an input (layers page) | 360x1711 | 1 changed | 4.8 KB | 8.3 KB | 4 | 1.0 s |
 | `testdata/layers.html` first load | 360x1711 | 10 + 3 layers | 20.7 KB | 24.8 KB | 4 | 1.4 s |
