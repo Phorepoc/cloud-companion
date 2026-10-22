@@ -54,11 +54,47 @@ func hashRect(img *image.RGBA, x, y, w, h int) uint64 {
 	return f.Sum64()
 }
 
-// Encode fills t.Fmt and t.Data from the image.
-func Encode(img *image.RGBA, t *Tile) error {
+// Options is the per-device byte budget: JPEG quality (0 = default) and grayscale.
+type Options struct {
+	Quality int
+	Gray    bool
+}
+
+// Encode fills t.Fmt and t.Data from the image with the default options.
+func Encode(img *image.RGBA, t *Tile) error { return EncodeOpt(img, t, Options{}) }
+
+// EncodeOpt is Encode with a byte budget.
+func EncodeOpt(img *image.RGBA, t *Tile, o Options) error {
+	q := o.Quality
+	if q <= 0 || q > 100 {
+		q = JPEGQuality
+	}
 	b := img.Bounds()
 	sub := img.SubImage(image.Rect(b.Min.X+t.X, b.Min.Y+t.Y, b.Min.X+t.X+t.W, b.Min.Y+t.Y+t.H)).(*image.RGBA)
 	pal, photo := palette(sub)
+	if o.Gray {
+		g := image.NewGray(image.Rect(0, 0, t.W, t.H))
+		for y := 0; y < t.H; y++ {
+			for x := 0; x < t.W; x++ {
+				g.SetGray(x, y, color.GrayModel.Convert(sub.RGBAAt(sub.Rect.Min.X+x, sub.Rect.Min.Y+y)).(color.Gray))
+			}
+		}
+		var gb bytes.Buffer
+		if photo {
+			if err := jpeg.Encode(&gb, g, &jpeg.Options{Quality: q}); err != nil {
+				return err
+			}
+			t.Fmt = "jpeg"
+		} else {
+			enc := png.Encoder{CompressionLevel: png.BestCompression}
+			if err := enc.Encode(&gb, g); err != nil {
+				return err
+			}
+			t.Fmt = "png"
+		}
+		t.Data = gb.Bytes()
+		return nil
+	}
 	var buf bytes.Buffer
 	switch {
 	case pal != nil:
@@ -76,7 +112,7 @@ func Encode(img *image.RGBA, t *Tile) error {
 		}
 		t.Fmt = "png"
 	case photo:
-		if err := jpeg.Encode(&buf, sub, &jpeg.Options{Quality: JPEGQuality}); err != nil {
+		if err := jpeg.Encode(&buf, sub, &jpeg.Options{Quality: q}); err != nil {
 			return err
 		}
 		t.Fmt = "jpeg"

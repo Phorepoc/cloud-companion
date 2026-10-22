@@ -85,11 +85,16 @@ typedef struct {
     char title[PHC_TITLE_MAX];
 } phc_page;
 
-enum { PHC_LAYER_FIXED = 0, PHC_LAYER_STICKY = 1 };
+enum { PHC_LAYER_FIXED = 0, PHC_LAYER_STICKY = 1, PHC_LAYER_SCROLL = 2 };
 
 typedef struct {
     int id, kind, x, y, w, h, z;
     int has_top, top, has_bottom, bottom;
+    /* kind SCROLL (an inner overflow box): x,y,w,h = the visible box in document coordinates; the layer tiles cover
+       cw x ch of content; scroll_x/scroll_y = the box's current scroll (starts at the server's sx/sy; the host changes it
+       with phc_layer_scroll) */
+    int cw, ch, sx, sy;
+    int scroll_x, scroll_y;
 } phc_layer;
 
 enum { PHC_REGION_LINK = 0, PHC_REGION_BUTTON, PHC_REGION_INPUT, PHC_REGION_SELECT, PHC_REGION_TEXTAREA };
@@ -112,7 +117,8 @@ typedef struct {
     char inputmode[16], enter[16];      /* inputmode and enterkeyhint */
 } phc_focus;
 
-enum { PHC_DLG_ALERT = 0, PHC_DLG_CONFIRM, PHC_DLG_PROMPT, PHC_DLG_BEFOREUNLOAD };
+/* auth = HTTP authentication (reply with phc_dialog_reply_auth); cert = certificate error (ok = continue anyway) */
+enum { PHC_DLG_ALERT = 0, PHC_DLG_CONFIRM, PHC_DLG_PROMPT, PHC_DLG_BEFOREUNLOAD, PHC_DLG_AUTH, PHC_DLG_CERT };
 
 /* a JavaScript dialog: the page is blocked until phc_dialog_reply (the server dismisses it after 60 s) */
 typedef struct {
@@ -124,6 +130,7 @@ typedef struct { char url[256], name[64]; int refused; } phc_download;
 
 typedef struct {
     int pid, seq, ms, tiles, bytes;     /* the last `done` frame */
+    int more;                           /* progressive load: 1 = the first screenful is in, another `done` follows (pump again) */
 } phc_done;
 
 typedef struct {
@@ -197,6 +204,12 @@ int phc_text_ex(phc *c, int region_id, const char *text, int submit, int replace
 int phc_key(phc *c, const char *name);
 int phc_select(phc *c, int region_id, int option_index);
 int phc_dialog_reply(phc *c, int dialog_id, int ok, const char *text);
+/* auth dialogs: ok = provide credentials (user, pass) / cancel */
+int phc_dialog_reply_auth(phc *c, int dialog_id, int ok, const char *user, const char *pass);
+/* per-device byte budget, stored by the server: JPEG quality 1..100 (0 = default), grayscale tiles */
+int phc_settings(phc *c, int jpeg_quality, int gray);
+/* scroll an inner scroll layer locally (content coordinates, clamped); the host redraws */
+void phc_layer_scroll(phc *c, int layer_id, int dx, int dy);
 int phc_ping(phc *c);
 /* hit-test a screen point (scroll_y = the client's scroll, view_h = viewport height) and send a tap input frame */
 int phc_tap_screen(phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit *out);

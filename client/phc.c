@@ -186,6 +186,43 @@ int phc_dialog_reply(phc *c, int dialog_id, int ok, const char *text)
     return send_frame(c, &w);
 }
 
+int phc_dialog_reply_auth(phc *c, int dialog_id, int ok, const char *user, const char *pass)
+{
+    phc_w w;
+    begin(c, &w, "dialogreply", 4);
+    phc_w_kv_int(&w, "id", dialog_id);
+    phc_w_kv_bool(&w, "ok", ok);
+    phc_w_kv_text(&w, "text", user ? user : "");
+    phc_w_kv_text(&w, "pass", pass ? pass : "");
+    return send_frame(c, &w);
+}
+
+int phc_settings(phc *c, int jpeg_quality, int gray)
+{
+    phc_w w;
+    begin(c, &w, "settings", 2);
+    phc_w_kv_int(&w, "q", jpeg_quality);
+    phc_w_kv_bool(&w, "gray", gray);
+    return send_frame(c, &w);
+}
+
+void phc_layer_scroll(phc *c, int layer_id, int dx, int dy)
+{
+    int i;
+    for (i = 0; i < c->nlayers; i++) {
+        phc_layer *l = &c->layers[i];
+        int maxx, maxy;
+        if (l->id != layer_id || l->kind != PHC_LAYER_SCROLL) continue;
+        maxx = l->cw > l->w ? l->cw - l->w : 0;
+        maxy = l->ch > l->h ? l->ch - l->h : 0;
+        l->scroll_x += dx; l->scroll_y += dy;
+        if (l->scroll_x < 0) l->scroll_x = 0;
+        if (l->scroll_x > maxx) l->scroll_x = maxx;
+        if (l->scroll_y < 0) l->scroll_y = 0;
+        if (l->scroll_y > maxy) l->scroll_y = maxy;
+    }
+}
+
 int phc_ping(phc *c)
 {
     phc_w w;
@@ -368,14 +405,19 @@ static int on_layers(phc *c, phc_r *r)
                 else if (phc_text_eq(kk, kkl, "w")) rc = get_int(r, &l.w);
                 else if (phc_text_eq(kk, kkl, "h")) rc = get_int(r, &l.h);
                 else if (phc_text_eq(kk, kkl, "z")) rc = get_int(r, &l.z);
+                else if (phc_text_eq(kk, kkl, "cw")) rc = get_int(r, &l.cw);
+                else if (phc_text_eq(kk, kkl, "ch")) rc = get_int(r, &l.ch);
+                else if (phc_text_eq(kk, kkl, "sx")) rc = get_int(r, &l.sx);
+                else if (phc_text_eq(kk, kkl, "sy")) rc = get_int(r, &l.sy);
                 else if (phc_text_eq(kk, kkl, "top")) { rc = get_int(r, &l.top); l.has_top = !rc; }
                 else if (phc_text_eq(kk, kkl, "bottom")) { rc = get_int(r, &l.bottom); l.has_bottom = !rc; }
                 else if (phc_text_eq(kk, kkl, "kind")) {
                     rc = phc_r_text(r, &s, &sl);
-                    if (!rc) l.kind = phc_text_eq(s, sl, "sticky") ? PHC_LAYER_STICKY : PHC_LAYER_FIXED;
+                    if (!rc) l.kind = phc_text_eq(s, sl, "sticky") ? PHC_LAYER_STICKY : phc_text_eq(s, sl, "scroll") ? PHC_LAYER_SCROLL : PHC_LAYER_FIXED;
                 } else rc = phc_r_skip(r);
                 if (rc) return PHC_ERR_PROTO;
             }
+            l.scroll_x = l.sx; l.scroll_y = l.sy;
             if (c->nlayers < PHC_MAX_LAYERS) c->layers[c->nlayers++] = l;
         }
     }
@@ -509,7 +551,9 @@ static int on_dialog(phc *c, phc_r *r)
             rc = phc_r_text(r, &s, &sl);
             if (!rc) d.kind = phc_text_eq(s, sl, "confirm") ? PHC_DLG_CONFIRM
                             : phc_text_eq(s, sl, "prompt") ? PHC_DLG_PROMPT
-                            : phc_text_eq(s, sl, "beforeunload") ? PHC_DLG_BEFOREUNLOAD : PHC_DLG_ALERT;
+                            : phc_text_eq(s, sl, "beforeunload") ? PHC_DLG_BEFOREUNLOAD
+                            : phc_text_eq(s, sl, "auth") ? PHC_DLG_AUTH
+                            : phc_text_eq(s, sl, "cert") ? PHC_DLG_CERT : PHC_DLG_ALERT;
         } else rc = phc_r_skip(r);
         if (rc) return PHC_ERR_PROTO;
     }
@@ -556,6 +600,7 @@ static int on_done(phc *c, phc_r *r)
         else if (phc_text_eq(k, kl, "ms")) rc = get_int(r, &d.ms);
         else if (phc_text_eq(k, kl, "tiles")) rc = get_int(r, &d.tiles);
         else if (phc_text_eq(k, kl, "bytes")) rc = get_int(r, &d.bytes);
+        else if (phc_text_eq(k, kl, "more")) rc = phc_r_bool(r, &d.more);
         else rc = phc_r_skip(r);
         if (rc) return PHC_ERR_PROTO;
     }
@@ -674,6 +719,7 @@ int phc_layer_screen_y(const phc_layer *l, int scroll_y, int view_h)
     int y = l->y;
     if (l->kind == PHC_LAYER_FIXED) return y;
     y -= scroll_y;
+    if (l->kind == PHC_LAYER_SCROLL) return y;   /* a scroll box moves with the page */
     if (l->has_top) { if (y < l->top) y = l->top; }
     else if (l->has_bottom) { if (y + l->h > view_h - l->bottom) y = view_h - l->bottom - l->h; }
     return y;
@@ -697,6 +743,7 @@ int phc_hit_test(const phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit
         layer = top->id;
         lx = sx - top->x;
         ly = sy - phc_layer_screen_y(top, scroll_y, view_h);
+        if (top->kind == PHC_LAYER_SCROLL) { lx += top->scroll_x; ly += top->scroll_y; }   /* content coordinates */
     } else {
         lx = sx;
         ly = sy + scroll_y;
@@ -711,7 +758,7 @@ int phc_hit_test(const phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit
     }
     out->layer = layer;
     out->region = best;
-    if (top && top->kind == PHC_LAYER_FIXED) {   /* fixed: the server clicks at layer-relative coordinates */
+    if (top && top->kind != PHC_LAYER_STICKY) {   /* fixed and scroll layers: the server maps layer-relative (content) coordinates */
         out->tap_layer = layer; out->tap_x = lx; out->tap_y = ly;
     } else {                                     /* page or sticky: document coordinates of the screen point */
         out->tap_layer = 0; out->tap_x = sx; out->tap_y = sy + scroll_y;

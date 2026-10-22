@@ -127,8 +127,23 @@ These frames are implemented in the server, the Go client and the C core, and cr
   `client/test/selftest.c` feeds every truncation of a canned conversation, thousands of byte-flipped copies, random garbage
   frames, a 200-deep nesting and absurd lengths through the decoder under AddressSanitizer + UBSan (`make fuzz`).
 
+## Round 5 additions
+- **Progressive load**: `done.more` = 1 means "the first screenful is in, another `done` follows". `phc_pump` returns at every `done`, so the
+  plug-in paints after the first one (`PHE_EV_REPAINT`, then `PHE_EV_PROGRESS` 50) and calls `phc_pump` again for the rest (`FINISHED`
+  at the last). Measured on the host: Wikipedia's first screen after 1.3 s instead of 5.3 s.
+- **Scroll layers** (`PHC_LAYER_SCROLL`): an inner `overflow:auto` box. `x,y,w,h` is the visible box in document coordinates (it moves with
+  the page), `cw x ch` the content the layer tiles cover, `scroll_x/scroll_y` the current local scroll (`phc_layer_scroll`). Compose the
+  box by blitting its tiles at `(x - scroll_x, y - scroll_y - page_scroll)` clipped to the box; a touch that starts inside it scrolls the
+  box, not the page, until the box hits its end. Regions inside it use content coordinates; `phc_hit_test` converts, and the tap goes out as
+  `(layer, content x, content y)` (the server scrolls the real box there and clicks).
+- **Dialog kinds** `PHC_DLG_AUTH` (reply with `phc_dialog_reply_auth(user, pass)`; map to `PHE_DLG_AUTH`) and `PHC_DLG_CERT` (a certificate
+  error on a main-frame load; `ok` = load once anyway; map to `PHE_DLG_CERT`, default to "no").
+- **Byte budget**: `phc_settings(jpeg_quality, gray)` (stored per device by the server; send it after connecting, e.g. from a "data saver"
+  setting; q35 + grayscale halves the bytes of photo tiles).
+- **Layout width** is always exactly 360 css px; wide fixed/sticky layers are clamped to the viewport.
+
 ## Still open
-1. **HTTP auth and certificate-error dialogs** (CDP `Fetch.authRequired`, certificate errors): same pattern as `dialog`.
+1. **Multi-step auth flows** (retry on a wrong password, client certificates).
 2. **Date/time pickers and file inputs**: the region reports the input type; the picker and the upload reply are not defined yet.
 3. **Zoom**: v1 is fixed 360 px layout. Pinch can map to a new `open`/`resize` with a different width (re-render) or to local
    scaling of the cached tiles for the gesture, committing a re-render afterwards.

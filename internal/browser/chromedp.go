@@ -16,12 +16,15 @@ import (
 	"image"
 	"image/draw"
 	"image/png"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
+	"github.com/chromedp/cdproto/security"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 )
@@ -101,15 +104,38 @@ func (c *CDP) newTab() (*tab, error) {
 		if d, ok := ev.(*page.EventJavascriptDialogOpening); ok {
 			go func() { // the page is blocked until we answer; never block the event loop
 				h := box.get()
-				accept, text := false, ""
+				ans := Answer{}
 				if h.Dialog != nil {
-					accept, text = h.Dialog(Dialog{Kind: string(d.Type), Message: d.Message, Default: d.DefaultPrompt, URL: d.URL})
+					ans = h.Dialog(Dialog{Kind: string(d.Type), Message: d.Message, Default: d.DefaultPrompt, URL: d.URL})
 				}
-				chromedp.Run(tctx, page.HandleJavaScriptDialog(accept).WithPromptText(text))
+				chromedp.Run(tctx, page.HandleJavaScriptDialog(ans.OK).WithPromptText(ans.Text))
+			}()
+		}
+		if p, ok := ev.(*fetch.EventRequestPaused); ok {
+			go chromedp.Run(tctx, fetch.ContinueRequest(p.RequestID))
+		}
+		if a, ok := ev.(*fetch.EventAuthRequired); ok { // HTTP authentication: ask the phone
+			go func() {
+				h := box.get()
+				ans := Answer{}
+				if h.Dialog != nil {
+					msg := a.AuthChallenge.Origin
+					if a.AuthChallenge.Realm != "" {
+						msg += " " + a.AuthChallenge.Realm
+					}
+					ans = h.Dialog(Dialog{Kind: "auth", Message: msg, URL: a.AuthChallenge.Origin})
+				}
+				resp := &fetch.AuthChallengeResponse{Response: fetch.AuthChallengeResponseResponseCancelAuth}
+				if ans.OK {
+					resp = &fetch.AuthChallengeResponse{Response: fetch.AuthChallengeResponseResponseProvideCredentials, Username: ans.Text, Password: ans.Pass}
+				}
+				chromedp.Run(tctx, fetch.ContinueWithAuth(a.RequestID, resp))
 			}()
 		}
 	})
-	if err := chromedp.Run(tctx, network.Enable(), page.Enable()); err != nil { // also starts the tab
+	// Fetch on documents only (navigations and frames): needed for authRequired events (HTTP auth); each paused request is continued at once
+	if err := chromedp.Run(tctx, network.Enable(), page.Enable(),
+		fetch.Enable().WithHandleAuthRequests(true).WithPatterns([]*fetch.RequestPattern{{URLPattern: "*", ResourceType: network.ResourceTypeDocument}})); err != nil { // also starts the tab
 		cancel()
 		return nil, err
 	}
@@ -169,13 +195,14 @@ func (c *CDP) Close() { c.cancel() }
 // netState counts in-flight requests so that "settled" is event-driven: no requests in flight and a short quiet time.
 type netState struct {
 	mu       sync.Mutex
-	inflight map[network.RequestID]struct{}
+	inflight map[network.RequestID]string // request id -> URL
+	cert     *certErr                     // a main-frame load failed with a certificate error
 	last     time.Time
 	ch       chan struct{}
 }
 
 func newNetState() *netState {
-	return &netState{inflight: map[network.RequestID]struct{}{}, last: time.Now(), ch: make(chan struct{}, 1)}
+	return &netState{inflight: map[network.RequestID]string{}, last: time.Now(), ch: make(chan struct{}, 1)}
 }
 
 func (n *netState) touch() {
@@ -192,10 +219,13 @@ func (n *netState) handle(ev any) {
 			n.mu.Unlock()
 			return
 		}
-		n.inflight[e.RequestID] = struct{}{}
+		n.inflight[e.RequestID] = e.Request.URL
 	case *network.EventLoadingFinished:
 		delete(n.inflight, e.RequestID)
 	case *network.EventLoadingFailed:
+		if strings.HasPrefix(e.ErrorText, "net::ERR_CERT") && e.Type == network.ResourceTypeDocument {
+			n.cert = &certErr{URL: n.inflight[e.RequestID], Text: e.ErrorText}
+		}
 		delete(n.inflight, e.RequestID)
 	default:
 		n.mu.Unlock()
@@ -212,6 +242,7 @@ func (n *netState) handle(ev any) {
 const quiet = 60 * time.Millisecond
 
 type cdpSession struct {
+	inCert bool
 	ctx    context.Context
 	cancel context.CancelFunc
 	ns     *netState
@@ -240,10 +271,10 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
 		emulation.SetUserAgentOverride(mobileUA),
-		emulation.SetDeviceMetricsOverride(int64(width), viewH, 1, true),
+		emulation.SetDeviceMetricsOverride(int64(width), viewH, 1, false), // not "mobile": the layout is always exactly width px, whatever the viewport meta says
 		chromedp.Navigate(url),
 	)
-	if err != nil {
+	if err != nil && !s.ns.hasCert() {
 		return err
 	}
 	s.sy = 0
@@ -278,6 +309,11 @@ func (s *cdpSession) settle(ctx context.Context) error {
 		}
 	}
 	s.run(ctx, 5*time.Second, chromedp.Evaluate(frameJS, nil, func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) }))
+	if !s.inCert {
+		s.inCert = true
+		s.certFlow(ctx)
+		s.inCert = false
+	}
 	return nil
 }
 
@@ -327,7 +363,7 @@ func (s *cdpSession) Navigate(ctx context.Context, url, action string) error {
 	default:
 		a = chromedp.Navigate(url)
 	}
-	if err := s.run(ctx, 30*time.Second, a); err != nil {
+	if err := s.run(ctx, 30*time.Second, a); err != nil && !s.ns.hasCert() {
 		return err
 	}
 	s.sy = 0
@@ -438,6 +474,10 @@ type jsLayer struct {
 	Z      int    `json:"z"`
 	Top    *int   `json:"top"`
 	Bottom *int   `json:"bottom"`
+	CW     int    `json:"cw"`
+	CH     int    `json:"ch"`
+	SX     int    `json:"sx"`
+	SY     int    `json:"sy"`
 }
 
 type jsRegion struct {
@@ -484,12 +524,13 @@ type jsInfo struct {
 const lazyJS = `(async()=>{
  const H=Math.min(Math.max(document.documentElement.scrollHeight,document.body?document.body.scrollHeight:0),%d);
  const lazy=[...document.images].some(i=>!i.complete||i.loading==='lazy')||document.querySelector('[data-src],[data-lazy-src],[data-srcset]');
- if(H<=%d||!lazy){window.scrollTo(0,0);return false;}
+ if(window.__pheLazy===location.href||H<=%d||!lazy){window.__pheLazy=location.href;window.scrollTo(0,0);return false;}
  for(let y=0;y<H;y+=%d){window.scrollTo(0,y);await new Promise(r=>setTimeout(r,40));}
  window.scrollTo(0,0);
  const imgs=[...document.images].filter(i=>!i.complete);
  await Promise.race([Promise.all(imgs.map(i=>new Promise(r=>{i.addEventListener('load',r);i.addEventListener('error',r);}))),new Promise(r=>setTimeout(r,2500))]);
  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+ window.__pheLazy=location.href;
  return true;})()`
 
 // extractJS runs at scroll 0. It tags layer roots with data-phe-layer and every tap target with data-phe-id.
@@ -505,9 +546,21 @@ const extractJS = `(()=>{
  for(const e of all){
   if(out.layers.length>=8)break;
   const cs=getComputedStyle(e);
-  if(cs.position!=='fixed'&&cs.position!=='sticky')continue;
   if(cs.visibility==='hidden'||cs.display==='none'||+cs.opacity===0)continue;
   if(roots.some(l=>l.contains(e)))continue;
+  const isScr=(['auto','scroll'].includes(cs.overflowY)&&e.scrollHeight>e.clientHeight+8)||(['auto','scroll'].includes(cs.overflowX)&&e.scrollWidth>e.clientWidth+8);
+  if(cs.position!=='fixed'&&cs.position!=='sticky'){
+   if(!isScr)continue;
+   // an inner scroll box of known size becomes its own scrollable layer (its content is rendered in full)
+   const rr=e.getBoundingClientRect();
+   if(e.clientWidth<40||e.clientHeight<40||rr.left<0||rr.left>=vw||rr.top+scrollY>=100000)continue;
+   const sid=out.layers.length+1,sx0=Math.round(rr.left),sy0=Math.round(rr.top+scrollY);
+   e.setAttribute('data-phe-layer',String(sid));
+   roots.push(e);
+   out.layers.push({id:sid,kind:'scroll',x:sx0,y:sy0,w:Math.min(vw-sx0,e.clientWidth),h:e.clientHeight,z:0,
+    cw:Math.min(e.scrollWidth,2048),ch:Math.min(e.scrollHeight,4096),sx:Math.round(e.scrollLeft),sy:Math.round(e.scrollTop)});
+   continue;
+  }
   const r=e.getBoundingClientRect();
   if(r.width<4||r.height<4)continue;
   if(cs.position==='fixed'&&(r.bottom<=0||r.top>=vh||r.right<=0||r.left>=vw))continue;
@@ -530,8 +583,9 @@ const extractJS = `(()=>{
   if(r.width<4||r.height<4)continue;
   const lr=e.closest('[data-phe-layer]');
   let layer=0,x=Math.round(r.left),y=Math.round(r.top);
-  if(lr){layer=+lr.getAttribute('data-phe-layer');const b=lr.getBoundingClientRect();x=Math.round(r.left-b.left);y=Math.round(r.top-b.top);}
-  if(r.left>=vw||r.right<=0)continue;
+  if(lr){layer=+lr.getAttribute('data-phe-layer');const b=lr.getBoundingClientRect();x=Math.round(r.left-b.left);y=Math.round(r.top-b.top);
+   if(out.layers[layer-1]&&out.layers[layer-1].kind==='scroll'){x+=Math.round(lr.scrollLeft);y+=Math.round(lr.scrollTop);}}
+  else if(r.left>=vw||r.right<=0)continue;
   const tag=e.tagName.toLowerCase();
   let kind='button';
   if(tag==='a'||e.getAttribute('role')==='link')kind='link';
@@ -583,13 +637,20 @@ func (s *cdpSession) shot(ctx context.Context, x, y, w, h int, beyond bool) (*im
 	return rgba, nil
 }
 
-func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
+// quickRows is the height of the first-screenful snapshot: the viewport plus a little, in whole tile rows (3 x 256).
+const quickRows = 768
+
+func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error) {
 	keepSY := s.sy
-	// 1. trigger lazy loading, return to the top.
-	var done bool
-	if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH, viewH, viewH), &done,
-		func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) })); err != nil {
-		return nil, fmt.Errorf("lazy pass: %w", err)
+	// 1. trigger lazy loading (once per page), return to the top. The quick snapshot skips it: the full one follows.
+	if !quick {
+		var done bool
+		if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH, viewH, viewH), &done,
+			func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) })); err != nil {
+			return nil, fmt.Errorf("lazy pass: %w", err)
+		}
+	} else {
+		s.run(ctx, 5*time.Second, chromedp.Evaluate(`window.scrollTo(0,0)`, nil))
 	}
 	// 2. extract layers + regions.
 	var js string
@@ -622,19 +683,34 @@ func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
 		h, sn.Truncated = s.maxH, true
 	}
 	sn.H = h
-	// 3. layers as their own images (fixed ones inside the viewport, sticky ones beyond it).
+	capH := h
+	if quick && h > quickRows {
+		capH, sn.Partial = quickRows, true
+	}
+	// 3. layers as their own images: fixed ones inside the viewport, sticky ones beyond it, scroll boxes with their whole content.
 	for _, l := range info.Layers {
-		img, err := s.shot(ctx, l.X, l.Y, l.W, l.H, l.Kind == "sticky")
+		var img *image.RGBA
+		var err error
+		cw, ch := 0, 0
+		if l.Kind == "scroll" {
+			img, err = s.shotScroll(ctx, l)
+			if err == nil {
+				cw, ch = l.CW, l.CH
+			}
+		} else {
+			img, err = s.shot(ctx, l.X, l.Y, l.W, l.H, l.Kind == "sticky")
+		}
 		if err != nil {
 			return nil, fmt.Errorf("layer %d: %w", l.ID, err)
 		}
-		sn.Layers = append(sn.Layers, Layer{ID: l.ID, Kind: l.Kind, X: l.X, Y: l.Y, W: l.W, H: l.H, Z: l.Z, Top: l.Top, Bottom: l.Bottom, Img: img})
+		sn.Layers = append(sn.Layers, Layer{ID: l.ID, Kind: l.Kind, X: l.X, Y: l.Y, W: l.W, H: l.H, Z: l.Z, Top: l.Top, Bottom: l.Bottom,
+			CW: cw, CH: ch, SX: l.SX, SY: l.SY, Img: img})
 	}
 	// 4. the page itself with the layers hidden.
 	if len(info.Layers) > 0 {
 		s.run(ctx, 5*time.Second, chromedp.Evaluate(hideCSS, nil))
 	}
-	img, err := s.shot(ctx, 0, 0, s.width, h, true)
+	img, err := s.shot(ctx, 0, 0, s.width, capH, true)
 	if len(info.Layers) > 0 {
 		s.run(ctx, 5*time.Second, chromedp.Evaluate(unhideCSS, nil))
 	}
@@ -659,6 +735,48 @@ func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
 	return sn, nil
 }
 
+// shotScroll renders the whole content of an inner scroll box: the box is expanded for the shot (overflow visible, natural
+// height/width), captured at its document position, and restored. Falls back to the visible box.
+func (s *cdpSession) shotScroll(ctx context.Context, l jsLayer) (*image.RGBA, error) {
+	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-layer="%d"]');if(!e)return null;
+ e.__pheStyle=e.getAttribute('style');
+ e.style.setProperty('overflow','visible','important');
+ if(e.scrollHeight>e.clientHeight){e.style.setProperty('height','auto','important');e.style.setProperty('max-height','none','important');}
+ if(e.scrollWidth>e.clientWidth){e.style.setProperty('width',e.scrollWidth+'px','important');e.style.setProperty('max-width','none','important');}
+ const r=e.getBoundingClientRect();return [Math.round(r.left),Math.round(r.top+scrollY),Math.round(r.width),Math.round(r.height)];})()`, l.ID)
+	var box []int
+	if err := s.run(ctx, 5*time.Second, chromedp.Evaluate(js, &box)); err != nil || len(box) != 4 {
+		return s.shot(ctx, l.X, l.Y, l.W, l.H, false)
+	}
+	restore := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-layer="%d"]');if(!e)return false;
+ if(e.__pheStyle===null)e.removeAttribute('style');else e.setAttribute('style',e.__pheStyle);return true})()`, l.ID)
+	defer s.run(ctx, 5*time.Second, chromedp.Evaluate(restore, nil))
+	w, h := min(box[2], l.CW), min(box[3], l.CH)
+	if w < l.W || h < l.H { // expansion did not give the content (clipped by an ancestor): use the visible box
+		return s.shot(ctx, l.X, l.Y, l.W, l.H, false)
+	}
+	return s.shot(ctx, box[0], box[1], w, h, true)
+}
+
+// TapScroll taps a point (content coordinates of the scroll box) after scrolling the box so the point is visible.
+func (s *cdpSession) TapScroll(ctx context.Context, layer, x, y int) error {
+	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-layer="%d"]');if(!e)return null;
+ const X=%d,Y=%d;
+ e.scrollTo(Math.max(0,Math.min(X-e.clientWidth/2,e.scrollWidth-e.clientWidth)),Math.max(0,Math.min(Y-e.clientHeight/2,e.scrollHeight-e.clientHeight)));
+ let b=e.getBoundingClientRect();
+ if(b.top<0||b.bottom>innerHeight){window.scrollBy(0,b.top-40);b=e.getBoundingClientRect();}
+ return [b.left+(X-e.scrollLeft),b.top+(Y-e.scrollTop)];})()`, layer, x, y)
+	var pt []float64
+	if err := s.run(ctx, 5*time.Second, chromedp.Evaluate(js, &pt)); err != nil || len(pt) != 2 {
+		return fmt.Errorf("no scroll layer %d", layer)
+	}
+	if err := s.run(ctx, 15*time.Second, chromedp.MouseClickXY(pt[0], pt[1])); err != nil {
+		return err
+	}
+	s.sy = 0
+	return s.settle(ctx)
+}
+
 func (s *cdpSession) bcid() cdp.BrowserContextID {
 	return chromedp.FromContext(s.ctx).BrowserContextID
 }
@@ -667,3 +785,34 @@ func (s *cdpSession) bcid() cdp.BrowserContextID {
 func (s *cdpSession) browserCtx(c context.Context) context.Context {
 	return cdp.WithExecutor(c, chromedp.FromContext(s.ctx).Browser)
 }
+
+type certErr struct{ URL, Text string }
+
+func (n *netState) takeCert() *certErr {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	c := n.cert
+	n.cert = nil
+	return c
+}
+
+// certFlow: a main-frame load failed with a certificate error. Ask the phone (dialog kind "cert"); on OK load the
+// page once with certificate errors ignored, otherwise leave Chromium's error page.
+func (s *cdpSession) certFlow(ctx context.Context) {
+	ce := s.ns.takeCert()
+	h := s.box.get()
+	if ce == nil || h.Dialog == nil || ce.URL == "" {
+		return
+	}
+	ans := h.Dialog(Dialog{Kind: "cert", Message: ce.Text + " " + ce.URL, URL: ce.URL})
+	if !ans.OK {
+		return
+	}
+	s.run(ctx, 5*time.Second, security.SetIgnoreCertificateErrors(true))
+	s.run(ctx, 30*time.Second, chromedp.Navigate(ce.URL))
+	s.settle(ctx)
+	s.run(ctx, 5*time.Second, security.SetIgnoreCertificateErrors(false))
+	s.ns.takeCert()
+}
+
+func (n *netState) hasCert() bool { n.mu.Lock(); defer n.mu.Unlock(); return n.cert != nil }

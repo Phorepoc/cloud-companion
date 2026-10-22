@@ -36,8 +36,11 @@ type Session interface {
 	// Cookies exports the tab's cookie jar (JSON); SetCookies imports one.
 	Cookies(ctx context.Context) ([]byte, error)
 	SetCookies(ctx context.Context, data []byte) error
-	// Snapshot renders the whole page (height capped) as one image, with fixed/sticky elements cut out into layers.
-	Snapshot(ctx context.Context) (*Snapshot, error)
+	// Snapshot renders the page (height capped) as one image, with fixed/sticky elements and inner scroll boxes cut out into
+	// layers. quick = only the first screenful (and no lazy-load pass); Snapshot.Partial then says more follows.
+	Snapshot(ctx context.Context, quick bool) (*Snapshot, error)
+	// TapScroll taps a point (content coordinates) inside an inner scroll layer, scrolling the box there first.
+	TapScroll(ctx context.Context, layer, x, y int) error
 	Close()
 }
 
@@ -48,17 +51,19 @@ type Snapshot struct {
 	Layers     []Layer
 	Regions    []Region
 	Truncated  bool // page taller than the cap
+	Partial    bool // quick snapshot of a taller page: Page covers only the first rows
 	Back, Fwd  bool // history
 	Focus      Focus
 }
 
 type Layer struct {
-	ID          int
-	Kind        string // fixed | sticky
-	X, Y, W, H  int
-	Z           int
-	Top, Bottom *int
-	Img         *image.RGBA
+	ID             int
+	Kind           string // fixed | sticky | scroll
+	X, Y, W, H     int
+	Z              int
+	Top, Bottom    *int
+	CW, CH, SX, SY int // kind scroll: content size and initial scroll offset
+	Img            *image.RGBA
 }
 
 type Region struct {
@@ -85,6 +90,7 @@ type Focus struct {
 	EnterKey   string
 }
 
+// Dialog.Kind: alert | confirm | prompt | beforeunload | auth (HTTP authentication) | cert (certificate error).
 type Dialog struct {
 	Kind, Message, Default, URL string
 }
@@ -93,6 +99,13 @@ type Download struct{ URL, Name string }
 
 // Handlers are called from the browser's event goroutine; Dialog blocks until the phone answers.
 type Handlers struct {
-	Dialog   func(Dialog) (ok bool, text string)
+	Dialog   func(Dialog) Answer
 	Download func(Download)
+}
+
+// Answer is the phone's reply to a Dialog: OK = accept/continue/provide credentials; Text = the prompt text or the user
+// name (auth); Pass = the password (auth).
+type Answer struct {
+	OK         bool
+	Text, Pass string
 }

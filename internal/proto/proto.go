@@ -41,6 +41,7 @@ const (
 	TDialog      = "dialog"      // S->C  a JavaScript alert/confirm/prompt/beforeunload is waiting
 	TDialogReply = "dialogreply" // C->S
 	TDownload    = "download"    // S->C  a download was refused
+	TSettings    = "settings"    // C->S  per-device byte budget: JPEG quality, grayscale
 )
 
 type Header struct {
@@ -151,6 +152,12 @@ type Layer struct {
 	Z      int    `cbor:"z"`
 	Top    *int   `cbor:"top,omitempty"`
 	Bottom *int   `cbor:"bottom,omitempty"`
+	// kind scroll (an inner overflow:auto box): X,Y,W,H = the visible box in document coordinates; CW,CH = the content
+	// size (the layer tiles cover CW x CH); SX,SY = the initial scroll offset.
+	CW int `cbor:"cw,omitempty"`
+	CH int `cbor:"ch,omitempty"`
+	SX int `cbor:"sx,omitempty"`
+	SY int `cbor:"sy,omitempty"`
 }
 
 type Layers struct {
@@ -191,7 +198,8 @@ type Done struct {
 	Seq   int    `cbor:"seq"`
 	Ms    int    `cbor:"ms"` // server render time
 	Tiles int    `cbor:"tiles"`
-	Bytes int    `cbor:"bytes"` // tile payload bytes in this update
+	Bytes int    `cbor:"bytes"`          // tile payload bytes in this update
+	More  bool   `cbor:"more,omitempty"` // progressive load: another `done` follows (the first one marks the first screenful)
 }
 
 // Write encodes v and writes one frame.
@@ -271,6 +279,7 @@ type DialogReply struct {
 	ID   int    `cbor:"id"`
 	OK   bool   `cbor:"ok"`
 	Text string `cbor:"text,omitempty"`
+	Pass string `cbor:"pass,omitempty"` // auth dialogs: Text = user name, Pass = password
 }
 
 // Download is informational: v1 never downloads in the cloud.
@@ -279,4 +288,12 @@ type Download struct {
 	URL     string `cbor:"url"`
 	Name    string `cbor:"name"`
 	Refused bool   `cbor:"refused"`
+}
+
+// Settings is the per-device byte budget (stored by the server per device and applied to every later tile).
+// Quality 0 = default (70); Gray = grayscale tiles.
+type Settings struct {
+	T       string `cbor:"t"`
+	Quality int    `cbor:"q,omitempty"`
+	Gray    bool   `cbor:"gray,omitempty"`
 }

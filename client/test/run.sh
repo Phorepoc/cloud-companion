@@ -60,6 +60,23 @@ crun -type hello -url "$LAYERS" | tee "$RUN/c2.txt" | grep -E "^(SUMMARY|layers|
 crun -url https://en.m.wikipedia.org/wiki/Nokia | tee "$RUN/c3.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
 crun -scenario gaps -url "$GAPS" | tee "$RUN/c4.txt" | grep -E "^(SUMMARY|  dialog|PASS|FAIL)" | cut -c1-120 || true
 
+SCROLL=$(cat testdata/scroll.url)
+PHOTO=$(cat testdata/photo.url)
+echo "== round 5 scenarios: scroll layer, HTTP auth, certificate error, byte budget"
+gorun -scenario scroll -url "$SCROLL" | tee "$RUN/go5.txt" | grep -E "^(SUMMARY|  layer)" | cut -c1-120 || true
+crun -scenario scroll -url "$SCROLL" | tee "$RUN/c5.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
+gorun -url https://httpbin.org/basic-auth/zed/pw | tee "$RUN/go6.txt" | grep -E "^(SUMMARY|  dialog)" | cut -c1-120 || true
+crun -url https://httpbin.org/basic-auth/zed/pw | tee "$RUN/c6.txt" | grep -E "^(SUMMARY|  dialog|PASS|FAIL)" | cut -c1-120 || true
+gorun -url https://127.0.0.1:7400/ | tee "$RUN/go7.txt" | grep -E "^(SUMMARY|  dialog)" | cut -c1-120 || true
+crun -url https://127.0.0.1:7400/ | tee "$RUN/c7.txt" | grep -E "^(SUMMARY|  dialog|PASS|FAIL)" | cut -c1-120 || true
+gorun -q 35 -gray -url "$PHOTO" | tee "$RUN/go8.txt" | grep -E "^SUMMARY" | cut -c1-120 || true
+crun -q 35 -gray -url "$PHOTO" | tee "$RUN/c8.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
+gorun -q 70 -url "$PHOTO" | tee "$RUN/go9.txt" | grep -E "^SUMMARY" | cut -c1-120 || true
+crun -q 70 -url "$PHOTO" | tee "$RUN/c9.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
+echo "== time to first screen (Wikipedia, progressive)"
+grep -E "first screen" "$RUN/go3.txt" | head -1
+grep -E "^TIMING" "$RUN/c3.txt" | head -1
+
 # field(file, step, name)
 field() { grep "^SUMMARY step=$2 " "$1" | head -1 | tr ' ' '\n' | grep "^$3=" | cut -d= -f2-; }
 bad=0
@@ -95,5 +112,13 @@ cmp_fields 4 key fvalue
 cmp_fields 4 select sel opts
 cmp_fields 4 dialog title dialogs dlgkind dlgmsg focus
 cmp_fields 4 download dl dlname title
-for n in 1 2 3 4; do grep -q "^PASS" "$RUN/c$n.txt" || { echo "C test $n did not PASS"; bad=1; }; done
+cmp_fields 5 open url h tiles tilebytes hx regions layers title
+cmp_fields 5 scrolltap url title regions layers
+cmp_fields 6 open url dialogs dlgkind
+cmp_fields 7 open url dialogs dlgkind
+cmp_fields 8 open url h tiles tilebytes hx regions
+cmp_fields 9 open url h tiles tilebytes hx regions
+gb=$(field "$RUN/go8.txt" open tilebytes); gd=$(field "$RUN/go9.txt" open tilebytes)
+if [ -n "$gb" ] && [ -n "$gd" ] && [ "$gb" -lt "$gd" ]; then echo "ok   byte budget (q=35, gray): $gb bytes < $gd default"; else echo "MISMATCH byte budget: $gb not below $gd"; bad=1; fi
+for n in 1 2 3 4 5 6 7 8 9; do grep -q "^PASS" "$RUN/c$n.txt" || { echo "C test $n did not PASS"; bad=1; }; done
 if [ $bad = 0 ]; then echo "ALL MATCH"; else echo "DIFFERENCES FOUND"; exit 1; fi

@@ -5,6 +5,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,8 +25,8 @@ type tval struct {
 
 // session is one phone connection with one browser tab. Requests are handled one at a time.
 type dialogAnswer struct {
-	ok   bool
-	text string
+	ok         bool
+	text, pass string
 }
 
 type session struct {
@@ -44,6 +45,8 @@ type session struct {
 	url    string
 	cache  map[tkey]tval
 	layers []browser.Layer
+	opts   tiles.Options // the per-device byte budget
+	loaded bool
 }
 
 func (s *session) close() {
@@ -54,7 +57,26 @@ func (s *session) close() {
 }
 
 func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
+	if !s.loaded {
+		s.loaded = true
+		if b := s.srv.Store.LoadSettings(s.dev); len(b) > 0 {
+			var st proto.Settings
+			if json.Unmarshal(b, &st) == nil {
+				s.opts = tiles.Options{Quality: st.Quality, Gray: st.Gray}
+			}
+		}
+	}
 	switch t {
+	case proto.TSettings:
+		var st proto.Settings
+		if err := proto.Decode(raw, &st); err != nil {
+			return err
+		}
+		s.opts = tiles.Options{Quality: st.Quality, Gray: st.Gray}
+		b, _ := json.Marshal(st)
+		s.srv.Store.SaveSettings(s.dev, b)
+		s.cache = nil // re-send every tile with the new budget on the next update
+		return nil
 	case proto.TPing:
 		return s.c.send(proto.Header{T: proto.TPong})
 	case proto.TOpen:
@@ -79,18 +101,20 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		if err := s.br.Open(ctx, o.URL, o.Width, o.DPR); err != nil {
 			return err
 		}
-		return s.update(ctx, start)
+		return s.update(ctx, start, true)
 	}
 	if s.br == nil {
 		return errors.New("no page open")
 	}
 	start := time.Now()
+	progressive := false // page loads and taps (which usually navigate) stream the first screenful first
 	switch t {
 	case proto.TNavigate:
 		var n proto.Navigate
 		if err := proto.Decode(raw, &n); err != nil {
 			return err
 		}
+		progressive = true
 		if err := s.br.Navigate(ctx, n.URL, n.Action); err != nil {
 			return err
 		}
@@ -101,6 +125,7 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		}
 		switch in.Kind {
 		case "tap":
+			progressive = true
 			x, y, sy := in.X, in.Y, in.SY
 			if in.Layer != 0 {
 				var l *browser.Layer
@@ -111,6 +136,12 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 				}
 				if l == nil {
 					return fmt.Errorf("no layer %d", in.Layer)
+				}
+				if l.Kind == "scroll" {
+					if err := s.br.TapScroll(ctx, in.Layer, in.X, in.Y); err != nil {
+						return err
+					}
+					break
 				}
 				x, y = l.X+in.X, l.Y+in.Y
 				if l.Kind == "fixed" {
@@ -142,17 +173,35 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 	default:
 		return fmt.Errorf("unknown frame %q", t)
 	}
-	return s.update(ctx, start)
+	return s.update(ctx, start, progressive)
 }
 
 // update snapshots the page and sends what changed since the last update.
-func (s *session) update(ctx context.Context, start time.Time) error {
+// update snapshots the page and sends what changed. progressive (page loads): the first screenful goes out first with
+// done.more = true, the rest follows after the lazy-load pass.
+func (s *session) update(ctx context.Context, start time.Time, progressive bool) error {
+	if progressive {
+		t0 := time.Now()
+		sn, err := s.br.Snapshot(ctx, true)
+		if err != nil {
+			return err
+		}
+		if err := s.sendSnapshot(ctx, start, sn, int(time.Since(t0).Milliseconds()), sn.Partial); err != nil {
+			return err
+		}
+		if !sn.Partial {
+			return nil
+		}
+	}
 	t0 := time.Now()
-	sn, err := s.br.Snapshot(ctx)
+	sn, err := s.br.Snapshot(ctx, false)
 	if err != nil {
 		return err
 	}
-	snapMs := int(time.Since(t0).Milliseconds())
+	return s.sendSnapshot(ctx, start, sn, int(time.Since(t0).Milliseconds()), false)
+}
+
+func (s *session) sendSnapshot(ctx context.Context, start time.Time, sn *browser.Snapshot, snapMs int, more bool) error {
 	fresh := sn.URL != s.url || s.cache == nil
 	if fresh {
 		s.pid++
@@ -168,7 +217,8 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 	}
 	var ll []proto.Layer
 	for _, l := range sn.Layers {
-		ll = append(ll, proto.Layer{ID: l.ID, Kind: l.Kind, X: l.X, Y: l.Y, W: l.W, H: l.H, Z: l.Z, Top: l.Top, Bottom: l.Bottom})
+		ll = append(ll, proto.Layer{ID: l.ID, Kind: l.Kind, X: l.X, Y: l.Y, W: l.W, H: l.H, Z: l.Z, Top: l.Top, Bottom: l.Bottom,
+			CW: l.CW, CH: l.CH, SX: l.SX, SY: l.SY})
 	}
 	if err := s.c.send(proto.Layers{T: proto.TLayers, PID: s.pid, Seq: s.seq, List: ll}); err != nil {
 		return err
@@ -184,7 +234,7 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 			if old, ok := s.cache[k]; ok && old.hash == t.Hash && old.w == t.W && old.h == t.H {
 				continue
 			}
-			if err := tiles.Encode(im, &t); err != nil {
+			if err := tiles.EncodeOpt(im, &t, s.opts); err != nil {
 				return err
 			}
 			s.cache[k] = tval{t.Hash, t.W, t.H}
@@ -233,12 +283,12 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 			return sn.URL[:100]
 		}
 		return sn.URL
-	}(), "h", sn.H, "layers", len(sn.Layers), "regions", len(rr), "tiles", nt, "bytes", nb, "ms", ms, "snapshot_ms", snapMs)
-	return s.c.send(proto.Done{T: proto.TDone, PID: s.pid, Seq: s.seq, Ms: ms, Tiles: nt, Bytes: nb})
+	}(), "h", sn.H, "layers", len(sn.Layers), "regions", len(rr), "tiles", nt, "bytes", nb, "ms", ms, "snapshot_ms", snapMs, "more", more)
+	return s.c.send(proto.Done{T: proto.TDone, PID: s.pid, Seq: s.seq, Ms: ms, Tiles: nt, Bytes: nb, More: more})
 }
 
 // onDialog runs on the browser's event goroutine: ask the phone and wait for its reply (60 s, then dismiss).
-func (s *session) onDialog(d browser.Dialog) (bool, string) {
+func (s *session) onDialog(d browser.Dialog) browser.Answer {
 	s.dmu.Lock()
 	s.dnext++
 	id := s.dnext
@@ -247,15 +297,15 @@ func (s *session) onDialog(d browser.Dialog) (bool, string) {
 	s.dmu.Unlock()
 	defer func() { s.dmu.Lock(); delete(s.dialogs, id); s.dmu.Unlock() }()
 	if err := s.c.send(proto.Dialog{T: proto.TDialog, ID: id, Kind: d.Kind, Message: d.Message, Default: d.Default, URL: d.URL}); err != nil {
-		return false, ""
+		return browser.Answer{}
 	}
 	select {
 	case a := <-ch:
-		return a.ok, a.text
+		return browser.Answer{OK: a.ok, Text: a.text, Pass: a.pass}
 	case <-time.After(60 * time.Second):
 	case <-s.done:
 	}
-	return false, ""
+	return browser.Answer{}
 }
 
 func (s *session) dialogReply(raw []byte) {
@@ -268,7 +318,7 @@ func (s *session) dialogReply(raw []byte) {
 	s.dmu.Unlock()
 	if ch != nil {
 		select {
-		case ch <- dialogAnswer{r.OK, r.Text}:
+		case ch <- dialogAnswer{r.OK, r.Text, r.Pass}:
 		default:
 		}
 	}

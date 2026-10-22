@@ -27,6 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 static int failures;
@@ -164,7 +165,7 @@ static void cpy(char *d, size_t cap, const char *s)
 
 static void on_dialog(void *user, const phc_dialog *d)
 {
-    static const char *names[] = {"alert", "confirm", "prompt", "beforeunload"};
+    static const char *names[] = {"alert", "confirm", "prompt", "beforeunload", "auth", "cert"};
     (void)user;
     dialogs++;
     if (dialogs == 1) {
@@ -172,7 +173,9 @@ static void on_dialog(void *user, const phc_dialog *d)
         cpy(dlg_msg, sizeof dlg_msg, d->message);
     }
     printf("  dialog #%d %s \"%s\" default \"%s\" -> replying ok\n", d->id, names[d->kind], d->message, d->def);
-    phc_dialog_reply(&c, d->id, 1, "Zed");
+    if (d->kind == PHC_DLG_AUTH) phc_dialog_reply_auth(&c, d->id, 1, "zed", "pw");
+    else if (d->kind == PHC_DLG_CERT) phc_dialog_reply(&c, d->id, 0, "");   /* do not continue past a certificate error */
+    else phc_dialog_reply(&c, d->id, 1, "Zed");
 }
 
 static void on_download(void *user, const phc_download *d)
@@ -192,6 +195,16 @@ static const char *sp(const char *s, char *buf, size_t cap)
     return buf;
 }
 
+static long done_tiles;      /* sum of done.tiles over the progressive phases of one step */
+static double first_screen_ms, step_t0;
+
+static double now_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1e6;
+}
+
 static void summary(const char *step)
 {
     static const char *fk[] = {"none", "text", "textarea", "select"};
@@ -204,6 +217,7 @@ static void summary(const char *step)
             for (k = 0; k < nopts; k++) if (c.opts[c.regions[i].opt_first + k].selected) sel = k;
             break;
         }
+    printf("TIMING step=%s first_screen_ms=%.0f\n", step, first_screen_ms);
     printf("SUMMARY step=%s url=%.100s h=%d tiles=%ld tilebytes=%ld hx=%016llx regions=%d layers=%d trunc=%s "
            "title=%s back=%s fwd=%s focus=%s ftype=%s fvalue=%s opts=%d sel=%d dialogs=%d dlgkind=%s dlgmsg=%s dl=%d dlname=%s\n",
            step, c.page.url, c.page.h, c.stats.tiles, c.stats.tile_bytes, (unsigned long long)c.stats.hash_xor, c.nregions,
@@ -218,17 +232,24 @@ static void new_step(void)
     phc_stats_reset(&c);
     png_tiles = jpg_tiles = bad_tiles = 0;
     dialogs = downloads = 0;
+    done_tiles = 0;
+    step_t0 = now_ms();
     dlg_kind[0] = dlg_msg[0] = dl_name[0] = 0;
 }
 
 static int pump(const char *what)
 {
-    int rc;
+    int rc, first = 1;
     for (;;) {
         rc = phc_pump(&c);
         if (rc == PHC_WOULDBLOCK) {   /* non-blocking transport: wait for the socket, then retry */
             if (c.io.wait) c.io.wait(c.io.ctx);
             continue;
+        }
+        if (rc == PHC_OK) {
+            done_tiles += c.done.tiles;
+            if (first) { first_screen_ms = now_ms() - step_t0; first = 0; }
+            if (c.done.more) continue;   /* progressive load: the first screenful arrived, wait for the rest */
         }
         break;
     }
@@ -258,18 +279,35 @@ static int is_text(const phc_region *r, void *a) { (void)a; return r->kind == PH
 static int is_select(const phc_region *r, void *a) { (void)a; return r->kind == PHC_REGION_SELECT; }
 static int has_label(const phc_region *r, void *a) { return strcmp(r->label, (const char *)a) == 0; }
 
-/* tap the middle of a region through the real hit-test, scrolling so it is on screen; asserts the hit-test finds it */
+/* tap the middle of a region through the real hit-test, scrolling so it is on screen; asserts the hit-test finds it.
+ * A region inside an inner scroll layer: the box is scrolled locally (phc_layer_scroll) until the region is visible. */
 static int tap_region(const phc_region *r, const char *step)
 {
     int cx = r->x + r->w / 2, cy = r->y + r->h / 2;
-    int scroll = cy - 320, maxs = c.page.h - 640, sy;
+    int scroll = 0, maxs = c.page.h - 640, sy, k;
     phc_hit hit;
-    if (scroll > maxs) scroll = maxs;
-    if (scroll < 0) scroll = 0;
-    sy = cy - scroll;
+    if (r->layer != 0) {
+        const phc_layer *l = NULL;
+        for (k = 0; k < c.nlayers; k++) if (c.layers[k].id == r->layer) l = &c.layers[k];
+        CHECK(l != NULL, "region %d is in unknown layer %d", r->id, r->layer);
+        if (!l) return -1;
+        if (l->kind == PHC_LAYER_SCROLL) {   /* put the region in the middle of the box, then convert to screen coordinates */
+            phc_layer_scroll(&c, l->id, cx - l->w / 2 - l->scroll_x, cy - l->h / 2 - l->scroll_y);
+            cx = l->x + (cx - l->scroll_x);
+            sy = phc_layer_screen_y(l, 0, 640) + (cy - l->scroll_y);
+        } else {
+            cx = l->x + cx;
+            sy = phc_layer_screen_y(l, 0, 640) + cy;
+        }
+    } else {
+        scroll = cy - 320;
+        if (scroll > maxs) scroll = maxs;
+        if (scroll < 0) scroll = 0;
+        sy = cy - scroll;
+    }
     phc_hit_test(&c, scroll, 640, cx, sy, &hit);
     CHECK(hit.region && hit.region->id == r->id, "hit-test missed region %d (got %d)", r->id, hit.region ? hit.region->id : -1);
-    printf("tapping #%d \"%s\" at screen (%d,%d) scroll %d\n", r->id, r->label, cx, sy, scroll);
+    printf("tapping #%d \"%s\" at screen (%d,%d) scroll %d layer %d\n", r->id, r->label, cx, sy, scroll, r->layer);
     new_step();
     if (phc_tap_screen(&c, scroll, 640, cx, sy, &hit)) { failures++; return -1; }
     return step_done(step);
@@ -278,6 +316,7 @@ static int tap_region(const phc_region *r, const char *step)
 int main(int argc, char **argv)
 {
     const char *addr = "127.0.0.1:7400", *state = "c-state.txt", *code = NULL, *type = NULL, *scenario = NULL;
+    int quality = 0, gray = 0;
     const char *urls[8];
     int nurls = 0, tap = 0, tls = 0, i, fd;
     phc_creds cr;
@@ -298,6 +337,8 @@ int main(int argc, char **argv)
         else if (!strcmp(argv[i], "-url") && i + 1 < argc && nurls < 8) urls[nurls++] = argv[++i];
         else if (!strcmp(argv[i], "-tap-first-link")) tap = 1;
         else if (!strcmp(argv[i], "-tls")) tls = 1;
+        else if (!strcmp(argv[i], "-q") && i + 1 < argc) quality = atoi(argv[++i]);
+        else if (!strcmp(argv[i], "-gray")) gray = 1;
     }
     memset(&cr, 0, sizeof cr);
     memset(fp, 0, sizeof fp);
@@ -338,6 +379,8 @@ int main(int argc, char **argv)
     save_state(state, &cr, tls ? fp : NULL);
     printf("authenticated as %s\n", cr.dev);
 
+    if (quality > 0 || gray) phc_settings(&c, quality, gray);
+
     for (i = 0; i < nurls; i++) {
         const phc_region *r;
         new_step();
@@ -347,7 +390,7 @@ int main(int argc, char **argv)
         CHECK(c.page.w == 360, "page width %d", c.page.w);
         CHECK(png_tiles + jpg_tiles == c.stats.tiles && bad_tiles == 0, "tile container check: png %d jpeg %d bad %d of %ld", png_tiles, jpg_tiles, bad_tiles, c.stats.tiles);
         CHECK(phc_tile_lookup(&c, 0, 0, 0) != NULL, "cache has no tile (0,0)");
-        CHECK(c.stats.tiles == (long)c.done.tiles, "done.tiles %d != received %ld", c.done.tiles, c.stats.tiles);
+        CHECK(c.stats.tiles == done_tiles, "sum of done.tiles %ld != received %ld", done_tiles, c.stats.tiles);
 
         if (tap && i == 0) {
             r = find_region(is_link0, NULL);
@@ -370,6 +413,14 @@ int main(int argc, char **argv)
                 if (phc_text(&c, r->id, type, 0)) { failures++; break; }
                 if (step_done("typed")) break;
                 CHECK(c.stats.tiles >= 1, "typing changed no tile");
+            }
+        }
+        if (scenario && !strcmp(scenario, "scroll") && i == 0) {
+            r = find_region(has_label, (void *)"deep");
+            CHECK(r != NULL && r->layer != 0, "scroll: no region inside the scroll layer");
+            if (r) {
+                if (tap_region(r, "scrolltap")) break;
+                CHECK(!strcmp(c.page.title, "Deep"), "scroll tap: title '%s'", c.page.title);
             }
         }
         if (scenario && !strcmp(scenario, "gaps") && i == 0) {

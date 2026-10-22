@@ -58,6 +58,8 @@ func main() {
 	tap := flag.Bool("tap-first-link", false, "after the first page, tap the first link and report the update")
 	fp := flag.String("fp", "", "expected server certificate fingerprint at pairing (else trust on first use)")
 	scenario := flag.String("scenario", "", "gaps: focus, select, dialog and download steps on the first page")
+	quality := flag.Int("q", 0, "byte budget: JPEG quality 1-100 (0 = default)")
+	gray := flag.Bool("gray", false, "byte budget: grayscale tiles")
 	typ := flag.String("type", "", "after the first page, type this text into the first input")
 	var us urls
 	flag.Var(&us, "url", "URL to open (repeatable)")
@@ -128,6 +130,9 @@ func main() {
 	}
 
 	wconn = nc
+	if *quality > 0 || *gray {
+		proto.Write(nc, proto.Settings{T: proto.TSettings, Quality: *quality, Gray: *gray})
+	}
 	var totalWire int64
 	step := func(name, label string, send func()) *summary {
 		before := cr.n
@@ -141,7 +146,7 @@ func main() {
 	tapRegion := func(name string, r proto.Region) *summary {
 		fmt.Printf("tapping #%d %q at (%d,%d)\n", r.ID, r.Label, r.X+r.W/2, r.Y+r.H/2)
 		return step(name, "(after tap)", func() {
-			proto.Write(nc, proto.Input{T: proto.TInput, Kind: "tap", X: r.X + r.W/2, Y: r.Y + r.H/2})
+			proto.Write(nc, proto.Input{T: proto.TInput, Kind: "tap", Layer: r.Layer, X: r.X + r.W/2, Y: r.Y + r.H/2})
 		})
 	}
 	find := func(rs []proto.Region, pred func(proto.Region) bool) *proto.Region {
@@ -166,6 +171,11 @@ func main() {
 				step("typed", "(after text input)", func() {
 					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "text", ID: r.ID, Text: *typ})
 				})
+			}
+		}
+		if *scenario == "scroll" && i == 0 {
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "deep" }); r != nil {
+				tapRegion("scrolltap", *r)
 			}
 		}
 		if *scenario == "gaps" && i == 0 {
@@ -206,6 +216,7 @@ type summary struct {
 	srvMs            int
 	rtt              time.Duration
 	firstTile        time.Duration
+	firstDone        time.Duration
 	focus            proto.Focus
 	dialogs          int
 	dlgKind, dlgMsg  string
@@ -234,7 +245,14 @@ func collect(r *counter, dir string, start time.Time) *summary {
 			if s.dialogs == 1 {
 				s.dlgKind, s.dlgMsg = d.Kind, d.Message
 			}
-			fmt.Printf("  dialog #%d %s %q default %q -> replying ok\n", d.ID, d.Kind, d.Message, d.Default)
+			ans := proto.DialogReply{T: proto.TDialogReply, ID: d.ID, OK: true, Text: "Zed"}
+			switch d.Kind {
+			case "auth":
+				ans.Text, ans.Pass = "zed", "pw"
+			case "cert":
+				ans.OK = false
+			}
+			proto.Write(wconn, ans)
 			proto.Write(wconn, proto.DialogReply{T: proto.TDialogReply, ID: d.ID, OK: true, Text: "Zed"})
 		case proto.TDownload:
 			var d proto.Download
@@ -273,6 +291,12 @@ func collect(r *counter, dir string, start time.Time) *summary {
 			var d proto.Done
 			proto.Decode(raw, &d)
 			s.srvMs = d.Ms
+			if s.firstDone == 0 {
+				s.firstDone = time.Since(start)
+			}
+			if d.More { // progressive load: the first screenful is in, the rest follows
+				continue
+			}
 			s.rtt = time.Since(start)
 			return s
 		case proto.TError:
@@ -321,7 +345,7 @@ func (s *summary) print(step, label string, wire int64) {
 	fmt.Printf("   tiles %d (png %d = %d B, jpeg %d = %d B)  tile bytes %d  wire bytes %d\n",
 		s.tiles, s.png, s.pngB, s.jpg, s.jpgB, s.pngB+s.jpgB, wire)
 	fmt.Printf("   layers %d  regions %d %v\n", s.layers, len(s.regions), kinds)
-	fmt.Printf("   server render %d ms  first tile %d ms  complete %d ms\n", s.srvMs, s.firstTile.Milliseconds(), s.rtt.Milliseconds())
+	fmt.Printf("   server render %d ms  first tile %d ms  first screen %d ms  complete %d ms\n", s.srvMs, s.firstTile.Milliseconds(), s.firstDone.Milliseconds(), s.rtt.Milliseconds())
 }
 
 func fatal(err error) {

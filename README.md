@@ -51,6 +51,14 @@ with a fixed header, a sticky bar, a fixed footer and an input, for the layers.
   inputmode); `input` kinds `key`, `select` and `text` into the focused field; `<select>` options in the region list;
   `dialog`/`dialogreply` (alert, confirm, prompt, beforeunload; the page waits for the phone, 60 s timeout); `download`
   (downloads are refused in the cloud and reported). Each tab is its own browser context, so these are per device.
+- **Round 5**: progressive loads (page load and taps send the first three tile rows and everything near them first, with
+  `done.more = true`, then the rest after the lazy-image pass); the layout is always exactly 360 px (not "mobile" emulation, so
+  pages without a viewport meta no longer render at 980 px and get cropped) and layers are clamped to the viewport; inner
+  `overflow:auto` boxes of known size become `scroll` layers (the whole content is rendered, the phone scrolls it locally, a tap
+  inside it carries content coordinates and the server scrolls the real box to that point); HTTP authentication (`dialog` kind
+  `auth`, reply `text` = user and `pass`) and certificate errors (`dialog` kind `cert`; OK = load once with errors ignored); a
+  per-device byte budget (`settings`: JPEG quality, grayscale), applied to every later tile.
+
 ## Measured (2026-10-22, round 2: event-driven settle, TLS 1.3, warm tab pool; Ryzen server container, 2 CPUs, loopback)
 Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done on the server (navigation, settle, screenshots, tiling, encoding). Round 1 (fixed sleeps) in brackets.
 
@@ -65,6 +73,22 @@ Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done
 
 Per-update fixed cost is now: Snapshot about 70-110 ms (screenshots + tiling) plus one 60 ms network-quiet window and two animation frames. The rest of a load is Chromium fetching the page; Wikipedia is dominated by about 5000 px of lazy images (the scroll pass only runs when the page has lazy images). Idle server 16 MiB plus Chromium (2 warm tabs).
 
+
+### Round 5 (progressive load, scroll layers, auth/cert dialogs, byte budget)
+Server render with the first screenful streamed first (`done.more`); "first screen" = time until the first `done`, as seen by
+the client (round 4 in brackets where measured before: the whole page arrived at once):
+
+| page | first screen | complete | tile bytes |
+|---|---|---|---|
+| https://example.com | 0.35-0.38 s | 0.43-0.47 s [0.40-0.50 s] | 32 KB |
+| Wikipedia, Nokia article (5.3k px) | **1.3 s** [5.1 s] | 5.3 s | 446 KB |
+| https://news.ycombinator.com | 1.2 s | 1.65 s [1.5 s] | 303 KB |
+| tap link on example.com -> iana.org | 0.9 s | 1.04 s [1.05 s] | 59 KB |
+| text into a focused input | 0.31 s | 0.31 s [0.33 s] | 5 KB |
+
+Wikipedia's remaining 4 s are the lazy-image pass over 5000 px (it now runs once per page load, not on every update).
+Byte budget (`settings` frame, per device, stored by the server): a gradient test page of 4 tiles is 16.8 KB at JPEG q70 and
+8.6 KB at q35 + grayscale.
 ## Not done yet (next)
 - Scopes and token expiry; a web admin/login (passkeys).
 - Incremental updates without a full re-screenshot (MutationObserver dirty rects), image/video elements, popups and
