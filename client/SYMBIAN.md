@@ -152,3 +152,15 @@ These frames are implemented in the server, the Go client and the C core, and cr
 5. **Several views on one connection**: add a view id to every frame so a browser with five tabs uses one TLS connection.
 6. **Bandwidth**: tiles are lossless PNG for text; a paletted-PNG decoder is the cheapest path, and the server may later send a
    zstd/deflate-compressed tile stream if the decoder is a bottleneck.
+
+## Round 8 additions: server-side zoom and views
+- **Zoom**: `welcome.features` lists `zoom` (`c->feat_zoom`). `phc_zoom(c, pct)` asks for a render scale (100, 125, 150, 200, 250 or 300); the
+  answer is the usual page + tiles + regions with `page.zoom = pct` and `page.reset = 1` (the core drops its tile cache). All geometry is in
+  device pixels at that scale, so the plug-in's pinch maps to: scale the cached tiles during the gesture, then `phc_zoom` with the nearest
+  ladder value, then keep the window centre (`pct_new / pct_old` times the old centre) when the new tiles arrive. `PHE_CAP_ZOOM` can now be
+  advertised when the feature is present; `zoom_permille` = `page.zoom * 10 * local factor`.
+- **Views**: `phc_tab(c, "new" | "close" | "switch" | "list", v)` (answer: `phc_pump_tabs`, which returns after a `tabs` frame; `c->tabs[]`,
+  `c->active_tab`), `phc_set_view(c, v)` chooses the view later requests are about; frames of other views are ignored. Map views to
+  `PheView` ids (one connection, `max_views = 3`); `view_create` = tab new + open, `view_destroy` = tab close, switching the visible tab =
+  `switch` (the server re-sends the page; the plug-in can keep the old bitmaps meanwhile and discard them at the first new tile). The server
+  sends the `tabs` list before the `done` of an update whose title/url changed, so a step that ends at `done` has already consumed it.

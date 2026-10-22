@@ -5,7 +5,7 @@
 #include "phc_sha256.h"
 #include <string.h>
 
-enum { T_UNKNOWN, T_CHALLENGE, T_WELCOME, T_ERROR, T_PAGE, T_TILE, T_LAYERS, T_REGIONS, T_DONE, T_PONG, T_FOCUS, T_DIALOG, T_DOWNLOAD };
+enum { T_UNKNOWN, T_CHALLENGE, T_WELCOME, T_ERROR, T_PAGE, T_TILE, T_LAYERS, T_REGIONS, T_DONE, T_PONG, T_FOCUS, T_DIALOG, T_DOWNLOAD, T_TABS };
 
 void phc_init(phc *c, phc_transport io, uint8_t *rxbuf, size_t rxcap)
 {
@@ -13,6 +13,8 @@ void phc_init(phc *c, phc_transport io, uint8_t *rxbuf, size_t rxcap)
     c->io = io;
     c->rx = rxbuf;
     c->rx_cap = rxcap;
+    c->view = 1;
+    c->page.zoom = 100;
 }
 
 void phc_set_events(phc *c, phc_events ev) { c->ev = ev; }
@@ -84,6 +86,7 @@ static int frame_type(const uint8_t *p, size_t n)
             if (phc_text_eq(v, vl, "focus")) return T_FOCUS;
             if (phc_text_eq(v, vl, "dialog")) return T_DIALOG;
             if (phc_text_eq(v, vl, "download")) return T_DOWNLOAD;
+            if (phc_text_eq(v, vl, "tabs")) return T_TABS;
             return T_UNKNOWN;
         }
         if (phc_r_skip(&r)) return T_UNKNOWN;
@@ -105,8 +108,9 @@ static int send_frame(phc *c, const phc_w *w)
 static void begin(phc *c, phc_w *w, const char *type, unsigned nkeys)
 {
     phc_w_init(w, c->tx + 4, sizeof c->tx - 4);
-    phc_w_map(w, nkeys + 1);
+    phc_w_map(w, nkeys + 2);
     phc_w_kv_text(w, "t", type);
+    phc_w_kv_int(w, "v", c->view);
 }
 
 int phc_open(phc *c, const char *url, int width)
@@ -315,12 +319,15 @@ static int on_page(phc *c, phc_r *r)
         else if (phc_text_eq(k, kl, "trunc")) rc = phc_r_bool(r, &p.trunc);
         else if (phc_text_eq(k, kl, "back")) rc = phc_r_bool(r, &p.back);
         else if (phc_text_eq(k, kl, "fwd")) rc = phc_r_bool(r, &p.fwd);
+        else if (phc_text_eq(k, kl, "zoom")) rc = get_int(r, &p.zoom);
+        else if (phc_text_eq(k, kl, "reset")) rc = phc_r_bool(r, &p.reset);
         else if (phc_text_eq(k, kl, "url")) rc = copy_text(r, p.url, sizeof p.url);
         else if (phc_text_eq(k, kl, "title")) rc = copy_text(r, p.title, sizeof p.title);
         else rc = phc_r_skip(r);
         if (rc) return PHC_ERR_PROTO;
     }
-    if (p.pid != c->page.pid) c->ntiles = 0;   /* a new page: nothing cached applies */
+    if (p.zoom == 0) p.zoom = 100;
+    if (p.pid != c->page.pid || p.reset) c->ntiles = 0;   /* a new page, or the same page at another scale: nothing cached applies */
     c->page = p;
     if (c->ev.on_page) c->ev.on_page(c->ev.user, &c->page);
     return PHC_OK;
@@ -608,12 +615,70 @@ static int on_done(phc *c, phc_r *r)
     return PHC_OK;
 }
 
-/* returns PHC_OK to keep reading, 1 after a `done`, or an error */
+/* the "v" (view) of a frame: 1 when absent */
+static int frame_view(const uint8_t *p, size_t n)
+{
+    phc_r r;
+    uint32_t cnt, i;
+    phc_r_init(&r, p, n);
+    if (phc_r_map(&r, &cnt)) return 1;
+    for (i = 0; i < cnt; i++) {
+        const char *k;
+        size_t kl;
+        uint64_t v;
+        if (phc_r_text(&r, &k, &kl)) return 1;
+        if (phc_text_eq(k, kl, "v")) return phc_r_uint(&r, &v) ? 1 : (int)v;
+        if (phc_r_skip(&r)) return 1;
+    }
+    return 1;
+}
+
+static int on_tabs(phc *c, phc_r *r)
+{
+    uint32_t n, i, cnt, j;
+    c->ntabs = 0;
+    if (phc_r_map(r, &n)) return PHC_ERR_PROTO;
+    for (i = 0; i < n; i++) {
+        const char *k;
+        size_t kl;
+        if (phc_r_text(r, &k, &kl)) return PHC_ERR_PROTO;
+        if (phc_text_eq(k, kl, "active")) { if (get_int(r, &c->active_tab)) return PHC_ERR_PROTO; continue; }
+        if (!phc_text_eq(k, kl, "list")) { if (phc_r_skip(r)) return PHC_ERR_PROTO; continue; }
+        if (phc_r_array(r, &cnt)) return PHC_ERR_PROTO;
+        for (j = 0; j < cnt; j++) {
+            uint32_t m, q;
+            phc_tabinfo t;
+            memset(&t, 0, sizeof t);
+            if (phc_r_map(r, &m)) return PHC_ERR_PROTO;
+            for (q = 0; q < m; q++) {
+                const char *kk;
+                size_t kkl;
+                int rc;
+                if (phc_r_text(r, &kk, &kkl)) return PHC_ERR_PROTO;
+                if (phc_text_eq(kk, kkl, "v")) rc = get_int(r, &t.v);
+                else if (phc_text_eq(kk, kkl, "title")) rc = copy_text(r, t.title, sizeof t.title);
+                else if (phc_text_eq(kk, kkl, "url")) rc = copy_text(r, t.url, sizeof t.url);
+                else rc = phc_r_skip(r);
+                if (rc) return PHC_ERR_PROTO;
+            }
+            if (c->ntabs < PHC_MAX_TABS) c->tabs[c->ntabs++] = t;
+        }
+    }
+    return 2;
+}
+
+/* returns PHC_OK to keep reading, 1 after a `done`, 2 after a `tabs` frame, or an error */
 static int dispatch(phc *c, size_t len)
 {
     phc_r r;
     int rc, t = frame_type(c->rx, len);
     phc_r_init(&r, c->rx, len);
+    switch (t) {   /* the page frames of a view that is not shown are ignored */
+    case T_PAGE: case T_TILE: case T_LAYERS: case T_REGIONS: case T_FOCUS: case T_DONE:
+        if (frame_view(c->rx, len) != c->view) return PHC_OK;
+        break;
+    default: break;
+    }
     switch (t) {
     case T_ERROR: return on_error(c, &r);
     case T_PAGE: return on_page(c, &r);
@@ -623,22 +688,48 @@ static int dispatch(phc *c, size_t len)
     case T_FOCUS: return on_focus(c, &r);
     case T_DIALOG: return on_dialog(c, &r);
     case T_DOWNLOAD: return on_download(c, &r);
+    case T_TABS: return on_tabs(c, &r);
     case T_DONE: rc = on_done(c, &r); return rc ? rc : 1;
     case T_PONG: return PHC_OK;
     default: return PHC_OK;   /* unknown frame types are ignored: the protocol may grow */
     }
 }
 
-int phc_pump(phc *c)
+static int pump_until(phc *c, int want)
 {
     for (;;) {
         size_t len;
         int rc = read_frame(c, &len);
         if (rc) return rc;
         rc = dispatch(c, len);
-        if (rc == 1) return PHC_OK;
+        if (rc == want) return PHC_OK;
+        if (rc == 1 || rc == 2) continue;   /* a done / tabs frame we did not wait for */
         if (rc) return rc;
     }
+}
+
+int phc_pump(phc *c) { return pump_until(c, 1); }
+int phc_pump_tabs(phc *c) { return pump_until(c, 2); }
+
+int phc_tab(phc *c, const char *action, int v)
+{
+    phc_w w;
+    int saved = c->view;
+    c->view = v;                 /* the tab frame's "v" is the target view */
+    begin(c, &w, "tab", 1);
+    c->view = saved;
+    phc_w_kv_text(&w, "action", action);
+    return send_frame(c, &w);
+}
+
+void phc_set_view(phc *c, int v) { c->view = v; }
+
+int phc_zoom(phc *c, int pct)
+{
+    phc_w w;
+    begin(c, &w, "zoom", 1);
+    phc_w_kv_int(&w, "pct", pct);
+    return send_frame(c, &w);
 }
 
 /* ---- authentication ---- */
@@ -707,6 +798,16 @@ int phc_auth(phc *c, phc_creds *cr, const char *code, const char *devname)
             if (phc_r_bytes(&r, &b, &bl) || bl != sizeof cr->key) return PHC_ERR_PROTO;
             memcpy(cr->key, b, bl);
             cr->have = 1;
+        } else if (phc_text_eq(k, kl, "features")) {
+            uint32_t fc, fi;
+            if (phc_r_array(&r, &fc)) return PHC_ERR_PROTO;
+            for (fi = 0; fi < fc; fi++) {
+                const char *fs;
+                size_t fl;
+                if (phc_r_text(&r, &fs, &fl)) return PHC_ERR_PROTO;
+                if (phc_text_eq(fs, fl, "zoom")) c->feat_zoom = 1;
+                if (phc_text_eq(fs, fl, "tabs")) c->feat_tabs = 1;
+            }
         } else if (phc_r_skip(&r)) return PHC_ERR_PROTO;
     }
     return PHC_OK;

@@ -45,6 +45,9 @@ const (
 	TDevices     = "devices"     // C->S  (admin) list devices
 	TDeviceList  = "devicelist"  // S->C
 	TRevoke      = "revoke"      // C->S  (admin) revoke a device
+	TTab         = "tab"         // C->S  new | close | switch | list a view
+	TTabs        = "tabs"        // S->C  the views of this connection
+	TZoom        = "zoom"        // C->S  re-render the view at a scale (percent; needs the "zoom" feature)
 )
 
 type Header struct {
@@ -85,6 +88,7 @@ type Error struct {
 
 type Open struct {
 	T     string  `cbor:"t"`
+	V     int     `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	URL   string  `cbor:"url"`
 	Width int     `cbor:"width"`
 	DPR   float64 `cbor:"dpr"`
@@ -93,6 +97,7 @@ type Open struct {
 // Navigate: URL, or Action = back | forward | reload.
 type Navigate struct {
 	T      string `cbor:"t"`
+	V      int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	URL    string `cbor:"url,omitempty"`
 	Action string `cbor:"action,omitempty"`
 }
@@ -104,6 +109,7 @@ type Navigate struct {
 //	text:   ID = region id, Text, Submit = press Enter afterwards
 type Input struct {
 	T       string `cbor:"t"`
+	V       int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	Kind    string `cbor:"kind"`
 	Layer   int    `cbor:"layer,omitempty"`
 	X       int    `cbor:"x,omitempty"`
@@ -118,6 +124,7 @@ type Input struct {
 
 type Page struct {
 	T     string `cbor:"t"`
+	V     int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	PID   int    `cbor:"pid"`
 	Seq   int    `cbor:"seq"`
 	URL   string `cbor:"url"`
@@ -127,12 +134,15 @@ type Page struct {
 	TileW int    `cbor:"tw"`
 	TileH int    `cbor:"th"`
 	Trunc bool   `cbor:"trunc,omitempty"` // the page was cut at the height cap
+	Zoom  int    `cbor:"zoom,omitempty"`  // render scale in percent (0 = 100); tiles, regions and layers are in device pixels at this scale
+	Reset bool   `cbor:"reset,omitempty"` // same page re-rendered at another scale: drop all cached tiles
 	Back  bool   `cbor:"back,omitempty"`  // history: can go back
 	Fwd   bool   `cbor:"fwd,omitempty"`   // history: can go forward
 }
 
 type Tile struct {
 	T     string `cbor:"t"`
+	V     int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	PID   int    `cbor:"pid"`
 	Layer int    `cbor:"layer"`
 	X     int    `cbor:"x"`
@@ -167,6 +177,7 @@ type Layer struct {
 
 type Layers struct {
 	T    string  `cbor:"t"`
+	V    int     `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	PID  int     `cbor:"pid"`
 	Seq  int     `cbor:"seq"`
 	List []Layer `cbor:"list"`
@@ -192,6 +203,7 @@ type Region struct {
 
 type Regions struct {
 	T    string   `cbor:"t"`
+	V    int      `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	PID  int      `cbor:"pid"`
 	Seq  int      `cbor:"seq"`
 	List []Region `cbor:"list"`
@@ -199,6 +211,7 @@ type Regions struct {
 
 type Done struct {
 	T     string `cbor:"t"`
+	V     int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	PID   int    `cbor:"pid"`
 	Seq   int    `cbor:"seq"`
 	Ms    int    `cbor:"ms"` // server render time
@@ -256,6 +269,7 @@ type Opt struct {
 // type (text, search, email, url, tel, number, password, ...). Value is empty for password fields.
 type Focus struct {
 	T         string `cbor:"t"`
+	V         int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	PID       int    `cbor:"pid"`
 	Seq       int    `cbor:"seq"`
 	ID        int    `cbor:"id,omitempty"`
@@ -272,6 +286,7 @@ type Focus struct {
 // (or 60 s pass, then it is dismissed).
 type Dialog struct {
 	T       string `cbor:"t"`
+	V       int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	ID      int    `cbor:"id"`
 	Kind    string `cbor:"kind"`
 	Message string `cbor:"msg"`
@@ -290,6 +305,7 @@ type DialogReply struct {
 // Download is informational: v1 never downloads in the cloud.
 type Download struct {
 	T       string `cbor:"t"`
+	V       int    `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
 	URL     string `cbor:"url"`
 	Name    string `cbor:"name"`
 	Refused bool   `cbor:"refused"`
@@ -330,4 +346,54 @@ func TypeOf(b []byte) (string, error) {
 	var h Header
 	err := cbor.Unmarshal(b, &h)
 	return h.T, err
+}
+
+// MaxTabs is the per-device cap on views (tabs).
+const MaxTabs = 3
+
+// ZoomLadder lists the render scales in percent. Each divides 360 exactly (layout width 360/scale css px), so a tile row stays
+// 360 device pixels wide.
+var ZoomLadder = []int{100, 125, 150, 200, 250, 300}
+
+// SnapZoom returns the ladder entry nearest to pct.
+func SnapZoom(pct int) int {
+	best := ZoomLadder[0]
+	for _, z := range ZoomLadder {
+		if abs(z-pct) < abs(best-pct) {
+			best = z
+		}
+	}
+	return best
+}
+
+func abs(x int) int {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+// Tab: Action = new | close | switch | list; V = the view (new: omitted, the server picks the next free id).
+type Tab struct {
+	T      string `cbor:"t"`
+	Action string `cbor:"action"`
+	V      int    `cbor:"v,omitempty"`
+}
+
+type TabInfo struct {
+	V     int    `cbor:"v"`
+	Title string `cbor:"title,omitempty"`
+	URL   string `cbor:"url,omitempty"`
+}
+
+type Tabs struct {
+	T      string    `cbor:"t"`
+	Active int       `cbor:"active"`
+	List   []TabInfo `cbor:"list"`
+}
+
+type Zoom struct {
+	T   string `cbor:"t"`
+	V   int    `cbor:"v,omitempty"`
+	Pct int    `cbor:"pct"`
 }

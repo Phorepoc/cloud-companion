@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -23,12 +25,28 @@ type tval struct {
 	w, h int
 }
 
-// session is one phone connection with one browser tab. Requests are handled one at a time.
 type dialogAnswer struct {
 	ok         bool
 	text, pass string
 }
 
+// tab is one view of a connection: one browser tab and what the phone has of it. Frames of a view carry its id (`v`).
+type tab struct {
+	id     int
+	br     browser.Session
+	pid    int
+	seq    int
+	url    string
+	title  string
+	cache  map[tkey]tval
+	layers []browser.Layer
+	zoom   int  // render scale in percent
+	reset  bool // the next update re-renders the same page at another scale
+	sent   string
+}
+
+// session is one device connection with up to proto.MaxTabs views. Requests are handled one at a time; the embedded *tab is
+// the view the current request is about.
 type session struct {
 	done    chan struct{}
 	dialogs map[int]chan dialogAnswer
@@ -40,21 +58,94 @@ type session struct {
 
 	dev    string
 	admin  bool
-	br     browser.Session
-	pid    int
-	seq    int
-	url    string
-	cache  map[tkey]tval
-	layers []browser.Layer
 	opts   tiles.Options // the per-device byte budget
 	loaded bool
+
+	tabs   map[int]*tab
+	active int
+	*tab
 }
 
 func (s *session) close() {
 	close(s.done)
-	if s.br != nil {
-		s.br.Close()
+	for _, t := range s.tabs {
+		if t.br != nil {
+			t.br.Close()
+		}
 	}
+}
+
+func viewOf(raw []byte) int {
+	var h struct {
+		V int `cbor:"v"`
+	}
+	proto.Decode(raw, &h)
+	if h.V <= 0 {
+		return 1
+	}
+	return h.V
+}
+
+// tabFor returns the view v, creating it when allowed (per-device cap).
+func (s *session) tabFor(v int, create bool) (*tab, error) {
+	if t := s.tabs[v]; t != nil {
+		return t, nil
+	}
+	if !create {
+		return nil, fmt.Errorf("no view %d", v)
+	}
+	if len(s.tabs) >= proto.MaxTabs {
+		return nil, fmt.Errorf("tab limit (%d per device)", proto.MaxTabs)
+	}
+	t := &tab{id: v, zoom: 100}
+	if s.tabs == nil {
+		s.tabs = map[int]*tab{}
+	}
+	s.tabs[v] = t
+	return t, nil
+}
+
+func (s *session) sendTabs() error {
+	var ids []int
+	for id := range s.tabs {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	out := proto.Tabs{T: proto.TTabs, Active: s.active}
+	for _, id := range ids {
+		t := s.tabs[id]
+		out.List = append(out.List, proto.TabInfo{V: id, Title: t.title, URL: truncate(t.url, 200)})
+	}
+	return s.c.send(out)
+}
+
+func truncate(u string, n int) string {
+	if len(u) > n {
+		return u[:n]
+	}
+	return u
+}
+
+func (s *session) startBrowser(ctx context.Context, t *tab) error {
+	if t.br != nil {
+		return nil
+	}
+	b, err := s.srv.Browser.New(ctx)
+	if err != nil {
+		return err
+	}
+	t.br = b
+	id := t.id
+	b.SetHandlers(browser.Handlers{
+		Dialog:   func(d browser.Dialog) browser.Answer { return s.onDialog(id, d) },
+		Download: func(d browser.Download) { s.onDownload(id, d) },
+	})
+	if ck := s.srv.Store.LoadCookies(s.dev); len(ck) > 0 {
+		if err := b.SetCookies(ctx, ck); err != nil {
+			s.log.Warn("restore cookies", "err", err)
+		}
+	}
+	return nil
 }
 
 func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
@@ -76,7 +167,9 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		s.opts = tiles.Options{Quality: st.Quality, Gray: st.Gray}
 		b, _ := json.Marshal(st)
 		s.srv.Store.SaveSettings(s.dev, b)
-		s.cache = nil // re-send every tile with the new budget on the next update
+		for _, tb := range s.tabs {
+			tb.cache = nil // re-send every tile with the new budget on the next update
+		}
 		return nil
 	case proto.TDevices:
 		if !s.admin {
@@ -102,36 +195,53 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		return s.srv.Store.Revoke(r.ID)
 	case proto.TPing:
 		return s.c.send(proto.Header{T: proto.TPong})
+	case proto.TTab:
+		return s.tabAction(ctx, raw)
 	case proto.TOpen:
 		var o proto.Open
 		if err := proto.Decode(raw, &o); err != nil {
 			return err
 		}
-		start := time.Now()
-		if s.br == nil {
-			b, err := s.srv.Browser.New(ctx)
-			if err != nil {
-				return err
-			}
-			s.br = b
-			b.SetHandlers(browser.Handlers{Dialog: s.onDialog, Download: s.onDownload})
-			if ck := s.srv.Store.LoadCookies(s.dev); len(ck) > 0 {
-				if err := b.SetCookies(ctx, ck); err != nil {
-					s.log.Warn("restore cookies", "err", err)
-				}
-			}
+		tb, err := s.tabFor(viewOf(raw), true)
+		if err != nil {
+			return err
 		}
-		if err := s.br.Open(ctx, o.URL, o.Width, o.DPR); err != nil {
+		s.tab, s.active = tb, tb.id
+		start := time.Now()
+		if err := s.startBrowser(ctx, tb); err != nil {
+			return err
+		}
+		if err := tb.br.Open(ctx, o.URL, o.Width, o.DPR); err != nil {
 			return err
 		}
 		return s.update(ctx, start, true)
 	}
+	tb, err := s.tabFor(viewOf(raw), false)
+	if err != nil {
+		return err
+	}
+	s.tab, s.active = tb, tb.id
 	if s.br == nil {
 		return errors.New("no page open")
 	}
 	start := time.Now()
 	progressive := false // page loads and taps (which usually navigate) stream the first screenful first
+	z := float64(s.zoom) / 100
+	css := func(v int) int { return int(math.Round(float64(v) / z)) } // device pixels at the render scale -> css px
 	switch t {
+	case proto.TZoom:
+		var zr proto.Zoom
+		if err := proto.Decode(raw, &zr); err != nil {
+			return err
+		}
+		pct := proto.SnapZoom(zr.Pct)
+		if pct == s.zoom {
+			return nil
+		}
+		if err := s.br.SetScale(ctx, pct); err != nil {
+			return err
+		}
+		s.zoom, s.reset = pct, true
 	case proto.TNavigate:
 		var n proto.Navigate
 		if err := proto.Decode(raw, &n); err != nil {
@@ -161,7 +271,7 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 					return fmt.Errorf("no layer %d", in.Layer)
 				}
 				if l.Kind == "scroll" {
-					if err := s.br.TapScroll(ctx, in.Layer, in.X, in.Y); err != nil {
+					if err := s.br.TapScroll(ctx, in.Layer, css(in.X), css(in.Y)); err != nil {
 						return err
 					}
 					break
@@ -171,11 +281,14 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 					sy = -1 // viewport coordinates, no scrolling
 				}
 			}
-			if err := s.br.Tap(ctx, x, y, sy); err != nil {
+			if sy >= 0 {
+				sy = css(sy)
+			}
+			if err := s.br.Tap(ctx, css(x), css(y), sy); err != nil {
 				return err
 			}
 		case "scroll":
-			if err := s.br.ScrollTo(ctx, in.Y); err != nil {
+			if err := s.br.ScrollTo(ctx, css(in.Y)); err != nil {
 				return err
 			}
 		case "key":
@@ -199,7 +312,78 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 	return s.update(ctx, start, progressive)
 }
 
-// update snapshots the page and sends what changed since the last update.
+// tabAction: new | close | switch | list.
+func (s *session) tabAction(ctx context.Context, raw []byte) error {
+	var ta proto.Tab
+	if err := proto.Decode(raw, &ta); err != nil {
+		return err
+	}
+	switch ta.Action {
+	case "list":
+		return s.sendTabs()
+	case "new":
+		id := 1
+		for s.tabs[id] != nil {
+			id++
+		}
+		tb, err := s.tabFor(id, true)
+		if err != nil {
+			return err
+		}
+		s.tab, s.active = tb, id
+		return s.sendTabs()
+	case "close":
+		tb := s.tabs[ta.V]
+		if tb == nil {
+			return fmt.Errorf("no view %d", ta.V)
+		}
+		if tb.br != nil {
+			tb.br.Close()
+		}
+		delete(s.tabs, ta.V)
+		if s.tab == tb {
+			s.tab = nil
+		}
+		if s.active == ta.V { // fall back to the lowest remaining view and show it
+			s.active = 0
+			for id := 1; id <= 64; id++ {
+				if s.tabs[id] != nil {
+					s.active = id
+					break
+				}
+			}
+		}
+		if err := s.sendTabs(); err != nil {
+			return err
+		}
+		if s.active != 0 {
+			return s.showTab(ctx, s.tabs[s.active])
+		}
+		return nil
+	case "switch":
+		tb := s.tabs[ta.V]
+		if tb == nil {
+			return fmt.Errorf("no view %d", ta.V)
+		}
+		s.active = ta.V
+		if err := s.sendTabs(); err != nil {
+			return err
+		}
+		return s.showTab(ctx, tb)
+	}
+	return fmt.Errorf("unknown tab action %q", ta.Action)
+}
+
+// showTab re-sends a view in full (the phone drops what it had when it switches views).
+func (s *session) showTab(ctx context.Context, tb *tab) error {
+	s.tab = tb
+	if tb.br == nil || tb.url == "" {
+		return nil
+	}
+	tb.cache = nil
+	return s.update(ctx, time.Now(), false)
+}
+
 // update snapshots the page and sends what changed. progressive (page loads): the first screenful goes out first with
 // done.more = true, the rest follows after the lazy-load pass.
 func (s *session) update(ctx context.Context, start time.Time, progressive bool) error {
@@ -225,17 +409,29 @@ func (s *session) update(ctx context.Context, start time.Time, progressive bool)
 }
 
 func (s *session) sendSnapshot(ctx context.Context, start time.Time, sn *browser.Snapshot, snapMs int, more bool) error {
-	fresh := sn.URL != s.url || s.cache == nil
-	if fresh {
+	reset := false
+	switch {
+	case s.reset:
+		// the same page re-rendered at another scale: same pid, the phone drops its tiles
+		s.reset, reset = false, true
+		s.cache = map[tkey]tval{}
+		s.seq = 0
+	case sn.URL != s.url || s.cache == nil:
 		s.pid++
 		s.seq = 0
 		s.cache = map[tkey]tval{}
-		s.url = sn.URL
 	}
+	s.url = sn.URL
+	s.title = sn.Title
 	s.seq++
 	s.layers = sn.Layers
-	if err := s.c.send(proto.Page{T: proto.TPage, PID: s.pid, Seq: s.seq, URL: sn.URL, Title: sn.Title, W: sn.W, H: sn.H,
-		TileW: tiles.TileW, TileH: tiles.TileH, Trunc: sn.Truncated, Back: sn.Back, Fwd: sn.Fwd}); err != nil {
+	v := s.id
+	zoom := 0
+	if s.zoom != 100 {
+		zoom = s.zoom
+	}
+	if err := s.c.send(proto.Page{T: proto.TPage, V: v, PID: s.pid, Seq: s.seq, URL: sn.URL, Title: sn.Title, W: sn.W, H: sn.H,
+		TileW: tiles.TileW, TileH: tiles.TileH, Trunc: sn.Truncated, Back: sn.Back, Fwd: sn.Fwd, Zoom: zoom, Reset: reset}); err != nil {
 		return err
 	}
 	var ll []proto.Layer
@@ -243,7 +439,7 @@ func (s *session) sendSnapshot(ctx context.Context, start time.Time, sn *browser
 		ll = append(ll, proto.Layer{ID: l.ID, Kind: l.Kind, X: l.X, Y: l.Y, W: l.W, H: l.H, Z: l.Z, Top: l.Top, Bottom: l.Bottom,
 			CW: l.CW, CH: l.CH, SX: l.SX, SY: l.SY})
 	}
-	if err := s.c.send(proto.Layers{T: proto.TLayers, PID: s.pid, Seq: s.seq, List: ll}); err != nil {
+	if err := s.c.send(proto.Layers{T: proto.TLayers, V: v, PID: s.pid, Seq: s.seq, List: ll}); err != nil {
 		return err
 	}
 	nt, nb := 0, 0
@@ -263,7 +459,7 @@ func (s *session) sendSnapshot(ctx context.Context, start time.Time, sn *browser
 			s.cache[k] = tval{t.Hash, t.W, t.H}
 			nt++
 			nb += len(t.Data)
-			if err := s.c.send(proto.Tile{T: proto.TTile, PID: s.pid, Layer: layer, X: t.X, Y: t.Y, W: t.W, H: t.H, Fmt: t.Fmt, Hash: t.Hash, Data: t.Data}); err != nil {
+			if err := s.c.send(proto.Tile{T: proto.TTile, V: v, PID: s.pid, Layer: layer, X: t.X, Y: t.Y, W: t.W, H: t.H, Fmt: t.Fmt, Hash: t.Hash, Data: t.Data}); err != nil {
 				return err
 			}
 		}
@@ -286,11 +482,11 @@ func (s *session) sendSnapshot(ctx context.Context, start time.Time, sn *browser
 		}
 		rr = append(rr, pr)
 	}
-	if err := s.c.send(proto.Regions{T: proto.TRegions, PID: s.pid, Seq: s.seq, List: rr}); err != nil {
+	if err := s.c.send(proto.Regions{T: proto.TRegions, V: v, PID: s.pid, Seq: s.seq, List: rr}); err != nil {
 		return err
 	}
 	f := sn.Focus
-	if err := s.c.send(proto.Focus{T: proto.TFocus, PID: s.pid, Seq: s.seq, ID: f.ID, Kind: f.Kind, Type: f.Type, Value: f.Value,
+	if err := s.c.send(proto.Focus{T: proto.TFocus, V: v, PID: s.pid, Seq: s.seq, ID: f.ID, Kind: f.Kind, Type: f.Type, Value: f.Value,
 		Start: f.Start, End: f.End, InputMode: f.InputMode, Enter: f.EnterKey}); err != nil {
 		return err
 	}
@@ -301,17 +497,20 @@ func (s *session) sendSnapshot(ctx context.Context, start time.Time, sn *browser
 		s.log.Debug("cookies saved", "bytes", len(ck))
 	}
 	ms := int(time.Since(start).Milliseconds())
-	s.log.Info("update", "pid", s.pid, "seq", s.seq, "url", func() string {
-		if len(sn.URL) > 100 {
-			return sn.URL[:100]
+	s.log.Info("update", "v", v, "pid", s.pid, "seq", s.seq, "zoom", s.zoom, "url", truncate(sn.URL, 100), "h", sn.H, "layers", len(sn.Layers),
+		"regions", len(rr), "tiles", nt, "bytes", nb, "ms", ms, "snapshot_ms", snapMs, "more", more)
+	// the tab strip shows titles: the list goes out before `done`, so a step that ends at `done` has consumed it
+	if sig := s.title + "\x00" + s.url; !more && sig != s.sent {
+		s.sent = sig
+		if err := s.sendTabs(); err != nil {
+			return err
 		}
-		return sn.URL
-	}(), "h", sn.H, "layers", len(sn.Layers), "regions", len(rr), "tiles", nt, "bytes", nb, "ms", ms, "snapshot_ms", snapMs, "more", more)
-	return s.c.send(proto.Done{T: proto.TDone, PID: s.pid, Seq: s.seq, Ms: ms, Tiles: nt, Bytes: nb, More: more})
+	}
+	return s.c.send(proto.Done{T: proto.TDone, V: v, PID: s.pid, Seq: s.seq, Ms: ms, Tiles: nt, Bytes: nb, More: more})
 }
 
 // onDialog runs on the browser's event goroutine: ask the phone and wait for its reply (60 s, then dismiss).
-func (s *session) onDialog(d browser.Dialog) browser.Answer {
+func (s *session) onDialog(view int, d browser.Dialog) browser.Answer {
 	s.dmu.Lock()
 	s.dnext++
 	id := s.dnext
@@ -319,7 +518,7 @@ func (s *session) onDialog(d browser.Dialog) browser.Answer {
 	s.dialogs[id] = ch
 	s.dmu.Unlock()
 	defer func() { s.dmu.Lock(); delete(s.dialogs, id); s.dmu.Unlock() }()
-	if err := s.c.send(proto.Dialog{T: proto.TDialog, ID: id, Kind: d.Kind, Message: d.Message, Default: d.Default, URL: d.URL}); err != nil {
+	if err := s.c.send(proto.Dialog{T: proto.TDialog, V: view, ID: id, Kind: d.Kind, Message: d.Message, Default: d.Default, URL: d.URL}); err != nil {
 		return browser.Answer{}
 	}
 	select {
@@ -347,7 +546,7 @@ func (s *session) dialogReply(raw []byte) {
 	}
 }
 
-func (s *session) onDownload(d browser.Download) {
+func (s *session) onDownload(view int, d browser.Download) {
 	s.log.Info("download refused", "url", d.URL, "name", d.Name)
-	s.c.send(proto.Download{T: proto.TDownload, URL: d.URL, Name: d.Name, Refused: true})
+	s.c.send(proto.Download{T: proto.TDownload, V: view, URL: d.URL, Name: d.Name, Refused: true})
 }

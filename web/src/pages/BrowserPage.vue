@@ -2,6 +2,15 @@
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
   <q-page class="column items-center q-pa-sm">
+    <div class="row items-center no-wrap q-gutter-xs q-mb-xs" style="width:100%;max-width:720px;overflow-x:auto" data-test="tab-strip">
+      <q-chip v-for="t in state.tabs" :key="t.v" clickable removable dense :color="t.v === state.activeView ? 'primary' : 'grey-3'"
+              :text-color="t.v === state.activeView ? 'white' : 'black'" :data-test="'tab-' + t.v" @click="api.tab('switch', t.v)" @remove="api.tab('close', t.v)">
+        <span class="ellipsis" style="max-width:130px">{{ t.title || t.url || 'New tab' }}</span>
+      </q-chip>
+      <q-btn flat round dense icon="add" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')">
+        <q-tooltip>New tab (at most 3)</q-tooltip>
+      </q-btn>
+    </div>
     <div class="row items-center no-wrap q-gutter-xs" style="width:100%;max-width:720px">
       <q-btn flat round dense icon="arrow_back" :disable="!state.page.back" data-test="back" @click="api.action('back')" />
       <q-btn flat round dense icon="arrow_forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')" />

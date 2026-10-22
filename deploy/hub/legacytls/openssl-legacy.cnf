@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+# No MinProtocol, security level 0: this listener exists for old clients on purpose.
+openssl_conf = default_conf
+[default_conf]
+ssl_conf = ssl_sect
+[ssl_sect]
+system_default = system_default_sect
+[system_default_sect]
+CipherString = ALL:@SECLEVEL=0

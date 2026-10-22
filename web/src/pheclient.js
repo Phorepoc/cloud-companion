@@ -14,6 +14,7 @@ export class PheClient {
     this.ws = null
     this.onframe = () => {}
     this.onclose = () => {}
+    this.view = 1 // the view (tab) later requests are about
   }
 
   // Resolves with the welcome frame ({dev, key (pairing only), admin}); rejects with the server's error text.
@@ -53,6 +54,7 @@ export class PheClient {
   }
 
   send(frame) {
+    if (frame.v === undefined && frame.t !== 'pair' && frame.t !== 'hello') frame.v = this.view
     if (this.ws && this.ws.readyState === 1) this.ws.send(encode(frame))
   }
 
@@ -68,6 +70,8 @@ export class PheClient {
   settings(q, gray) { this.send({ t: 'settings', q, gray }) }
   devices() { this.send({ t: 'devices' }) }
   revoke(id) { this.send({ t: 'revoke', id }) }
+  tab(action, v) { this.send({ t: 'tab', action, v: v || 0 }) }
+  zoom(pct) { this.send({ t: 'zoom', pct }) }
 
   close() { if (this.ws) { this.ws.onclose = null; this.ws.close() } this.ws = null }
 }

@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: Apache-2.0
+# Personal hub (phase P0/P1): Stalwart (mail, CalDAV, CardDAV, JMAP) + Z-Push (Exchange ActiveSync 14.1 bridge).
+# Both are AGPL-3.0 and run as separate containers; nothing here links them into phecloud.
+# Use:  docker compose --profile hub up -d --build        (see README, "Hub")
+# Behind HTTPS too:  CADDYFILE=./deploy/hub/Caddyfile.hub docker compose --profile hub --profile tls up -d
+services:
+  stalwart:
+    profiles: ["hub"]
+    image: stalwartlabs/stalwart:v0.16.27
+    container_name: phe-stalwart
+    cpus: 1
+    mem_limit: 1g
+    # first start = bootstrap mode; deploy/hub/hub-init.sh completes it (hostname, domain, owner account)
+    env_file:
+      - path: deploy/hub/.env.stalwart   # STALWART_RECOVERY_ADMIN=admin:<password>, written by hub-init.sh
+        required: false
+    volumes:
+      - stalwart-data:/var/lib/stalwart
+      - stalwart-etc:/etc/stalwart
+    # Not published: clients come in through Caddy (HTTPS) or the phetail tunnel. For desktop mail clients on the LAN
+    # uncomment: "993:993" (IMAPS), "465:465" (SMTPS), "25:25" (inbound mail from outside).
+    # ports: ["993:993", "465:465"]
+    restart: unless-stopped
+  zpush:
+    profiles: ["hub"]
+    build: ./deploy/hub/zpush
+    image: phe-zpush:dev
+    container_name: phe-zpush
+    cpus: 1
+    mem_limit: 512m
+    environment:
+      ZPUSH_TIMEZONE: ${ZPUSH_TIMEZONE:-UTC}
+    volumes:
+      - zpush-state:/var/lib/z-push
+    depends_on:
+      - stalwart
+    restart: unless-stopped
+  # Optional: a TLS 1.0-capable listener for a phone whose native stack cannot do TLS 1.2 (README, "Old phones and TLS").
+  legacytls:
+    profiles: ["hub-legacy"]
+    build: ./deploy/hub/legacytls
+    image: phe-legacytls:dev
+    container_name: phe-legacytls
+    cpus: 0.5
+    mem_limit: 128m
+    environment:
+      LEGACY_TLS_CN: ${PHECLOUD_DOMAIN:-localhost}
+    ports:
+      - "${PHECLOUD_LEGACY_TLS_PORT:-8443}:8443"
+    volumes:
+      - legacytls-data:/data
+    depends_on:
+      - zpush
+    restart: unless-stopped
+volumes:
+  stalwart-data:
+  stalwart-etc:
+  zpush-state:
+  legacytls-data:

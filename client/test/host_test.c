@@ -196,6 +196,9 @@ static const char *sp(const char *s, char *buf, size_t cap)
 }
 
 static long done_tiles;      /* sum of done.tiles over the progressive phases of one step */
+static int tabs_mode, expect_err;   /* tab steps: wait for a `tabs` frame / for a server error */
+static char step_err[96];
+static void cpy(char *d, size_t cap, const char *s);
 static double first_screen_ms, step_t0;
 
 static double now_ms(void)
@@ -208,7 +211,7 @@ static double now_ms(void)
 static void summary(const char *step)
 {
     static const char *fk[] = {"none", "text", "textarea", "select"};
-    char b1[160], b2[160], b3[160], b4[160], b5[160], b6[160];
+    char b1[160], b2[160], b3[160], b4[160], b5[160], b6[160], b7[160];
     int i, nopts = 0, sel = -1;
     for (i = 0; i < c.nregions; i++)
         if (c.regions[i].kind == PHC_REGION_SELECT) {
@@ -219,11 +222,13 @@ static void summary(const char *step)
         }
     printf("TIMING step=%s first_screen_ms=%.0f\n", step, first_screen_ms);
     printf("SUMMARY step=%s url=%.100s h=%d tiles=%ld tilebytes=%ld hx=%016llx regions=%d layers=%d trunc=%s "
-           "title=%s back=%s fwd=%s focus=%s ftype=%s fvalue=%s opts=%d sel=%d dialogs=%d dlgkind=%s dlgmsg=%s dl=%d dlname=%s\n",
-           step, c.page.url, c.page.h, c.stats.tiles, c.stats.tile_bytes, (unsigned long long)c.stats.hash_xor, c.nregions,
+           "title=%s back=%s fwd=%s focus=%s ftype=%s fvalue=%s opts=%d sel=%d dialogs=%d dlgkind=%s dlgmsg=%s dl=%d dlname=%s "
+           "zoom=%d tabs=%d active=%d err=%s\n",
+           step, c.page.url[0] ? c.page.url : "-", c.page.h, c.stats.tiles, c.stats.tile_bytes, (unsigned long long)c.stats.hash_xor, c.nregions,
            c.nlayers, c.page.trunc ? "true" : "false", sp(c.page.title, b1, sizeof b1), c.page.back ? "true" : "false",
            c.page.fwd ? "true" : "false", fk[c.focus.kind], sp(c.focus.type, b2, sizeof b2), sp(c.focus.value, b3, sizeof b3),
-           nopts, sel, dialogs, sp(dlg_kind, b4, sizeof b4), sp(dlg_msg, b5, sizeof b5), downloads, sp(dl_name, b6, sizeof b6));
+           nopts, sel, dialogs, sp(dlg_kind, b4, sizeof b4), sp(dlg_msg, b5, sizeof b5), downloads, sp(dl_name, b6, sizeof b6),
+           c.page.zoom, c.ntabs, c.active_tab, sp(step_err, b7, sizeof b7));
     fflush(stdout);
 }
 
@@ -235,24 +240,26 @@ static void new_step(void)
     done_tiles = 0;
     step_t0 = now_ms();
     dlg_kind[0] = dlg_msg[0] = dl_name[0] = 0;
+    step_err[0] = 0;
 }
 
 static int pump(const char *what)
 {
     int rc, first = 1;
     for (;;) {
-        rc = phc_pump(&c);
+        rc = tabs_mode ? phc_pump_tabs(&c) : phc_pump(&c);
         if (rc == PHC_WOULDBLOCK) {   /* non-blocking transport: wait for the socket, then retry */
             if (c.io.wait) c.io.wait(c.io.ctx);
             continue;
         }
-        if (rc == PHC_OK) {
+        if (rc == PHC_OK && !tabs_mode) {
             done_tiles += c.done.tiles;
             if (first) { first_screen_ms = now_ms() - step_t0; first = 0; }
             if (c.done.more) continue;   /* progressive load: the first screenful arrived, wait for the rest */
         }
         break;
     }
+    if (rc == PHC_ERR_SERVER && expect_err) { cpy(step_err, sizeof step_err, c.errmsg); rc = 0; }
     if (rc) {
         fprintf(stderr, "%s: pump failed %d (%s)\n", what, rc, c.errmsg);
         failures++;
@@ -311,6 +318,49 @@ static int tap_region(const phc_region *r, const char *step)
     new_step();
     if (phc_tap_screen(&c, scroll, 640, cx, sy, &hit)) { failures++; return -1; }
     return step_done(step);
+}
+
+/* ---- views (tabs) and server-side zoom scenarios ---- */
+static int open_in(const char *name, const char *u)
+{
+    new_step();
+    if (phc_open(&c, u, 360)) { failures++; return -1; }
+    return step_done(name);
+}
+
+/* mode 0: the answer is a page (done), 1: a tabs frame, 2: a server error */
+static int tab_cmd(const char *name, const char *action, int v, int mode)
+{
+    int rc;
+    new_step();
+    tabs_mode = mode != 0;
+    expect_err = mode == 2;
+    if (phc_tab(&c, action, v)) { failures++; return -1; }
+    rc = step_done(name);
+    tabs_mode = expect_err = 0;
+    return rc;
+}
+
+static void run_tabs(const char **urls)
+{
+    CHECK(c.feat_tabs, "the server did not advertise the tabs feature");
+    open_in("open1", urls[0]);
+    tab_cmd("tabnew2", "new", 0, 1);
+    phc_set_view(&c, c.active_tab);
+    open_in("open2", urls[1]);
+    tab_cmd("tabnew3", "new", 0, 1);
+    phc_set_view(&c, c.active_tab);
+    open_in("open3", urls[2]);
+    tab_cmd("tabnew4", "new", 0, 2);   /* over the per-device cap of 3 */
+    CHECK(strstr(step_err, "tab limit") != NULL, "4th tab: '%s'", step_err);
+    phc_set_view(&c, 1);
+    tab_cmd("switch1", "switch", 1, 0);
+    CHECK(strstr(c.page.url, "example.com") != NULL, "switch to view 1 shows %s", c.page.url);
+    tab_cmd("close2", "close", 2, 1);
+    CHECK(c.ntabs == 2 && c.active_tab == 1, "after closing view 2: %d tabs, active %d", c.ntabs, c.active_tab);
+    phc_set_view(&c, 3);
+    tab_cmd("switch3", "switch", 3, 0);
+    CHECK(c.page.h > 0 && c.stats.tiles > 0, "switch to view 3 re-sent no tiles");
 }
 
 int main(int argc, char **argv)
@@ -381,6 +431,11 @@ int main(int argc, char **argv)
 
     if (quality > 0 || gray) phc_settings(&c, quality, gray);
 
+    if (scenario && !strcmp(scenario, "tabs") && nurls >= 3) {
+        run_tabs(urls);
+        nurls = 0;
+    }
+
     for (i = 0; i < nurls; i++) {
         const phc_region *r;
         new_step();
@@ -413,6 +468,19 @@ int main(int argc, char **argv)
                 if (phc_text(&c, r->id, type, 0)) { failures++; break; }
                 if (step_done("typed")) break;
                 CHECK(c.stats.tiles >= 1, "typing changed no tile");
+            }
+        }
+        if (scenario && !strcmp(scenario, "zoom") && i == 0) {
+            CHECK(c.feat_zoom, "the server did not advertise the zoom feature");
+            new_step();
+            if (phc_zoom(&c, 200)) { failures++; break; }
+            if (step_done("zoom")) break;
+            CHECK(c.page.zoom == 200 && c.page.reset, "zoom frame: zoom %d reset %d", c.page.zoom, c.page.reset);
+            r = find_region(is_link0, NULL);
+            CHECK(r != NULL, "no link region at 200%%");
+            if (r) {
+                if (tap_region(r, "zoomtap")) break;
+                CHECK(strstr(c.page.url, "iana.org") != NULL, "tap at 200%% did not navigate: %s", c.page.url);
             }
         }
         if (scenario && !strcmp(scenario, "scroll") && i == 0) {

@@ -248,7 +248,9 @@ type cdpSession struct {
 	ns     *netState
 	box    *handlerBox
 	maxH   int
-	width  int
+	width  int // device width of a tile row (360)
+	cssW   int // layout width in css px: 360 / scale
+	pct    int // render scale in percent (0 = 100)
 	dpr    float64
 	sy     int
 }
@@ -267,11 +269,15 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	if width <= 0 {
 		width = 360
 	}
-	s.width, s.dpr = width, 1 // v1: tiles are in CSS px, dpr is fixed at 1
+	s.width, s.dpr = width, 1 // a tile row is 360 device pixels; the scale only changes the layout width and the device scale factor
 	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
 		emulation.SetUserAgentOverride(mobileUA),
-		emulation.SetDeviceMetricsOverride(int64(width), viewH, 1, false), // not "mobile": the layout is always exactly width px, whatever the viewport meta says
+		chromedp.ActionFunc(func(c context.Context) error {
+			w, h := s.cssView() // not "mobile": the layout is always exactly 360/scale px wide, whatever the viewport meta says
+			s.cssW = w
+			return emulation.SetDeviceMetricsOverride(int64(w), int64(h), float64(s.scalePct())/100, false).Do(c)
+		}),
 		chromedp.Navigate(url),
 	)
 	if err != nil && !s.ns.hasCert() {
@@ -384,10 +390,10 @@ func (s *cdpSession) Tap(ctx context.Context, x, y, sy int) error {
 				return err
 			}
 			vy = y - int(act+0.5)
-			if vy >= 0 && vy < viewH {
+			if _, ch := s.cssView(); vy >= 0 && vy < ch {
 				break
 			}
-			sy = max(0, y-viewH/2)
+			sy = max(0, y-s.cssViewH()/2)
 		}
 	}
 	err := s.run(ctx, 15*time.Second, chromedp.MouseClickXY(float64(x), float64(vy)))
@@ -645,7 +651,7 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 	// 1. trigger lazy loading (once per page), return to the top. The quick snapshot skips it: the full one follows.
 	if !quick {
 		var done bool
-		if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH, viewH, viewH), &done,
+		if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH*100/s.scalePct(), s.cssViewH(), s.cssViewH()), &done,
 			func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) })); err != nil {
 			return nil, fmt.Errorf("lazy pass: %w", err)
 		}
@@ -676,16 +682,17 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 		return nil
 	}))
 	h := info.H
-	if h < viewH {
-		h = viewH
+	if h < s.cssViewH() {
+		h = s.cssViewH()
 	}
-	if h > s.maxH {
-		h, sn.Truncated = s.maxH, true
+	if h > s.maxH*100/s.scalePct() {
+		h, sn.Truncated = s.maxH*100/s.scalePct(), true
 	}
 	sn.H = h
 	capH := h
-	if quick && h > quickRows {
-		capH, sn.Partial = quickRows, true
+	qr := (quickRows*100 + s.scalePct() - 1) / s.scalePct() // the first screenful in css px
+	if quick && h > qr {
+		capH, sn.Partial = qr, true
 	}
 	// 3. layers as their own images: fixed ones inside the viewport, sticky ones beyond it, scroll boxes with their whole content.
 	for _, l := range info.Layers {
@@ -710,7 +717,7 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 	if len(info.Layers) > 0 {
 		s.run(ctx, 5*time.Second, chromedp.Evaluate(hideCSS, nil))
 	}
-	img, err := s.shot(ctx, 0, 0, s.width, capH, true)
+	img, err := s.shot(ctx, 0, 0, s.cssW, capH, true)
 	if len(info.Layers) > 0 {
 		s.run(ctx, 5*time.Second, chromedp.Evaluate(unhideCSS, nil))
 	}
@@ -728,6 +735,26 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 			reg.Opts = append(reg.Opts, Opt{Label: o.L, Sel: o.S})
 		}
 		sn.Regions = append(sn.Regions, reg)
+	}
+	if p := s.scalePct(); p != 100 { // geometry goes out in device pixels at the render scale
+		sn.H = scaleInt(sn.H, p)
+		for i := range sn.Layers {
+			l := &sn.Layers[i]
+			l.X, l.Y, l.W, l.H = scaleInt(l.X, p), scaleInt(l.Y, p), scaleInt(l.W, p), scaleInt(l.H, p)
+			l.CW, l.CH, l.SX, l.SY = scaleInt(l.CW, p), scaleInt(l.CH, p), scaleInt(l.SX, p), scaleInt(l.SY, p)
+			if l.Top != nil {
+				v := scaleInt(*l.Top, p)
+				l.Top = &v
+			}
+			if l.Bottom != nil {
+				v := scaleInt(*l.Bottom, p)
+				l.Bottom = &v
+			}
+		}
+		for i := range sn.Regions {
+			r := &sn.Regions[i]
+			r.X, r.Y, r.W, r.H = scaleInt(r.X, p), scaleInt(r.Y, p), scaleInt(r.W, p), scaleInt(r.H, p)
+		}
 	}
 	if keepSY > 0 {
 		s.ScrollTo(ctx, keepSY)
@@ -816,3 +843,38 @@ func (s *cdpSession) certFlow(ctx context.Context) {
 }
 
 func (n *netState) hasCert() bool { n.mu.Lock(); defer n.mu.Unlock(); return n.cert != nil }
+
+// ---- render scale ----
+
+func (s *cdpSession) scalePct() int {
+	if s.pct <= 0 {
+		return 100
+	}
+	return s.pct
+}
+
+// cssView is the layout viewport in css px at the current scale (360/z x 640/z).
+func (s *cdpSession) cssView() (int, int) {
+	p := s.scalePct()
+	return 360 * 100 / p, viewH * 100 / p
+}
+
+func (s *cdpSession) applyMetrics(ctx context.Context) error {
+	w, h := s.cssView()
+	s.cssW = w
+	return s.run(ctx, 10*time.Second, emulation.SetDeviceMetricsOverride(int64(w), int64(h), float64(s.scalePct())/100, false))
+}
+
+// SetScale re-lays the page out at 360/scale css px and renders it at device scale factor scale: text stays sharp and the
+// tiles stay 360 device pixels wide. pct must be one of the ladder values (100 divides 360 exactly for all of them).
+func (s *cdpSession) SetScale(ctx context.Context, pct int) error {
+	s.pct = pct
+	if err := s.applyMetrics(ctx); err != nil {
+		return err
+	}
+	return s.settle(ctx)
+}
+
+func scaleInt(v, pct int) int { return (v*pct + 50) / 100 }
+
+func (s *cdpSession) cssViewH() int { _, h := s.cssView(); return h }

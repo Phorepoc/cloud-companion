@@ -12,7 +12,7 @@ export const state = reactive({
   error: '',
   dev: '',
   admin: false,
-  page: { pid: 0, url: '', title: '', w: 360, h: 640, back: false, fwd: false, trunc: false },
+  page: { pid: 0, zoom: 100, url: '', title: '', w: 360, h: 640, back: false, fwd: false, trunc: false },
   layers: [],
   regions: [],
   focus: { kind: 'none', id: 0, type: '', value: '' },
@@ -21,11 +21,13 @@ export const state = reactive({
   downloadNote: '',
   deviceList: [],
   adminError: '',
-  features: [],             // optional server features from the welcome frame ("zoom": render at the requested scale)
+  tabs: [],                 // the views of this connection: [{v, title, url}]
+  activeView: 1,
+  features: [],             // optional server features from the welcome frame (zoom, tabs)
   settings: { q: 70, gray: false },
 })
 
-export const hooks = { onTile: null, onNewPage: null, onRedraw: null }
+export const hooks = { onTile: null, onNewPage: null, onRedraw: null, onRescale: null }
 export const creds = shallowRef(null)
 let client = null
 
@@ -40,12 +42,37 @@ export async function loadCreds() {
   return creds.value
 }
 
+// view (tab) switching: the page state of the shown view is dropped; the server re-sends the new view in full
+function showView(v) {
+  state.activeView = v
+  if (client) client.view = v
+  state.page.pid = 0
+  state.page.zoom = 100
+  state.page.title = ''
+  state.page.url = ''
+  state.layers = []
+  state.regions = []
+  state.focus = { kind: 'none', id: 0, type: '', value: '' }
+  state.loading = false
+  if (hooks.onNewPage) hooks.onNewPage(0)
+}
+
+const VIEW_FRAMES = ['page', 'tile', 'layers', 'regions', 'focus', 'done']
+
 function onFrame(f) {
+  if (VIEW_FRAMES.includes(f.t) && f.v && f.v !== state.activeView) return // another view's frame
   switch (f.t) {
+    case 'tabs':
+      state.tabs = f.list || []
+      if (f.active && f.active !== state.activeView) showView(f.active)
+      break
     case 'page': {
       const newPage = f.pid !== state.page.pid
-      Object.assign(state.page, { pid: f.pid, url: f.url, title: f.title, w: f.w, h: f.h, back: !!f.back, fwd: !!f.fwd, trunc: !!f.trunc })
+      const oldZ = state.page.zoom || 100
+      const newZ = f.zoom || 100
+      Object.assign(state.page, { pid: f.pid, zoom: newZ, url: f.url, title: f.title, w: f.w, h: f.h, back: !!f.back, fwd: !!f.fwd, trunc: !!f.trunc })
       if (newPage && hooks.onNewPage) hooks.onNewPage(f.pid)
+      else if (f.reset && hooks.onRescale) hooks.onRescale(oldZ, newZ) // same page at another render scale
       document.title = f.title ? f.title + ' - Phecloud' : 'Phecloud'
       state.loading = true
       break
@@ -150,7 +177,8 @@ export const api = {
   text: (id, t, r) => client && client.text(id, t, r),
   key: (k) => client && client.key(k),
   select: (id, i) => client && client.select(id, i),
-  zoom: (s) => client && client.send({ t: 'zoom', scale: s }),
+  zoom: (pct) => client && client.zoom(pct),
+  tab: (action, v) => client && client.tab(action, v),
   settings(q, gray) {
     state.settings.q = q
     state.settings.gray = gray

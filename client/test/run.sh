@@ -73,6 +73,10 @@ gorun -q 35 -gray -url "$PHOTO" | tee "$RUN/go8.txt" | grep -E "^SUMMARY" | cut 
 crun -q 35 -gray -url "$PHOTO" | tee "$RUN/c8.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
 gorun -q 70 -url "$PHOTO" | tee "$RUN/go9.txt" | grep -E "^SUMMARY" | cut -c1-120 || true
 crun -q 70 -url "$PHOTO" | tee "$RUN/c9.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
+gorun -scenario zoom -url https://example.com | tee "$RUN/go10.txt" | grep -E "^SUMMARY" | cut -c1-120 || true
+crun -scenario zoom -url https://example.com | tee "$RUN/c10.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
+gorun -scenario tabs -url https://example.com -url "$LAYERS" -url "$PHOTO" | tee "$RUN/go11.txt" | grep -E "^SUMMARY" | cut -c1-120 || true
+crun -scenario tabs -url https://example.com -url "$LAYERS" -url "$PHOTO" | tee "$RUN/c11.txt" | grep -E "^(SUMMARY|PASS|FAIL)" | cut -c1-120 || true
 echo "== time to first screen (Wikipedia, progressive)"
 grep -E "first screen" "$RUN/go3.txt" | head -1
 grep -E "^TIMING" "$RUN/c3.txt" | head -1
@@ -119,7 +123,19 @@ cmp_fields 6 open url dialogs dlgkind
 cmp_fields 7 open url dialogs dlgkind
 cmp_fields 8 open url h tiles tilebytes hx regions
 cmp_fields 9 open url h tiles tilebytes hx regions
+cmp_fields 10 open url h tiles tilebytes hx regions zoom
+cmp_fields 10 zoom url h tiles tilebytes hx regions zoom
+cmp_fields 10 zoomtap url title regions zoom
+cmp_fields 11 open1 url h tiles tilebytes hx regions
+cmp_fields 11 tabnew2 tabs active
+cmp_fields 11 open2 url h tiles tilebytes hx regions layers
+cmp_fields 11 tabnew3 tabs active
+cmp_fields 11 open3 url h tiles tilebytes hx regions
+cmp_fields 11 tabnew4 err tabs
+cmp_fields 11 switch1 url h tiles tilebytes hx regions tabs active
+cmp_fields 11 close2 tabs active
+cmp_fields 11 switch3 url h tiles tilebytes hx regions active
 gb=$(field "$RUN/go8.txt" open tilebytes); gd=$(field "$RUN/go9.txt" open tilebytes)
 if [ -n "$gb" ] && [ -n "$gd" ] && [ "$gb" -lt "$gd" ]; then echo "ok   byte budget (q=35, gray): $gb bytes < $gd default"; else echo "MISMATCH byte budget: $gb not below $gd"; bad=1; fi
-for n in 1 2 3 4 5 6 7 8 9; do grep -q "^PASS" "$RUN/c$n.txt" || { echo "C test $n did not PASS"; bad=1; }; done
+for n in 1 2 3 4 5 6 7 8 9 10 11; do grep -q "^PASS" "$RUN/c$n.txt" || { echo "C test $n did not PASS"; bad=1; }; done
 if [ $bad = 0 ]; then echo "ALL MATCH"; else echo "DIFFERENCES FOUND"; exit 1; fi

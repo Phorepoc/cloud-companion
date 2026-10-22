@@ -146,7 +146,7 @@ func main() {
 	tapRegion := func(name string, r proto.Region) *summary {
 		fmt.Printf("tapping #%d %q at (%d,%d)\n", r.ID, r.Label, r.X+r.W/2, r.Y+r.H/2)
 		return step(name, "(after tap)", func() {
-			proto.Write(nc, proto.Input{T: proto.TInput, Kind: "tap", Layer: r.Layer, X: r.X + r.W/2, Y: r.Y + r.H/2})
+			proto.Write(nc, proto.Input{T: proto.TInput, V: view, Kind: "tap", Layer: r.Layer, X: r.X + r.W/2, Y: r.Y + r.H/2})
 		})
 	}
 	find := func(rs []proto.Region, pred func(proto.Region) bool) *proto.Region {
@@ -157,20 +157,64 @@ func main() {
 		}
 		return nil
 	}
+	if *scenario == "mem" { // memory measurement: one tab per URL, a handshake on stdin after each ("MEM-READY n" -> any line)
+		in := bufio.NewReader(os.Stdin)
+		for i, u := range us {
+			if i > 0 {
+				stopOnTabs = true
+				view = step("tabnew", "(tab new)", func() { proto.Write(nc, proto.Tab{T: proto.TTab, Action: "new"}) }).active
+				stopOnTabs = false
+			}
+			step("open", u, func() { proto.Write(nc, proto.Open{T: proto.TOpen, V: view, URL: u, Width: 360, DPR: 1}) })
+			fmt.Printf("MEM-READY %d\n", i+1)
+			in.ReadString('\n')
+		}
+		return
+	}
+	if *scenario == "tabs" && len(us) >= 3 { // views: open pages in three tabs, hit the per-device cap, switch, close
+		openIn := func(name, u string) *summary {
+			return step(name, u, func() { proto.Write(nc, proto.Open{T: proto.TOpen, V: view, URL: u, Width: 360, DPR: 1}) })
+		}
+		tabCmd := func(name, action string, v int, mode string) *summary {
+			stopOnTabs, expectErr = mode == "tabs", mode == "err"
+			s := step(name, "(tab "+action+")", func() { proto.Write(nc, proto.Tab{T: proto.TTab, Action: action, V: v}) })
+			stopOnTabs, expectErr = false, false
+			return s
+		}
+		openIn("open1", us[0])
+		view = tabCmd("tabnew2", "new", 0, "tabs").active
+		openIn("open2", us[1])
+		view = tabCmd("tabnew3", "new", 0, "tabs").active
+		openIn("open3", us[2])
+		tabCmd("tabnew4", "new", 0, "err")
+		view = 1
+		tabCmd("switch1", "switch", 1, "done")
+		tabCmd("close2", "close", 2, "tabs")
+		view = 3
+		tabCmd("switch3", "switch", 3, "done")
+		fmt.Printf("TOTAL wire bytes: %d\n", totalWire)
+		return
+	}
 	for i, u := range us {
-		sum := step("open", u, func() { proto.Write(nc, proto.Open{T: proto.TOpen, URL: u, Width: 360, DPR: 1}) })
+		sum := step("open", u, func() { proto.Write(nc, proto.Open{T: proto.TOpen, V: view, URL: u, Width: 360, DPR: 1}) })
 		if *tap && i == 0 {
 			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "link" && r.Layer == 0 }); r != nil {
 				tapRegion("tap", *r)
-				step("back", "(back)", func() { proto.Write(nc, proto.Navigate{T: proto.TNavigate, Action: "back"}) })
+				step("back", "(back)", func() { proto.Write(nc, proto.Navigate{T: proto.TNavigate, V: view, Action: "back"}) })
 			}
 		}
 		if *typ != "" && i == 0 {
 			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "input" || r.Kind == "textarea" }); r != nil {
 				fmt.Printf("typing %q into region #%d (%s)\n", *typ, r.ID, r.Name)
 				step("typed", "(after text input)", func() {
-					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "text", ID: r.ID, Text: *typ})
+					proto.Write(nc, proto.Input{T: proto.TInput, V: view, Kind: "text", ID: r.ID, Text: *typ})
 				})
+			}
+		}
+		if *scenario == "zoom" && i == 0 { // server-side re-render at a scale: sharp text, tiles stay 360 device px wide
+			z := step("zoom", "(render at 200%)", func() { proto.Write(nc, proto.Zoom{T: proto.TZoom, V: view, Pct: 200}) })
+			if r := find(z.regions, func(r proto.Region) bool { return r.Kind == "link" && r.Layer == 0 }); r != nil {
+				tapRegion("zoomtap", *r)
 			}
 		}
 		if *scenario == "scroll" && i == 0 {
@@ -182,15 +226,15 @@ func main() {
 			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "input" }); r != nil {
 				tapRegion("focus", *r)
 				step("text", "(text into the focused field)", func() {
-					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "text", Text: "abc"})
+					proto.Write(nc, proto.Input{T: proto.TInput, V: view, Kind: "text", Text: "abc"})
 				})
 				step("key", "(Backspace)", func() {
-					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "key", Text: "Backspace"})
+					proto.Write(nc, proto.Input{T: proto.TInput, V: view, Kind: "key", Text: "Backspace"})
 				})
 			}
 			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "select" }); r != nil {
 				step("select", "(select option 2)", func() {
-					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "select", ID: r.ID, Index: 2})
+					proto.Write(nc, proto.Input{T: proto.TInput, V: view, Kind: "select", ID: r.ID, Index: 2})
 				})
 			}
 			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "ask" }); r != nil {
@@ -206,6 +250,16 @@ func main() {
 
 var wconn io.Writer
 
+// view is the view (tab) the requests are about.
+var view = 1
+
+// collect modes: stopOnTabs ends a step at a `tabs` frame (tab new/close need no page), expectErr turns a server error into a result
+var stopOnTabs, expectErr bool
+
+// the latest tab list (survives steps that send no `tabs` frame)
+var lastTabs []proto.TabInfo
+var lastActive int
+
 type summary struct {
 	page             proto.Page
 	tiles, png, jpg  int
@@ -217,6 +271,9 @@ type summary struct {
 	rtt              time.Duration
 	firstTile        time.Duration
 	firstDone        time.Duration
+	tabs             []proto.TabInfo
+	active           int
+	errMsg           string
 	focus            proto.Focus
 	dialogs          int
 	dlgKind, dlgMsg  string
@@ -234,6 +291,24 @@ func collect(r *counter, dir string, start time.Time) *summary {
 			fatal(err)
 		}
 		switch t {
+		case proto.TPage, proto.TTile, proto.TLayers, proto.TRegions, proto.TFocus, proto.TDone: // frames of another view are not ours
+			var hv struct {
+				V int `cbor:"v"`
+			}
+			proto.Decode(raw, &hv)
+			if hv.V != 0 && hv.V != view {
+				continue
+			}
+		}
+		switch t {
+		case proto.TTabs:
+			var tb proto.Tabs
+			proto.Decode(raw, &tb)
+			s.tabs, s.active = tb.List, tb.Active
+			lastTabs, lastActive = tb.List, tb.Active
+			if stopOnTabs {
+				return s
+			}
 		case proto.TPage:
 			proto.Decode(raw, &s.page)
 		case proto.TFocus:
@@ -302,6 +377,10 @@ func collect(r *counter, dir string, start time.Time) *summary {
 		case proto.TError:
 			var e proto.Error
 			proto.Decode(raw, &e)
+			if expectErr {
+				s.errMsg = e.Msg
+				return s
+			}
 			fatal(fmt.Errorf("server error: %s", e.Msg))
 		}
 	}
@@ -310,6 +389,9 @@ func collect(r *counter, dir string, start time.Time) *summary {
 func (s *summary) print(step, label string, wire int64) {
 	if *summaryFlag {
 		u := s.page.URL
+		if u == "" {
+			u = "-"
+		}
 		if len(u) > 100 {
 			u = u[:100]
 		}
@@ -332,10 +414,12 @@ func (s *summary) print(step, label string, wire int64) {
 			return strings.NewReplacer(" ", "_", "\n", "_").Replace(v)
 		}
 		fmt.Printf("SUMMARY step=%s url=%s h=%d tiles=%d tilebytes=%d hx=%016x regions=%d layers=%d trunc=%v "+
-			"title=%s back=%v fwd=%v focus=%s ftype=%s fvalue=%s opts=%d sel=%d dialogs=%d dlgkind=%s dlgmsg=%s dl=%d dlname=%s\n",
+			"title=%s back=%v fwd=%v focus=%s ftype=%s fvalue=%s opts=%d sel=%d dialogs=%d dlgkind=%s dlgmsg=%s dl=%d dlname=%s "+
+			"zoom=%d tabs=%d active=%d err=%s\n",
 			step, u, s.page.H, s.tiles, s.pngB+s.jpgB, s.hx, len(s.regions), s.layers, s.page.Trunc,
 			sp(s.page.Title), s.page.Back, s.page.Fwd, s.focus.Kind, sp(s.focus.Type), sp(s.focus.Value), nopts, sel,
-			s.dialogs, sp(s.dlgKind), sp(s.dlgMsg), s.downloads, sp(s.dlName))
+			s.dialogs, sp(s.dlgKind), sp(s.dlgMsg), s.downloads, sp(s.dlName),
+			max(s.page.Zoom, 100), len(lastTabs), lastActive, sp(s.errMsg))
 	}
 	kinds := map[string]int{}
 	for _, r := range s.regions {

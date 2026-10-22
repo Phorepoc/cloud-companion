@@ -21,6 +21,9 @@ import (
 	"github.com/phorepoc/phecloud/internal/store"
 )
 
+// Features are advertised in the welcome frame.
+var Features = []string{"zoom", "tabs"}
+
 type Server struct {
 	Store   *store.Store
 	Browser browser.Factory
@@ -150,7 +153,7 @@ func (s *Server) auth(c *conn, fio FrameIO, nonce []byte) (string, bool, error) 
 			time.Sleep(time.Second) // slow down guessing
 			return "", false, err
 		}
-		return id, admin, c.send(proto.Welcome{T: proto.TWelcome, Dev: id, Key: key, Server: "phecloud", Admin: admin})
+		return id, admin, c.send(proto.Welcome{T: proto.TWelcome, Dev: id, Key: key, Server: "phecloud", Admin: admin, Features: Features})
 	case proto.THello:
 		var h proto.Hello
 		if err := proto.Decode(raw, &h); err != nil {
@@ -161,7 +164,7 @@ func (s *Server) auth(c *conn, fio FrameIO, nonce []byte) (string, bool, error) 
 			time.Sleep(time.Second)
 			return "", false, store.ErrUnknown
 		}
-		return h.Dev, admin, c.send(proto.Welcome{T: proto.TWelcome, Dev: h.Dev, Server: "phecloud", Admin: admin})
+		return h.Dev, admin, c.send(proto.Welcome{T: proto.TWelcome, Dev: h.Dev, Server: "phecloud", Admin: admin, Features: Features})
 	}
 	return "", false, store.ErrUnknown
 }

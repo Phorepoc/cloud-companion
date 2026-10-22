@@ -7,6 +7,7 @@
 //	phecloud paircode [--admin] print a single-use pairing code (valid 10 minutes); --admin: the new device may manage devices
 //	phecloud devices            list paired devices
 //	phecloud revoke <id>        revoke a device
+//	phecloud hub ...            personal hub: per-device app passwords (see hub.go)
 //
 // Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400), PHECLOUD_CHROME (chromium binary),
 // PHECLOUD_MAX_PAGE_H (page height cap in px, 8192).
@@ -40,6 +41,10 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Fprintln(os.Stderr, "usage: phecloud serve|paircode|devices|revoke <id>")
 		os.Exit(2)
+	}
+	if os.Args[1] == "hub" { // personal hub: app passwords in Stalwart (hub.go); no local database needed
+		hubMain(os.Args[2:])
+		return
 	}
 	st, err := store.Open(env("PHECLOUD_DB", "phecloud.db"))
 	if err != nil {

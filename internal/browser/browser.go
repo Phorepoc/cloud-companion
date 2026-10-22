@@ -39,6 +39,9 @@ type Session interface {
 	// Snapshot renders the page (height capped) as one image, with fixed/sticky elements and inner scroll boxes cut out into
 	// layers. quick = only the first screenful (and no lazy-load pass); Snapshot.Partial then says more follows.
 	Snapshot(ctx context.Context, quick bool) (*Snapshot, error)
+	// SetScale re-lays the page out at 360/scale css px and renders at device scale factor scale (pct = 100..300); all geometry in
+	// a Snapshot is then in device pixels at that scale.
+	SetScale(ctx context.Context, pct int) error
 	// TapScroll taps a point (content coordinates) inside an inner scroll layer, scrolling the box there first.
 	TapScroll(ctx context.Context, layer, x, y int) error
 	Close()

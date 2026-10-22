@@ -81,6 +81,8 @@ typedef struct {
 typedef struct {
     int pid, seq, w, h, tw, th, trunc;
     int back, fwd;                 /* history: can go back / forward */
+    int zoom;                      /* render scale in percent (100 = 1x): geometry is in device pixels at this scale */
+    int reset;                     /* the same page was re-rendered at another scale: all cached tiles were dropped */
     char url[PHC_URL_MAX];
     char title[PHC_TITLE_MAX];
 } phc_page;
@@ -127,6 +129,11 @@ typedef struct {
 } phc_dialog;
 
 typedef struct { char url[256], name[64]; int refused; } phc_download;
+
+#ifndef PHC_MAX_TABS
+#define PHC_MAX_TABS 4
+#endif
+typedef struct { int v; char title[64]; char url[128]; } phc_tabinfo;
 
 typedef struct {
     int pid, seq, ms, tiles, bytes;     /* the last `done` frame */
@@ -182,6 +189,11 @@ typedef struct phc {
     phc_option opts[PHC_MAX_OPTS];
     int nopts;
     phc_focus focus;
+
+    int view;                           /* the view (tab) shown; every request carries it, frames of other views are ignored */
+    phc_tabinfo tabs[PHC_MAX_TABS];     /* the last `tabs` frame */
+    int ntabs, active_tab;
+    int feat_zoom, feat_tabs;           /* server features from the welcome frame */
     char pool[PHC_POOL_SIZE];
     size_t pool_used;
 } phc;
@@ -216,6 +228,13 @@ int phc_tap_screen(phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit *ou
 
 /* read frames until a `done` (returns PHC_OK, c->done set) or an error / PHC_WOULDBLOCK */
 int phc_pump(phc *c);
+/* the same, but returns after a `tabs` frame (the answer to tab new/close/list needs no page) */
+int phc_pump_tabs(phc *c);
+/* views (tabs), at most 3 per device: the server answers with a `tabs` frame; switch (and closing the active view) re-send the page */
+int phc_tab(phc *c, const char *action, int v);   /* "new" | "close" | "switch" | "list" */
+void phc_set_view(phc *c, int v);                 /* which view later requests are about and whose frames are shown */
+/* re-render the view at a scale (100/125/150/200/250/300 percent; needs the server feature "zoom") */
+int phc_zoom(phc *c, int pct);
 
 /* the tile cache / hit-test, usable without the network */
 int phc_hit_test(const phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit *out);

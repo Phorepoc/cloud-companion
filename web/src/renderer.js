@@ -34,12 +34,14 @@ export class Renderer {
     this.drag = null
     this.pointers = new Map()
     this.pinch = null
+    this.pending = null
   }
 
   attach() {
     hooks.onTile = (f) => this.addTile(f)
     hooks.onNewPage = () => { this.tiles.clear(); this.view.scrollY = 0; this.view.panX = 0; this.view.zoom = 1; this.lscroll = {}; this.invalidate() }
     hooks.onRedraw = () => this.invalidate()
+    hooks.onRescale = (oldZ, newZ) => this.rescaled(newZ)
     const c = this.cv
     c.addEventListener('wheel', (e) => {
       e.preventDefault()
@@ -89,7 +91,7 @@ export class Renderer {
   }
 
   detach() {
-    hooks.onTile = hooks.onNewPage = hooks.onRedraw = null
+    hooks.onTile = hooks.onNewPage = hooks.onRedraw = hooks.onRescale = null
     cancelAnimationFrame(this.raf)
   }
 
@@ -127,7 +129,8 @@ export class Renderer {
 
   // zoom about the canvas point (cx, cy): the page point under it stays under it
   zoomAt(cx, cy, z) {
-    z = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
+    const pz = (state.page.zoom || 100) / 100 // the server render scale: the tiles are already pz times bigger
+    z = Math.max(MIN_ZOOM / pz, Math.min(MAX_ZOOM / pz, z))
     const v = this.view
     const px = cx / v.zoom + v.panX
     const py = cy / v.zoom + v.scrollY
@@ -138,11 +141,42 @@ export class Renderer {
     this.invalidate()
     clearTimeout(this.zoomTimer)
     // a server that renders at the requested scale advertises the "zoom" feature; otherwise the zoom stays local
-    this.zoomTimer = setTimeout(() => { if (state.features.includes('zoom')) api.zoom(v.zoom) }, 400)
+    this.zoomTimer = setTimeout(() => this.requestScale(), 400)
   }
 
+
+  // The server advertises "zoom": after the gesture settles, ask it to re-render at the nearest scale of its ladder (the text
+  // stays sharp). The point at the middle of the window is kept in place when the new tiles arrive (rescaled()).
+  requestScale() {
+    if (!state.features.includes('zoom')) return // otherwise the zoom stays local scaling of the cached tiles
+    const ladder = [100, 125, 150, 200, 250, 300]
+    const pz = state.page.zoom || 100
+    const T = (pz / 100) * this.view.zoom // total zoom
+    const target = ladder.reduce((b, v) => (Math.abs(v - T * 100) < Math.abs(b - T * 100) ? v : b), 100)
+    if (target === pz) return
+    const s = pz / 100
+    const v = this.view
+    this.pending = { T, cssX: (v.panX + W / 2 / v.zoom) / s, cssY: (v.scrollY + VIEW_H / 2 / v.zoom) / s }
+    api.zoom(target)
+  }
+
+  // the page frame of a re-render at another scale (same page): old tiles are dropped, the view keeps its centre
+  rescaled(newZ) {
+    this.tiles.clear()
+    const s = newZ / 100
+    const p = this.pending
+    this.pending = null
+    const z = Math.max(1 / s, Math.min(3 / s, (p ? p.T : s * this.view.zoom) / s)) // what is left to scale locally
+    this.view.zoom = z
+    if (p) {
+      this.view.panX = p.cssX * s - W / 2 / z
+      this.view.scrollY = p.cssY * s - VIEW_H / 2 / z
+    }
+    this.clampView()
+    this.invalidate()
+  }
   zoomBy(f) { this.zoomAt(W / 2, VIEW_H / 2, this.view.zoom * f) }
-  zoomReset() { this.zoomAt(W / 2, VIEW_H / 2, 1) }
+  zoomReset() { this.zoomAt(W / 2, VIEW_H / 2, 100 / (state.page.zoom || 100)) }
 
   // screen (canvas unit) point -> point in the scrolled page window
   windowPoint(p) { return { x: p.x / this.view.zoom + this.view.panX, y: p.y / this.view.zoom } }

@@ -75,10 +75,16 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
 - **Settings page**: JPEG quality slider and grayscale (the per-device byte budget), forget this device.
 - Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use the Caddy profile below for anything but localhost, or
   `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).
-- **Zoom**: pinch (two pointers), ctrl + wheel, or the zoom buttons scale the cached tiles locally (1x to 3x, pan and scroll in
-  page units, hit-testing and the keyboard overlay follow). The cloud renders at a fixed 360 css px, so zoomed text is the
-  1x bitmap scaled; when a server advertises the `zoom` feature in its welcome frame the view sends a `zoom` frame after the
-  gesture settles so it can re-render at the new scale (no server does yet).
+- **Zoom** (pinch with two pointers, ctrl + wheel, or the zoom buttons): the cached tiles scale locally while the gesture runs; when it
+  settles the web app asks the cloud to **re-render at the nearest scale of a ladder** (100, 125, 150, 200, 250, 300 percent, advertised
+  as the `zoom` feature in the welcome frame; the `zoom` frame carries a percentage). The page is then re-laid-out at `360/scale`
+  css px and rendered at that device scale factor, so text stays sharp; tiles stay 360 device pixels wide, and every coordinate
+  (page height, layers, regions, taps) is in device pixels at that scale (`page.zoom`, and `page.reset` marks a same-page re-render).
+  The view keeps the centre of the window in place; a server without the feature keeps the local scaling.
+- **Tabs**: up to 3 views per device over one connection. Every request and page frame carries a view id (`v`); `tab` frames
+  (`new`, `close`, `switch`, `list`) answer with a `tabs` list (ids, titles, urls, the active one). Switching re-sends the view in full; the
+  tab strip above the address bar shows the tabs. Each tab is its own browser context (the warm pool of 2 is shared by the server and
+  refilled whenever a tab is taken); the cookie jar is per device.
 - **HTTPS** (`docker compose --profile tls up -d`): a Caddy container (`deploy/Caddyfile`) terminates TLS and proxies HTTPS and
   WebSocket to the web port. For a public host set `PHECLOUD_DOMAIN=cloud.example.org` (DNS pointing here, ports 80/443
   open): Caddy gets and renews a Let's Encrypt certificate by itself. For a LAN use
@@ -123,6 +129,18 @@ the client (round 4 in brackets where measured before: the whole page arrived at
 
 Wikipedia's remaining 4 s are the lazy-image pass over 5000 px (it now runs once per page load, not on every update).
 Byte budget (`settings` frame, per device, stored by the server): a gradient test page of 4 tiles is 16.8 KB at JPEG q70 and
+
+### Memory per open tab (round 8; 2 warm tabs in the pool; measured on the server container, pages loaded)
+| pages | idle server | after tab 1 | after tab 2 | after tab 3 |
+|---|---|---|---|---|
+| example.com x3: container (cgroup) | 86 MiB | 116 MiB | 135 MiB | 152 MiB |
+| example.com x3: summed Chromium RSS (counts shared pages repeatedly) | 493 MB | 621 MB | 729 MB | 837 MB |
+| Wikipedia, Hacker News, Wikipedia: container | 80 MiB | 215 MiB | 223 MiB | 360 MiB |
+| the same: summed Chromium RSS | 497 MB | 730 MB | 849 MB | 1072 MB |
+
+A light tab costs about 20-30 MiB of container memory (about 110 MB of RSS, much of it shared); a long Wikipedia page about 135 MiB, Hacker News
+about 10 MiB. Budget roughly 150 MiB per open heavy tab, so three tabs of one device are within 0.5 GiB, and the 2 GiB container cap
+leaves room for several devices. (`bash client/test/memory.sh [urls]` repeats the measurement.)
 8.6 KB at q35 + grayscale.
 ## Not done yet (next)
 - Scopes and token expiry; a web admin/login (passkeys).

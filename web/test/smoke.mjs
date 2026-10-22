@@ -94,32 +94,37 @@ try {
 
   if (QUICK) { console.log('SMOKE PASS (quick)'); process.exit(0) }
 
-  // 5. zoom: local scaling of the cached tiles; the tap still lands on the right region
+  // 5. zoom: the cloud re-renders at the nearest scale (sharp text); the tap still lands on the right region
+  assert((await S(() => window.__phe.state.features)).includes('zoom'), 'the server must advertise the zoom feature')
   await page.click('[data-test=zoom-in]')
-  await page.click('[data-test=zoom-in]')
+  await page.click('[data-test=zoom-in]') // 1.25^2 = 1.56 -> the 150% render
+  await page.waitForFunction(() => window.__phe.state.page.zoom === 150, null, { timeout: 20000 })
+  await page.waitForFunction(() => !window.__phe.state.loading)
+  const ph = await S(() => window.__phe.state.page.h)
+  assert(ph > 918 * 1.4, 'the page is rendered 1.5x taller at 150%, got h=' + ph)
   const z = await S(() => window.__phe.renderer.view.zoom)
-  assert(z > 1.5 && z < 1.6, 'zoom must be 1.25^2, got ' + z)
+  assert(z > 1 && z < 1.1, 'the leftover local zoom is 1.5625/1.5, got ' + z)
   await page.waitForTimeout(250)
   await page.screenshot({ path: OUT + '/web-zoomed.png' })
   await tapRegion('Learn more')
   await waitTitle('Example Domains')
   await idle()
-  step('zoom x' + z.toFixed(2) + ': hit-test and tap are correct under zoom')
+  step('zoom: server render at 150%, page height ' + ph + ', tap correct')
   await page.click('[data-test=back]')
   await waitTitle('Example Domain')
   await idle()
-  assert.equal(await S(() => window.__phe.renderer.view.zoom), 1, 'a new page resets the zoom')
-  // ctrl + wheel zoom
+  // ctrl + wheel zoom to the top of the ladder, then back out to 100%
   const box = await page.locator('[data-test=canvas]').boundingBox()
   await page.mouse.move(box.x + 180, box.y + 200)
   await page.keyboard.down('Control')
   await page.mouse.wheel(0, -100)
   await page.keyboard.up('Control')
-  await page.waitForTimeout(200)
-  assert((await S(() => window.__phe.renderer.view.zoom)) > 1, 'ctrl+wheel must zoom')
-  for (let i = 0; i < 5; i++) await page.click('[data-test=zoom-out]') // e^1 = 2.7 -> 1.25^-5 -> clamped to 1
+  await page.waitForFunction(() => window.__phe.state.page.zoom === 300, null, { timeout: 20000 })
+  for (let i = 0; i < 9; i++) await page.click('[data-test=zoom-out]')
+  await page.waitForFunction(() => window.__phe.state.page.zoom === 100, null, { timeout: 20000 })
+  await page.waitForFunction(() => !window.__phe.state.loading)
   assert.equal(await S(() => window.__phe.renderer.view.zoom), 1)
-  step('ctrl+wheel zoom and zoom-out work')
+  step('ctrl+wheel -> 300% render, zoom-out -> back to 100%')
 
   // 6. a page with an input, a select and dialogs
   const html = readFileSync(new URL('./webgaps.html', import.meta.url), 'utf8')
@@ -200,6 +205,34 @@ try {
   assert.equal(await S(() => window.__phe.state.dialogs.length), 0, 'no further auth prompt after the right password')
   await idle()
   step('auth dialog: wrong password asked again, right password accepted')
+
+  // 7b. several tabs over one connection: three at most
+  assert((await S(() => window.__phe.state.features)).includes('tabs'))
+  await page.click('[data-test=tab-new]')
+  await page.waitForFunction(() => window.__phe.state.tabs.length === 2 && window.__phe.state.activeView === 2)
+  await openUrl('https://example.com')
+  await waitTitle('Example Domain')
+  await idle()
+  await page.click('[data-test=tab-new]')
+  await page.waitForFunction(() => window.__phe.state.tabs.length === 3 && window.__phe.state.activeView === 3)
+  const gaps = readFileSync(new URL('./webgaps.html', import.meta.url), 'utf8')
+  await openUrl('data:text/html,' + encodeURIComponent(gaps))
+  await waitTitle('WebGaps')
+  await idle()
+  assert(await page.locator('[data-test=tab-new]').isDisabled(), 'the fourth tab must be refused (cap of 3)')
+  await page.screenshot({ path: OUT + '/web-tabs.png' })
+  await page.click('[data-test=tab-2]')
+  await waitTitle('Example Domain')
+  await idle()
+  await page.click('[data-test=tab-1]')
+  await page.waitForFunction(() => window.__phe.state.activeView === 1 && window.__phe.state.page.url.includes('httpbin.org'), null, { timeout: 20000 })
+  await page.click('[data-test=tab-3]')
+  await waitTitle('WebGaps')
+  await page.locator('[data-test=tab-2] .q-chip__icon--remove').click()
+  await page.waitForFunction(() => window.__phe.state.tabs.length === 2)
+  await page.click('[data-test=tab-new]')
+  await page.waitForFunction(() => window.__phe.state.tabs.length === 3)
+  step('tabs: three tabs, fourth refused, switching re-shows each page, close and new work')
 
   // 8. devices page (the first/--admin device)
   await page.click('[data-test=tab-devices]')
