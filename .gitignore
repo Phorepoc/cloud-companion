@@ -2,3 +2,5 @@
 /data/
 *.db*
 /tiles/
+/.testrun/
+/client/build/

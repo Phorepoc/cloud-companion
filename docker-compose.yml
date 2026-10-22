@@ -12,5 +12,7 @@ services:
     volumes:
       - phecloud-data:/data
     restart: unless-stopped
+    # environment:
+    #   PHECLOUD_PLAIN_LISTEN: ":7401"   # development only: plain TCP for client/test/run.sh
 volumes:
   phecloud-data:

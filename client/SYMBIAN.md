@@ -1,0 +1,117 @@
+# From the C core to a phewebengine plug-in (design note)
+
+Status: design, written against `phewebengine.h` (interface version 1, `PHE_WEBENGINE_VERSION 1`) and the ECom wrapper
+`phewebengine_ecom.h`. The C core (`phc*.c`) is done and tested on a host; nothing here has run on a phone yet.
+
+## What exists
+`phc` (C99, no malloc, no OS calls) speaks the phecloud phone protocol and keeps the state of one page:
+- framing (4-byte length + CBOR), a tiny CBOR reader/writer, SHA-256/HMAC, pairing and HMAC authentication;
+- the tile cache (layer, tile x/y, pixel hash), the fixed/sticky layer list, the tap-region list, the last `page`/`done`;
+- `phc_hit_test` (screen point -> layer -> smallest tap region) and the input frames (`tap`, `text`, `scroll`, `navigate`).
+
+It does not draw, decode images, open sockets or run TLS. The host gives it a transport (`send`/`recv`) and two callbacks
+(`on_page`, `on_tile`; the tile bytes are valid only during the call). Memory: one `phc` object is about 230 KB on a
+32-bit target with the default limits (1024 tiles, 1536 regions, 96 KB string pool; all `#define`s; 267 KB measured on x86-64, where pointers are twice as big), plus a caller-owned
+receive buffer (192 KB holds the largest tile frame). Tests: `client/test/selftest.c` (offline vectors and a canned
+conversation) and `client/test/run.sh` (host test against a live server, compared with the Go client: same tile count,
+tile bytes, XOR of tile pixel hashes, regions and layers).
+
+## The plug-in shape
+One ECom DLL under interface `0xE7016B01` (its own implementation UID), `Api()` returns a `PheWebEngineApi` named
+`"Phecloud"`. Phorepoc Browser stays unchanged; the user picks "Phecloud" in the engine list like any other engine, and
+the package comes from the app store. Caps: `PHE_CAP_TLS13` (the link is TLS 1.3), `PHE_CAP_SCRIPT` (scripts run in the
+cloud, so the page is fully scripted), `PHE_CAP_SNAPSHOT` (the first tile scaled down is a free tab thumbnail),
+`PHE_CAP_SUSPEND` and `PHE_CAP_STATE`. Not in v1: zoom, find, downloads, private views (a cloud session is not private
+from the server; do not advertise it).
+
+### Threads
+The seam says all calls come from the UI thread and must not block, and that `notify` may be called from any thread.
+- **UI thread**: the `PheWebEngineApi` functions only put a small request on a mutex-protected queue (load, command,
+  scroll report, tap, text) and read cached state; `poll()` drains the event queue.
+- **Network thread** (one per engine, one connection per view or one shared connection with a view id in a later protocol
+  version; v1 is one connection per view because the server maps a connection to a tab): connects, runs the TLS 1.3 handshake
+  (mbedTLS, certificate pinned by SHA-256 fingerprint exactly as the Go client does), `phc_auth`, then loops
+  `phc_pump`. Requests from the queue are sent between pumps (`phc_pump` returns after every `done`; with a transport
+  that returns `PHC_WOULDBLOCK` between frames, one thread can also wait on a socket and a queue event at once).
+- **Decode worker** (optional second thread): turns encoded tiles into bitmaps so a 30 ms JPEG decode never stalls the pump.
+`notify(ctx, view)` is called from the network/decode thread when an event is queued or pixels changed.
+
+## Pixels, and local scrolling over cached tiles
+`lock_pixels` returns the view buffer (BGRA, premultiplied, `view_w x view_h`); the engine owns it and composes into it.
+- **Tile store**: key (layer, x, y), value = the encoded bytes (about 20 KB per 360x256 tile, 446 KB for a long Wikipedia
+  page) and, when decoded, a bitmap. A decoded 360x256 tile is 368 KB at 32 bpp, so a 5500 px page would be 8 MB and a
+  full 8192 px page 12 MB: keep encoded data always, decode on arrival only for the first three screens and for tiles inside
+  the scroll window plus one tile of read-ahead in the scroll direction, LRU for the rest (a handful of bitmaps; 16 bpp
+  halves it). M0 measured 84 ms for a 360x640 JPEG decode through the platform decoder, which is about 30 ms per tile, so
+  read-ahead has to run one tile ahead of a fling, not on demand. The `codecpack` repo is the place to look for a smaller
+  PNG/JPEG decoder if the platform one is too slow.
+- **Composition** (on `PHE_EV_REPAINT` and when the scroll position changes): fill the buffer, blit the decoded tiles of
+  layer 0 that intersect `[scroll_y, scroll_y + view_h)` at `y - scroll_y` (a checkerboard or the page background where a tile
+  has not arrived), then draw layers in `(z, id)` order: a fixed layer at `(x, y)`, a sticky layer at
+  `phc_layer_screen_y()` (which clamps to its `top`/`bottom` offset), each from its own tiles in the same store.
+  Then the tap-feedback highlight.
+- **Scrolling is local**: `scroll(v, dx, dy)` clamps `scroll_y` to `[0, page.h - view_h]` and recomposes; there is no network
+  round trip (flings run at the blit rate, about 60 fps full screen on the M0 device). When scrolling stops (debounced
+  about 300 ms) the engine sends `phc_scroll(y)` so the server can load lazy content and extend the page; the server then
+  sends only the changed tiles. `get_state` reports `scroll_y`, `content_h = page.h`, `zoom_permille = 1000`.
+- **Truncation**: when `page.trunc` is set the engine shows a "page continues on the desktop" bar at the end of the content.
+
+## Tap: pointer -> region -> input frame
+- `pointer(DOWN)`: `phc_hit_test` at the point; if a region is hit, remember it, draw the highlight at once (this is the
+  local feedback that hides the server round trip), set `PHE_STR_FOCUS_URL` to `region->href` for links.
+- `pointer(MOVE)` beyond the touch slop: cancel the tap and scroll locally.
+- `pointer(UP)` without a cancel: `phc_tap_screen(c, scroll_y, view_h, x, y, &hit)` builds the `input` frame. For a point in a
+  fixed layer it carries `(layer, x, y)` in layer coordinates; for the page or a sticky layer it carries document coordinates
+  `(0, x, y + scroll_y)` plus `sy`. The server clicks in Chromium and answers with changed tiles, a new `layers`/`regions`
+  list, and, if the URL changed, a new `page` (new `pid`, so the cache is dropped).
+- Text input: when the hit region is `PHC_REGION_INPUT`/`TEXTAREA`, raise `PHE_EV_FOCUS a = 2` so the frontend shows the
+  keyboard and remember the region id; `text(v, utf16, len)` converts to UTF-8 and calls `phc_text(id, text, 0)`; the Enter
+  key (`key()`) calls `phc_text(id, "", 1)` to submit. Passwords: the server never sends the value back.
+- `PHE_CMD_ACTIVATE` (D-pad focus) = tap at the centre of the focused region.
+
+## Navigation and events
+| API | core call |
+|---|---|
+| `load` | `phc_open(url, 360)` on the first load of a view, `phc_navigate(url)` afterwards (UTF-16 to UTF-8 first) |
+| `cmd BACK/FORWARD/RELOAD` | `phc_navigate_action("back" / "forward" / "reload")` |
+| `view_create/resize` | store `view_w/h`; `phc_open` width stays 360 in v1 (a different width needs a new `open`) |
+| `view_destroy` / `view_suspend` | close the connection (the server closes the tab); `view_save_state` stores url + scroll_y; resume reconnects and re-opens, cookies come back from the per-device jar |
+| `memory_pressure` | LOW: drop decoded bitmaps; CRITICAL: also drop the encoded tiles of background views |
+
+Event mapping: request sent -> `PHE_EV_START` (a = 0) + `PHE_EV_PROGRESS` 10; `on_page` -> `PHE_EV_COMMIT` when `pid`
+changed, `PHE_EV_TITLE`; `done` -> `PHE_EV_PROGRESS` 100, `PHE_EV_FINISHED`, `PHE_EV_REPAINT`; a server `error` frame or a lost
+connection -> `PHE_EV_FAILED` (with text) or `PHE_EV_CRASHED` for a protocol error. The security level is `PHE_SEC_SECURE`
+when the page URL is https, which only means the cloud validated the site's certificate; say so in the UI.
+
+## Transport, pairing and storage
+- mbedTLS 3.x, TLS 1.3 only, no certificate chain: one callback compares the SHA-256 of the server certificate with the pinned
+  fingerprint (the same rule as the Go client: pin at pairing, refuse a changed certificate).
+- Pairing UI lives in the phebrowser settings (engine page for Phecloud): host:port, the 8-character code from
+  `phecloud paircode` (the fingerprint is printed next to it; show it so the user can compare), then `phc_auth(code)`.
+- Credentials (device id, 32-byte key, fingerprint, host) go in the engine's private directory on C: (a 100-byte file);
+  the key is the only secret on the phone, and `phecloud revoke <id>` kills it server-side.
+- The network interface comes from `set_iap` (an RConnection / Open C interface name); WiFi power save showed no first-packet
+  penalty in M0, so no keep-alive is needed beyond `phc_ping` every 30 s when idle.
+
+## Build
+The core is plain C99 with only `memcpy/memset/memcmp/strlen/strncpy` from libc: build it as a static library with the modern GCC
+toolchain (`-std=c99`), link it into the plug-in DLL (C++ glue calls it through `extern "C"`; `phc.h` already has the guards). The
+plug-in DLL has no writable static data issue if the `phc` object is heap-allocated once per view (`new` in the glue, 230 KB).
+Stack use is small; the one recursion (`phc_r_skip`) is bounded by the frame, and a depth limit of 16 should be added before
+the first on-device run.
+
+## What this design does not cover yet (protocol gaps to close on the server side first)
+1. **History state**: `can_back` / `can_forward` are not in the `page` frame; add them (and `loading`).
+2. **JavaScript dialogs, HTTP auth, certificate errors, downloads** (CDP `Page.javascriptDialogOpening`, `Fetch.authRequired`,
+   `Browser.downloadWillBegin`): new server-to-phone frames and replies mapping to `PHE_EV_DIALOG` / `PHE_EV_DOWNLOAD`.
+3. **`<select>` options and date pickers**: region kind `select` is reported but its options are not; the phone needs the list
+   to show a native chooser (and a reply that sets the value).
+4. **Focus and caret**: after a tap the server should say what got focus (kind, value) so `PHE_EV_FOCUS` does not rely on the
+   region kind alone, and so the typed text can be echoed from the server's tiles without a local widget.
+5. **Zoom**: v1 is fixed 360 px layout. Pinch can map to a new `open`/`resize` with a different width (re-render) or to local
+   scaling of the cached tiles for the gesture, committing a re-render afterwards.
+6. **Find in page, long-press context menu, stop, favicon, new-view requests, inner scroll containers** (`overflow:scroll` boxes
+   scroll inside their own layer; the cloud currently renders them as part of the page).
+7. **Several views on one connection**: add a view id to every frame so a browser with five tabs uses one TLS connection.
+8. **Bandwidth**: tiles are lossless PNG for text; a paletted-PNG decoder is the cheapest path, and the server may later send a
+   zstd/deflate-compressed tile stream if the decoder is a bottleneck.

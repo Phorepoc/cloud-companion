@@ -1,0 +1,9 @@
+# Copyright The Phorepoc Authors
+# SPDX-License-Identifier: Apache-2.0
+# Development only: adds an unencrypted listener for the C client host test.
+services:
+  phecloud:
+    environment:
+      PHECLOUD_PLAIN_LISTEN: ":7401"
+    ports:
+      - "7401:7401"

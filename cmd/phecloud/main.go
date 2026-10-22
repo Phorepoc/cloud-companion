@@ -16,6 +16,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"strconv"
 	"time"
@@ -87,6 +88,16 @@ func main() {
 		}
 		log.Info("phecloud listening", "addr", ln.Addr().String())
 		srv := &server.Server{Store: st, Browser: br, Log: log}
+		if pl := os.Getenv("PHECLOUD_PLAIN_LISTEN"); pl != "" {
+			// DEVELOPMENT ONLY: an unencrypted listener for the C client's host test (no TLS stack there).
+			pln, err := net.Listen("tcp", pl)
+			if err != nil {
+				log.Error("plain listen", "err", err)
+				os.Exit(1)
+			}
+			log.Warn("PLAIN (no TLS) listener enabled, development only", "addr", pln.Addr().String())
+			go srv.Serve(pln)
+		}
 		log.Error("serve", "err", srv.Serve(ln))
 	default:
 		fmt.Fprintln(os.Stderr, "unknown command")

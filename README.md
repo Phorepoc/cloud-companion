@@ -39,6 +39,13 @@ docker run --rm --network host -v $PWD/run:/w -w /w --entrypoint phecloud-client
 Tiles land in `tiles/p<N>/L<layer>_y<row>_x<col>.png|jpg`. `testdata/layers.html` (+ `.url`, a `data:` URL) is a page
 with a fixed header, a sticky bar, a fixed footer and an input, for the layers.
 
+- **C client core** (`client/`): `phc`, a portable C99 implementation of the phone side (CBOR, framing, pairing + HMAC auth,
+  tile cache, layers, tap regions with hit-testing; no malloc, transport and image decoding supplied by the host).
+  `client/test/run.sh` cross-checks it against the Go client on a live server: example.com, a tap through the hit-test, the
+  layers page with typed text, and a Wikipedia article give identical tile counts, tile bytes, tile pixel hashes (XOR),
+  regions and layers; the same script checks that a changed server certificate is refused. `client/SYMBIAN.md` is the design
+  note for turning it into a web-engine plug-in. The server has a development-only plain listener
+  (`PHECLOUD_PLAIN_LISTEN`) for the C host test; production is TLS 1.3 only.
 ## Measured (2026-10-22, round 2: event-driven settle, TLS 1.3, warm tab pool; Ryzen server container, 2 CPUs, loopback)
 Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done on the server (navigation, settle, screenshots, tiling, encoding). Round 1 (fixed sleeps) in brackets.
 
@@ -54,14 +61,14 @@ Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done
 Per-update fixed cost is now: Snapshot about 70-110 ms (screenshots + tiling) plus one 60 ms network-quiet window and two animation frames. The rest of a load is Chromium fetching the page; Wikipedia is dominated by about 5000 px of lazy images (the scroll pass only runs when the page has lazy images). Idle server 16 MiB plus Chromium (2 warm tabs).
 
 ## Not done yet (next)
-- Scopes and token expiry; a web admin/login (passkeys); the pinning-mismatch refusal path is coded but not yet tested.
+- Scopes and token expiry; a web admin/login (passkeys).
 - Incremental updates without a full re-screenshot (MutationObserver dirty rects), image/video elements, popups and
   new tabs, pinch/zoom (dpr is fixed at 1).
 - Sticky layers: only their natural position at scroll 0 is sent, plus the CSS `top`/`bottom` offset.
 - Wide sticky elements (e.g. JSON viewers) are not clamped to the viewport width.
 
 ## Layout
-`cmd/phecloud` (server + admin CLI), `cmd/phecloud-client` (test client), `internal/{proto,store,server,browser,tiles}`.
+`cmd/phecloud` (server + admin CLI), `cmd/phecloud-client` (test client, `-summary` for machine-readable output), `client/` (the C core), `internal/{proto,store,server,browser,tiles,tlsutil}`.
 
 ## License
 Apache-2.0, see `LICENSE`.

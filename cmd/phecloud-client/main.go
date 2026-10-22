@@ -24,6 +24,8 @@ import (
 	"github.com/phorepoc/phecloud/internal/tlsutil"
 )
 
+var summaryFlag = flag.Bool("summary", false, "print one machine-readable SUMMARY line per step (compared with the C client)")
+
 type urls []string
 
 func (u *urls) String() string     { return strings.Join(*u, ",") }
@@ -129,7 +131,7 @@ func main() {
 		start := time.Now()
 		proto.Write(nc, proto.Open{T: proto.TOpen, URL: u, Width: 360, DPR: 1})
 		sum := collect(cr, filepath.Join(*out, fmt.Sprintf("p%d", i)), start)
-		sum.print(u, cr.n-before)
+		sum.print("open", u, cr.n-before)
 		totalWire += cr.n - before
 		if *tap && i == 0 && len(sum.regions) > 0 {
 			for _, r := range sum.regions {
@@ -139,7 +141,7 @@ func main() {
 					start = time.Now()
 					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "tap", X: r.X + r.W/2, Y: r.Y + r.H/2})
 					s2 := collect(cr, filepath.Join(*out, "tap"), start)
-					s2.print("(after tap)", cr.n-before)
+					s2.print("tap", "(after tap)", cr.n-before)
 					break
 				}
 			}
@@ -152,7 +154,7 @@ func main() {
 					start = time.Now()
 					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "text", ID: r.ID, Text: *typ})
 					s2 := collect(cr, filepath.Join(*out, "typed"), start)
-					s2.print("(after text input)", cr.n-before)
+					s2.print("typed", "(after text input)", cr.n-before)
 					break
 				}
 			}
@@ -164,6 +166,7 @@ func main() {
 type summary struct {
 	page             proto.Page
 	tiles, png, jpg  int
+	hx               uint64
 	pngB, jpgB       int
 	layers, regions2 int
 	regions          []proto.Region
@@ -202,6 +205,7 @@ func collect(r *counter, dir string, start time.Time) *summary {
 				s.firstTile = time.Since(start)
 			}
 			s.tiles++
+			s.hx ^= tl.Hash
 			if tl.Fmt == "jpeg" {
 				s.jpg++
 				s.jpgB += len(tl.Data)
@@ -225,7 +229,14 @@ func collect(r *counter, dir string, start time.Time) *summary {
 	}
 }
 
-func (s *summary) print(label string, wire int64) {
+func (s *summary) print(step, label string, wire int64) {
+	if *summaryFlag {
+		u := s.page.URL
+		if len(u) > 100 {
+			u = u[:100]
+		}
+		fmt.Printf("SUMMARY step=%s url=%s h=%d tiles=%d tilebytes=%d hx=%016x regions=%d layers=%d trunc=%v\n", step, u, s.page.H, s.tiles, s.pngB+s.jpgB, s.hx, len(s.regions), s.layers, s.page.Trunc)
+	}
 	kinds := map[string]int{}
 	for _, r := range s.regions {
 		kinds[r.Kind]++

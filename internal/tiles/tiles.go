@@ -12,6 +12,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"image/png"
+	"sort"
 )
 
 const (
@@ -113,7 +114,12 @@ func palette(img *image.RGBA) (*pal, bool) {
 		return nil, false
 	}
 	p := &pal{index: map[[4]byte]uint8{}}
+	keys := make([][4]byte, 0, len(seen))
 	for k := range seen {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return bytes.Compare(keys[i][:], keys[j][:]) < 0 }) // deterministic palette
+	for _, k := range keys {
 		p.index[k] = uint8(len(p.colours))
 		p.colours = append(p.colours, color.RGBA{k[0], k[1], k[2], k[3]})
 	}
