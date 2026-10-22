@@ -37,6 +37,9 @@ extern "C" {
 #ifndef PHC_MAX_REGIONS
 #define PHC_MAX_REGIONS 1536
 #endif
+#ifndef PHC_MAX_OPTS
+#define PHC_MAX_OPTS 256      /* <select> options across all regions of a page */
+#endif
 #ifndef PHC_POOL_SIZE
 #define PHC_POOL_SIZE (96 * 1024)  /* region strings (href, label, ...) */
 #endif
@@ -56,6 +59,7 @@ typedef struct {
     void *ctx;
     int (*send)(void *ctx, const void *p, size_t n);   /* sends all n bytes; returns n or < 0 */
     int (*recv)(void *ctx, void *p, size_t n);
+    void (*wait)(void *ctx);   /* optional: block until recv may succeed; called instead of spinning on PHC_WOULDBLOCK mid-frame */
 } phc_transport;
 
 typedef struct {
@@ -76,6 +80,7 @@ typedef struct {
 
 typedef struct {
     int pid, seq, w, h, tw, th, trunc;
+    int back, fwd;                 /* history: can go back / forward */
     char url[PHC_URL_MAX];
     char title[PHC_TITLE_MAX];
 } phc_page;
@@ -92,7 +97,30 @@ enum { PHC_REGION_LINK = 0, PHC_REGION_BUTTON, PHC_REGION_INPUT, PHC_REGION_SELE
 typedef struct {
     int id, layer, x, y, w, h, kind;    /* x,y relative to the layer (layer 0: document coordinates) */
     const char *href, *type, *name, *placeholder, *value, *label;   /* NUL-terminated, in the pool; "" when absent */
+    int opt_first, opt_count;           /* <select>: the options are c->opts[opt_first .. opt_first + opt_count) */
 } phc_region;
+
+typedef struct { const char *label; int selected; } phc_option;
+
+enum { PHC_FOCUS_NONE = 0, PHC_FOCUS_TEXT, PHC_FOCUS_TEXTAREA, PHC_FOCUS_SELECT };
+
+/* what has keyboard focus after the last update: the phone opens its own keyboard when kind != NONE */
+typedef struct {
+    int id, kind, start, end;           /* id = region id (0 if none); start/end = caret/selection, -1 unknown */
+    char type[16];                      /* HTML input type: text, search, email, url, tel, number, password, ... */
+    char value[96];                     /* empty for password fields */
+    char inputmode[16], enter[16];      /* inputmode and enterkeyhint */
+} phc_focus;
+
+enum { PHC_DLG_ALERT = 0, PHC_DLG_CONFIRM, PHC_DLG_PROMPT, PHC_DLG_BEFOREUNLOAD };
+
+/* a JavaScript dialog: the page is blocked until phc_dialog_reply (the server dismisses it after 60 s) */
+typedef struct {
+    int id, kind;
+    char message[256], def[128];
+} phc_dialog;
+
+typedef struct { char url[256], name[64]; int refused; } phc_download;
 
 typedef struct {
     int pid, seq, ms, tiles, bytes;     /* the last `done` frame */
@@ -112,6 +140,9 @@ typedef struct {
 typedef struct {
     void (*on_page)(void *user, const phc_page *p);
     void (*on_tile)(void *user, const phc_tile *t);
+    void (*on_focus)(void *user, const phc_focus *f);        /* after every update */
+    void (*on_dialog)(void *user, const phc_dialog *d);      /* reply with phc_dialog_reply (may be called from here) */
+    void (*on_download)(void *user, const phc_download *d);  /* a download was refused by the cloud */
     void *user;
 } phc_events;
 
@@ -141,6 +172,9 @@ typedef struct phc {
     int nlayers;
     phc_region regions[PHC_MAX_REGIONS];
     int nregions, regions_dropped;
+    phc_option opts[PHC_MAX_OPTS];
+    int nopts;
+    phc_focus focus;
     char pool[PHC_POOL_SIZE];
     size_t pool_used;
 } phc;
@@ -157,7 +191,12 @@ int phc_open(phc *c, const char *url, int width);
 int phc_navigate(phc *c, const char *url);               /* url */
 int phc_navigate_action(phc *c, const char *action);     /* "back" | "forward" | "reload" */
 int phc_scroll(phc *c, int y);
-int phc_text(phc *c, int region_id, const char *text, int submit);
+int phc_text(phc *c, int region_id, const char *text, int submit);   /* insert at the caret of region_id (0: the focused field) */
+int phc_text_ex(phc *c, int region_id, const char *text, int submit, int replace);   /* replace = select the content first */
+/* press a key in the focused field: Backspace, Enter, Tab, Delete, ArrowLeft/Right/Up/Down, Escape */
+int phc_key(phc *c, const char *name);
+int phc_select(phc *c, int region_id, int option_index);
+int phc_dialog_reply(phc *c, int dialog_id, int ok, const char *text);
 int phc_ping(phc *c);
 /* hit-test a screen point (scroll_y = the client's scroll, view_h = viewport height) and send a tap input frame */
 int phc_tap_screen(phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit *out);

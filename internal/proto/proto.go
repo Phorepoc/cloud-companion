@@ -22,21 +22,25 @@ const (
 
 // Frame types.
 const (
-	TChallenge = "challenge" // S->C  first frame
-	TPair      = "pair"      // C->S  pairing code -> new device key
-	THello     = "hello"     // C->S  device id + HMAC(key, nonce)
-	TWelcome   = "welcome"   // S->C
-	TError     = "error"     // S->C
-	TOpen      = "open"      // C->S
-	TNavigate  = "navigate"  // C->S
-	TInput     = "input"     // C->S
-	TPage      = "page"      // S->C  page geometry (new page or resized)
-	TTile      = "tile"      // S->C
-	TLayers    = "layers"    // S->C  full list of fixed/sticky layers
-	TRegions   = "regions"   // S->C  full list of tap regions
-	TDone      = "done"      // S->C  end of one update
-	TPing      = "ping"
-	TPong      = "pong"
+	TChallenge   = "challenge" // S->C  first frame
+	TPair        = "pair"      // C->S  pairing code -> new device key
+	THello       = "hello"     // C->S  device id + HMAC(key, nonce)
+	TWelcome     = "welcome"   // S->C
+	TError       = "error"     // S->C
+	TOpen        = "open"      // C->S
+	TNavigate    = "navigate"  // C->S
+	TInput       = "input"     // C->S
+	TPage        = "page"      // S->C  page geometry (new page or resized)
+	TTile        = "tile"      // S->C
+	TLayers      = "layers"    // S->C  full list of fixed/sticky layers
+	TRegions     = "regions"   // S->C  full list of tap regions
+	TDone        = "done"      // S->C  end of one update
+	TPing        = "ping"
+	TPong        = "pong"
+	TFocus       = "focus"       // S->C  what has keyboard focus after an update
+	TDialog      = "dialog"      // S->C  a JavaScript alert/confirm/prompt/beforeunload is waiting
+	TDialogReply = "dialogreply" // C->S
+	TDownload    = "download"    // S->C  a download was refused
 )
 
 type Header struct {
@@ -93,15 +97,17 @@ type Navigate struct {
 //	scroll: Y = new scroll position
 //	text:   ID = region id, Text, Submit = press Enter afterwards
 type Input struct {
-	T      string `cbor:"t"`
-	Kind   string `cbor:"kind"`
-	Layer  int    `cbor:"layer,omitempty"`
-	X      int    `cbor:"x,omitempty"`
-	Y      int    `cbor:"y,omitempty"`
-	SY     int    `cbor:"sy,omitempty"`
-	ID     int    `cbor:"id,omitempty"`
-	Text   string `cbor:"text,omitempty"`
-	Submit bool   `cbor:"submit,omitempty"`
+	T       string `cbor:"t"`
+	Kind    string `cbor:"kind"`
+	Layer   int    `cbor:"layer,omitempty"`
+	X       int    `cbor:"x,omitempty"`
+	Y       int    `cbor:"y,omitempty"`
+	SY      int    `cbor:"sy,omitempty"`
+	ID      int    `cbor:"id,omitempty"`
+	Text    string `cbor:"text,omitempty"`
+	Submit  bool   `cbor:"submit,omitempty"`
+	Replace bool   `cbor:"replace,omitempty"` // text: select the field's content first
+	Index   int    `cbor:"index,omitempty"`   // select: option index
 }
 
 type Page struct {
@@ -115,6 +121,8 @@ type Page struct {
 	TileW int    `cbor:"tw"`
 	TileH int    `cbor:"th"`
 	Trunc bool   `cbor:"trunc,omitempty"` // the page was cut at the height cap
+	Back  bool   `cbor:"back,omitempty"`  // history: can go back
+	Fwd   bool   `cbor:"fwd,omitempty"`   // history: can go forward
 }
 
 type Tile struct {
@@ -167,6 +175,7 @@ type Region struct {
 	Placeholder string `cbor:"ph,omitempty"`
 	Value       string `cbor:"value,omitempty"`
 	Label       string `cbor:"label,omitempty"`
+	Opts        []Opt  `cbor:"opts,omitempty"` // select: the options
 }
 
 type Regions struct {
@@ -223,3 +232,51 @@ func Read(r io.Reader) (string, []byte, error) {
 
 // Decode decodes a raw payload into v.
 func Decode(raw []byte, v any) error { return cbor.Unmarshal(raw, v) }
+
+// Opt is one <select> option.
+type Opt struct {
+	Label string `cbor:"l"`
+	Sel   bool   `cbor:"s,omitempty"`
+}
+
+// Focus is sent after every update. Kind: none | text | textarea | select (a focused <select>); Type is the HTML input
+// type (text, search, email, url, tel, number, password, ...). Value is empty for password fields.
+type Focus struct {
+	T         string `cbor:"t"`
+	PID       int    `cbor:"pid"`
+	Seq       int    `cbor:"seq"`
+	ID        int    `cbor:"id,omitempty"`
+	Kind      string `cbor:"kind"`
+	Type      string `cbor:"type,omitempty"`
+	Value     string `cbor:"value,omitempty"`
+	Start     int    `cbor:"start"`
+	End       int    `cbor:"end"`
+	InputMode string `cbor:"im,omitempty"`
+	Enter     string `cbor:"enter,omitempty"` // enterkeyhint
+}
+
+// Dialog: Kind = alert | confirm | prompt | beforeunload. The page stays blocked until the phone sends DialogReply
+// (or 60 s pass, then it is dismissed).
+type Dialog struct {
+	T       string `cbor:"t"`
+	ID      int    `cbor:"id"`
+	Kind    string `cbor:"kind"`
+	Message string `cbor:"msg"`
+	Default string `cbor:"def,omitempty"`
+	URL     string `cbor:"url,omitempty"`
+}
+
+type DialogReply struct {
+	T    string `cbor:"t"`
+	ID   int    `cbor:"id"`
+	OK   bool   `cbor:"ok"`
+	Text string `cbor:"text,omitempty"`
+}
+
+// Download is informational: v1 never downloads in the cloud.
+type Download struct {
+	T       string `cbor:"t"`
+	URL     string `cbor:"url"`
+	Name    string `cbor:"name"`
+	Refused bool   `cbor:"refused"`
+}

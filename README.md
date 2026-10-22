@@ -40,12 +40,17 @@ Tiles land in `tiles/p<N>/L<layer>_y<row>_x<col>.png|jpg`. `testdata/layers.html
 with a fixed header, a sticky bar, a fixed footer and an input, for the layers.
 
 - **C client core** (`client/`): `phc`, a portable C99 implementation of the phone side (CBOR, framing, pairing + HMAC auth,
-  tile cache, layers, tap regions with hit-testing; no malloc, transport and image decoding supplied by the host).
-  `client/test/run.sh` cross-checks it against the Go client on a live server: example.com, a tap through the hit-test, the
-  layers page with typed text, and a Wikipedia article give identical tile counts, tile bytes, tile pixel hashes (XOR),
-  regions and layers; the same script checks that a changed server certificate is refused. `client/SYMBIAN.md` is the design
-  note for turning it into a web-engine plug-in. The server has a development-only plain listener
-  (`PHECLOUD_PLAIN_LISTEN`) for the C host test; production is TLS 1.3 only.
+  tile cache, layers, tap regions with hit-testing, focus/keyboard state, select options, dialogs; no malloc, the transport and
+  image decoding are the host's), `phc_mbedtls` (TLS 1.3 on mbedTLS 3.6, pinned certificate, non-blocking), selftest and a
+  frame fuzzer run under ASan/UBSan. `client/test/run.sh` cross-checks it against the Go client on a live server over the real
+  TLS listener (example.com with a tap and history back, the layers page, a Wikipedia article, a page with a search field, a
+  select, a JavaScript prompt and a download link): identical tile counts, bytes and pixel hashes, regions, layers, titles,
+  history flags, focus, options, dialog and download results; both clients also refuse a changed certificate.
+  `client/SYMBIAN.md` is the design note for turning it into a web-engine plug-in.
+- **Phone-protocol additions** (round 4): `page.back/fwd`; a `focus` frame after every update (kind, input type, value, caret,
+  inputmode); `input` kinds `key`, `select` and `text` into the focused field; `<select>` options in the region list;
+  `dialog`/`dialogreply` (alert, confirm, prompt, beforeunload; the page waits for the phone, 60 s timeout); `download`
+  (downloads are refused in the cloud and reported). Each tab is its own browser context, so these are per device.
 ## Measured (2026-10-22, round 2: event-driven settle, TLS 1.3, warm tab pool; Ryzen server container, 2 CPUs, loopback)
 Bytes are tile payloads (wire = payload plus about 6%); "render" is open-to-done on the server (navigation, settle, screenshots, tiling, encoding). Round 1 (fixed sleeps) in brackets.
 

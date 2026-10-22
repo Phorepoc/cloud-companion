@@ -8,9 +8,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/storage"
+	"github.com/chromedp/cdproto/target"
 	"image"
 	"image/draw"
 	"image/png"
@@ -35,12 +37,15 @@ type CDP struct {
 	cancel  context.CancelFunc
 	MaxH    int
 	pool    chan *tab
+	mu      sync.Mutex
+	boxes   map[target.ID]*handlerBox // tab target id -> its handlers (download events are browser-level)
 }
 
 type tab struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	ns     *netState
+	box    *handlerBox
 }
 
 func NewCDP(chromePath string, maxH, poolSize int) *CDP {
@@ -61,22 +66,73 @@ func NewCDP(chromePath string, maxH, poolSize int) *CDP {
 	}
 	rootCtx, rootCancel := chromedp.NewContext(ctx)
 	chromedp.Run(rootCtx) // start the browser process
-	c := &CDP{rootCtx: rootCtx, cancel: func() { rootCancel(); cancel() }, MaxH: maxH, pool: make(chan *tab, max(poolSize, 1))}
+	c := &CDP{rootCtx: rootCtx, cancel: func() { rootCancel(); cancel() }, MaxH: maxH, pool: make(chan *tab, max(poolSize, 1)), boxes: map[target.ID]*handlerBox{}}
+	chromedp.ListenBrowser(rootCtx, func(ev any) {
+		if e, ok := ev.(*browser.EventDownloadWillBegin); ok {
+			c.mu.Lock()
+			b := c.boxes[target.ID(e.FrameID)]
+			c.mu.Unlock()
+			if b != nil {
+				if h := b.get(); h.Download != nil {
+					h.Download(Download{URL: e.URL, Name: e.SuggestedFilename})
+				}
+			}
+		}
+	})
 	for i := 0; i < poolSize; i++ {
 		c.refill()
 	}
 	return c
 }
 
+type handlerBox struct {
+	mu sync.Mutex
+	h  Handlers
+}
+
+func (b *handlerBox) get() Handlers { b.mu.Lock(); defer b.mu.Unlock(); return b.h }
+
 func (c *CDP) newTab() (*tab, error) {
 	tctx, cancel := chromedp.NewContext(c.rootCtx, chromedp.WithNewBrowserContext())
 	ns := newNetState()
-	chromedp.ListenTarget(tctx, ns.handle)
-	if err := chromedp.Run(tctx, network.Enable()); err != nil { // also starts the tab
+	box := &handlerBox{}
+	chromedp.ListenTarget(tctx, func(ev any) {
+		ns.handle(ev)
+		if d, ok := ev.(*page.EventJavascriptDialogOpening); ok {
+			go func() { // the page is blocked until we answer; never block the event loop
+				h := box.get()
+				accept, text := false, ""
+				if h.Dialog != nil {
+					accept, text = h.Dialog(Dialog{Kind: string(d.Type), Message: d.Message, Default: d.DefaultPrompt, URL: d.URL})
+				}
+				chromedp.Run(tctx, page.HandleJavaScriptDialog(accept).WithPromptText(text))
+			}()
+		}
+	})
+	if err := chromedp.Run(tctx, network.Enable(), page.Enable()); err != nil { // also starts the tab
 		cancel()
 		return nil, err
 	}
-	return &tab{tctx, cancel, ns}, nil
+	fc := chromedp.FromContext(tctx)
+	// downloads are refused (and reported through Handlers.Download)
+	err := chromedp.Run(tctx, chromedp.ActionFunc(func(x context.Context) error {
+		return browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorDeny).WithBrowserContextID(fc.BrowserContextID).
+			WithEventsEnabled(true).Do(cdp.WithExecutor(x, fc.Browser))
+	}))
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	tid := fc.Target.TargetID
+	c.mu.Lock()
+	c.boxes[tid] = box
+	c.mu.Unlock()
+	return &tab{tctx, func() {
+		c.mu.Lock()
+		delete(c.boxes, tid)
+		c.mu.Unlock()
+		cancel()
+	}, ns, box}, nil
 }
 
 // refill warms one more tab in the background (dropped if the pool is already full).
@@ -105,7 +161,7 @@ func (c *CDP) New(ctx context.Context) (Session, error) {
 		}
 	}
 	c.refill()
-	return &cdpSession{ctx: t.ctx, cancel: t.cancel, ns: t.ns, maxH: c.MaxH}, nil
+	return &cdpSession{ctx: t.ctx, cancel: t.cancel, ns: t.ns, box: t.box, maxH: c.MaxH}, nil
 }
 
 func (c *CDP) Close() { c.cancel() }
@@ -159,6 +215,7 @@ type cdpSession struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	ns     *netState
+	box    *handlerBox
 	maxH   int
 	width  int
 	dpr    float64
@@ -304,26 +361,65 @@ func (s *cdpSession) Tap(ctx context.Context, x, y, sy int) error {
 	return s.settle(ctx)
 }
 
-func (s *cdpSession) Text(ctx context.Context, id int, text string, submit bool) error {
-	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-id="%d"]');if(!e)return false;
-e.scrollIntoView({block:'center'});e.focus();if(e.select)e.select();return true})()`, id)
+func (s *cdpSession) Text(ctx context.Context, id int, text string, submit, replace bool) error {
+	if id > 0 {
+		js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-id="%d"]');if(!e)return false;
+e.scrollIntoView({block:'center'});e.focus();if(%v&&e.select)e.select();return true})()`, id, replace)
+		var ok bool
+		if err := s.run(ctx, 10*time.Second, chromedp.Evaluate(js, &ok)); err != nil {
+			return err
+		}
+		if !ok {
+			return fmt.Errorf("no such region %d", id)
+		}
+	}
+	var acts []chromedp.Action
+	if text != "" {
+		acts = append(acts, chromedp.ActionFunc(func(c context.Context) error { return inputInsert(c, text) }))
+	}
+	if submit {
+		acts = append(acts, chromedp.KeyEvent(kb.Enter))
+	}
+	if len(acts) > 0 {
+		if err := s.run(ctx, 10*time.Second, acts...); err != nil {
+			return err
+		}
+	}
+	s.sy = 0
+	return s.settle(ctx)
+}
+
+var keyNames = map[string]string{
+	"Backspace": kb.Backspace, "Enter": kb.Enter, "Tab": kb.Tab, "Delete": kb.Delete, "ArrowLeft": kb.ArrowLeft,
+	"ArrowRight": kb.ArrowRight, "ArrowUp": kb.ArrowUp, "ArrowDown": kb.ArrowDown, "Escape": kb.Escape,
+}
+
+func (s *cdpSession) Key(ctx context.Context, name string) error {
+	k, ok := keyNames[name]
+	if !ok {
+		return fmt.Errorf("unknown key %q", name)
+	}
+	if err := s.run(ctx, 10*time.Second, chromedp.KeyEvent(k)); err != nil {
+		return err
+	}
+	return s.settle(ctx)
+}
+
+func (s *cdpSession) Select(ctx context.Context, id, index int) error {
+	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-id="%d"]');if(!e||e.tagName!=='SELECT'||!e.options[%d])return false;
+e.selectedIndex=%d;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`, id, index, index)
 	var ok bool
 	if err := s.run(ctx, 10*time.Second, chromedp.Evaluate(js, &ok)); err != nil {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no such region %d", id)
-	}
-	acts := []chromedp.Action{chromedp.ActionFunc(func(c context.Context) error { return inputInsert(c, text) })}
-	if submit {
-		acts = append(acts, chromedp.KeyEvent(kb.Enter))
-	}
-	if err := s.run(ctx, 10*time.Second, acts...); err != nil {
-		return err
+		return fmt.Errorf("no such select/option %d/%d", id, index)
 	}
 	s.sy = 0
 	return s.settle(ctx)
 }
+
+func (s *cdpSession) SetHandlers(h Handlers) { s.box.mu.Lock(); s.box.h = h; s.box.mu.Unlock() }
 
 func (s *cdpSession) ScrollTo(ctx context.Context, y int) error {
 	s.sy = y
@@ -358,6 +454,21 @@ type jsRegion struct {
 	Ph    string `json:"ph"`
 	Value string `json:"value"`
 	Label string `json:"label"`
+	Opts  []struct {
+		L string `json:"l"`
+		S bool   `json:"s"`
+	} `json:"opts"`
+}
+
+type jsFocus struct {
+	ID    int    `json:"id"`
+	Kind  string `json:"kind"`
+	Type  string `json:"type"`
+	Value string `json:"value"`
+	Start int    `json:"start"`
+	End   int    `json:"end"`
+	IM    string `json:"im"`
+	Enter string `json:"enter"`
 }
 
 type jsInfo struct {
@@ -366,6 +477,7 @@ type jsInfo struct {
 	H       int        `json:"h"`
 	Layers  []jsLayer  `json:"layers"`
 	Regions []jsRegion `json:"regions"`
+	Focus   jsFocus    `json:"focus"`
 }
 
 // lazyJS scrolls through the page once to trigger lazy loading, but only when the page can have lazy content.
@@ -429,8 +541,20 @@ const extractJS = `(()=>{
   out.regions.push({id:idOf(e),layer,x,y,w:Math.round(r.width),h:Math.round(r.height),kind,
    href:tag==='a'?e.href:'',type:e.type||'',name:e.name||'',ph:e.placeholder||'',
    value:(tag==='input'||tag==='textarea')&&e.type!=='password'?String(e.value||'').slice(0,64):'',
-   label:(e.getAttribute('aria-label')||e.innerText||e.value||'').trim().slice(0,40)});
+   label:(e.getAttribute('aria-label')||e.innerText||e.value||'').trim().slice(0,40),opts:tag==='select'?[...e.options].slice(0,100).map(o=>({l:(o.label||o.text||'').slice(0,40),s:o.selected})):undefined});
  }
+ out.focus={kind:'none'};
+ {const a=document.activeElement;
+  if(a&&a!==document.body&&a!==document.documentElement){
+   const tg=a.tagName.toLowerCase(),ty=(a.type||'').toLowerCase();let kind='none';
+   if(tg==='textarea')kind='textarea';
+   else if(tg==='input'&&!['button','submit','reset','checkbox','radio','image','file','range','color'].includes(ty))kind='text';
+   else if(tg==='select')kind='select';
+   else if(a.isContentEditable)kind='textarea';
+   if(kind!=='none'){let st=-1,en=-1;try{st=a.selectionStart;en=a.selectionEnd;}catch(e){}
+    out.focus={id:idOf(a),kind,type:tg==='input'?ty:'',value:ty==='password'?'':String(a.value!==undefined?a.value:(a.innerText||'')).slice(0,200),
+     start:st===null?-1:st,end:en===null?-1:en,im:a.inputMode||'',enter:a.enterKeyHint||''};}
+  }}
  window.__pheNext=nid;
  return JSON.stringify(out);})()`
 
@@ -477,6 +601,19 @@ func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
 		return nil, err
 	}
 	sn := &Snapshot{URL: info.URL, Title: info.Title, W: s.width}
+	sn.Focus = Focus{ID: info.Focus.ID, Kind: info.Focus.Kind, Type: info.Focus.Type, Value: info.Focus.Value,
+		Start: info.Focus.Start, End: info.Focus.End, InputMode: info.Focus.IM, EnterKey: info.Focus.Enter}
+	if sn.Focus.Kind == "" {
+		sn.Focus.Kind = "none"
+	}
+	s.run(ctx, 5*time.Second, chromedp.ActionFunc(func(c context.Context) error {
+		idx, entries, err := page.GetNavigationHistory().Do(c)
+		if err == nil {
+			sn.Back = idx > 0 && entries[idx-1].URL != "about:blank" // the first entry of a fresh tab is about:blank
+			sn.Fwd = int(idx) < len(entries)-1
+		}
+		return nil
+	}))
 	h := info.H
 	if h < viewH {
 		h = viewH
@@ -509,8 +646,12 @@ func (s *cdpSession) Snapshot(ctx context.Context) (*Snapshot, error) {
 		if r.Layer == 0 && r.Y >= h {
 			continue
 		}
-		sn.Regions = append(sn.Regions, Region{ID: r.ID, Layer: r.Layer, X: r.X, Y: r.Y, W: r.W, H: r.H, Kind: r.Kind,
-			Href: r.Href, Type: r.Type, Name: r.Name, Placeholder: r.Ph, Value: r.Value, Label: r.Label})
+		reg := Region{ID: r.ID, Layer: r.Layer, X: r.X, Y: r.Y, W: r.W, H: r.H, Kind: r.Kind,
+			Href: r.Href, Type: r.Type, Name: r.Name, Placeholder: r.Ph, Value: r.Value, Label: r.Label}
+		for _, o := range r.Opts {
+			reg.Opts = append(reg.Opts, Opt{Label: o.L, Sel: o.S})
+		}
+		sn.Regions = append(sn.Regions, reg)
 	}
 	if keepSY > 0 {
 		s.ScrollTo(ctx, keepSY)

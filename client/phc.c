@@ -5,7 +5,7 @@
 #include "phc_sha256.h"
 #include <string.h>
 
-enum { T_UNKNOWN, T_CHALLENGE, T_WELCOME, T_ERROR, T_PAGE, T_TILE, T_LAYERS, T_REGIONS, T_DONE, T_PONG };
+enum { T_UNKNOWN, T_CHALLENGE, T_WELCOME, T_ERROR, T_PAGE, T_TILE, T_LAYERS, T_REGIONS, T_DONE, T_PONG, T_FOCUS, T_DIALOG, T_DOWNLOAD };
 
 void phc_init(phc *c, phc_transport io, uint8_t *rxbuf, size_t rxcap)
 {
@@ -27,6 +27,7 @@ static int read_exact(phc *c, uint8_t *p, size_t n, int allow_wouldblock)
         int r = c->io.recv(c->io.ctx, p + got, n - got);
         if (r == PHC_WOULDBLOCK) {
             if (got == 0 && allow_wouldblock) return PHC_WOULDBLOCK;
+            if (c->io.wait) c->io.wait(c->io.ctx);
             continue;   /* mid-frame: keep waiting */
         }
         if (r <= 0) return PHC_ERR_IO;
@@ -50,6 +51,15 @@ static int read_frame(phc *c, size_t *len)
     return PHC_OK;
 }
 
+/* read_frame that waits through PHC_WOULDBLOCK (used while authenticating, where no other work is pending) */
+static int read_frame_wait(phc *c, size_t *len)
+{
+    int rc;
+    while ((rc = read_frame(c, len)) == PHC_WOULDBLOCK)
+        if (c->io.wait) c->io.wait(c->io.ctx);
+    return rc;
+}
+
 static int frame_type(const uint8_t *p, size_t n)
 {
     phc_r r;
@@ -71,6 +81,9 @@ static int frame_type(const uint8_t *p, size_t n)
             if (phc_text_eq(v, vl, "regions")) return T_REGIONS;
             if (phc_text_eq(v, vl, "done")) return T_DONE;
             if (phc_text_eq(v, vl, "pong")) return T_PONG;
+            if (phc_text_eq(v, vl, "focus")) return T_FOCUS;
+            if (phc_text_eq(v, vl, "dialog")) return T_DIALOG;
+            if (phc_text_eq(v, vl, "download")) return T_DOWNLOAD;
             return T_UNKNOWN;
         }
         if (phc_r_skip(&r)) return T_UNKNOWN;
@@ -130,14 +143,46 @@ int phc_scroll(phc *c, int y)
     return send_frame(c, &w);
 }
 
-int phc_text(phc *c, int region_id, const char *text, int submit)
+int phc_text_ex(phc *c, int region_id, const char *text, int submit, int replace)
 {
     phc_w w;
-    begin(c, &w, "input", 4);
+    begin(c, &w, "input", 5);
     phc_w_kv_text(&w, "kind", "text");
     phc_w_kv_int(&w, "id", region_id);
     phc_w_kv_text(&w, "text", text);
     phc_w_kv_bool(&w, "submit", submit);
+    phc_w_kv_bool(&w, "replace", replace);
+    return send_frame(c, &w);
+}
+
+int phc_text(phc *c, int region_id, const char *text, int submit) { return phc_text_ex(c, region_id, text, submit, 0); }
+
+int phc_key(phc *c, const char *name)
+{
+    phc_w w;
+    begin(c, &w, "input", 2);
+    phc_w_kv_text(&w, "kind", "key");
+    phc_w_kv_text(&w, "text", name);
+    return send_frame(c, &w);
+}
+
+int phc_select(phc *c, int region_id, int option_index)
+{
+    phc_w w;
+    begin(c, &w, "input", 3);
+    phc_w_kv_text(&w, "kind", "select");
+    phc_w_kv_int(&w, "id", region_id);
+    phc_w_kv_int(&w, "index", option_index);
+    return send_frame(c, &w);
+}
+
+int phc_dialog_reply(phc *c, int dialog_id, int ok, const char *text)
+{
+    phc_w w;
+    begin(c, &w, "dialogreply", 3);
+    phc_w_kv_int(&w, "id", dialog_id);
+    phc_w_kv_bool(&w, "ok", ok);
+    phc_w_kv_text(&w, "text", text ? text : "");
     return send_frame(c, &w);
 }
 
@@ -231,6 +276,8 @@ static int on_page(phc *c, phc_r *r)
         else if (phc_text_eq(k, kl, "tw")) rc = get_int(r, &p.tw);
         else if (phc_text_eq(k, kl, "th")) rc = get_int(r, &p.th);
         else if (phc_text_eq(k, kl, "trunc")) rc = phc_r_bool(r, &p.trunc);
+        else if (phc_text_eq(k, kl, "back")) rc = phc_r_bool(r, &p.back);
+        else if (phc_text_eq(k, kl, "fwd")) rc = phc_r_bool(r, &p.fwd);
         else if (phc_text_eq(k, kl, "url")) rc = copy_text(r, p.url, sizeof p.url);
         else if (phc_text_eq(k, kl, "title")) rc = copy_text(r, p.title, sizeof p.title);
         else rc = phc_r_skip(r);
@@ -339,6 +386,7 @@ static int on_regions(phc *c, phc_r *r)
 {
     uint32_t n, i, cnt, j;
     c->nregions = 0;
+    c->nopts = 0;
     c->regions_dropped = 0;
     c->pool_used = 0;
     if (phc_r_map(r, &n)) return PHC_ERR_PROTO;
@@ -371,6 +419,28 @@ static int on_regions(phc *c, phc_r *r)
                 else if (phc_text_eq(kk, kkl, "ph")) { g.placeholder = pool_text(c, r, 47); rc = r->err; }
                 else if (phc_text_eq(kk, kkl, "value")) { g.value = pool_text(c, r, 63); rc = r->err; }
                 else if (phc_text_eq(kk, kkl, "label")) { g.label = pool_text(c, r, 47); rc = r->err; }
+                else if (phc_text_eq(kk, kkl, "opts")) {
+                    uint32_t no, oi;
+                    rc = phc_r_array(r, &no);
+                    g.opt_first = c->nopts;
+                    for (oi = 0; !rc && oi < no; oi++) {
+                        uint32_t om, oq;
+                        phc_option o;
+                        o.label = ""; o.selected = 0;
+                        if (phc_r_map(r, &om)) { rc = -1; break; }
+                        for (oq = 0; oq < om; oq++) {
+                            const char *ok;
+                            size_t okl;
+                            if (phc_r_text(r, &ok, &okl)) { rc = -1; break; }
+                            if (phc_text_eq(ok, okl, "l")) { o.label = pool_text(c, r, 47); if (r->err) rc = -1; }
+                            else if (phc_text_eq(ok, okl, "s")) { if (phc_r_bool(r, &o.selected)) rc = -1; }
+                            else if (phc_r_skip(r)) rc = -1;
+                            if (rc) break;
+                        }
+                        if (rc) break;
+                        if (c->nopts < PHC_MAX_OPTS) { c->opts[c->nopts++] = o; g.opt_count++; }
+                    }
+                }
                 else if (phc_text_eq(kk, kkl, "kind")) {
                     rc = phc_r_text(r, &s, &sl);
                     if (!rc) {
@@ -386,6 +456,87 @@ static int on_regions(phc *c, phc_r *r)
             else c->regions_dropped++;
         }
     }
+    return PHC_OK;
+}
+
+static int on_focus(phc *c, phc_r *r)
+{
+    uint32_t n, i;
+    phc_focus f;
+    memset(&f, 0, sizeof f);
+    f.start = f.end = -1;
+    if (phc_r_map(r, &n)) return PHC_ERR_PROTO;
+    for (i = 0; i < n; i++) {
+        const char *k, *s;
+        size_t kl, sl;
+        int rc;
+        if (phc_r_text(r, &k, &kl)) return PHC_ERR_PROTO;
+        if (phc_text_eq(k, kl, "id")) rc = get_int(r, &f.id);
+        else if (phc_text_eq(k, kl, "start")) rc = get_int(r, &f.start);
+        else if (phc_text_eq(k, kl, "end")) rc = get_int(r, &f.end);
+        else if (phc_text_eq(k, kl, "type")) rc = copy_text(r, f.type, sizeof f.type);
+        else if (phc_text_eq(k, kl, "value")) rc = copy_text(r, f.value, sizeof f.value);
+        else if (phc_text_eq(k, kl, "im")) rc = copy_text(r, f.inputmode, sizeof f.inputmode);
+        else if (phc_text_eq(k, kl, "enter")) rc = copy_text(r, f.enter, sizeof f.enter);
+        else if (phc_text_eq(k, kl, "kind")) {
+            rc = phc_r_text(r, &s, &sl);
+            if (!rc) f.kind = phc_text_eq(s, sl, "text") ? PHC_FOCUS_TEXT
+                            : phc_text_eq(s, sl, "textarea") ? PHC_FOCUS_TEXTAREA
+                            : phc_text_eq(s, sl, "select") ? PHC_FOCUS_SELECT : PHC_FOCUS_NONE;
+        } else rc = phc_r_skip(r);
+        if (rc) return PHC_ERR_PROTO;
+    }
+    c->focus = f;
+    if (c->ev.on_focus) c->ev.on_focus(c->ev.user, &c->focus);
+    return PHC_OK;
+}
+
+static int on_dialog(phc *c, phc_r *r)
+{
+    uint32_t n, i;
+    phc_dialog d;
+    memset(&d, 0, sizeof d);
+    if (phc_r_map(r, &n)) return PHC_ERR_PROTO;
+    for (i = 0; i < n; i++) {
+        const char *k, *s;
+        size_t kl, sl;
+        int rc;
+        if (phc_r_text(r, &k, &kl)) return PHC_ERR_PROTO;
+        if (phc_text_eq(k, kl, "id")) rc = get_int(r, &d.id);
+        else if (phc_text_eq(k, kl, "msg")) rc = copy_text(r, d.message, sizeof d.message);
+        else if (phc_text_eq(k, kl, "def")) rc = copy_text(r, d.def, sizeof d.def);
+        else if (phc_text_eq(k, kl, "kind")) {
+            rc = phc_r_text(r, &s, &sl);
+            if (!rc) d.kind = phc_text_eq(s, sl, "confirm") ? PHC_DLG_CONFIRM
+                            : phc_text_eq(s, sl, "prompt") ? PHC_DLG_PROMPT
+                            : phc_text_eq(s, sl, "beforeunload") ? PHC_DLG_BEFOREUNLOAD : PHC_DLG_ALERT;
+        } else rc = phc_r_skip(r);
+        if (rc) return PHC_ERR_PROTO;
+    }
+    /* no handler: dismiss, so the page does not stay blocked */
+    if (c->ev.on_dialog) c->ev.on_dialog(c->ev.user, &d);
+    else phc_dialog_reply(c, d.id, 0, "");
+    return PHC_OK;
+}
+
+static int on_download(phc *c, phc_r *r)
+{
+    uint32_t n, i;
+    phc_download d;
+    memset(&d, 0, sizeof d);
+    if (phc_r_map(r, &n)) return PHC_ERR_PROTO;
+    for (i = 0; i < n; i++) {
+        const char *k;
+        size_t kl;
+        int rc;
+        if (phc_r_text(r, &k, &kl)) return PHC_ERR_PROTO;
+        if (phc_text_eq(k, kl, "url")) rc = copy_text(r, d.url, sizeof d.url);
+        else if (phc_text_eq(k, kl, "name")) rc = copy_text(r, d.name, sizeof d.name);
+        else if (phc_text_eq(k, kl, "refused")) rc = phc_r_bool(r, &d.refused);
+        else rc = phc_r_skip(r);
+        if (rc) return PHC_ERR_PROTO;
+    }
+    if (c->ev.on_download) c->ev.on_download(c->ev.user, &d);
     return PHC_OK;
 }
 
@@ -424,6 +575,9 @@ static int dispatch(phc *c, size_t len)
     case T_TILE: return on_tile(c, &r);
     case T_LAYERS: return on_layers(c, &r);
     case T_REGIONS: return on_regions(c, &r);
+    case T_FOCUS: return on_focus(c, &r);
+    case T_DIALOG: return on_dialog(c, &r);
+    case T_DOWNLOAD: return on_download(c, &r);
     case T_DONE: rc = on_done(c, &r); return rc ? rc : 1;
     case T_PONG: return PHC_OK;
     default: return PHC_OK;   /* unknown frame types are ignored: the protocol may grow */
@@ -453,7 +607,7 @@ int phc_auth(phc *c, phc_creds *cr, const char *code, const char *devname)
     phc_w w;
     static const char suffix[] = "phecloud-v1";
 
-    rc = read_frame(c, &len);
+    rc = read_frame_wait(c, &len);
     if (rc) return rc;
     t = frame_type(c->rx, len);
     if (t != T_CHALLENGE) return PHC_ERR_PROTO;
@@ -489,7 +643,7 @@ int phc_auth(phc *c, phc_creds *cr, const char *code, const char *devname)
     rc = send_frame(c, &w);
     if (rc) return rc;
 
-    rc = read_frame(c, &len);
+    rc = read_frame_wait(c, &len);
     if (rc) return rc;
     t = frame_type(c->rx, len);
     phc_r_init(&r, c->rx, len);

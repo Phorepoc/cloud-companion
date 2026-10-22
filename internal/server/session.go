@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/browser"
@@ -22,10 +23,19 @@ type tval struct {
 }
 
 // session is one phone connection with one browser tab. Requests are handled one at a time.
+type dialogAnswer struct {
+	ok   bool
+	text string
+}
+
 type session struct {
-	srv *Server
-	c   *conn
-	log *slog.Logger
+	done    chan struct{}
+	dialogs map[int]chan dialogAnswer
+	dmu     sync.Mutex
+	dnext   int
+	srv     *Server
+	c       *conn
+	log     *slog.Logger
 
 	dev    string
 	br     browser.Session
@@ -37,6 +47,7 @@ type session struct {
 }
 
 func (s *session) close() {
+	close(s.done)
 	if s.br != nil {
 		s.br.Close()
 	}
@@ -58,6 +69,7 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 				return err
 			}
 			s.br = b
+			b.SetHandlers(browser.Handlers{Dialog: s.onDialog, Download: s.onDownload})
 			if ck := s.srv.Store.LoadCookies(s.dev); len(ck) > 0 {
 				if err := b.SetCookies(ctx, ck); err != nil {
 					s.log.Warn("restore cookies", "err", err)
@@ -112,8 +124,16 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 			if err := s.br.ScrollTo(ctx, in.Y); err != nil {
 				return err
 			}
+		case "key":
+			if err := s.br.Key(ctx, in.Text); err != nil {
+				return err
+			}
+		case "select":
+			if err := s.br.Select(ctx, in.ID, in.Index); err != nil {
+				return err
+			}
 		case "text":
-			if err := s.br.Text(ctx, in.ID, in.Text, in.Submit); err != nil {
+			if err := s.br.Text(ctx, in.ID, in.Text, in.Submit, in.Replace); err != nil {
 				return err
 			}
 		default:
@@ -143,7 +163,7 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 	s.seq++
 	s.layers = sn.Layers
 	if err := s.c.send(proto.Page{T: proto.TPage, PID: s.pid, Seq: s.seq, URL: sn.URL, Title: sn.Title, W: sn.W, H: sn.H,
-		TileW: tiles.TileW, TileH: tiles.TileH, Trunc: sn.Truncated}); err != nil {
+		TileW: tiles.TileW, TileH: tiles.TileH, Trunc: sn.Truncated, Back: sn.Back, Fwd: sn.Fwd}); err != nil {
 		return err
 	}
 	var ll []proto.Layer
@@ -186,10 +206,19 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 	}
 	var rr []proto.Region
 	for _, r := range sn.Regions {
-		rr = append(rr, proto.Region{ID: r.ID, Layer: r.Layer, X: r.X, Y: r.Y, W: r.W, H: r.H, Kind: r.Kind, Href: r.Href,
-			Type: r.Type, Name: r.Name, Placeholder: r.Placeholder, Value: r.Value, Label: r.Label})
+		pr := proto.Region{ID: r.ID, Layer: r.Layer, X: r.X, Y: r.Y, W: r.W, H: r.H, Kind: r.Kind, Href: r.Href,
+			Type: r.Type, Name: r.Name, Placeholder: r.Placeholder, Value: r.Value, Label: r.Label}
+		for _, o := range r.Opts {
+			pr.Opts = append(pr.Opts, proto.Opt{Label: o.Label, Sel: o.Sel})
+		}
+		rr = append(rr, pr)
 	}
 	if err := s.c.send(proto.Regions{T: proto.TRegions, PID: s.pid, Seq: s.seq, List: rr}); err != nil {
+		return err
+	}
+	f := sn.Focus
+	if err := s.c.send(proto.Focus{T: proto.TFocus, PID: s.pid, Seq: s.seq, ID: f.ID, Kind: f.Kind, Type: f.Type, Value: f.Value,
+		Start: f.Start, End: f.End, InputMode: f.InputMode, Enter: f.EnterKey}); err != nil {
 		return err
 	}
 	if ck, err := s.br.Cookies(ctx); err != nil {
@@ -206,4 +235,46 @@ func (s *session) update(ctx context.Context, start time.Time) error {
 		return sn.URL
 	}(), "h", sn.H, "layers", len(sn.Layers), "regions", len(rr), "tiles", nt, "bytes", nb, "ms", ms, "snapshot_ms", snapMs)
 	return s.c.send(proto.Done{T: proto.TDone, PID: s.pid, Seq: s.seq, Ms: ms, Tiles: nt, Bytes: nb})
+}
+
+// onDialog runs on the browser's event goroutine: ask the phone and wait for its reply (60 s, then dismiss).
+func (s *session) onDialog(d browser.Dialog) (bool, string) {
+	s.dmu.Lock()
+	s.dnext++
+	id := s.dnext
+	ch := make(chan dialogAnswer, 1)
+	s.dialogs[id] = ch
+	s.dmu.Unlock()
+	defer func() { s.dmu.Lock(); delete(s.dialogs, id); s.dmu.Unlock() }()
+	if err := s.c.send(proto.Dialog{T: proto.TDialog, ID: id, Kind: d.Kind, Message: d.Message, Default: d.Default, URL: d.URL}); err != nil {
+		return false, ""
+	}
+	select {
+	case a := <-ch:
+		return a.ok, a.text
+	case <-time.After(60 * time.Second):
+	case <-s.done:
+	}
+	return false, ""
+}
+
+func (s *session) dialogReply(raw []byte) {
+	var r proto.DialogReply
+	if proto.Decode(raw, &r) != nil {
+		return
+	}
+	s.dmu.Lock()
+	ch := s.dialogs[r.ID]
+	s.dmu.Unlock()
+	if ch != nil {
+		select {
+		case ch <- dialogAnswer{r.OK, r.Text}:
+		default:
+		}
+	}
+}
+
+func (s *session) onDownload(d browser.Download) {
+	s.log.Info("download refused", "url", d.URL, "name", d.Name)
+	s.c.send(proto.Download{T: proto.TDownload, URL: d.URL, Name: d.Name, Refused: true})
 }

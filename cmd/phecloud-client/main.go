@@ -15,6 +15,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,6 +57,7 @@ func main() {
 	out := flag.String("out", "tiles", "output dir")
 	tap := flag.Bool("tap-first-link", false, "after the first page, tap the first link and report the update")
 	fp := flag.String("fp", "", "expected server certificate fingerprint at pairing (else trust on first use)")
+	scenario := flag.String("scenario", "", "gaps: focus, select, dialog and download steps on the first page")
 	typ := flag.String("type", "", "after the first page, type this text into the first input")
 	var us urls
 	flag.Var(&us, "url", "URL to open (repeatable)")
@@ -125,43 +127,74 @@ func main() {
 		fmt.Println("authenticated as", w.Dev)
 	}
 
+	wconn = nc
 	var totalWire int64
-	for i, u := range us {
+	step := func(name, label string, send func()) *summary {
 		before := cr.n
 		start := time.Now()
-		proto.Write(nc, proto.Open{T: proto.TOpen, URL: u, Width: 360, DPR: 1})
-		sum := collect(cr, filepath.Join(*out, fmt.Sprintf("p%d", i)), start)
-		sum.print("open", u, cr.n-before)
+		send()
+		s := collect(cr, filepath.Join(*out, name), start)
+		s.print(name, label, cr.n-before)
 		totalWire += cr.n - before
-		if *tap && i == 0 && len(sum.regions) > 0 {
-			for _, r := range sum.regions {
-				if r.Kind == "link" && r.Layer == 0 {
-					fmt.Printf("tapping link #%d %q -> %s at (%d,%d)\n", r.ID, r.Label, r.Href, r.X+r.W/2, r.Y+r.H/2)
-					before = cr.n
-					start = time.Now()
-					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "tap", X: r.X + r.W/2, Y: r.Y + r.H/2})
-					s2 := collect(cr, filepath.Join(*out, "tap"), start)
-					s2.print("tap", "(after tap)", cr.n-before)
-					break
-				}
+		return s
+	}
+	tapRegion := func(name string, r proto.Region) *summary {
+		fmt.Printf("tapping #%d %q at (%d,%d)\n", r.ID, r.Label, r.X+r.W/2, r.Y+r.H/2)
+		return step(name, "(after tap)", func() {
+			proto.Write(nc, proto.Input{T: proto.TInput, Kind: "tap", X: r.X + r.W/2, Y: r.Y + r.H/2})
+		})
+	}
+	find := func(rs []proto.Region, pred func(proto.Region) bool) *proto.Region {
+		for i := range rs {
+			if pred(rs[i]) {
+				return &rs[i]
+			}
+		}
+		return nil
+	}
+	for i, u := range us {
+		sum := step("open", u, func() { proto.Write(nc, proto.Open{T: proto.TOpen, URL: u, Width: 360, DPR: 1}) })
+		if *tap && i == 0 {
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "link" && r.Layer == 0 }); r != nil {
+				tapRegion("tap", *r)
+				step("back", "(back)", func() { proto.Write(nc, proto.Navigate{T: proto.TNavigate, Action: "back"}) })
 			}
 		}
 		if *typ != "" && i == 0 {
-			for _, r := range sum.regions {
-				if r.Kind == "input" || r.Kind == "textarea" {
-					fmt.Printf("typing %q into region #%d (%s)\n", *typ, r.ID, r.Name)
-					before = cr.n
-					start = time.Now()
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "input" || r.Kind == "textarea" }); r != nil {
+				fmt.Printf("typing %q into region #%d (%s)\n", *typ, r.ID, r.Name)
+				step("typed", "(after text input)", func() {
 					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "text", ID: r.ID, Text: *typ})
-					s2 := collect(cr, filepath.Join(*out, "typed"), start)
-					s2.print("typed", "(after text input)", cr.n-before)
-					break
-				}
+				})
+			}
+		}
+		if *scenario == "gaps" && i == 0 {
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "input" }); r != nil {
+				tapRegion("focus", *r)
+				step("text", "(text into the focused field)", func() {
+					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "text", Text: "abc"})
+				})
+				step("key", "(Backspace)", func() {
+					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "key", Text: "Backspace"})
+				})
+			}
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Kind == "select" }); r != nil {
+				step("select", "(select option 2)", func() {
+					proto.Write(nc, proto.Input{T: proto.TInput, Kind: "select", ID: r.ID, Index: 2})
+				})
+			}
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "ask" }); r != nil {
+				tapRegion("dialog", *r)
+			}
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "dl" }); r != nil {
+				tapRegion("download", *r)
 			}
 		}
 	}
 	fmt.Printf("TOTAL wire bytes: %d\n", totalWire)
 }
+
+var wconn io.Writer
 
 type summary struct {
 	page             proto.Page
@@ -173,6 +206,11 @@ type summary struct {
 	srvMs            int
 	rtt              time.Duration
 	firstTile        time.Duration
+	focus            proto.Focus
+	dialogs          int
+	dlgKind, dlgMsg  string
+	downloads        int
+	dlName           string
 }
 
 func collect(r *counter, dir string, start time.Time) *summary {
@@ -187,6 +225,22 @@ func collect(r *counter, dir string, start time.Time) *summary {
 		switch t {
 		case proto.TPage:
 			proto.Decode(raw, &s.page)
+		case proto.TFocus:
+			proto.Decode(raw, &s.focus)
+		case proto.TDialog:
+			var d proto.Dialog
+			proto.Decode(raw, &d)
+			s.dialogs++
+			if s.dialogs == 1 {
+				s.dlgKind, s.dlgMsg = d.Kind, d.Message
+			}
+			fmt.Printf("  dialog #%d %s %q default %q -> replying ok\n", d.ID, d.Kind, d.Message, d.Default)
+			proto.Write(wconn, proto.DialogReply{T: proto.TDialogReply, ID: d.ID, OK: true, Text: "Zed"})
+		case proto.TDownload:
+			var d proto.Download
+			proto.Decode(raw, &d)
+			s.downloads++
+			s.dlName = d.Name
 		case proto.TLayers:
 			var l proto.Layers
 			proto.Decode(raw, &l)
@@ -235,7 +289,29 @@ func (s *summary) print(step, label string, wire int64) {
 		if len(u) > 100 {
 			u = u[:100]
 		}
-		fmt.Printf("SUMMARY step=%s url=%s h=%d tiles=%d tilebytes=%d hx=%016x regions=%d layers=%d trunc=%v\n", step, u, s.page.H, s.tiles, s.pngB+s.jpgB, s.hx, len(s.regions), s.layers, s.page.Trunc)
+		nopts, sel := 0, -1
+		for _, r := range s.regions {
+			if r.Kind == "select" {
+				nopts = len(r.Opts)
+				for i, o := range r.Opts {
+					if o.Sel {
+						sel = i
+					}
+				}
+				break
+			}
+		}
+		sp := func(v string) string {
+			if v == "" {
+				return "-"
+			}
+			return strings.NewReplacer(" ", "_", "\n", "_").Replace(v)
+		}
+		fmt.Printf("SUMMARY step=%s url=%s h=%d tiles=%d tilebytes=%d hx=%016x regions=%d layers=%d trunc=%v "+
+			"title=%s back=%v fwd=%v focus=%s ftype=%s fvalue=%s opts=%d sel=%d dialogs=%d dlgkind=%s dlgmsg=%s dl=%d dlname=%s\n",
+			step, u, s.page.H, s.tiles, s.pngB+s.jpgB, s.hx, len(s.regions), s.layers, s.page.Trunc,
+			sp(s.page.Title), s.page.Back, s.page.Fwd, s.focus.Kind, sp(s.focus.Type), sp(s.focus.Value), nopts, sel,
+			s.dialogs, sp(s.dlgKind), sp(s.dlgMsg), s.downloads, sp(s.dlName))
 	}
 	kinds := map[string]int{}
 	for _, r := range s.regions {

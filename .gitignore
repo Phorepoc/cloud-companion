@@ -4,3 +4,4 @@
 /tiles/
 /.testrun/
 /client/build/
+/.deps/

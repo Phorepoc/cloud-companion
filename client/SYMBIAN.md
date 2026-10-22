@@ -97,21 +97,43 @@ when the page URL is https, which only means the cloud validated the site's cert
 The core is plain C99 with only `memcpy/memset/memcmp/strlen/strncpy` from libc: build it as a static library with the modern GCC
 toolchain (`-std=c99`), link it into the plug-in DLL (C++ glue calls it through `extern "C"`; `phc.h` already has the guards). The
 plug-in DLL has no writable static data issue if the `phc` object is heap-allocated once per view (`new` in the glue, 230 KB).
-Stack use is small; the one recursion (`phc_r_skip`) is bounded by the frame, and a depth limit of 16 should be added before
-the first on-device run.
+Stack use is small; the one recursion (`phc_r_skip`) now has a depth limit of 16 (see "Robustness" below), which was the
+a requirement for the first on-device run.
 
-## What this design does not cover yet (protocol gaps to close on the server side first)
-1. **History state**: `can_back` / `can_forward` are not in the `page` frame; add them (and `loading`).
-2. **JavaScript dialogs, HTTP auth, certificate errors, downloads** (CDP `Page.javascriptDialogOpening`, `Fetch.authRequired`,
-   `Browser.downloadWillBegin`): new server-to-phone frames and replies mapping to `PHE_EV_DIALOG` / `PHE_EV_DOWNLOAD`.
-3. **`<select>` options and date pickers**: region kind `select` is reported but its options are not; the phone needs the list
-   to show a native chooser (and a reply that sets the value).
-4. **Focus and caret**: after a tap the server should say what got focus (kind, value) so `PHE_EV_FOCUS` does not rely on the
-   region kind alone, and so the typed text can be echoed from the server's tiles without a local widget.
-5. **Zoom**: v1 is fixed 360 px layout. Pinch can map to a new `open`/`resize` with a different width (re-render) or to local
+## Protocol additions (round 4) and how the plug-in uses them
+These frames are implemented in the server, the Go client and the C core, and cross-checked by `client/test/run.sh`.
+- **History** (`page.back`, `page.fwd`, plus `title`/`url` on every update): drives `PheViewState.can_back/can_forward`
+  and `PHE_EV_HISTORY` / `PHE_EV_TITLE`; `phc_navigate_action("back"|"forward"|"reload")` is `PHE_CMD_BACK/FORWARD/RELOAD`.
+- **Focus** (`focus` frame after every update: region id, kind none/text/textarea/select, HTML input type, value, caret
+  start/end, inputmode, enterkeyhint; the value is empty for password fields): the plug-in raises `PHE_EV_FOCUS a = 2` when
+  `kind` is text/textarea so the frontend opens its own keyboard, and picks the keyboard layout from `type`/`inputmode`
+  (email, url, tel, number, search). Typing is `phc_text(c, 0, utf8, 0)` (into the focused field, at the caret),
+  `phc_key(c, "Backspace" | "Enter" | "Delete" | "Tab" | "Arrow*" | "Escape")` for the editing keys, `phc_text_ex(.., replace=1)`
+  to replace the whole content. The caret and the typed text come back as tiles and as `focus.value`, so the phone needs no
+  text widget of its own for the page.
+- **Select** (region `opts`: label and selected flag, at most 100 per select): the plug-in shows a native list for a tap on a
+  `PHC_REGION_SELECT` region and answers with `phc_select(c, region_id, index)`; the page sees `input`/`change` events.
+- **Dialogs** (`dialog` frame: id, kind alert/confirm/prompt/beforeunload, message, default; reply `dialogreply`): the page is
+  blocked until the reply (the server dismisses after 60 s, or at once if no handler is installed). `on_dialog` maps to
+  `PHE_EV_DIALOG` (`PHE_DLG_ALERT/CONFIRM/PROMPT`; beforeunload as CONFIRM) and `dialog_reply` to `phc_dialog_reply`.
+  The server reads frames on a separate goroutine so the reply is processed while the request that opened the dialog waits.
+- **Downloads** are refused in the cloud (browser-level `Browser.setDownloadBehavior = deny`); the `download` frame
+  (`url`, `name`, `refused`) lets the plug-in show "downloads are not supported by the cloud browser". A later version could
+  stream the file to the phone as a download (`PHE_EV_DOWNLOAD`) once there is a channel for bulk data.
+- **TLS**: `phc_mbedtls.[ch]` is the mbedTLS 3.6 adapter (TLS 1.3 only, certificate pinned by SHA-256, non-blocking with an
+  optional wait hook; tested against the real listener). The phone needs `mbedtls_hardware_poll()` for entropy and should set
+  `MBEDTLS_MEMORY_BUFFER_ALLOC_C` with a static pool so mbedTLS does not touch the system heap.
+- **Robustness**: the CBOR skipper has a nesting limit (16) and rejects array/map counts larger than the remaining bytes;
+  `client/test/selftest.c` feeds every truncation of a canned conversation, thousands of byte-flipped copies, random garbage
+  frames, a 200-deep nesting and absurd lengths through the decoder under AddressSanitizer + UBSan (`make fuzz`).
+
+## Still open
+1. **HTTP auth and certificate-error dialogs** (CDP `Fetch.authRequired`, certificate errors): same pattern as `dialog`.
+2. **Date/time pickers and file inputs**: the region reports the input type; the picker and the upload reply are not defined yet.
+3. **Zoom**: v1 is fixed 360 px layout. Pinch can map to a new `open`/`resize` with a different width (re-render) or to local
    scaling of the cached tiles for the gesture, committing a re-render afterwards.
-6. **Find in page, long-press context menu, stop, favicon, new-view requests, inner scroll containers** (`overflow:scroll` boxes
+4. **Find in page, long-press context menu, stop, favicon, new-view requests, inner scroll containers** (`overflow:scroll` boxes
    scroll inside their own layer; the cloud currently renders them as part of the page).
-7. **Several views on one connection**: add a view id to every frame so a browser with five tabs uses one TLS connection.
-8. **Bandwidth**: tiles are lossless PNG for text; a paletted-PNG decoder is the cheapest path, and the server may later send a
+5. **Several views on one connection**: add a view id to every frame so a browser with five tabs uses one TLS connection.
+6. **Bandwidth**: tiles are lossless PNG for text; a paletted-PNG decoder is the cheapest path, and the server may later send a
    zstd/deflate-compressed tile stream if the decoder is a bottleneck.

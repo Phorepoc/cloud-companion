@@ -23,8 +23,15 @@ type Session interface {
 	Navigate(ctx context.Context, url, action string) error
 	// Tap clicks at (x, y); see the implementation for the coordinate rules.
 	Tap(ctx context.Context, x, y, sy int) error
-	// Text focuses region id, inserts text, optionally presses Enter.
-	Text(ctx context.Context, id int, text string, submit bool) error
+	// Text inserts text into region id (id 0: the focused element), optionally selecting its content first (replace) and
+	// pressing Enter after.
+	Text(ctx context.Context, id int, text string, submit, replace bool) error
+	// Key presses a named key (Backspace, Enter, Tab, Delete, ArrowLeft/Right/Up/Down) in the focused element.
+	Key(ctx context.Context, name string) error
+	// Select picks option index of the <select> region id.
+	Select(ctx context.Context, id, index int) error
+	// SetHandlers installs the callbacks for JavaScript dialogs and refused downloads.
+	SetHandlers(h Handlers)
 	ScrollTo(ctx context.Context, y int) error
 	// Cookies exports the tab's cookie jar (JSON); SetCookies imports one.
 	Cookies(ctx context.Context) ([]byte, error)
@@ -41,6 +48,8 @@ type Snapshot struct {
 	Layers     []Layer
 	Regions    []Region
 	Truncated  bool // page taller than the cap
+	Back, Fwd  bool // history
+	Focus      Focus
 }
 
 type Layer struct {
@@ -58,4 +67,32 @@ type Region struct {
 	Kind                      string
 	Href, Type, Name          string
 	Placeholder, Value, Label string
+	Opts                      []Opt
+}
+
+type Opt struct {
+	Label string
+	Sel   bool
+}
+
+type Focus struct {
+	ID         int
+	Kind       string // none | text | textarea | select
+	Type       string
+	Value      string
+	Start, End int
+	InputMode  string
+	EnterKey   string
+}
+
+type Dialog struct {
+	Kind, Message, Default, URL string
+}
+
+type Download struct{ URL, Name string }
+
+// Handlers are called from the browser's event goroutine; Dialog blocks until the phone answers.
+type Handlers struct {
+	Dialog   func(Dialog) (ok bool, text string)
+	Download func(Download)
 }

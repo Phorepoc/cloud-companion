@@ -141,10 +141,13 @@ int phc_r_array(phc_r *r, uint32_t *n)
     return 0;
 }
 
-int phc_r_skip(phc_r *r)
+#define PHC_CBOR_MAX_DEPTH 16   /* nesting limit for skipping: a hostile frame cannot recurse the stack away */
+
+static int skip_d(phc_r *r, int depth)
 {
     unsigned m, ai;
     uint64_t a, i;
+    if (depth > PHC_CBOR_MAX_DEPTH) return fail(r);
     if (rhead(r, &m, &a, &ai)) return -1;
     switch (m) {
     case 0: case 1: case 7: return 0;
@@ -152,11 +155,19 @@ int phc_r_skip(phc_r *r)
         if ((uint64_t)(r->end - r->p) < a) return fail(r);
         r->p += a;
         return 0;
-    case 4: for (i = 0; i < a; i++) if (phc_r_skip(r)) return -1; return 0;
-    case 5: for (i = 0; i < 2 * a; i++) if (phc_r_skip(r)) return -1; return 0;
-    case 6: return phc_r_skip(r);
+    case 4:
+        if (a > (uint64_t)(r->end - r->p)) return fail(r);   /* every item takes at least one byte */
+        for (i = 0; i < a; i++) if (skip_d(r, depth + 1)) return -1;
+        return 0;
+    case 5:
+        if (a > (uint64_t)(r->end - r->p)) return fail(r);
+        for (i = 0; i < 2 * a; i++) if (skip_d(r, depth + 1)) return -1;
+        return 0;
+    case 6: return skip_d(r, depth + 1);
     }
     return fail(r);
 }
+
+int phc_r_skip(phc_r *r) { return skip_d(r, 0); }
 
 int phc_text_eq(const char *s, size_t len, const char *lit) { return strlen(lit) == len && memcmp(s, lit, len) == 0; }

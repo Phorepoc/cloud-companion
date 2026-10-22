@@ -80,17 +80,40 @@ func (s *Server) handle(nc net.Conn) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ses := &session{srv: s, c: c, log: log, dev: dev}
+	ses := &session{srv: s, c: c, log: log, dev: dev, done: make(chan struct{}), dialogs: map[int]chan dialogAnswer{}}
 	defer ses.close()
 
-	for {
-		t, raw, err := proto.Read(r)
-		if err != nil {
-			log.Info("disconnected", "err", err)
-			return
+	type frameMsg struct {
+		t   string
+		raw []byte
+	}
+	reqs := make(chan frameMsg, 16)
+	go func() { // a dialog reply must be read while a request is blocked on the dialog, so reading is separate
+		defer close(reqs)
+		for {
+			t, raw, err := proto.Read(r)
+			if err != nil {
+				log.Info("disconnected", "err", err)
+				cancel()
+				return
+			}
+			if t == proto.TDialogReply {
+				ses.dialogReply(raw)
+				continue
+			}
+			select {
+			case reqs <- frameMsg{t, raw}:
+			case <-ctx.Done():
+				return
+			}
 		}
-		if err := ses.dispatch(ctx, t, raw); err != nil {
-			log.Warn("request failed", "type", t, "err", err)
+	}()
+	for m := range reqs {
+		if err := ses.dispatch(ctx, m.t, m.raw); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+			log.Warn("request failed", "type", m.t, "err", err)
 			c.send(proto.Error{T: proto.TError, Msg: err.Error()})
 		}
 	}
