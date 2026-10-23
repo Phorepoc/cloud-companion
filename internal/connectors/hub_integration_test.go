@@ -14,6 +14,7 @@ import (
 	"context"
 	"github.com/emersion/go-imap/v2"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -218,4 +219,56 @@ func TestHubEndToEnd(t *testing.T) {
 	}
 	t.Log("merge on real hub contacts: links moved, sources untouched, no resurrection")
 	_ = time.Second
+}
+
+// Outlook (a fake Graph server) into the REAL hub: the vCards and iCalendar events written by the Graph mapping are accepted by Stalwart and read back.
+func TestHubGraph(t *testing.T) {
+	hub := davhub.FromEnv()
+	if hub == nil {
+		t.Skip("no hub in the environment")
+	}
+	g := &fakeGraph{t: t}
+	srv := httptest.NewServer(g)
+	defer srv.Close()
+	g.base = srv.URL
+	t.Setenv("PHECLOUD_GRAPH_URL", srv.URL+"/v1.0")
+	st := store.OpenTest(t)
+	ctx := context.Background()
+	tok := Cred("tokG")
+	if ch, _, err := SyncGraph(ctx, "accG", "card", DAVCfg{URL: srv.URL + "/v1.0/me/contacts", OAuth: "microsoft"}, tok, hub, st); err != nil || ch != 3 {
+		t.Fatalf("contacts into Stalwart: %d %v", ch, err)
+	}
+	if ch, _, err := SyncGraph(ctx, "accG", "cal", DAVCfg{URL: srv.URL + "/v1.0/me/calendarView", OAuth: "microsoft"}, tok, hub, st); err != nil || ch != 2 {
+		t.Fatalf("events into Stalwart: %d %v", ch, err)
+	}
+	defer func() {
+		for _, n := range []string{"accG-A", "accG-B_", "accG-C"} {
+			hub.DeleteRaw("card", n+".vcf")
+		}
+		for _, n := range []string{"accG-E1", "accG-E2"} {
+			hub.DeleteRaw("cal", n+".ics")
+		}
+	}()
+	cs, _ := hub.Contacts()
+	found := map[string]bool{}
+	for _, c := range cs {
+		if strings.HasPrefix(HubID(c.Href), "accG-") {
+			found[c.Name] = true
+			if c.Name == "Ann Lee" && (len(c.Phones) != 3 || len(c.Emails) != 1 || c.Org != "Acme") {
+				t.Fatalf("Ann in the hub: %+v", c)
+			}
+		}
+	}
+	if !found["Ann Lee"] || !found["Bob"] || !found["Cy"] {
+		t.Fatalf("contacts in the hub: %v", found)
+	}
+	evs, _ := hub.Events("2026-10-30", "2026-11-05")
+	titles := map[string]bool{}
+	for _, e := range evs {
+		titles[e.Title] = true
+	}
+	if !titles["Planning, Q4; kickoff"] || !titles["Holiday"] {
+		t.Fatalf("events in the hub: %v", titles)
+	}
+	t.Log("Outlook (fake Graph) contacts and events accepted by Stalwart and read back")
 }
