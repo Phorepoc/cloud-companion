@@ -5,6 +5,13 @@ import { chromium } from 'playwright'
 import fs from 'fs'
 
 const BASE = process.env.BASE, TICKET = process.env.TICKET, OUT = process.env.OUT || '/out'
+// hooks: the Playwright container cannot reach adb, so android.sh runs a small loop that executes "hook-<name>.req" files from OUT with adb and answers "hook-<name>.out/.done"
+async function hook(name) {
+  for (const x of ['.done', '.out']) try { fs.unlinkSync(`${OUT}/hook-${name}${x}`) } catch (e) {}
+  fs.writeFileSync(`${OUT}/hook-${name}.req`, '')
+  for (let i = 0; i < 200; i++) { if (fs.existsSync(`${OUT}/hook-${name}.done`)) return fs.readFileSync(`${OUT}/hook-${name}.out`, 'utf8'); await new Promise((r2) => setTimeout(r2, 250)) }
+  throw new Error('hook ' + name + ' timed out')
+}
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
 const page = await browser.newPage({ viewport: { width: 700, height: 900 }, ignoreHTTPSErrors: true })
 const msgs = []
@@ -90,5 +97,74 @@ await page.locator('#screen').focus(); await page.keyboard.type('hello'); await 
 await page.waitForTimeout(800)
 console.log('still connected:', (await page.textContent('#info')).startsWith('connected'))
 fs.writeFileSync(OUT + '/android-last-info.txt', last + '\n')
+
+// ---- round 30 ----
+const changed = async (fn, ms = 1500) => { const h0 = (await canvasInfo()).hash; await fn(); await page.waitForTimeout(ms); return (await canvasInfo()).hash !== h0 }
+const results = {}
+
+// scroll wheel: Settings is a long list
+await hook('settings'); await page.waitForTimeout(2500)
+const wb = await page.locator('#screen').boundingBox()
+await page.mouse.move(wb.x + wb.width / 2, wb.y + wb.height / 2)
+results.wheel = await changed(async () => { for (let i = 0; i < 4; i++) { await page.mouse.wheel(0, 300); await page.waitForTimeout(150) } })
+console.log('wheel scroll changed the screen:', results.wheel)
+
+// rotation: the stream follows the device (the canvas becomes landscape, then portrait again)
+await hook('rot1'); await page.waitForTimeout(3500)
+const land = await canvasInfo()
+console.log('after rotating the device: canvas', land.w + 'x' + land.h)
+results.rotate = land.w > land.h
+await page.screenshot({ path: OUT + '/android-4-landscape.png' })
+// a tap in landscape still lands where it should: open the first Settings entry area and check the screen changes
+results.landscapeTouch = await changed(async () => { const [x, y] = px(0.5, 0.35); await page.mouse.click(x, y) })
+await hook('rot0'); await page.waitForTimeout(3500)
+const port = await canvasInfo()
+results.rotateBack = port.h > port.w
+console.log('rotated back: canvas', port.w + 'x' + port.h)
+await hook('home'); await page.waitForTimeout(1200)
+
+// clipboard, browser -> phone: paste into a text field (Settings search), read it back from the UI hierarchy
+await swipe([0.5, 0.9], [0.5, 0.25]); await page.waitForTimeout(1500) // the launcher's app drawer has a search field
+let [sx, sy] = px(0.5, 0.115)
+await page.mouse.click(sx, sy); await page.waitForTimeout(1500)
+await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+await page.evaluate(() => navigator.clipboard.writeText('pasted from the browser 42'))
+await page.screenshot({ path: OUT + '/android-5a-search.png' })
+await page.click('#pasteto'); await page.waitForTimeout(2000)
+await page.screenshot({ path: OUT + '/android-5b-pasted.png' })
+const ui = await hook('dump')
+console.log('ui edit fields:', (ui.match(/<node[^>]*EditText[^>]*>/g) || []).map((x) => (x.match(/text="[^"]*"/) || [''])[0]).join(' | '), '| note:', await page.textContent('#msg'))
+results.clipPaste = ui.includes('pasted from the browser 42')
+console.log('paste to phone reached the text field:', results.clipPaste)
+// phone -> browser: select all in the field and copy through the page (Ctrl+C asks the phone for its clipboard)
+await hook('selectall'); await page.waitForTimeout(500)
+await page.evaluate(() => { window.__clip = ''; return navigator.clipboard.writeText('overwritten') })
+await page.locator('#screen').focus(); await page.keyboard.press('Control+c'); await page.waitForTimeout(2000)
+const back = await page.evaluate(() => window.__clip || '')
+results.clipCopy = back.includes('pasted from the browser 42')
+console.log('phone clipboard arrived in the browser:', results.clipCopy, JSON.stringify(back.slice(0, 40)))
+await hook('home'); await page.waitForTimeout(800)
+
+// APK install: upload a file, and an F-Droid package by name
+await page.setInputFiles('#apk', process.env.APK || '/t/markor.apk')
+await page.waitForFunction(() => /installed|failed/.test(document.getElementById('msg').textContent), null, { timeout: 120000 })
+console.log('upload:', await page.textContent('#msg'))
+results.apkUpload = (await page.textContent('#msg')).includes('installed.')
+await page.fill('#pkg', 'org.fossify.notes'); await page.click('#fd')
+await page.waitForFunction(() => /org.fossify.notes from F-Droid: (installed|failed)/.test(document.getElementById('msg').textContent), null, { timeout: 180000 })
+console.log('f-droid:', await page.textContent('#msg'))
+results.fdroid = (await page.textContent('#msg')).includes('installed.')
+const pk = await hook('pkgs')
+results.pkgsListed = pk.includes('net.gsantner.markor') && pk.includes('org.fossify.notes')
+await page.fill('#pkg', 'not a package'); await page.click('#fd'); await page.waitForTimeout(800)
+console.log('bad name:', await page.textContent('#msg'))
+
+// audio: switch it on, play a tone on the device, see decoded frames (only if the device can capture audio)
+await page.click('#sound'); await page.waitForTimeout(500)
+await hook('tone'); await page.waitForTimeout(4000)
+const af = await page.evaluate(() => window.__audioFrames || 0)
+console.log('audio message from the bridge:', await page.evaluate(() => window.__audioMsg), '| audio frames decoded in the browser:', af, '| page says:', await page.textContent('#msg'))
+results.audio = af > 0
+console.log('RESULTS', JSON.stringify(results))
 await browser.close()
 console.log('OK')

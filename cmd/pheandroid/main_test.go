@@ -40,3 +40,24 @@ func TestTicketAndMessages(t *testing.T) {
 		t.Fatalf("codec string %q", c)
 	}
 }
+
+func TestScrollClipboardMessages(t *testing.T) {
+	// scrcpy's own test vector: position (260,1026) on 1080x1920, hscroll 16, vscroll -16, buttons 1 (here buttons stay 0)
+	m := scrollMsg(260.0/1079, 1026.0/1919, 16, -16, 1080, 1920)
+	want := []byte{3, 0, 0, 1, 4, 0, 0, 4, 2, 4, 0x38, 7, 0x80, 0x7f, 0xff, 0x80, 0, 0, 0, 0, 0}
+	if len(m) != len(want) {
+		t.Fatalf("scroll length %d", len(m))
+	}
+	for i := range want {
+		if m[i] != want[i] {
+			t.Fatalf("scroll byte %d: got %x want %x\n%x", i, m[i], want[i], m)
+		}
+	}
+	c := clipSetMsg("hello, world!", true)
+	if len(c) != 27 || c[0] != 9 || c[9] != 1 || binary.BigEndian.Uint32(c[10:]) != 13 || string(c[14:]) != "hello, world!" {
+		t.Fatalf("set clipboard: %x", c)
+	}
+	if fixed16(0) != 0 || fixed16(-1) >= 0 || fixed16(100) != 0x7fff || fixed16(-100) != -0x8000 {
+		t.Fatal("fixed16")
+	}
+}

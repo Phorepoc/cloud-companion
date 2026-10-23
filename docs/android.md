@@ -36,8 +36,26 @@ codec string `avc1.42c029`, key frames start with the parameter sets).
 - Input to the next video frame arriving at the bridge: about 32 ms median (one frame time at 30 fps; browser decode and paint come on top). Bridge round trip on the same host about 1 ms.
 - CPU: the Android container 18 to 65 % of one core while swiping (cap 2 cores), about 4 % idle; the bridge about 1 %. Memory: Android about 770 MiB, bridge 7 MiB.
 - Query options of the page: `size` (longest edge, default 720), `fps` (30), `kbps` (2000), `codec` (`h264`, `vp8`, `vp9`).
-- Not done: audio, clipboard, rotation, multiple viewers, scroll wheel (drag instead).
+- Not done: multiple viewers at once, microphone/camera, file download from the phone, pinch zoom.
 
 ## Test
 `JAR=/path/to/scrcpy-server-v5.0.1 QUERY='&codec=vp8' sh web/test/android.sh` (own Docker network `phepa`, capped containers, cleaned up afterwards): probes the H.264 stream, decodes VP8 on a canvas,
 swipes and presses Home through pointer events and checks that the screen changes, prints latency numbers.
+
+## What the page can do
+- **Touch and keys**: mouse or touch on the screen; typed characters go to the focused field; Back / Home / Recent buttons.
+- **Scroll wheel**: over the screen, scrolls the view under the pointer.
+- **Rotation**: the stream follows the device orientation (the canvas switches between portrait and landscape; touches stay aligned). Rotate the phone from its own quick settings or an app.
+- **Sound** (button, off by default: a browser plays sound only after a click): the device's audio is captured by the scrcpy server as Opus, decoded with WebCodecs `AudioDecoder` and played with Web Audio (about 60 ms buffer).
+  If a device cannot capture audio (older than Android 11, or no audio device) the stream continues without it. `&audio=0` in the page address turns capture off.
+- **Clipboard both ways**: *Paste to phone* (or Ctrl+V on the screen) sets the phone's clipboard and pastes; *Copy from phone* (or Ctrl+C / Ctrl+X on the screen) asks the phone to copy and puts the text on this computer's clipboard.
+  Browsers allow writing the clipboard only soon after a click or key press, so a copy the phone makes by itself is announced and the button completes it.
+- **Install apps**: *Install an APK file* uploads a file (up to 512 MB) and runs `adb install -r -g`; *Install from F-Droid* takes a package name (for example `org.fossify.notes`), downloads the suggested build from f-droid.org
+  (the bridge container needs internet access) and installs it. Apps whose suggested build is ARM-only fail with the install error text, since the image has no translation layer. Installing needs the viewer's session (given by the open stream), not just a ticket.
+
+## Verified, and what only a real browser can check
+Automated (headless Chromium, `web/test/android.sh`): scroll wheel changes the screen; rotating the device gives a 720x404 canvas and back to 404x720, and a tap in landscape lands correctly; browser clipboard text arrives in a focused
+text field on the phone (read back from the UI hierarchy) and the phone's selected text comes back to the browser; APK upload and F-Droid install both end in `Success` and the packages are listed; a bad package name is refused;
+audio: Opus decoded in the browser (254,000 samples in 4 s of mostly silence).
+**Not verified (needs a real Chrome/Firefox/Safari, which the test image does not have):** H.264 decoding (the default codec; only the bytes on the wire are checked, and the test decodes VP8 instead), audible output, the
+browser's clipboard permission prompts, and the iframe-in-the-web-app path with a real admin device's ticket (the ticket endpoint and format are unit-tested and a minted ticket works through the hub's Caddy).

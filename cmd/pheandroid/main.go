@@ -98,6 +98,8 @@ func main() {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write(page)
 	})
+	mux.HandleFunc("/apk", handleAPK)
+	mux.HandleFunc("/fdroid", handleFDroid)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 	addr := env("PHE_ANDROID_ADDR", ":8090")
 	go prepare()
@@ -132,7 +134,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer c.CloseNow()
-	c.SetReadLimit(1 << 16)
+	c.SetReadLimit(1 << 17)
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 	active.Lock() // one viewer at a time: a new one replaces the old
@@ -142,7 +144,7 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	active.cancel = cancel
 	active.Unlock()
 	q := r.URL.Query()
-	if err := session(ctx, c, q.Get("size"), q.Get("fps"), q.Get("kbps"), q.Get("codec")); err != nil && ctx.Err() == nil {
+	if err := session(ctx, c, q.Get("size"), q.Get("fps"), q.Get("kbps"), q.Get("codec"), q.Get("audio") != "0"); err != nil && ctx.Err() == nil {
 		log.Println("session:", err)
 		c.Close(websocket.StatusInternalError, trunc(err.Error(), 100))
 	}
@@ -163,7 +165,7 @@ func num(s string, d, lo, hi int) int {
 	return v
 }
 
-func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec string) error {
+func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec string, wantAudio bool) error {
 	if codec != "vp8" && codec != "vp9" {
 		codec = "h264"
 	}
@@ -180,7 +182,7 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 	srvCtx, stop := context.WithCancel(ctx)
 	defer stop()
 	srv := exec.CommandContext(srvCtx, "adb", "-s", serial, "shell", "CLASSPATH=/data/local/tmp/scrcpy-server.jar", "app_process", "/", "com.genymobile.scrcpy.Server", version,
-		"scid="+scid, "video_codec="+codec, "tunnel_forward=true", "audio=false", "cleanup=false", "send_device_meta=true",
+		"scid="+scid, "video_codec="+codec, "tunnel_forward=true", "audio="+strconv.FormatBool(wantAudio), "audio_codec=opus", "cleanup=false", "send_device_meta=true",
 		"max_size="+strconv.Itoa(num(size, 720, 240, 2000)), "max_fps="+strconv.Itoa(num(fps, 30, 5, 60)), "video_bit_rate="+strconv.Itoa(num(kbps, 2000, 200, 20000)*1000),
 		"power_off_on_close=false", "stay_awake=true")
 	srv.Stdout, srv.Stderr = io.Discard, io.Discard
@@ -222,6 +224,15 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 		time.Sleep(500 * time.Millisecond)
 	}
 	defer video.Close()
+	var ar *bufio.Reader
+	if wantAudio { // sockets open in the order video, audio, control
+		ac, err := dial()
+		if err != nil {
+			return err
+		}
+		defer ac.Close()
+		ar = bufio.NewReaderSize(ac, 1<<16)
+	}
 	ctl, err := dial()
 	if err != nil {
 		return err
@@ -251,7 +262,91 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 		defer cancel()
 		return ws.Write(cx, typ, p)
 	}
-	errc := make(chan error, 3)
+	errc := make(chan error, 4)
+	sid := newSession()
+	defer endSession(sid)
+	hello, _ := json.Marshal(map[string]any{"t": "hello", "sid": sid})
+	wsend(websocket.MessageText, hello)
+
+	// device audio (Opus) -> browser: [0x10|config(1)] [pts u64] [packet]
+	if ar != nil {
+		go func() {
+			var id [4]byte
+			if _, err := io.ReadFull(ar, id[:]); err != nil {
+				return
+			}
+			on := string(id[:]) == "opus"
+			m, _ := json.Marshal(map[string]any{"t": "audio", "on": on})
+			wsend(websocket.MessageText, m)
+			if !on { // the device could not capture audio (codec id 0: disabled, 1: error); video goes on
+				return
+			}
+			hdr := make([]byte, 12)
+			for {
+				if _, err := io.ReadFull(ar, hdr); err != nil {
+					return
+				}
+				pts := binary.BigEndian.Uint64(hdr[:8])
+				n := binary.BigEndian.Uint32(hdr[8:12])
+				if n > 1<<20 {
+					return
+				}
+				p := make([]byte, 9+n)
+				p[0] = 0x10
+				if pts&(1<<62) != 0 {
+					p[0] |= 1
+				}
+				binary.BigEndian.PutUint64(p[1:9], pts&(1<<61-1))
+				if _, err := io.ReadFull(ar, p[9:]); err != nil {
+					return
+				}
+				if err := wsend(websocket.MessageBinary, p); err != nil {
+					return
+				}
+			}
+		}()
+	}
+	// device messages on the control socket: clipboard text (type 0), set-clipboard ack (1), uhid output (2, ignored)
+	go func() {
+		cr := bufio.NewReader(ctl)
+		for {
+			t, err := cr.ReadByte()
+			if err != nil {
+				return
+			}
+			switch t {
+			case 0:
+				var l [4]byte
+				if _, err := io.ReadFull(cr, l[:]); err != nil {
+					return
+				}
+				n := binary.BigEndian.Uint32(l[:])
+				if n > 1<<20 {
+					return
+				}
+				txt := make([]byte, n)
+				if _, err := io.ReadFull(cr, txt); err != nil {
+					return
+				}
+				m, _ := json.Marshal(map[string]any{"t": "clip", "s": string(txt)})
+				wsend(websocket.MessageText, m)
+			case 1:
+				if _, err := io.ReadFull(cr, make([]byte, 8)); err != nil {
+					return
+				}
+			case 2:
+				var h [4]byte
+				if _, err := io.ReadFull(cr, h[:]); err != nil {
+					return
+				}
+				if _, err := io.ReadFull(cr, make([]byte, binary.BigEndian.Uint16(h[2:]))); err != nil {
+					return
+				}
+			default:
+				return
+			}
+		}
+	}()
 
 	// device -> browser
 	go func() {
@@ -366,6 +461,10 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 				S      string  `json:"s"`
 				TS     float64 `json:"ts"`
 				Button int     `json:"b"`
+				DX     float64 `json:"dx"`
+				DY     float64 `json:"dy"`
+				Paste  bool    `json:"paste"`
+				Cut    bool    `json:"cut"`
 			}
 			if json.Unmarshal(p, &m) != nil {
 				continue
@@ -383,6 +482,20 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 				}
 				mu.Unlock()
 				msg = touchMsg(m.A, m.X, m.Y, w, h)
+			case "scroll": // dx, dy in wheel steps (browser pixels / 100, sign as scrcpy: positive dy scrolls up)
+				mu.Lock()
+				w, h := width, height
+				mu.Unlock()
+				msg = scrollMsg(m.X, m.Y, m.DX, m.DY, w, h)
+			case "clip_set":
+				if len(m.S) < 1<<15 {
+					msg = clipSetMsg(m.S, m.Paste)
+				}
+			case "clip_get":
+				msg = []byte{8, 1}
+				if m.Cut {
+					msg[1] = 2
+				}
 			case "key": // a: 0 down, 1 up; code: Android keycode
 				msg = keyMsg(m.A, m.Code)
 			case "text":
@@ -398,7 +511,6 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 			}
 		}
 	}()
-	go func() { io.Copy(io.Discard, ctl) }() // device messages (clipboard) are not used
 	select {
 	case err := <-errc:
 		if websocket.CloseStatus(err) != -1 || errors.Is(err, context.Canceled) || errors.Is(err, io.EOF) {
@@ -463,4 +575,64 @@ func codecString(p []byte) string {
 		}
 	}
 	return "avc1.42e01f"
+}
+
+func scrollMsg(x, y, dx, dy float64, w, h int) []byte {
+	b := make([]byte, 21)
+	b[0] = 3
+	binary.BigEndian.PutUint32(b[1:], uint32(clamp(x)*float64(w-1)))
+	binary.BigEndian.PutUint32(b[5:], uint32(clamp(y)*float64(h-1)))
+	binary.BigEndian.PutUint16(b[9:], uint16(w))
+	binary.BigEndian.PutUint16(b[11:], uint16(h))
+	binary.BigEndian.PutUint16(b[13:], uint16(fixed16(dx)))
+	binary.BigEndian.PutUint16(b[15:], uint16(fixed16(dy)))
+	return b // buttons (b[17:21]) stay 0
+}
+
+// fixed16 encodes a float in [-16, 16] the way scrcpy does (i16: 0x7fff is 16, 0x8000 is -16).
+func fixed16(v float64) int16 {
+	if v > 16 {
+		v = 16
+	}
+	if v < -16 {
+		v = -16
+	}
+	f := v / 16
+	if f >= 1 {
+		return 0x7fff
+	}
+	return int16(f * 0x8000)
+}
+
+func clipSetMsg(text string, paste bool) []byte {
+	b := make([]byte, 14, 14+len(text))
+	b[0] = 9
+	binary.BigEndian.PutUint64(b[1:], uint64(time.Now().UnixNano())) // sequence: only the ack uses it
+	if paste {
+		b[9] = 1
+	}
+	binary.BigEndian.PutUint32(b[10:], uint32(len(text)))
+	return append(b, text...)
+}
+
+// Viewer sessions: the WebSocket hands the page a random session id; the HTTP actions (APK install) need it, so a ticket (two minutes) is not what keeps them open.
+var sessions = struct {
+	sync.Mutex
+	m map[string]bool
+}{m: map[string]bool{}}
+
+func newSession() string {
+	var b [16]byte
+	rand.Read(b[:])
+	id := hex.EncodeToString(b[:])
+	sessions.Lock()
+	sessions.m[id] = true
+	sessions.Unlock()
+	return id
+}
+func endSession(id string) { sessions.Lock(); delete(sessions.m, id); sessions.Unlock() }
+func sessionOK(id string) bool {
+	sessions.Lock()
+	defer sessions.Unlock()
+	return id != "" && sessions.m[id]
 }
