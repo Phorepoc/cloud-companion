@@ -39,3 +39,20 @@ It is built by the Phorepoc image builder (`emitter/build_mmp_x32.py phewebengin
 header, the mbedTLS 3.6 headers and archive (with `-DMBEDTLS_CONFIG_FILE`, TLS 1.3 and PSA on), and the libpng and libjpeg
 headers and archives. Result: 512 KB of code, 39 KB bss, 90 imports (euser, efsrv, ecom, libc, libm, libpthread, libz), no
 unresolved symbols. Not booted yet.
+
+## Boot test (Phorepoc x86, QEMU)
+ROM with the browser frontend and this plug-in only (`NET=1`, the other engines left out), a copy of a fresh disk holding
+`C:\data\phecloud.ini` (host, port, pin, one-time pairing code), a phecloud server on the LAN. Results:
+- the frontend lists the engine and loads it (`load engine e7016b21 -> 0`);
+- TLS 1.3 handshake against the pinned certificate, pairing, then the server logs `device connected` and four tile updates
+  (`url=https://example.com/ h=918 tiles=3 + 1, 22 + 10 KB`);
+- the page appears in the browser (`docs/shots/engine-example-com.png`), composed from PNG tiles decoded on the guest;
+- fixed on the way: a progressive load repeats the `page` frame with the same page id, and the engine must keep the tiles
+  then (it cleared them, and the view stayed white).
+Not yet exercised in the guest: dragging/scrolling, text input, taps (the regress driver has no input; use the qmon keys
+or touch with `make_ekern.sh run`).
+
+Memory per view (x32, computed from the structures; not yet measured in a live heap): `phc` object about 230 KB + receive
+buffer 192 KB + TLS state about 40 KB + the view buffer (360x584x4 = 841 KB) + encoded tiles (about 32 KB for
+example.com) + up to 12 decoded tiles (368 KB each, 3 were live here = 1.1 MB): about 2.4 MB for a short page, at most
+about 7 MB for a long one (12 decoded tiles) before the view buffer. The DLL itself is 512 KB of code, 39 KB bss.

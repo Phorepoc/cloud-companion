@@ -20,7 +20,7 @@ extern "C" void phc_log(const char* aMsg)
 	TBuf<240> w;
 	TPtrC8 p(reinterpret_cast<const TUint8*>(aMsg), Min((TInt)User::StringLength(reinterpret_cast<const TUint8*>(aMsg)), 239));
 	w.Copy(p);
-	RDebug::Printf("PH: [phecloud] %S", &w);
+	RDebug::Printf("PH: [phecloud] %s", aMsg);
 	RFs fs;
 	if (fs.Connect() != KErrNone)
 		return;

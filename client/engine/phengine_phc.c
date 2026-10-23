@@ -48,6 +48,13 @@
 #define NREQ 24
 #define EVQ 128
 
+#ifdef PHC_TRACE_TILES                  /* -DPHC_TRACE_TILES: log every tile, decode and compose */
+#define PHC_TRACE(x) x
+#define PHC_TRACE_ON 1
+#else
+#define PHC_TRACE(x)
+#define PHC_TRACE_ON 0
+#endif
 extern void phc_log(const char *msg);       /* phewebengine_phecloud.cpp: RDebug + C:\data\phecloud_trace.txt */
 
 enum { RQ_LOAD = 1, RQ_ACTION, RQ_DOWN, RQ_TAP, RQ_CANCEL, RQ_TEXT, RQ_KEY, RQ_SCROLL, RQ_DIALOG, RQ_SUSPEND, RQ_STOP };
@@ -77,7 +84,7 @@ typedef struct view {
     char dlg_text[256], dlg_def[128];
     int dlg_id, dlg_kind;
     int loading, progress, can_back, can_fwd, sec, scroll_y, page_h, page_trunc, focus, dirty;
-    int discarded;
+    int discarded, pid;
     int down, down_x, down_y, moved, hl_active, hl_x, hl_y, hl_w, hl_h;
     long scroll_sent_ms; int scroll_unsent;
     /* pixels */
@@ -250,9 +257,16 @@ static void png_mem_read(png_structp png, png_bytep out, png_size_t n)
 }
 
 /* decode into a new w*h BGRA buffer (w, h = the tile size announced by the server); NULL on failure */
+static void png_err_cb(png_structp png, png_const_charp msg)
+{
+    phc_log(msg);
+    longjmp(png_jmpbuf(png), 1);
+}
+static void png_warn_cb(png_structp png, png_const_charp msg) { (void)png; (void)msg; }
+
 static uint32_t *decode_png(const uint8_t *data, size_t len, int w, int h)
 {
-    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, NULL, NULL);
+    png_structp png = png_create_read_struct(PNG_LIBPNG_VER_STRING, NULL, png_err_cb, png_warn_cb);
     png_infop info;
     membuf m;
     uint32_t *volatile out = NULL;
@@ -375,6 +389,7 @@ static void on_tile(void *user, const phc_tile *pt)
     int i;
     if (!copy) return;
     memcpy(copy, pt->data, pt->len);
+    PHC_TRACE({ char m[96]; snprintf(m, sizeof m, "tile layer=%d at %d,%d %dx%d fmt=%d len=%d", pt->layer, pt->x, pt->y, pt->w, pt->h, pt->fmt, (int)pt->len); phc_log(m); })
     pthread_mutex_lock(&v->pixmu);
     t = tile_find(v, pt->layer, pt->x, pt->y);
     if (!t) {
@@ -401,6 +416,7 @@ static uint32_t *tile_pixels(tile_t *t, unsigned stamp)    /* pixmu held */
     if (!t->dec) {
         if (t->w <= 0 || t->h <= 0 || t->w > 2048 || t->h > 2048) return NULL;
         t->dec = t->fmt == PHC_FMT_JPEG ? decode_jpeg(t->enc, t->enclen, t->w, t->h) : decode_png(t->enc, t->enclen, t->w, t->h);
+        if (!t->dec || PHC_TRACE_ON) { char m[96]; snprintf(m, sizeof m, "decode %s fmt=%d %dx%d len=%d", t->dec ? "ok" : "FAILED", t->fmt, t->w, t->h, (int)t->enclen); phc_log(m); }
     }
     t->stamp = stamp;
     return t->dec;
@@ -462,6 +478,7 @@ static void compose(view_t *v)
     pthread_mutex_lock(&v->pixmu);
     if (!v->px) { pthread_mutex_unlock(&v->pixmu); return; }
     v->stamp++;
+    PHC_TRACE({ char m[96]; snprintf(m, sizeof m, "compose sy=%d tiles=%d layers=%d view=%dx%d", sy, v->ntiles, c->nlayers, v->w, v->h); phc_log(m); })
     for (i = 0; i < v->w * v->h; i++) v->px[i] = 0xFFFFFFFFu;
     ox = v->w > PAGE_W ? (v->w - PAGE_W) / 2 : 0;
     draw_layer_tiles(v, 0, ox, -sy, 0, 0, v->w, v->h);
@@ -505,10 +522,12 @@ static void on_page(void *user, const phc_page *p)
 {
     view_t *v = (view_t *)user;
     int changed;
-    pthread_mutex_lock(&v->pixmu);
-    /* tiles of an older page (or the same page at another scale) never apply: phc dropped its hashes too */
-    tiles_clear(v);
-    pthread_mutex_unlock(&v->pixmu);
+    if (p->pid != v->pid || p->reset) {   /* a new page, or the same page at another scale: phc dropped its hashes too (a progressive load repeats the page frame: keep the tiles) */
+        pthread_mutex_lock(&v->pixmu);
+        tiles_clear(v);
+        pthread_mutex_unlock(&v->pixmu);
+        v->pid = p->pid;
+    }
     pthread_mutex_lock(&v->mu);
     changed = strcmp(v->url, p->url) != 0;
     copy_str(v->url, sizeof v->url, p->url);
