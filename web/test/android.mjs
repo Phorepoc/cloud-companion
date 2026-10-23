@@ -6,7 +6,7 @@ import fs from 'fs'
 
 const BASE = process.env.BASE, TICKET = process.env.TICKET, OUT = process.env.OUT || '/out'
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
-const page = await browser.newPage({ viewport: { width: 700, height: 900 } })
+const page = await browser.newPage({ viewport: { width: 700, height: 900 }, ignoreHTTPSErrors: true })
 const msgs = []
 page.on('console', (m) => msgs.push(m.text()))
 const sup = await page.goto(BASE + '/?t=' + TICKET + (process.env.QUERY || '')).then(() => page.evaluate(async () => {
@@ -19,7 +19,7 @@ console.log('codec support in this Chromium:', sup)
 
 // H.264 probe without a decoder (this Chromium has none): the bridge must announce a codec string and send key frames that start with the parameter sets
 const probe = await page.evaluate((t) => new Promise((resolve) => {
-  const w = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws?t=' + encodeURIComponent(t) + '&codec=h264'); w.binaryType = 'arraybuffer'
+  const w = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^/]*$/, '') + 'ws?t=' + encodeURIComponent(t) + '&codec=h264'); w.binaryType = 'arraybuffer'
   const r = { cfg: null, first: null, frames: 0 }
   const done = setTimeout(() => { w.close(); resolve(r) }, 12000)
   w.onmessage = (e) => {

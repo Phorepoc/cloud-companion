@@ -2,7 +2,7 @@
 # Copyright The Phorepoc Authors
 # SPDX-License-Identifier: Apache-2.0
 # Android stream test on the Deskmini: a Redroid container and the pheandroid bridge in their OWN network (phepa), capped, then a Playwright browser.
-# Needs: image phe-redroid-native:13 (docker/redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), the repo root as cwd.
+# Needs: image phe-redroid-native:13 (deploy/android/Dockerfile.redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), the repo root as cwd.
 #   QUERY='&codec=vp8' selects the codec (Playwright's Chromium has no H.264; real browsers do)
 set -eu
 JAR=${JAR:?path of the scrcpy server jar}
