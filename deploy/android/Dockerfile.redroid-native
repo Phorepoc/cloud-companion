@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# Redroid without any ARM translation layer (x86_64 apps only). The upstream image has no shell, so edit a copy in a stage and rebuild from scratch.
+ARG BASE=redroid/redroid:13.0.0_64only-240527
+FROM ${BASE} AS base
+FROM debian:bookworm-slim AS edit
+COPY --from=base / /r
+RUN set -e; cd /r; \
+    rm -f system/lib64/libnb.so system/lib/libnb.so system/lib64/libndk_translation*.so system/bin/ndk_translation_program_runner_binfmt_misc_arm64 \
+          system/etc/init/ndk_translation.rc; \
+    rm -rf system/etc/binfmt_misc system/lib64/arm64 system/bin/arm64; \
+    sed -i -e "/^ro.enable.native.bridge.exec=/d" -e "/^ro.dalvik.vm.isa.arm64=/d" -e "s/^ro.dalvik.vm.native.bridge=.*/ro.dalvik.vm.native.bridge=0/" vendor/build.prop; \
+    echo "ro.enable.native.bridge.exec=0" >> vendor/build.prop; \
+    sed -i -e "s/^\(ro\.[a-z.]*abilist\(64\)\?\)=x86_64,arm64-v8a/\1=x86_64/" system/build.prop vendor/build.prop vendor/odm/etc/build.prop; \
+    grep -rn "native.bridge\|abilist" system/build.prop vendor/build.prop vendor/odm/etc/build.prop
+FROM scratch
+COPY --from=edit /r /
+ENTRYPOINT ["/init","qemu=1","androidboot.hardware=redroid"]

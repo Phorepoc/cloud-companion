@@ -23,6 +23,7 @@ services:
       # the database: a SQLite file (default), or postgres://... / mysql://... (docker-compose.db.yml, docs/database.md)
       PHECLOUD_DB: ${PHECLOUD_DB:-/data/phecloud.db}
       # "Sign in with Google / Microsoft" on the Connections page: your own OAuth client registrations (docs/connections.md); empty = not offered
+      PHECLOUD_ANDROID_SECRET: ${PHECLOUD_ANDROID_SECRET:-}
       PHECLOUD_OAUTH_GOOGLE_ID: ${PHECLOUD_OAUTH_GOOGLE_ID:-}
       PHECLOUD_OAUTH_GOOGLE_SECRET: ${PHECLOUD_OAUTH_GOOGLE_SECRET:-}
       PHECLOUD_OAUTH_MS_ID: ${PHECLOUD_OAUTH_MS_ID:-}

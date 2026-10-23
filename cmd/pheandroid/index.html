@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Android</title>
+<style>
+:root { --bg:#f4f5f7; --fg:#1b1f24; --muted:#5b6672; --card:#ffffff; --line:#d5dae0; --accent:#1a5fb4; }
+@media (prefers-color-scheme: dark) { :root { --bg:#14171a; --fg:#e8eaed; --muted:#9aa4af; --card:#1d2227; --line:#323a42; --accent:#7ab0ff; } }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:12px 16px; gap:10px; }
+#bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; }
+button { font:inherit; color:var(--fg); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 14px; min-height:44px; cursor:pointer; }
+button:focus-visible, canvas:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+#screen { background:#000; border:1px solid var(--line); border-radius:10px; max-width:100%; max-height:calc(100vh - 150px); touch-action:none; cursor:pointer; }
+#info { color:var(--muted); font-size:14px; text-align:center; min-height:1.4em; }
+</style>
+</head>
+<body>
+<h1 style="font-size:1.1rem;margin:0">Android</h1>
+<div id="bar" role="toolbar" aria-label="Android keys">
+  <button data-k="4" title="Back">Back</button>
+  <button data-k="3" title="Home">Home</button>
+  <button data-k="187" title="Recent apps">Recent</button>
+  <button id="reconnect">Reconnect</button>
+</div>
+<canvas id="screen" width="360" height="640" tabindex="0" role="application" aria-label="Android screen: click or touch to tap, type to enter text"></canvas>
+<div id="info" role="status">Connecting</div>
+<script>
+'use strict';
+const cv = document.getElementById('screen'), ctx2d = cv.getContext('2d'), info = document.getElementById('info');
+const q = new URLSearchParams(location.search);
+const ticket = q.get('t') || '';
+let ws = null, dec = null, gotKey = false, W = 360, H = 640, rtt = 0, stats = {}, ts = 0;
+const KEY = { Escape:4, Enter:66, Backspace:67, Delete:112, Tab:61, ArrowUp:19, ArrowDown:20, ArrowLeft:21, ArrowRight:22, Home:3, ' ':62 };
+
+function say(s) { info.textContent = s; }
+function show() {
+  if (!ws || ws.readyState !== 1) return;
+  const bits = ['connected ' + W + 'x' + H];
+  if (stats.fps !== undefined) bits.push(stats.fps.toFixed(0) + ' fps', stats.kbps.toFixed(0) + ' kbit/s');
+  if (stats.i2f_n) bits.push('input to next frame ' + stats.i2f_ms.toFixed(0) + ' ms');
+  bits.push('round trip ' + rtt.toFixed(0) + ' ms');
+  say(bits.join(' · '));
+}
+function connect() {
+  if (ws) { try { ws.close(); } catch (e) {} }
+  if (dec) { try { dec.close(); } catch (e) {} dec = null; }
+  if (!('VideoDecoder' in window)) { say('This browser has no WebCodecs video decoder (needs a secure https page and a current browser).'); return; }
+  gotKey = false; stats = {};
+  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^/]*$/, '') + 'ws?t=' + encodeURIComponent(ticket) +
+    ['size', 'fps', 'kbps', 'codec'].filter((k) => q.get(k)).map((k) => '&' + k + '=' + encodeURIComponent(q.get(k))).join('');
+  say('Connecting');
+  ws = new WebSocket(url); ws.binaryType = 'arraybuffer';
+  const mine = ws;
+  ws.onclose = (e) => { if (mine === ws) say(e.code === 1006 || e.code === 1008 ? 'Not allowed or not reachable. Open this page again from Phecloud.' : 'Disconnected (' + (e.reason || e.code) + ').'); };
+  ws.onmessage = (e) => {
+    if (typeof e.data === 'string') {
+      const m = JSON.parse(e.data);
+      if (m.t === 'cfg') {
+        W = m.w; H = m.h; cv.width = W; cv.height = H;
+        if (dec) { try { dec.close(); } catch (e2) {} }
+        dec = new VideoDecoder({ output: (f) => { ctx2d.drawImage(f, 0, 0, W, H); f.close(); }, error: (er) => say('Decoder: ' + er.message) });
+        dec.configure({ codec: m.codec, optimizeForLatency: true });
+        gotKey = false;
+      } else if (m.t === 'stats') { stats = m; show(); }
+      else if (m.t === 'pong') { rtt = performance.now() - m.ts; }
+      return;
+    }
+    if (!dec || dec.state !== 'configured') return;
+    const u = new Uint8Array(e.data), key = (u[0] & 2) !== 0;
+    if (!gotKey && !key) return;
+    gotKey = true;
+    dec.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: ts += 33333, data: u.subarray(1) }));
+  };
+  ws.onopen = () => { ws.send(JSON.stringify({ t: 'ping', ts: performance.now() })); };
+}
+setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', ts: performance.now() })); }, 2000);
+function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+function pos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; }
+let down = false;
+cv.addEventListener('pointerdown', (e) => { cv.focus(); down = true; cv.setPointerCapture(e.pointerId); send({ t: 'touch', a: 0, ...pos(e) }); e.preventDefault(); });
+cv.addEventListener('pointermove', (e) => { if (down) send({ t: 'touch', a: 2, ...pos(e) }); });
+cv.addEventListener('pointerup', (e) => { if (down) { down = false; send({ t: 'touch', a: 1, ...pos(e) }); } });
+cv.addEventListener('pointercancel', (e) => { if (down) { down = false; send({ t: 'touch', a: 1, ...pos(e) }); } });
+cv.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (KEY[e.key] !== undefined) { send({ t: 'key', a: 0, code: KEY[e.key] }); e.preventDefault(); }
+  else if (e.key.length === 1) { send({ t: 'text', s: e.key }); e.preventDefault(); }
+});
+cv.addEventListener('keyup', (e) => { if (KEY[e.key] !== undefined) { send({ t: 'key', a: 1, code: KEY[e.key] }); e.preventDefault(); } });
+document.querySelectorAll('button[data-k]').forEach((b) => b.addEventListener('click', () => { const c = +b.dataset.k; send({ t: 'key', a: 0, code: c }); send({ t: 'key', a: 1, code: c }); }));
+document.getElementById('reconnect').addEventListener('click', connect);
+connect();
+</script>
+</body>
+</html>

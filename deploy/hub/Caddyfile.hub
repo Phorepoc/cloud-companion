@@ -24,6 +24,12 @@
 	handle @dav {
 		reverse_proxy stalwart:8080
 	}
+	# Android in the browser (docker-compose.android.yml, optional): the stream bridge; its WebSocket needs a ticket from phecloud
+	handle_path /android/* {
+		reverse_proxy phe-android:8090 {
+			flush_interval -1
+		}
+	}
 	handle {
 		encode zstd gzip
 		reverse_proxy phecloud:8080
