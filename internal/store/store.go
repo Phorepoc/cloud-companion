@@ -162,3 +162,10 @@ func (s *Store) LoadSettings(dev string) []byte {
 	s.db.QueryRow(`SELECT data FROM settings WHERE dev=?`, dev).Scan(&b)
 	return b
 }
+
+// DeviceName returns the name a device was paired with.
+func (s *Store) DeviceName(id string) string {
+	var n string
+	s.db.QueryRow(`SELECT COALESCE(name,'') FROM devices WHERE id=?`, id).Scan(&n)
+	return n
+}

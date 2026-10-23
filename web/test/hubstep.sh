@@ -15,7 +15,8 @@ trap 'docker compose -f docker-compose.yml -f web/test/compose.hub.yml down >/de
 sleep 6
 NET=$(docker inspect phe-cloud --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | tr ' ' '\n' | grep -v '^$' | grep -v "^$HUB_NETWORK\$" | head -1)
 CODE=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
+OWNER=$(grep "^PHECLOUD_HUB_OWNER=" "$HUB_ENV_FILE" | cut -d= -f2)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
-    -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE" -e OUT=/out \
+    -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE" -e OWNER="$OWNER" -e OUT=/out \
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node hub.mjs' \
     || { echo '--- server log'; docker logs phe-cloud 2>&1 | tail -12 | cut -c1-260; exit 1; }

@@ -24,6 +24,7 @@ export const state = reactive({
   adminError: '',
   tabs: [],                 // the views of this connection: [{v, title, url}]
   activeView: 1,
+  sessions: [],             // the connected devices and their tabs (for the "other devices" list)
   features: [],             // optional server features from the welcome frame (zoom, tabs)
   settings: { q: 70, gray: false },
 })
@@ -72,6 +73,9 @@ function onFrame(f) {
       }
       break
     }
+    case 'sessionlist':
+      state.sessions = f.list || []
+      break
     case 'tabs':
       state.tabs = f.list || []
       if (f.active && f.active !== state.activeView) showView(f.active)
@@ -189,6 +193,8 @@ export const api = {
   select: (id, i) => client && client.select(id, i),
   zoom: (pct) => client && client.zoom(pct),
   tab: (action, v) => client && client.tab(action, v),
+  sessions: () => client && client.send({ t: 'sessions' }),
+  remote: (msg) => client && client.send({ t: 'remote', ...msg }),
   settings(q, gray) {
     state.settings.q = q
     state.settings.gray = gray
@@ -204,7 +210,7 @@ export const api = {
 }
 
 // test/debug hook (the Playwright smoke test reads it)
-window.__phe = Object.assign(window.__phe || {}, { state })
+window.__phe = Object.assign(window.__phe || {}, { state, hubCall: (m) => hubCall(m) })
 
 // ---- the personal hub (contacts, calendar): one request, one answer, matched by id ----
 const hubPending = new Map()
@@ -219,4 +225,12 @@ export async function hubCall(msg) {
     client.send({ t: 'hub', id, ...msg })
     setTimeout(() => { if (hubPending.delete(id)) reject(new Error('The server did not answer. Try again.')) }, 25000)
   })
+}
+
+// open a page in a new tab of this browser (for "Open here" on another device's tab)
+export async function openInNewTab(url) {
+  const before = { n: state.tabs.length, v: state.activeView }
+  api.tab('new')
+  for (let i = 0; i < 80 && state.tabs.length <= before.n && state.activeView === before.v; i++) await new Promise((r) => setTimeout(r, 50))
+  api.open(url)
 }

@@ -95,6 +95,17 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
   "show older", and a reader that shows plain text (HTML bodies are reduced to text; no pictures, links or scripts load), over JMAP; messages are
   not marked as read. Go tests: `go test ./internal/server` drives the `hub` frames against a fake Stalwart (CardDAV, CalDAV, JMAP), including
   the admin check, UID-preserving edits, the foreign-address refusal, time zones, app passwords and mail.
+- **Round 12**: *Mail actions* (JMAP through the server): mark read/unread, move (Inbox, Junk, Trash and Archive where the hub has one) and delete
+  (to Trash; from Trash it is destroyed) both wait for the length of the Undo toast before they reach the hub; reply (recipient, `Re:` subject, quoted
+  text, `In-Reply-To`) and a composer, sent as a draft plus an `EmailSubmission` with the copy filed in Sent. **Outside sending is off by default**: the
+  server only delivers to addresses at the hub's own domain unless `PHECLOUD_HUB_ALLOW_EXTERNAL=1`. A message with an HTML part also gets a *Formatted
+  view*: the HTML is sanitised on the server (bluemonday: formatting and links only; no images, styles, scripts, forms or frames; links get
+  `rel="nofollow noreferrer noopener"` and `target="_blank"`) and shown in a sandboxed frame with a `default-src 'none'` content policy. *Browser
+  section*: a "Tabs on your devices" list (the button next to the tab strip) shows every connected device and its open cloud-browser tabs (the server keeps a
+  registry of live sessions and the tab list each one last sent); from it a tab can be closed on its device, a page can be opened on another device,
+  or its tab opened here. Actions on another device run inside that device's own request loop. Tests: Go (`go test ./internal/server`: mail actions,
+  the outside-sending refusal, the sanitiser, the sessions registry and remote close) and Playwright (`hubstep.sh`: compose, refuse outside, send
+  to the owner, mark, reply, move with Undo, delete to Trash then for good, cleanup; `run.sh`: two devices at once).
 - **Icons and toasts**: the Material Symbols font is subset to the icons in use at build time (6.5 KB instead of 3.6 MB), and toasts follow STYLE.md (4 seconds, Undo, paused on hover or focus).
 - Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use the Caddy profile below for anything but localhost, or
   `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).

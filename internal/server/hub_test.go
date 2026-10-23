@@ -4,6 +4,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -58,6 +59,20 @@ func fakeHub(puts *[]string) *httptest.Server {
 			var name string
 			json.Unmarshal(req.MethodCalls[0][0], &name)
 			switch {
+			case name == "Identity/get":
+				io.WriteString(w, `{"methodResponses":[["Identity/get",{"list":[{"id":"i1","name":"Owner","email":"owner@hub.lan"}]},"i1"]]}`)
+			case name == "Email/set" && len(req.MethodCalls) == 2: // a send: Email/set create + EmailSubmission/set
+				*puts = append(*puts, "SEND "+string(b))
+				io.WriteString(w, `{"methodResponses":[["Email/set",{"created":{"d":{"id":"n1"}}},"e1"],["EmailSubmission/set",{"created":{"s":{"id":"s1"}}},"e2"]]}`)
+			case name == "Email/set":
+				*puts = append(*puts, "SET "+string(b))
+				io.WriteString(w, `{"methodResponses":[["Email/set",{"updated":{"x1":null},"destroyed":[]},"s1"]]}`)
+			case name == "Email/get" && strings.Contains(string(b), `"mailboxIds"]`) && !strings.Contains(string(b), "textBody"):
+				if strings.Contains(string(b), `"id":"in-trash"`) || strings.Contains(string(b), `"ids":["in-trash"]`) {
+					io.WriteString(w, `{"methodResponses":[["Email/get",{"list":[{"id":"in-trash","mailboxIds":{"mt":true}}]},"g1"]]}`)
+				} else {
+					io.WriteString(w, `{"methodResponses":[["Email/get",{"list":[{"id":"x1","mailboxIds":{"m1":true}}]},"g1"]]}`)
+				}
 			case name == "x:AppPassword/get":
 				io.WriteString(w, `{"methodResponses":[["x:AppPassword/get",{"list":[{"id":"p1","description":"old phone","createdAt":"2026-10-01T00:00:00Z","expiresAt":null}]},"c1"]]}`)
 			case name == "x:AppPassword/set" && strings.Contains(string(b), "create"):
@@ -65,7 +80,7 @@ func fakeHub(puts *[]string) *httptest.Server {
 			case name == "x:AppPassword/set":
 				io.WriteString(w, `{"methodResponses":[["x:AppPassword/set",{"destroyed":["p1"]},"c1"]]}`)
 			case name == "Mailbox/get":
-				io.WriteString(w, `{"methodResponses":[["Mailbox/get",{"list":[{"id":"m1","name":"Inbox","role":"inbox","totalEmails":2,"unreadEmails":1}]},"m1"]]}`)
+				io.WriteString(w, `{"methodResponses":[["Mailbox/get",{"list":[{"id":"m1","name":"Inbox","role":"inbox","totalEmails":2,"unreadEmails":1},{"id":"md","name":"Drafts","role":"drafts"},{"id":"ms","name":"Sent","role":"sent"},{"id":"mt","name":"Trash","role":"trash"},{"id":"ma","name":"Archive","role":"archive"}]},"m1"]]}`)
 			case name == "Email/query":
 				io.WriteString(w, `{"methodResponses":[["Email/query",{"total":2,"ids":["x1"]},"q1"],["Email/get",{"list":[{"id":"x1","subject":"Hello","from":[{"name":"Grace","email":"g@example.org"}],"receivedAt":"2026-10-22T10:00:00Z","preview":"Hi there","keywords":{},"hasAttachment":false}]},"g1"]]}`)
 			case name == "Email/get":
@@ -155,7 +170,7 @@ func TestHubFrames(t *testing.T) {
 
 	// mail, read-only
 	r = ask(t, false, hub, proto.Hub{Op: "mail.folders"})
-	if !r.OK || len(r.Folders) != 1 || r.Folders[0].Role != "inbox" || r.Folders[0].Unread != 1 {
+	if !r.OK || len(r.Folders) != 5 || r.Folders[0].Role != "inbox" || r.Folders[0].Unread != 1 {
 		t.Fatalf("mail.folders: %+v", r)
 	}
 	r = ask(t, false, hub, proto.Hub{Op: "mail.list", Folder: "m1"})
@@ -165,5 +180,83 @@ func TestHubFrames(t *testing.T) {
 	r = ask(t, false, hub, proto.Hub{Op: "mail.read", ID2: "x1"})
 	if !r.OK || r.Mail == nil || r.Mail.Text != "Hi & welcome" || !r.Mail.HTML || r.Mail.Unread {
 		t.Fatalf("mail.read (HTML turned into text, scripts dropped): %+v", r.Mail)
+	}
+}
+
+func TestHubMailActions(t *testing.T) {
+	var puts []string
+	srv := fakeHub(&puts)
+	defer srv.Close()
+	hub := &davhub.Client{URL: srv.URL, Owner: "owner@hub.lan", Token: "tok", HTTP: srv.Client()}
+
+	if r := ask(t, false, hub, proto.Hub{Op: "mail.mark", ID2: "x1", Flag: "unread"}); !r.OK || !strings.Contains(puts[len(puts)-1], `"keywords/$seen":null`) {
+		t.Fatalf("mark unread removes the keyword: %+v %v", r, puts)
+	}
+	if r := ask(t, false, hub, proto.Hub{Op: "mail.mark", ID2: "x1", Flag: "read"}); !r.OK || !strings.Contains(puts[len(puts)-1], `"keywords/$seen":true`) {
+		t.Fatalf("mark read: %+v", r)
+	}
+	if r := ask(t, false, hub, proto.Hub{Op: "mail.move", ID2: "x1", Role: "archive"}); !r.OK || !strings.Contains(puts[len(puts)-1], `"mailboxIds":{"ma":true}`) {
+		t.Fatalf("move to archive: %+v %v", r, puts[len(puts)-1])
+	}
+	if r := ask(t, false, hub, proto.Hub{Op: "mail.delete", ID2: "x1"}); !r.OK || !strings.Contains(puts[len(puts)-1], `"mailboxIds":{"mt":true}`) {
+		t.Fatalf("delete moves to Trash: %+v %v", r, puts[len(puts)-1])
+	}
+	if r := ask(t, false, hub, proto.Hub{Op: "mail.delete", ID2: "in-trash"}); !r.OK || !strings.Contains(puts[len(puts)-1], `"destroy":["in-trash"]`) {
+		t.Fatalf("delete from Trash destroys: %+v %v", r, puts[len(puts)-1])
+	}
+
+	r := ask(t, false, hub, proto.Hub{Op: "mail.send", Rcpt: "owner@hub.lan", Subject: "Re: Hello", Body: "Thanks!", ReplyTo: "<abc@x>"})
+	last := puts[len(puts)-1]
+	if !r.OK || !strings.HasPrefix(last, "SEND") || !strings.Contains(last, `"inReplyTo":["abc@x"]`) || !strings.Contains(last, `"identityId":"i1"`) || !strings.Contains(last, `"mailboxIds":{"ms":true}`) {
+		t.Fatalf("mail.send (reply): %+v\n%s", r, last)
+	}
+	n := len(puts)
+	if r = ask(t, false, hub, proto.Hub{Op: "mail.send", Rcpt: "someone@elsewhere.example", Subject: "x", Body: "y"}); r.OK || !strings.Contains(r.Err, "switched off") || len(puts) != n {
+		t.Fatalf("outside sending must be refused and nothing sent: %+v", r)
+	}
+	if r = ask(t, false, hub, proto.Hub{Op: "mail.send", Rcpt: "not an address", Subject: "x"}); r.OK {
+		t.Fatalf("a bad address must be refused")
+	}
+}
+
+func TestSanitizeHTML(t *testing.T) {
+	in := `<p onclick="x()">Hi <b>there</b> <a href="https://example.org/a">link</a> <a href="javascript:evil()">bad</a></p><img src="https://track.example/p.gif"><script>steal()</script><style>p{background:url(//x/y)}</style><iframe src="//x"></iframe><form action="//x"><input name="q"></form>`
+	out := davhub.SanitizeHTML(in)
+	for _, bad := range []string{"<img", "<script", "<style", "<iframe", "<form", "<input", "onclick", "javascript:", "track.example"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("%q survived: %s", bad, out)
+		}
+	}
+	for _, want := range []string{"<b>there</b>", `href="https://example.org/a"`, `rel="nofollow noreferrer noopener"`, `target="_blank"`} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q: %s", want, out)
+		}
+	}
+}
+
+func TestOtherDevicesTabs(t *testing.T) {
+	s := &Server{}
+	a := &session{srv: s, dev: "dev-a", devName: "Laptop", ops: make(chan func(ctx context.Context) error, 4), c: &conn{io: &fakeIO{}}, log: slog.Default()}
+	b := &session{srv: s, dev: "dev-b", devName: "Phone", ops: make(chan func(ctx context.Context) error, 4), c: &conn{io: &fakeIO{}}, log: slog.Default()}
+	s.register(a)
+	s.register(b)
+	b.tabs = map[int]*tab{1: {id: 1, title: "Example Domain", url: "https://example.com/"}}
+	b.active = 1
+	b.sendTabs()
+	list := s.sessionList(a)
+	if len(list) != 2 || !list[0].Self || list[1].Self || list[1].Name != "Phone" || len(list[1].Tabs) != 1 || list[1].Tabs[0].Title != "Example Domain" {
+		t.Fatalf("session list: %+v", list)
+	}
+	raw, _ := proto.Marshal(proto.Remote{T: proto.TRemote, SID: b.sid, Action: "close", V: 1})
+	if err := a.remote(raw); err != nil || len(b.ops) != 1 {
+		t.Fatalf("remote close queued on the other session: %v %d", err, len(b.ops))
+	}
+	op := <-b.ops
+	if err := op(context.Background()); err != nil || len(b.tabs) != 0 {
+		t.Fatalf("the tab was closed in its own session: %v %v", err, b.tabs)
+	}
+	s.unregister(b)
+	if err := a.remote(raw); err == nil {
+		t.Fatalf("a device that left cannot be acted on")
 	}
 }

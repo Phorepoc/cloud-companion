@@ -30,6 +30,7 @@ type Server struct {
 	Browser browser.Factory
 	Log     *slog.Logger
 	Hub     *davhub.Client // the personal hub (contacts, calendar); nil when not configured
+	reg     registry
 }
 
 func MAC(key, nonce []byte) []byte {
@@ -100,7 +101,10 @@ func (s *Server) ServeConn(fio FrameIO, remote string) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ses := &session{srv: s, c: c, log: log, dev: dev, admin: admin, done: make(chan struct{}), dialogs: map[int]chan dialogAnswer{}}
+	ses := &session{srv: s, c: c, log: log, dev: dev, admin: admin, done: make(chan struct{}), dialogs: map[int]chan dialogAnswer{}, ops: make(chan func(ctx context.Context) error, 4)}
+	ses.devName = s.Store.DeviceName(dev)
+	s.register(ses)
+	defer s.unregister(ses)
 	defer ses.close()
 
 	type frameMsg struct {
@@ -128,13 +132,23 @@ func (s *Server) ServeConn(fio FrameIO, remote string) {
 			}
 		}
 	}()
-	for m := range reqs {
-		if err := ses.dispatch(ctx, m.t, m.raw); err != nil {
-			if ctx.Err() != nil {
+	for {
+		select {
+		case m, ok := <-reqs:
+			if !ok {
 				return
 			}
-			log.Warn("request failed", "type", m.t, "err", err)
-			c.send(proto.Error{T: proto.TError, Msg: err.Error()})
+			if err := ses.dispatch(ctx, m.t, m.raw); err != nil {
+				if ctx.Err() != nil {
+					return
+				}
+				log.Warn("request failed", "type", m.t, "err", err)
+				c.send(proto.Error{T: proto.TError, Msg: err.Error()})
+			}
+		case op := <-ses.ops: // another device asked this one to close a tab or open a page
+			if err := op(ctx); err != nil {
+				log.Warn("remote action failed", "err", err)
+			}
 		}
 	}
 }

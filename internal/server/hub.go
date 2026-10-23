@@ -76,6 +76,14 @@ func (s *session) hubRequest(raw []byte) error {
 		res.Mails, res.Total, err = hub.MailList(h.Folder, h.Pos)
 	case "mail.read":
 		res.Mail, err = hub.MailRead(h.ID2)
+	case "mail.mark":
+		err = hub.MailMark(h.ID2, h.Flag == "read")
+	case "mail.move":
+		err = hub.MailMove(h.ID2, h.Role)
+	case "mail.delete":
+		err = hub.MailDelete(h.ID2)
+	case "mail.send":
+		err = hub.MailSend(h.Rcpt, h.Subject, h.Body, h.ReplyTo)
 	default:
 		err = errors.New("unknown hub operation")
 	}

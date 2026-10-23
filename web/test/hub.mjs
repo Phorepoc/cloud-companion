@@ -218,6 +218,136 @@ try {
   } else {
     step('mail: folders load; the inbox is empty (nothing to read)')
   }
+
+  // ---- mail actions: send to the hub's own mailbox, mark, reply, move and delete with Undo; everything is cleaned up afterwards ----
+  const OWNER = process.env.OWNER
+  assert(OWNER, 'OWNER (the hub owner address) is required')
+  const SUBJ = `Mail test ${stamp}`
+  const purge = () => page.evaluate(async (s) => {
+    const { folders } = await window.__phe.hubCall({ op: 'mail.folders' })
+    for (const f of folders) {
+      const { mails } = await window.__phe.hubCall({ op: 'mail.list', folder: f.id })
+      for (const m of mails || []) {
+        if (!m.subject.includes(s)) continue
+        await window.__phe.hubCall({ op: 'mail.delete', id2: m.id })
+        if (f.role !== 'trash') await window.__phe.hubCall({ op: 'mail.delete', id2: m.id }) // a second delete from Trash destroys it
+      }
+    }
+  }, stamp)
+  const selectFolder = async (name) => {
+    await page.click('[data-test=mail-folder]')
+    await page.locator('.q-menu .q-item', { hasText: name }).first().click()
+    await page.waitForTimeout(900)
+  }
+  const waitRow = async (text, tries = 12) => {
+    for (let i = 0; i < tries; i++) {
+      if (await page.locator('[data-test^=mail-row-]', { hasText: text }).count()) return
+      await page.click('[data-test=mail-refresh]')
+      await page.waitForTimeout(1000)
+    }
+    assert.fail('no mail row with ' + text)
+  }
+  try {
+    await go('mail')
+    await page.waitForSelector('[data-test=mail-compose]')
+    await page.click('[data-test=mail-compose]')
+    await page.fill('[data-test=mail-to]', 'someone@elsewhere.example')
+    await page.fill('[data-test=mail-subject]', SUBJ)
+    await page.fill('[data-test=mail-body]', 'Hello from the test.')
+    await page.click('[data-test=mail-send]')
+    await page.waitForFunction(() => /switched off/.test(document.querySelector('[data-test=mail-compose-form]')?.textContent || ''))
+    step('sending outside the hub is refused with a clear message')
+    await page.fill('[data-test=mail-to]', OWNER)
+    await page.screenshot({ path: OUT + '/desktop-light-mail-compose.png' })
+    await page.click('[data-test=mail-send]')
+    await page.waitForFunction(() => /Message sent/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
+    await waitRow(SUBJ)
+    step('composed and sent to the hub owner; it arrived in the inbox')
+
+    const row = () => page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).first()
+    assert.equal(await row().locator('[data-test=mail-unread]').count(), 1, 'a new message is unread')
+    await row().click()
+    await page.waitForSelector('[data-test=mail-view-body]')
+    assert.match(await page.textContent('[data-test=mail-view-body]'), /Hello from the test/)
+    await page.click('[data-test=mail-toggle-read]')
+    await page.waitForFunction(() => /Marked as read/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
+    await page.keyboard.press('Escape')
+    await page.click('[data-test=mail-refresh]')
+    await page.waitForTimeout(1200)
+    assert.equal(await row().locator('[data-test=mail-unread]').count(), 0, 'marked read on the server')
+    await row().click()
+    await page.click('[data-test=mail-toggle-read]')
+    await page.waitForFunction(() => /Marked as unread/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
+    await page.keyboard.press('Escape')
+    await page.click('[data-test=mail-refresh]')
+    await page.waitForTimeout(1200)
+    assert.equal(await row().locator('[data-test=mail-unread]').count(), 1, 'marked unread again')
+    step('mark as read and as unread reach the hub')
+    await shots('mail-actions')
+
+    // reply
+    await row().click()
+    await page.screenshot({ path: OUT + '/desktop-light-mail-reader.png' })
+    await page.click('[data-test=mail-reply]')
+    assert.equal(await page.inputValue('[data-test=mail-to]'), OWNER)
+    assert.equal(await page.inputValue('[data-test=mail-subject]'), 'Re: ' + SUBJ)
+    assert.match(await page.inputValue('[data-test=mail-body]'), /> Hello from the test/)
+    await page.click('[data-test=mail-send]')
+    await page.waitForFunction(() => /Message sent/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
+    await waitRow('Re: ' + SUBJ)
+    step('reply: recipient, subject and quoted text prefilled; the answer arrived')
+
+    // move with Undo, then for real
+    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).first().click()
+    await page.click('[data-test=mail-move]')
+    await page.click('[data-test=mail-move-junk]')
+    await page.waitForSelector('[data-test=toast-undo]')
+    await page.click('[data-test=toast-undo]')
+    await page.waitForTimeout(500)
+    assert.ok(await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).count(), 'Undo brings the message back')
+    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).first().click()
+    await page.click('[data-test=mail-move]')
+    await page.click('[data-test=mail-move-junk]')
+    await page.waitForTimeout(5500)
+    await selectFolder(/Junk|Spam/i)
+    await waitRow(SUBJ)
+    step('move to Junk: Undo works; letting the toast run out moves it on the hub')
+
+    // delete: to Trash, then for good
+    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).first().click()
+    await page.click('[data-test=mail-delete]')
+    await page.waitForTimeout(5500)
+    await selectFolder(/Trash|Deleted/i)
+    await waitRow(SUBJ)
+    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).first().click()
+    await page.click('[data-test=mail-delete]')
+    await page.waitForTimeout(5500)
+    await page.click('[data-test=mail-refresh]')
+    await page.waitForTimeout(1200)
+    assert.equal(await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).count(), 0, 'deleted for good from Trash')
+    step('delete: Trash first, then destroyed from Trash')
+
+    // the sanitised HTML view, when a message has one: a sandboxed frame without any network access
+    await selectFolder(/Inbox/i)
+    const n = await page.locator('[data-test^=mail-row-]').count()
+    for (let i = 0; i < Math.min(n, 6); i++) {
+      await page.click(`[data-test=mail-row-${i}]`)
+      await page.waitForSelector('[data-test=mail-view-body]')
+      if (await page.locator('[data-test=mail-format]').count()) {
+        await page.locator('[data-test=mail-format]').getByText('Formatted view').click()
+        const fr = page.locator('[data-test=mail-frame]')
+        assert.equal(await fr.getAttribute('sandbox'), 'allow-popups allow-popups-to-escape-sandbox')
+        assert.match(await fr.getAttribute('srcdoc'), /default-src 'none'/)
+        assert.doesNotMatch(await fr.getAttribute('srcdoc'), /<img|<script/i)
+        step('formatted view: sandboxed frame, content policy forbids every load, no images or scripts')
+        break
+      }
+      await page.keyboard.press('Escape')
+    }
+  } finally {
+    await page.keyboard.press('Escape').catch(() => {})
+    await purge().catch((e) => console.error('cleanup:', e.message))
+  }
   console.log('HUB PASS')
 } catch (e) {
   console.error('HUB FAIL:', e.message)

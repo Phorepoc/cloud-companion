@@ -56,10 +56,15 @@ type session struct {
 	c       *conn
 	log     *slog.Logger
 
-	dev    string
-	admin  bool
-	opts   tiles.Options // the per-device byte budget
-	loaded bool
+	dev     string
+	admin   bool
+	sid     int
+	devName string
+	ops     chan func(ctx context.Context) error // actions other devices ask this session to run (close a tab, open a page)
+	pubMu   sync.Mutex
+	pub     []proto.TabInfo // the tab list as last sent to this device
+	opts    tiles.Options   // the per-device byte budget
+	loaded  bool
 
 	tabs   map[int]*tab
 	active int
@@ -116,6 +121,9 @@ func (s *session) sendTabs() error {
 		t := s.tabs[id]
 		out.List = append(out.List, proto.TabInfo{V: id, Title: t.title, URL: truncate(t.url, 200)})
 	}
+	s.pubMu.Lock()
+	s.pub = out.List
+	s.pubMu.Unlock()
 	return s.c.send(out)
 }
 
@@ -195,6 +203,10 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		return s.srv.Store.Revoke(r.ID)
 	case proto.TPing:
 		return s.c.send(proto.Header{T: proto.TPong})
+	case proto.TSessions:
+		return s.c.send(proto.SessionList{T: proto.TSessionList, List: s.srv.sessionList(s)})
+	case proto.TRemote:
+		return s.remote(raw)
 	case proto.THub:
 		return s.hubRequest(raw)
 	case proto.TTab:

@@ -45,6 +45,9 @@ const (
 	TDevices     = "devices"     // C->S  (admin) list devices
 	TDeviceList  = "devicelist"  // S->C
 	TRevoke      = "revoke"      // C->S  (admin) revoke a device
+	TSessions    = "sessions"    // C->S  the connected devices and their tabs
+	TSessionList = "sessionlist" // S->C
+	TRemote      = "remote"      // C->S  close a tab on / open a tab on another connected device
 	TTab         = "tab"         // C->S  new | close | switch | list a view
 	THub         = "hub"         // C->S  contacts / calendar request (the personal hub)
 	THubRes      = "hubres"      // S->C  its answer
@@ -451,6 +454,12 @@ type Hub struct {
 	ID2     string   `cbor:"id2,omitempty"`    // apppw.revoke / mail.read: the object id
 	Folder  string   `cbor:"folder,omitempty"` // mail.list: folder id
 	Pos     int      `cbor:"pos,omitempty"`    // mail.list: offset
+	Flag    string   `cbor:"flag,omitempty"`   // mail.mark: read | unread
+	Role    string   `cbor:"role,omitempty"`   // mail.move: inbox | archive | junk | trash
+	Rcpt    string   `cbor:"rcpt,omitempty"`   // mail.send: recipients, comma separated
+	Subject string   `cbor:"subject,omitempty"`
+	Body    string   `cbor:"body,omitempty"`
+	ReplyTo string   `cbor:"replyto,omitempty"` // mail.send: the Message-ID being answered
 }
 
 type HubRes struct {
@@ -491,19 +500,55 @@ type MailFolder struct {
 }
 
 type MailItem struct {
-	ID      string `cbor:"id"`
-	Subject string `cbor:"subject"`
-	From    string `cbor:"from"`
-	Date    string `cbor:"date"` // RFC 3339
-	Preview string `cbor:"preview,omitempty"`
-	Unread  bool   `cbor:"unread,omitempty"`
-	Attach  bool   `cbor:"attach,omitempty"`
+	ID       string `cbor:"id"`
+	Subject  string `cbor:"subject"`
+	From     string `cbor:"from"`
+	FromAddr string `cbor:"fromaddr,omitempty"`
+	Date     string `cbor:"date"` // RFC 3339
+	Preview  string `cbor:"preview,omitempty"`
+	Unread   bool   `cbor:"unread,omitempty"`
+	Attach   bool   `cbor:"attach,omitempty"`
 }
 
 type MailBody struct {
 	MailItem
-	To   []string `cbor:"to,omitempty"`
-	Cc   []string `cbor:"cc,omitempty"`
-	Text string   `cbor:"text"`
-	HTML bool     `cbor:"html,omitempty"` // the text was made from an HTML body
+	To      []string `cbor:"to,omitempty"`
+	Cc      []string `cbor:"cc,omitempty"`
+	Text    string   `cbor:"text"`
+	HTML    bool     `cbor:"html,omitempty"`    // the text was made from an HTML body
+	Safe    string   `cbor:"safe,omitempty"`    // the HTML body, sanitised (no images, scripts, styles, forms or remote loads), when the message has one
+	MsgID   string   `cbor:"msgid,omitempty"`   // Message-ID, for replies
+	Folders []string `cbor:"folders,omitempty"` // roles of the folders it is in
+}
+
+// ---- mail actions, other devices' tabs ----
+
+// MailSendFields are carried in Hub: Rcpt (comma separated), Subject, Body, InReplyTo (a Message-ID, for replies).
+// Hub.Flag = read | unread (mail.mark); Hub.Role = the folder role to move to (mail.move): inbox | archive | junk | trash.
+
+// Sessions: the connected devices and their cloud-browser tabs. Any paired device may ask.
+type Sessions struct {
+	T string `cbor:"t"`
+}
+
+type SessionInfo struct {
+	SID  int       `cbor:"sid"`
+	Dev  string    `cbor:"dev"`
+	Name string    `cbor:"name"`
+	Self bool      `cbor:"self,omitempty"`
+	Tabs []TabInfo `cbor:"tabs,omitempty"`
+}
+
+type SessionList struct {
+	T    string        `cbor:"t"`
+	List []SessionInfo `cbor:"list"`
+}
+
+// Remote: act on another connected device's tabs. Action = close (V = the view) | open (URL: a new tab on that device).
+type Remote struct {
+	T      string `cbor:"t"`
+	SID    int    `cbor:"sid"`
+	Action string `cbor:"action"`
+	V      int    `cbor:"view,omitempty"`
+	URL    string `cbor:"url,omitempty"`
 }

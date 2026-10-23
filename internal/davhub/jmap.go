@@ -216,6 +216,7 @@ type jmapEmail struct {
 	Preview    string          `json:"preview"`
 	Keywords   map[string]bool `json:"keywords"`
 	HasAttach  bool            `json:"hasAttachment"`
+	MessageID  []string        `json:"messageId"`
 	TextBody   []struct {
 		PartID string `json:"partId"`
 	} `json:"textBody"`
@@ -228,7 +229,7 @@ type jmapEmail struct {
 }
 
 func (e jmapEmail) item() proto.MailItem {
-	return proto.MailItem{ID: e.ID, Subject: e.Subject, From: firstAddr(e.From), Date: e.ReceivedAt, Preview: e.Preview, Unread: !e.Keywords["$seen"], Attach: e.HasAttach}
+	return proto.MailItem{ID: e.ID, Subject: e.Subject, From: firstAddr(e.From), FromAddr: firstEmail(e.From), Date: e.ReceivedAt, Preview: e.Preview, Unread: !e.Keywords["$seen"], Attach: e.HasAttach}
 }
 
 // MailList returns one page (30) of a folder, newest first, and the folder's total.
@@ -324,9 +325,27 @@ func (c *Client) MailRead(id string) (*proto.MailBody, error) {
 		}
 		body.Text, body.HTML = htmlToText(strings.Join(hs, "\n")), true
 	}
+	if len(e.MessageID) > 0 {
+		body.MsgID = e.MessageID[0]
+	}
+	// a formatted view exists when the message has an HTML part of its own (not just the text part standing in for it)
+	var hs []string
+	for _, p := range e.HTMLBody {
+		hs = append(hs, e.BodyValues[p.PartID].Value)
+	}
+	if h := strings.Join(hs, "\n"); strings.TrimSpace(h) != "" && (body.HTML || looksHTML(h)) {
+		body.Safe = SanitizeHTML(h)
+	}
 	return body, nil
 }
 
 func looksHTML(s string) bool {
 	return len(reTag.FindAllString(s, 4)) >= 3 && strings.Contains(strings.ToLower(s), "</")
+}
+
+func firstEmail(l []addr) string {
+	if len(l) == 0 {
+		return ""
+	}
+	return l[0].Email
 }

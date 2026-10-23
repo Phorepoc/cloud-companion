@@ -14,6 +14,9 @@
       <q-btn flat round icon="sym_o_add" aria-label="New tab" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')">
         <q-tooltip>New tab (up to 3)</q-tooltip>
       </q-btn>
+      <q-btn flat round icon="sym_o_devices" aria-label="Tabs on your other devices" data-test="other-devices" @click="openOthers">
+        <q-tooltip>Tabs on your other devices</q-tooltip>
+      </q-btn>
     </div>
 
     <div class="ph-address" role="search">
@@ -82,12 +85,41 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <q-dialog v-model="othersOpen" @hide="stopPoll">
+      <q-card class="ph-dialog" data-test="others-dialog">
+        <q-card-section>
+          <h2>Tabs on your devices</h2>
+          <p class="ph-muted ph-small">Browser tabs that are open right now on the devices that are connected. Closing a tab here closes it on that device.</p>
+          <EmptyState v-if="!state.sessions.length" state="loading" title="Looking for devices" text="" />
+          <section v-for="s in state.sessions" :key="s.sid" class="ph-dev" :data-test="'dev-' + s.sid">
+            <h3>{{ s.name || 'Device' }} <q-badge v-if="s.self" color="positive" text-color="white" label="This browser" /></h3>
+            <p v-if="!s.tabs || !s.tabs.length" class="ph-muted ph-small">No tabs open.</p>
+            <ul v-else class="ph-tablist">
+              <li v-for="t in s.tabs" :key="t.v" class="ph-trow" :data-test="'dev-tab-' + s.sid + '-' + t.v">
+                <span class="ph-ttext"><span class="ph-ttitle">{{ t.title || t.url || 'New tab' }}</span><span class="ph-small ph-muted ph-turl">{{ t.url }}</span></span>
+                <q-btn v-if="!s.self && t.url" flat round icon="sym_o_open_in_new" aria-label="Open here" :data-test="'dev-open-' + s.sid + '-' + t.v" @click="openHere(t)">
+                  <q-tooltip>Open here</q-tooltip>
+                </q-btn>
+                <q-btn flat round icon="sym_o_close" :aria-label="'Close ' + (t.title || 'tab')" :disable="s.self && s.tabs.length === 1 && false" :data-test="'dev-close-' + s.sid + '-' + t.v" @click="closeRemote(s, t)" />
+              </li>
+            </ul>
+            <form v-if="!s.self" class="ph-send" @submit.prevent="sendTo(s)">
+              <q-input v-model="sendUrl[s.sid]" dense outlined placeholder="Open a page on this device" aria-label="Web address to open on this device" :data-test="'dev-url-' + s.sid" />
+              <q-btn flat color="primary" label="Open" type="submit" :data-test="'dev-send-' + s.sid" />
+            </form>
+          </section>
+        </q-card-section>
+        <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /><q-btn flat icon="sym_o_refresh" label="Refresh" @click="api.sessions()" /></q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { state, api, connect, creds } from '../cloud.js'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { state, api, connect, creds, openInNewTab } from '../cloud.js'
+import EmptyState from '../components/EmptyState.vue'
 import { Renderer } from '../renderer.js'
 
 const cv = ref(null)
@@ -184,6 +216,28 @@ onMounted(async () => {
   }
 })
 onBeforeUnmount(() => renderer && renderer.detach())
+
+// ---- tabs on other devices ----
+const othersOpen = ref(false)
+const sendUrl = reactive({})
+let poll = 0
+function openOthers() { othersOpen.value = true; api.sessions(); clearInterval(poll); poll = setInterval(() => api.sessions(), 4000) }
+function stopPoll() { clearInterval(poll) }
+function closeRemote(s, t) {
+  if (s.self) api.tab('close', t.v)
+  else api.remote({ sid: s.sid, action: 'close', view: t.v })
+  setTimeout(() => api.sessions(), 500)
+}
+function sendTo(s) {
+  let u = (sendUrl[s.sid] || '').trim()
+  if (!u) return
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u
+  api.remote({ sid: s.sid, action: 'open', url: u })
+  sendUrl[s.sid] = ''
+  setTimeout(() => api.sessions(), 1500)
+}
+async function openHere(t) { othersOpen.value = false; await openInNewTab(t.url) }
+onBeforeUnmount(() => clearInterval(poll))
 </script>
 
 <style scoped>
@@ -208,4 +262,12 @@ onBeforeUnmount(() => renderer && renderer.detach())
 .ph-dialog { width: min(92vw, 420px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); }
 .ph-dialog-text { white-space: pre-wrap; margin: 0 0 var(--ph-s3); overflow-wrap: anywhere; }
+.ph-dev { margin-top: var(--ph-s4); }
+.ph-dev h3 { margin-bottom: var(--ph-s2); }
+.ph-tablist { list-style: none; padding: 0; margin: 0 0 var(--ph-s2); }
+.ph-trow { display: flex; align-items: center; gap: var(--ph-s2); min-height: var(--ph-tap); border-bottom: 1px solid var(--ph-divider); }
+.ph-ttext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ph-ttitle, .ph-turl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-send { display: flex; gap: var(--ph-s2); align-items: center; }
+.ph-send .q-field { flex: 1; }
 </style>
