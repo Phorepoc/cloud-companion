@@ -5,15 +5,15 @@ package webui
 
 // The Connections API of the web app (admin devices only, requests signed like the passkey calls, see auth.go):
 //
-//	GET  /api/connections                 the accounts (no secrets) with status and last sync
-//	POST /api/connections/test            {kind, config, secret}              -> {ok, detail}
-//	POST /api/connections                 {kind, provider, name, config, secret}   (tests first, then stores and starts a sync)
-//	POST /api/connections/sync            {id}
-//	POST /api/connections/remove          {id}
-//	GET  /api/duplicates                  likely duplicate hub contacts
-//	POST /api/duplicates/merge            {keep, drop}   folds `drop` into `keep`, moves its links, deletes it
-//	POST /api/duplicates/dismiss          {a, b}         "not the same person"
-//	GET  /api/links?hub=<id>              the (source, entry) links of a hub contact
+//	GET  /phe/connections                 the accounts (no secrets) with status and last sync
+//	POST /phe/connections/test            {kind, config, secret}              -> {ok, detail}
+//	POST /phe/connections                 {kind, provider, name, config, secret}   (tests first, then stores and starts a sync)
+//	POST /phe/connections/sync            {id}
+//	POST /phe/connections/remove          {id}
+//	GET  /phe/duplicates                  likely duplicate hub contacts
+//	POST /phe/duplicates/merge            {keep, drop}   folds `drop` into `keep`, moves its links, deletes it
+//	POST /phe/duplicates/dismiss          {a, b}         "not the same person"
+//	GET  /phe/links?hub=<id>              the (source, entry) links of a hub contact
 
 import (
 	"context"
@@ -50,7 +50,7 @@ func readJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 }
 
 func (c *conns) routes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/connections", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/connections", func(w http.ResponseWriter, r *http.Request) {
 		if !c.admin(w, r) {
 			return
 		}
@@ -80,7 +80,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}()
 		reply(w, 200, map[string]any{"account": a})
 	})
-	mux.HandleFunc("/api/connections/test", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/connections/test", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Kind, Config, Secret string }
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
@@ -94,7 +94,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"ok": true, "detail": d})
 	})
-	mux.HandleFunc("/api/connections/sync", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/connections/sync", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ ID string }
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
@@ -108,7 +108,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"ok": true, "detail": sum})
 	})
-	mux.HandleFunc("/api/connections/remove", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/connections/remove", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ ID string }
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
@@ -116,7 +116,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		c.m.Remove(in.ID)
 		reply(w, 200, map[string]any{"ok": true})
 	})
-	mux.HandleFunc("/api/duplicates", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/duplicates", func(w http.ResponseWriter, r *http.Request) {
 		if !c.admin(w, r) {
 			return
 		}
@@ -158,7 +158,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"suggestions": res, "contacts": len(cs)})
 	})
-	mux.HandleFunc("/api/duplicates/dismiss", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/duplicates/dismiss", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ A, B string }
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
@@ -166,7 +166,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		c.st.SyncedSet("_dup", "no:"+in.A+"|"+in.B, "1")
 		reply(w, 200, map[string]any{"ok": true})
 	})
-	mux.HandleFunc("/api/duplicates/merge", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/duplicates/merge", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Keep, Drop string }
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
@@ -186,7 +186,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"ok": true, "contact": merged.Name})
 	})
-	mux.HandleFunc("/api/devmerge/preview", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/devmerge/preview", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Account, A, B string }
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
@@ -218,9 +218,9 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, p)
 	})
-	mux.HandleFunc("/api/devmerge/apply", func(w http.ResponseWriter, r *http.Request) { c.devMerge(w, r, false) })
-	mux.HandleFunc("/api/devmerge/undo", func(w http.ResponseWriter, r *http.Request) { c.devMerge(w, r, true) })
-	mux.HandleFunc("/api/links", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/phe/devmerge/apply", func(w http.ResponseWriter, r *http.Request) { c.devMerge(w, r, false) })
+	mux.HandleFunc("/phe/devmerge/undo", func(w http.ResponseWriter, r *http.Request) { c.devMerge(w, r, true) })
+	mux.HandleFunc("/phe/links", func(w http.ResponseWriter, r *http.Request) {
 		if !c.admin(w, r) {
 			return
 		}

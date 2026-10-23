@@ -21,7 +21,7 @@ filled, notes joined), re-points its links to the kept contact and deletes the o
 merged away is not re-created by later syncs.
 
 ## API (admin devices, signed requests as for passkeys)
-`GET/POST /api/connections`, `POST /api/connections/test|sync|remove`, `GET /api/duplicates`, `POST /api/duplicates/merge|dismiss`, `GET /api/links?hub=<id>`.
+`GET/POST /phe/connections`, `POST /phe/connections/test|sync|remove`, `GET /phe/duplicates`, `POST /phe/duplicates/merge|dismiss`, `GET /phe/links?hub=<id>`.
 
 ## Merging and the sources
 Every device and every connected service keeps its **own** contact list. A merge only changes the hub: the data goes into the kept hub contact,
@@ -54,3 +54,5 @@ the device's own list, so it is explicit: the dialog lists exactly what will hap
 is deleted). **Merge on the account** then writes it through the connector: the merged card replaces the first entry and the second is deleted,
 both guarded by their ETags, so a change made on the device in the meantime stops the merge and nothing is touched. For 10 minutes an **Undo**
 puts both original cards back. The hub copies follow with the account's next sync (run right away). Properties the app does not model are kept.
+
+The Connections API is under `/phe/` (not `/api/`): the hub's Caddy sends `/api` to the mail server.

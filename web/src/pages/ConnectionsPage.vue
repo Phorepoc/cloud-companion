@@ -163,7 +163,7 @@ function ago(t) {
 }
 
 async function load() {
-  try { const j = await apiCall('GET', '/api/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = e.message }
+  try { const j = await apiCall('GET', '/phe/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = e.message }
 }
 function openAdd() { Object.assign(f, blank()); testResult.value = null; adding.value = true }
 
@@ -180,39 +180,39 @@ function payload() {
 }
 async function doTest() {
   busy.value = 'test'; testResult.value = null
-  try { testResult.value = await apiCall('POST', '/api/connections/test', payload()) } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
+  try { testResult.value = await apiCall('POST', '/phe/connections/test', payload()) } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
 }
 async function doAdd() {
   busy.value = 'add'; testResult.value = null
-  try { await apiCall('POST', '/api/connections', payload()); adding.value = false; await load() } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
+  try { await apiCall('POST', '/phe/connections', payload()); adding.value = false; await load() } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
 }
 async function sync(a) {
   syncing.value = a.id; error.value = ''
-  try { const r = await apiCall('POST', '/api/connections/sync', { id: a.id }); if (!r.ok) error.value = a.name + ': ' + r.detail } catch (e) { error.value = e.message } finally { syncing.value = ''; await load() }
+  try { const r = await apiCall('POST', '/phe/connections/sync', { id: a.id }); if (!r.ok) error.value = a.name + ': ' + r.detail } catch (e) { error.value = e.message } finally { syncing.value = ''; await load() }
 }
 async function doRemove() {
   const a = askRemove.value
   askRemove.value = null
-  try { await apiCall('POST', '/api/connections/remove', { id: a.id }) } catch (e) { error.value = e.message }
+  try { await apiCall('POST', '/phe/connections/remove', { id: a.id }) } catch (e) { error.value = e.message }
   await load()
 }
 async function findDups() {
   finding.value = true; dupError.value = ''
-  try { dups.value = (await apiCall('GET', '/api/duplicates')).suggestions } catch (e) { dupError.value = e.message } finally { finding.value = false }
+  try { dups.value = (await apiCall('GET', '/phe/duplicates')).suggestions } catch (e) { dupError.value = e.message } finally { finding.value = false }
 }
 async function merge(d, keep, drop) {
   dupError.value = ''
-  try { await apiCall('POST', '/api/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = e.message }
+  try { await apiCall('POST', '/phe/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = e.message }
 }
 async function previewDevice(d) {
   dupError.value = ''
-  try { devPreview.value = await apiCall('POST', '/api/devmerge/preview', { account: d.same_source, a: d.a, b: d.b }); devSource.value = d.source_name } catch (e) { dupError.value = e.message }
+  try { devPreview.value = await apiCall('POST', '/phe/devmerge/preview', { account: d.same_source, a: d.a, b: d.b }); devSource.value = d.source_name } catch (e) { dupError.value = e.message }
 }
 async function applyDevice() {
   const p = devPreview.value
   devPreview.value = null
   try {
-    await apiCall('POST', '/api/devmerge/apply', { id: p.id })
+    await apiCall('POST', '/phe/devmerge/apply', { id: p.id })
     undoable.value = { id: p.id, source: devSource.value }
     setTimeout(() => { if (undoable.value && undoable.value.id === p.id) undoable.value = null }, 10 * 60 * 1000)
     await findDups()
@@ -220,10 +220,10 @@ async function applyDevice() {
 }
 async function undoDevice() {
   const u = undoable.value
-  try { await apiCall('POST', '/api/devmerge/undo', { id: u.id }); undoable.value = null; await findDups() } catch (e) { dupError.value = e.message }
+  try { await apiCall('POST', '/phe/devmerge/undo', { id: u.id }); undoable.value = null; await findDups() } catch (e) { dupError.value = e.message }
 }
 async function dismiss(d) {
-  try { await apiCall('POST', '/api/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = dups.value.filter((x) => x !== d) } catch (e) { dupError.value = e.message }
+  try { await apiCall('POST', '/phe/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = dups.value.filter((x) => x !== d) } catch (e) { dupError.value = e.message }
 }
 
 onMounted(() => { load(); timer = setInterval(load, 10000) })

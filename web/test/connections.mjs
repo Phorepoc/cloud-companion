@@ -86,7 +86,7 @@ await page.waitForSelector('[data-test=dup-error]')
 step('duplicate finder reports the missing hub')
 
 // secrets never come back to the browser
-const list = await page.evaluate(async () => JSON.stringify(await (await fetch('/api/connections')).text()))
+const list = await page.evaluate(async () => JSON.stringify(await (await fetch('/phe/connections')).text()))
 assert(!list.includes('definitely-wrong') && !list.includes('secret"'))
 
 await page.locator('[data-test=account-remove]').first().click()
