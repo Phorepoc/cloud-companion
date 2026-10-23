@@ -108,7 +108,7 @@
           <p class="ph-muted">You will be sent to {{ oauthFor && oauthFor.label }} to allow access. Phecloud never sees your password and keeps only a revocable token on your server.</p>
           <q-input v-model="oauthName" outlined dense label="Name" hint="For example: Personal Gmail" data-test="oauth-name" />
           <q-option-group v-model="oauthKinds" type="checkbox" :options="oauthKindOptions" data-test="oauth-kinds" />
-          <p v-if="oauthFor && oauthFor.id === 'microsoft'" class="ph-muted ph-small">Outlook contacts and calendar use Microsoft Graph, which is not supported yet: only mail is offered.</p>
+          <p v-if="oauthFor && oauthFor.id === 'microsoft'" class="ph-muted ph-small">Outlook contacts and calendar are read through Microsoft Graph (read-only: Contacts.Read, Calendars.Read).</p>
           <p v-if="oauthError" class="ph-error" role="alert" data-test="oauth-error">{{ oauthError }}</p>
         </q-card-section>
         <q-card-actions align="right">

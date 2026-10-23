@@ -37,6 +37,7 @@ type Token struct {
 	Refresh string `json:"refresh"`
 	Expiry  int64  `json:"expiry"` // unix seconds
 	Email   string `json:"email,omitempty"`
+	Scope   string `json:"scope,omitempty"` // Microsoft: one access token serves ONE resource, so each account renews its own with its own scopes
 }
 
 type Provider struct {
@@ -98,12 +99,16 @@ func Providers() map[string]*Provider {
 	if id := os.Getenv("PHECLOUD_OAUTH_MS_ID"); id != "" {
 		tenant := envOr("PHECLOUD_OAUTH_MS_TENANT", "common")
 		p := &Provider{ID: "microsoft", Label: "Microsoft", ClientID: id, Secret: os.Getenv("PHECLOUD_OAUTH_MS_SECRET"),
-			AuthURL:    envOr("PHECLOUD_OAUTH_MS_AUTH_URL", "https://login.microsoftonline.com/"+tenant+"/oauth2/v2.0/authorize"),
-			TokenURL:   envOr("PHECLOUD_OAUTH_MS_TOKEN_URL", "https://login.microsoftonline.com/"+tenant+"/oauth2/v2.0/token"),
-			MailScopes: []string{"https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send", "offline_access"},
-			IMAP:       hostPort("PHECLOUD_OAUTH_MS_IMAP", "outlook.office365.com:993:tls"),
-			SMTP:       hostPort("PHECLOUD_OAUTH_MS_SMTP", "smtp.office365.com:587:starttls"),
-			// contacts and calendar of Outlook.com / Microsoft 365 are Microsoft Graph (JSON), not CardDAV / CalDAV: not built (docs/connections.md)
+			AuthURL:        envOr("PHECLOUD_OAUTH_MS_AUTH_URL", "https://login.microsoftonline.com/"+tenant+"/oauth2/v2.0/authorize"),
+			TokenURL:       envOr("PHECLOUD_OAUTH_MS_TOKEN_URL", "https://login.microsoftonline.com/"+tenant+"/oauth2/v2.0/token"),
+			MailScopes:     []string{"https://outlook.office.com/IMAP.AccessAsUser.All", "https://outlook.office.com/SMTP.Send", "offline_access"},
+			ContactScopes:  []string{"https://graph.microsoft.com/Contacts.Read", "offline_access"},
+			CalendarScopes: []string{"https://graph.microsoft.com/Calendars.Read", "offline_access"},
+			CardDAVURL:     func(string) string { return GraphURL() + "/me/contacts" },
+			CalDAVURL:      func(string) string { return GraphURL() + "/me/calendarView" },
+			IMAP:           hostPort("PHECLOUD_OAUTH_MS_IMAP", "outlook.office365.com:993:tls"),
+			SMTP:           hostPort("PHECLOUD_OAUTH_MS_SMTP", "smtp.office365.com:587:starttls"),
+			// contacts and calendar of Outlook.com / Microsoft 365 are Microsoft Graph (JSON), not CardDAV / CalDAV: graph.go
 		}
 		out[p.ID] = p
 	}
@@ -211,7 +216,11 @@ func (p *Provider) Exchange(ctx context.Context, code, verifier, redirect string
 
 // Refresh gets a new access token with the refresh token and updates tok in place.
 func (p *Provider) Refresh(ctx context.Context, tok *Token) error {
-	t, err := p.tokenCall(ctx, url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok.Refresh}})
+	form := url.Values{"grant_type": {"refresh_token"}, "refresh_token": {tok.Refresh}}
+	if tok.Scope != "" {
+		form.Set("scope", tok.Scope)
+	}
+	t, err := p.tokenCall(ctx, form)
 	if err != nil {
 		return err
 	}

@@ -61,6 +61,9 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		n, err := TestDAV(ctx, c, secret)
+		if c.OAuth == "microsoft" {
+			n, err = TestGraph(ctx, c, secret)
+		}
 		if err != nil {
 			return "", err
 		}
@@ -149,6 +152,12 @@ func (m *Manager) AddOAuth(p *Provider, kinds []string, name string, tok Token) 
 			continue
 		}
 		cj, _ := json.Marshal(cfg)
+		t := tok
+		if p.ID == "microsoft" { // one resource per access token: this account gets its own, renewed right away with its own scopes
+			t.Scope, t.Expiry = strings.Join(p.scopes([]string{k}), " "), 0
+			t.Scope = strings.TrimSuffix(strings.TrimSuffix(t.Scope, " openid email"), "")
+		}
+		raw, _ = json.Marshal(t)
 		nm := fmt.Sprintf("%s %s (%s)", p.Label, label, tok.Email)
 		if name != "" {
 			nm = fmt.Sprintf("%s %s", name, label)
@@ -211,7 +220,13 @@ func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
 			return "", err
 		}
 		kind := map[string]string{"carddav": "card", "caldav": "cal"}[a.Kind]
-		ch, rm, err := SyncDAV(ctx, a.ID, kind, c, pass, m.Hub, m.St)
+		var ch, rm int
+		var err error
+		if c.OAuth == "microsoft" { // Outlook contacts / calendar are Graph, not DAV
+			ch, rm, err = SyncGraph(ctx, a.ID, kind, c, pass, m.Hub, m.St)
+		} else {
+			ch, rm, err = SyncDAV(ctx, a.ID, kind, c, pass, m.Hub, m.St)
+		}
 		return fmt.Sprintf("%d changed, %d removed", ch, rm), err
 	}
 	return "", errors.New("unknown kind")

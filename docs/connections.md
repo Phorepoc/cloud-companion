@@ -79,12 +79,11 @@ a test user, and expect to sign in again every 7 days (Google expires refresh to
 
 **Register the app at Microsoft.** Microsoft Entra admin center, *App registrations*, *New registration*; supported account types as you need; redirect URI of type *Web* with the
 address above; *Certificates & secrets*, new client secret (copy the *value*); *API permissions*, *Add a permission*, *APIs my organization uses*, *Office 365 Exchange Online*,
-*Delegated permissions*: `IMAP.AccessAsUser.All` and `SMTP.Send`; also `offline_access`. Notes: a Microsoft 365 mailbox must allow *Authenticated SMTP* for sending; a company
+*Delegated permissions*: `IMAP.AccessAsUser.All` and `SMTP.Send`; then *Microsoft Graph*, *Delegated permissions*: `Contacts.Read` and `Calendars.Read` (for contacts and calendar); also `offline_access`. Notes: a Microsoft 365 mailbox must allow *Authenticated SMTP* for sending; a company
 tenant may require an admin to consent.
 
 **What you get.** Pick Mail, Contacts and/or Calendar: each becomes a normal account on the page (the Gmail one is IMAP imap.gmail.com + SMTP smtp.gmail.com with
-XOAUTH2; Google contacts and calendar are read over CardDAV and CalDAV with a Bearer token). Outlook **contacts and calendar are not supported**: Microsoft offers them only
-through its Graph API (JSON), not CardDAV/CalDAV, so only Mail is offered for Microsoft.
+XOAUTH2; Google contacts and calendar are read over CardDAV and CalDAV with a Bearer token). Outlook **contacts and calendar** come through Microsoft Graph (JSON, not CardDAV/CalDAV; see below).
 **Tokens.** The access token (about an hour) is renewed automatically with the refresh token before it expires; both are sealed with the same key as passwords and never
 sent to the browser. If you revoke the app at Google/Microsoft, or the refresh token expires, the account shows the problem ("could not renew the sign-in ... sign in again") and you
 sign in again. Removing the account deletes the tokens (revoke the app at the provider too if you want it gone there).
@@ -92,3 +91,13 @@ sign in again. Removing the account deletes the tokens (revoke the app at the pr
 **Tested** with a fake OAuth provider and fake IMAP, SMTP and DAV servers (no real Google or Microsoft credentials): code exchange with PKCE, id_token address, refresh and re-sealing,
 a revoked grant, XOAUTH2 login on IMAP and SMTP, Bearer on DAV, the redirect and the one-use state, and the Connections page (`web/test/oauth.sh`, `internal/connectors/oauth_test.go`,
 `internal/webui/oauth_test.go`). **Not tested against the real providers**: the endpoints, scopes and host names are from their documentation.
+
+### Outlook contacts and calendar (Microsoft Graph)
+Pulled one way (Outlook is never written) into the hub's address book and calendar like any other source. Contacts: `GET /me/contacts/delta`; calendar:
+`GET /me/calendarView/delta` for a window of 30 days back and 180 days ahead (times asked in UTC). **Delta queries**: the first run reads everything and keeps the `deltaLink`; later runs
+fetch only what changed (changed items are written again, items marked `@removed` and cancelled events are deleted from the hub and unlinked); the link is stored only after all pages were
+applied, so a failed run repeats the same changes. If Graph forgets the delta state (HTTP 410) the next run starts over. Mapping: display name, given and family name, company, notes, mobile /
+home / business phones and email addresses become the vCard (`<account>-<id>.vcf`, recorded in the contact link table as `graph:<id>`); events become iCalendar events (summary, start and end,
+all-day as a DATE, location, description). Occurrences of recurring events arrive expanded inside the window as separate events (no recurrence rule is written). **Tokens**: Microsoft gives
+one access token per resource (Graph and Outlook mail are different resources), so every account renews its own token with its own scopes; the first renewal happens right after sign-in.
+Tested against a fake Graph server (`internal/connectors/graph_test.go`: paging, delta, removal, 410, bad token, mapping); not against the real service.

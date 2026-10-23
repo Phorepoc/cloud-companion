@@ -33,6 +33,7 @@ type fakeOAuth struct {
 	refuse    bool
 	noRefresh bool
 	verifier  string
+	lastScope string
 }
 
 func (f *fakeOAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +61,7 @@ func (f *fakeOAuth) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		fmt.Fprintf(w, `{"access_token":"tok1","refresh_token":%q,"expires_in":3600,"id_token":%q}`, ref, idt)
 	case "refresh_token":
+		f.lastScope = r.PostForm.Get("scope")
 		if f.refuse || r.PostForm.Get("refresh_token") != "ref1" {
 			w.WriteHeader(400)
 			fmt.Fprint(w, `{"error":"invalid_grant","error_description":"Token has been expired or revoked."}`)
@@ -238,8 +240,8 @@ func TestManagerOAuth(t *testing.T) {
 	if got := strings.Join(p.Kinds(), ","); got != "mail,contacts,calendar" {
 		t.Fatalf("Google kinds: %s", got)
 	}
-	if ms := func() *Provider { t.Setenv("PHECLOUD_OAUTH_MS_ID", "m"); return Providers()["microsoft"] }(); ms == nil || strings.Join(ms.Kinds(), ",") != "mail" {
-		t.Fatalf("Microsoft offers mail only: %+v", ms)
+	if ms := func() *Provider { t.Setenv("PHECLOUD_OAUTH_MS_ID", "m"); return Providers()["microsoft"] }(); ms == nil || strings.Join(ms.Kinds(), ",") != "mail,contacts,calendar" {
+		t.Fatalf("Microsoft offers mail, contacts (Graph) and calendar (Graph): %+v", ms)
 	}
 	st := store.OpenTest(t)
 	v, err := OpenVault(t.TempDir())
@@ -324,5 +326,36 @@ func TestDAVBearer(t *testing.T) {
 	}
 	if _, err := TestDAV(context.Background(), cfg, Cred("old")); err == nil {
 		t.Fatal("an old token was accepted")
+	}
+}
+
+// Microsoft: one access token serves ONE resource, so every account asks for its own with its own scopes (the first token is renewed at once).
+func TestMicrosoftPerAccountScopes(t *testing.T) {
+	fo := &fakeOAuth{}
+	srv := httptest.NewServer(fo)
+	defer srv.Close()
+	t.Setenv("PHECLOUD_OAUTH_MS_ID", "cid")
+	t.Setenv("PHECLOUD_OAUTH_MS_SECRET", "csecret")
+	t.Setenv("PHECLOUD_OAUTH_MS_TOKEN_URL", srv.URL)
+	p := Providers()["microsoft"]
+	st := store.OpenTest(t)
+	v, _ := OpenVault(t.TempDir())
+	m := NewManager(st, nil, v)
+	accts, err := m.AddOAuth(p, []string{"mail", "contacts", "calendar"}, "", Token{Access: "wrong-resource", Refresh: "ref1", Expiry: time.Now().Unix() + 3600, Email: "me@outlook.test"})
+	if err != nil || len(accts) != 3 {
+		t.Fatalf("%v %v", accts, err)
+	}
+	want := map[string]string{"imap": "IMAP.AccessAsUser.All", "carddav": "graph.microsoft.com/Contacts.Read", "caldav": "graph.microsoft.com/Calendars.Read"}
+	for _, a := range accts {
+		cred, err := m.secret(a)
+		if err != nil || !strings.HasPrefix(cred, tokenPrefix+"tok") {
+			t.Fatalf("%s: %q %v", a.Kind, cred, err)
+		}
+		if !strings.Contains(fo.lastScope, want[a.Kind]) || strings.Contains(fo.lastScope, "openid") {
+			t.Fatalf("%s renews with scopes %q, want %q", a.Kind, fo.lastScope, want[a.Kind])
+		}
+	}
+	if fo.refreshes != 3 {
+		t.Fatalf("every account is renewed once at the start: %d", fo.refreshes)
 	}
 }

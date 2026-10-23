@@ -202,3 +202,8 @@ func (s *Store) DevMergeGet(id string) (DevMerge, bool) {
 func (s *Store) SetAccountSecret(id string, sealed []byte) {
 	s.db.Exec(`UPDATE accounts SET secret=? WHERE id=?`, sealed, id)
 }
+
+// UnlinkEntry drops one link (an entry deleted at its source).
+func (s *Store) UnlinkEntry(source, entryID string) {
+	s.db.Exec(`DELETE FROM contact_links WHERE source=? AND entry_id=?`, source, entryID)
+}
