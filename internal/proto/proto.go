@@ -51,6 +51,8 @@ const (
 	TTab         = "tab"         // C->S  new | close | switch | list a view
 	THub         = "hub"         // C->S  contacts / calendar request (the personal hub)
 	THubRes      = "hubres"      // S->C  its answer
+	TSMS         = "sms"         // C->S  a phone's SMS service: upload messages, report on outbound ones (the device is the authenticated connection)
+	TSMSRes      = "smsres"      // S->C  its answer: how many were new, the phone's pending outbound queue
 	TTabs        = "tabs"        // S->C  the views of this connection
 	TZoom        = "zoom"        // C->S  re-render the view at a scale (percent; needs the "zoom" feature)
 )
@@ -561,4 +563,43 @@ type Remote struct {
 	Action string `cbor:"action"`
 	V      int    `cbor:"view,omitempty"`
 	URL    string `cbor:"url,omitempty"`
+}
+
+// SMSMsg is one message a phone uploads. ID is the PHONE's own message id (the Symbian message server's TMsvId): uploading it again changes nothing.
+type SMSMsg struct {
+	ID     string `cbor:"id"`
+	Number string `cbor:"number"`
+	Dir    string `cbor:"dir"` // in | out
+	Body   string `cbor:"body"`
+	TS     int64  `cbor:"ts"`
+	Status string `cbor:"status,omitempty"`
+}
+
+// SMSAck reports on a queued outbound message the phone was asked to send (OutID = the hub's id from SMSPending).
+type SMSAck struct {
+	OutID  int64  `cbor:"out_id"`
+	ID     string `cbor:"id,omitempty"`
+	Status string `cbor:"status"` // sent | delivered | failed
+	Error  string `cbor:"error,omitempty"`
+}
+
+type SMSSync struct {
+	T        string   `cbor:"t"`
+	ID       int      `cbor:"id"`
+	Messages []SMSMsg `cbor:"messages,omitempty"`
+	Acks     []SMSAck `cbor:"acks,omitempty"`
+}
+
+type SMSPending struct {
+	OutID  int64  `cbor:"out_id"`
+	Number string `cbor:"number"`
+	Body   string `cbor:"body"`
+}
+
+type SMSSyncRes struct {
+	T        string       `cbor:"t"`
+	ID       int          `cbor:"id"`
+	Accepted int          `cbor:"accepted"`
+	Pending  []SMSPending `cbor:"pending,omitempty"`
+	Err      string       `cbor:"err,omitempty"`
 }

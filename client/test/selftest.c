@@ -142,6 +142,67 @@ static void fuzz(void)
     printf("fuzz: %ld runs, %ld ended cleanly at the end of the data, %ld refused a frame, no crash\n", ok + bad + 2000, ok, bad);
 }
 
+static void sms_test(void)
+{
+    static phc sc;
+    static uint8_t srx[4096], tmp[1024];
+    phc_transport io;
+    phc_sms_msg m[2];
+    phc_sms_ack ack;
+    phc_sms_pending pend[4];
+    int np = -1, acc = -1, rc;
+    phc_w w;
+    phc_r r;
+    uint32_t cnt, i;
+    int saw_sms = 0, saw_msgs = 0;
+    io.ctx = NULL; io.send = t_send; io.recv = t_recv; io.wait = NULL;
+    memset(&sc, 0, sizeof sc);
+    phc_init(&sc, io, srx, sizeof srx);
+    in_len = in_pos = out_len = 0;
+    /* canned answer: smsres with 2 accepted and one pending message */
+    w = begin_frame(tmp, sizeof tmp);
+    phc_w_map(&w, 4);
+    phc_w_kv_text(&w, "t", "smsres");
+    phc_w_kv_int(&w, "id", 1);
+    phc_w_kv_int(&w, "accepted", 2);
+    phc_w_text(&w, "pending");
+    phc_w_array(&w, 1);
+    phc_w_map(&w, 3);
+    phc_w_kv_int(&w, "out_id", 42);
+    phc_w_kv_text(&w, "number", "+358407654321");
+    phc_w_kv_text(&w, "body", "reply from the web");
+    end_frame(&w);
+    m[0].id = "1048583"; m[0].number = "+358407654321"; m[0].dir = "in"; m[0].body = "Hello"; m[0].status = NULL; m[0].ts = 1760000000;
+    m[1].id = "1048590"; m[1].number = "0407654321"; m[1].dir = "out"; m[1].body = "Hi"; m[1].status = "sent"; m[1].ts = 1760000100;
+    ack.out_id = 41; ack.id = "1048600"; ack.status = "failed"; ack.error = "no network";
+    rc = phc_sms_sync(&sc, m, 2, &ack, 1, pend, 4, &np, &acc);
+    CHECK(rc == PHC_OK && acc == 2 && np == 1, "sms sync answer: rc %d acc %d np %d", rc, acc, np);
+    CHECK(np == 1 && pend[0].out_id == 42 && !strcmp(pend[0].number, "+358407654321") && !strcmp(pend[0].body, "reply from the web"), "pending message parsed");
+    /* the request frame: t=sms, 2 messages with their ids, 1 ack */
+    phc_r_init(&r, out_buf + 4, out_len - 4);
+    CHECK(phc_r_map(&r, &cnt) == 0, "request is a map");
+    for (i = 0; i < cnt; i++) {
+        const char *k, *v;
+        size_t kl, vl;
+        phc_r_text(&r, &k, &kl);
+        if (kl == 1 && k[0] == 't') { phc_r_text(&r, &v, &vl); saw_sms = vl == 3 && !memcmp(v, "sms", 3); }
+        else if (kl == 8 && !memcmp(k, "messages", 8)) { uint32_t n; phc_r_array(&r, &n); saw_msgs = (int)n; for (n = 0; n < (uint32_t)saw_msgs; n++) phc_r_skip(&r); }
+        else phc_r_skip(&r);
+    }
+    CHECK(saw_sms && saw_msgs == 2, "request frame: sms=%d messages=%d", saw_sms, saw_msgs);
+    /* a server error frame */
+    memset(&sc, 0, sizeof sc);
+    phc_init(&sc, io, srx, sizeof srx);
+    in_len = in_pos = out_len = 0;
+    w = begin_frame(tmp, sizeof tmp);
+    phc_w_map(&w, 2);
+    phc_w_kv_text(&w, "t", "smsres");
+    phc_w_kv_text(&w, "err", "at most 500 messages per sync");
+    end_frame(&w);
+    rc = phc_sms_sync(&sc, NULL, 0, NULL, 0, pend, 4, &np, &acc);
+    CHECK(rc == PHC_ERR_SERVER && strstr(sc.errmsg, "500"), "server error surfaces (%d %s)", rc, sc.errmsg);
+}
+
 int main(void)
 {
     uint8_t d[32], tmp[1024];
@@ -315,6 +376,7 @@ int main(void)
     phc_hit_test(&c, 400, 640, 100, 10, &hit);
     CHECK(hit.layer == 1 && hit.region == NULL && hit.tap_layer == 1 && hit.tap_y == 10, "fixed layer");
 
+    sms_test();
     fuzz();
     printf(failures ? "selftest FAIL (%d)\n" : "selftest PASS\n", failures);
     return failures ? 1 : 0;

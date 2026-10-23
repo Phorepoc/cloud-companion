@@ -209,6 +209,8 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		return s.remote(raw)
 	case proto.THub:
 		return s.hubRequest(raw)
+	case proto.TSMS:
+		return s.smsSync(raw)
 	case proto.TTab:
 		return s.tabAction(ctx, raw)
 	case proto.TOpen:

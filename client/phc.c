@@ -874,3 +874,98 @@ int phc_tap_screen(phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit *ou
     if (out) *out = h;
     return send_tap(c, h.tap_layer, h.tap_x, h.tap_y, scroll_y);
 }
+
+/* ---- SMS sync ---- */
+
+static void sms_copy_text(char *dst, size_t cap, const char *s, size_t n)
+{
+    if (n >= cap) n = cap - 1;
+    memcpy(dst, s, n);
+    dst[n] = 0;
+}
+
+int phc_sms_sync(phc *c, const phc_sms_msg *m, int nm, const phc_sms_ack *a, int na, phc_sms_pending *out, int maxp, int *npend, int *accepted)
+{
+    phc_w w;
+    size_t len;
+    int i, rc;
+    unsigned nkeys = 1 + (nm > 0) + (na > 0);
+    *npend = 0;
+    *accepted = 0;
+    begin(c, &w, "sms", nkeys);
+    phc_w_kv_int(&w, "id", 1);
+    if (nm > 0) {
+        phc_w_text(&w, "messages");
+        phc_w_array(&w, (unsigned)nm);
+        for (i = 0; i < nm; i++) {
+            phc_w_map(&w, m[i].status && m[i].status[0] ? 6 : 5);
+            phc_w_kv_text(&w, "id", m[i].id);
+            phc_w_kv_text(&w, "number", m[i].number);
+            phc_w_kv_text(&w, "dir", m[i].dir);
+            phc_w_kv_text(&w, "body", m[i].body);
+            phc_w_kv_int(&w, "ts", m[i].ts);
+            if (m[i].status && m[i].status[0]) phc_w_kv_text(&w, "status", m[i].status);
+        }
+    }
+    if (na > 0) {
+        phc_w_text(&w, "acks");
+        phc_w_array(&w, (unsigned)na);
+        for (i = 0; i < na; i++) {
+            phc_w_map(&w, 2 + (a[i].id && a[i].id[0]) + (a[i].error && a[i].error[0]));
+            phc_w_kv_int(&w, "out_id", a[i].out_id);
+            if (a[i].id && a[i].id[0]) phc_w_kv_text(&w, "id", a[i].id);
+            phc_w_kv_text(&w, "status", a[i].status);
+            if (a[i].error && a[i].error[0]) phc_w_kv_text(&w, "error", a[i].error);
+        }
+    }
+    rc = send_frame(c, &w);
+    if (rc) return rc;
+    for (;;) {   /* the answer (other frame types cannot arrive on this connection, but skip anything that is not "smsres") */
+        phc_r r;
+        uint32_t cnt, k;
+        int is_res = 0;
+        rc = read_frame_wait(c, &len);
+        if (rc) return rc;
+        phc_r_init(&r, c->rx, len);
+        if (phc_r_map(&r, &cnt)) return PHC_ERR_PROTO;
+        for (k = 0; k < cnt; k++) {
+            const char *key, *v;
+            size_t kl, vl;
+            if (phc_r_text(&r, &key, &kl)) return PHC_ERR_PROTO;
+            if (phc_text_eq(key, kl, "t")) {
+                if (phc_r_text(&r, &v, &vl)) return PHC_ERR_PROTO;
+                is_res = phc_text_eq(v, vl, "smsres");
+                if (phc_text_eq(v, vl, "error")) is_res = 2;
+            } else if (phc_text_eq(key, kl, "accepted")) {
+                int64_t x;
+                if (phc_r_int(&r, &x)) return PHC_ERR_PROTO;
+                *accepted = (int)x;
+            } else if (phc_text_eq(key, kl, "err") || phc_text_eq(key, kl, "msg")) {
+                if (phc_r_text(&r, &v, &vl)) return PHC_ERR_PROTO;
+                sms_copy_text(c->errmsg, sizeof c->errmsg, v, vl);
+                if (vl) is_res = 2;
+            } else if (phc_text_eq(key, kl, "pending")) {
+                uint32_t np, j;
+                if (phc_r_array(&r, &np)) return PHC_ERR_PROTO;
+                for (j = 0; j < np; j++) {
+                    uint32_t fc, f;
+                    phc_sms_pending p;
+                    memset(&p, 0, sizeof p);
+                    if (phc_r_map(&r, &fc)) return PHC_ERR_PROTO;
+                    for (f = 0; f < fc; f++) {
+                        const char *fk, *fv;
+                        size_t fkl, fvl;
+                        if (phc_r_text(&r, &fk, &fkl)) return PHC_ERR_PROTO;
+                        if (phc_text_eq(fk, fkl, "out_id")) { if (phc_r_int(&r, &p.out_id)) return PHC_ERR_PROTO; }
+                        else if (phc_text_eq(fk, fkl, "number")) { if (phc_r_text(&r, &fv, &fvl)) return PHC_ERR_PROTO; sms_copy_text(p.number, sizeof p.number, fv, fvl); }
+                        else if (phc_text_eq(fk, fkl, "body")) { if (phc_r_text(&r, &fv, &fvl)) return PHC_ERR_PROTO; sms_copy_text(p.body, sizeof p.body, fv, fvl); }
+                        else if (phc_r_skip(&r)) return PHC_ERR_PROTO;
+                    }
+                    if (*npend < maxp) out[(*npend)++] = p;
+                }
+            } else if (phc_r_skip(&r)) return PHC_ERR_PROTO;
+        }
+        if (is_res == 1) return PHC_OK;
+        if (is_res == 2) return PHC_ERR_SERVER;
+    }
+}

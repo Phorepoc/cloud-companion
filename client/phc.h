@@ -236,6 +236,14 @@ void phc_set_view(phc *c, int v);                 /* which view later requests a
 /* re-render the view at a scale (100/125/150/200/250/300 percent; needs the server feature "zoom") */
 int phc_zoom(phc *c, int pct);
 
+/* ---- SMS sync (a phone's message service; docs/sms.md): one request, one answer; blocks until the answer arrives ---- */
+typedef struct { const char *id, *number, *dir, *body, *status; int64_t ts; } phc_sms_msg;       /* id = the phone's own message id; dir "in" | "out" */
+typedef struct { int64_t out_id; const char *id, *status, *error; } phc_sms_ack;                  /* status "sent" | "delivered" | "failed" */
+typedef struct { int64_t out_id; char number[48]; char body[512]; } phc_sms_pending;               /* a message the web app wants this phone to send */
+/* Upload nm messages and report na acks (keep a call under about 3 KB of text), get up to maxp pending messages (*npend, *accepted = how many uploads were new).
+ * Returns PHC_OK, PHC_ERR_BUF when the request does not fit one frame, PHC_ERR_SERVER with c->errmsg on a server error. Call it on a blocking transport. */
+int phc_sms_sync(phc *c, const phc_sms_msg *m, int nm, const phc_sms_ack *a, int na, phc_sms_pending *out, int maxp, int *npend, int *accepted);
+
 /* the tile cache / hit-test, usable without the network */
 int phc_hit_test(const phc *c, int scroll_y, int view_h, int sx, int sy, phc_hit *out);
 int phc_layer_screen_y(const phc_layer *l, int scroll_y, int view_h);
