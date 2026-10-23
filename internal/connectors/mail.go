@@ -34,9 +34,10 @@ type ServerCfg struct {
 type MailCfg struct {
 	IMAP    ServerCfg `json:"imap"`
 	SMTP    ServerCfg `json:"smtp"`
-	Folders []string  `json:"folders"` // default INBOX
-	Months  int       `json:"months"`  // how far back to pull (default 3)
-	From    string    `json:"from"`    // the address mail from this account is sent as
+	Folders []string  `json:"folders"`         // default INBOX
+	Months  int       `json:"months"`          // how far back to pull (default 3)
+	From    string    `json:"from"`            // the address mail from this account is sent as
+	OAuth   string    `json:"oauth,omitempty"` // "google" | "microsoft": the credential is an OAuth token (XOAUTH2), not a password
 }
 
 // Sink is the local cache the mail goes into (davhub.Client).
@@ -69,6 +70,13 @@ func dialIMAP(c ServerCfg, pass string) (*imapclient.Client, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if tok, ok := isCred(pass); ok { // an OAuth access token: XOAUTH2
+		if err := cl.Authenticate(xoauth2{c.User, tok}); err != nil {
+			cl.Close()
+			return nil, fmt.Errorf("login refused: %w", err)
+		}
+		return cl, nil
 	}
 	if err := cl.Login(c.User, pass).Wait(); err != nil {
 		cl.Close()
@@ -216,7 +224,7 @@ func TestSMTP(c ServerCfg, pass string) error {
 	defer cl.Close()
 	if ok, _ := cl.Extension("AUTH"); ok {
 		user := c.User
-		if err := cl.Auth(smtp.PlainAuth("", user, pass, c.Host)); err != nil {
+		if err := cl.Auth(smtpAuth(user, pass, c.Host)); err != nil {
 			return fmt.Errorf("login refused: %w", err)
 		}
 	}
@@ -239,7 +247,7 @@ func Relay(c MailCfg, pass, from string, to []string, raw []byte) error {
 		if user == "" {
 			user = c.IMAP.User
 		}
-		if err := cl.Auth(smtp.PlainAuth("", user, pass, c.SMTP.Host)); err != nil {
+		if err := cl.Auth(smtpAuth(user, pass, c.SMTP.Host)); err != nil {
 			return fmt.Errorf("SMTP login refused: %w", err)
 		}
 	}
@@ -301,4 +309,12 @@ func BuildMessage(from string, to []string, subject, body string) []byte {
 		from, strings.Join(to, ", "), strings.NewReplacer("\r", " ", "\n", " ").Replace(subject), time.Now().Format(time.RFC1123Z))
 	b.WriteString(strings.ReplaceAll(strings.ReplaceAll(body, "\r\n", "\n"), "\n", "\r\n"))
 	return b.Bytes()
+}
+
+// smtpAuth is PLAIN with a password, XOAUTH2 with an OAuth access token.
+func smtpAuth(user, pass, host string) smtp.Auth {
+	if tok, ok := isCred(pass); ok {
+		return smtpXOAuth2{user, tok}
+	}
+	return smtp.PlainAuth("", user, pass, host)
 }

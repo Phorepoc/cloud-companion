@@ -21,8 +21,9 @@ import (
 
 // DAVCfg is the config of a "carddav" or "caldav" account: one collection URL (an address book or a calendar) and the user.
 type DAVCfg struct {
-	URL  string `json:"url"`
-	User string `json:"user"`
+	URL   string `json:"url"`
+	User  string `json:"user"`
+	OAuth string `json:"oauth,omitempty"` // "google": the credential is an OAuth access token (Bearer)
 }
 
 // HubDAV is the hub side (davhub.Client).
@@ -64,7 +65,9 @@ func davDo(ctx context.Context, c DAVCfg, pass, method, u, body string, hdr map[
 	if err != nil {
 		return 0, nil, err
 	}
-	if c.User != "" {
+	if tok, ok := isCred(pass); ok { // OAuth (Google): a Bearer token
+		req.Header.Set("Authorization", "Bearer "+tok)
+	} else if c.User != "" {
 		req.SetBasicAuth(c.User, pass)
 	}
 	for k, v := range hdr {
@@ -215,7 +218,9 @@ func davDoH(ctx context.Context, c DAVCfg, pass, method, u, body string, hdr map
 	if err != nil {
 		return 0, nil, nil, err
 	}
-	if c.User != "" {
+	if tok, ok := isCred(pass); ok { // OAuth (Google): a Bearer token
+		req.Header.Set("Authorization", "Bearer "+tok)
+	} else if c.User != "" {
 		req.SetBasicAuth(c.User, pass)
 	}
 	for k, v := range hdr {

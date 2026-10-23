@@ -68,6 +68,7 @@ func Handler(s *server.Server, m *connectors.Manager) http.Handler {
 	(&smsAPI{a: a, st: s.Store, hub: s.Hub}).routes(mux)
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
+		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)
 	}
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		in := infoOf(r)

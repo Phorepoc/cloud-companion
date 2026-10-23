@@ -197,3 +197,8 @@ func (s *Store) DevMergeGet(id string) (DevMerge, bool) {
 		Scan(&m.ID, &m.Account, &m.AHref, &m.ABody, &m.AETag, &m.BHref, &m.BBody, &m.BETag, &m.MergedBody, &m.MergedETag, &m.State, &m.Expires)
 	return m, err == nil
 }
+
+// SetAccountSecret replaces the sealed credential of an account (an OAuth access token that was refreshed).
+func (s *Store) SetAccountSecret(id string, sealed []byte) {
+	s.db.Exec(`UPDATE accounts SET secret=? WHERE id=?`, sealed, id)
+}

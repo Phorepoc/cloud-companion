@@ -83,9 +83,86 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	return m.St.AddAccount(store.Account{Kind: kind, Provider: provider, Name: strings.TrimSpace(name), Config: cfgJSON, Secret: m.V.Seal([]byte(secret))})
 }
 
+// secret is what the connector logs in with: the password, or for an OAuth account a fresh access token (refreshed and re-sealed when it is about to expire).
 func (m *Manager) secret(a store.Account) (string, error) {
 	b, err := m.V.Open(a.Secret)
-	return string(b), err
+	if err != nil {
+		return "", err
+	}
+	var oc struct {
+		OAuth string `json:"oauth"`
+	}
+	json.Unmarshal([]byte(a.Config), &oc)
+	if oc.OAuth == "" {
+		return string(b), nil
+	}
+	var tok Token
+	if err := json.Unmarshal(b, &tok); err != nil {
+		return "", errors.New("the stored OAuth token is damaged: sign in again")
+	}
+	if tok.Expiry < time.Now().Unix()+90 {
+		p := Providers()[oc.OAuth]
+		if p == nil {
+			return "", errors.New("the " + oc.OAuth + " sign-in is no longer configured on this server")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := p.Refresh(ctx, &tok); err != nil {
+			return "", fmt.Errorf("could not renew the sign-in (%v): sign in again", err)
+		}
+		nb, _ := json.Marshal(tok)
+		m.St.SetAccountSecret(a.ID, m.V.Seal(nb))
+	}
+	return Cred(tok.Access), nil
+}
+
+// AddOAuth creates the accounts a completed sign-in asked for (kinds: mail, contacts, calendar); each keeps its own sealed copy of the tokens.
+func (m *Manager) AddOAuth(p *Provider, kinds []string, name string, tok Token) ([]store.Account, error) {
+	if tok.Email == "" {
+		return nil, errors.New("the provider did not tell which address signed in")
+	}
+	raw, _ := json.Marshal(tok)
+	var out []store.Account
+	for _, k := range kinds {
+		var kind string
+		var cfg any
+		var label string
+		switch k {
+		case "mail":
+			imap, smtp := p.IMAP, p.SMTP
+			imap.User, smtp.User = tok.Email, tok.Email
+			kind, label = "imap", "mail"
+			cfg = MailCfg{IMAP: imap, SMTP: smtp, Folders: []string{"INBOX"}, Months: 3, From: tok.Email, OAuth: p.ID}
+		case "contacts":
+			if p.CardDAVURL == nil {
+				continue
+			}
+			kind, label = "carddav", "contacts"
+			cfg = DAVCfg{URL: p.CardDAVURL(tok.Email), User: tok.Email, OAuth: p.ID}
+		case "calendar":
+			if p.CalDAVURL == nil {
+				continue
+			}
+			kind, label = "caldav", "calendar"
+			cfg = DAVCfg{URL: p.CalDAVURL(tok.Email), User: tok.Email, OAuth: p.ID}
+		default:
+			continue
+		}
+		cj, _ := json.Marshal(cfg)
+		nm := fmt.Sprintf("%s %s (%s)", p.Label, label, tok.Email)
+		if name != "" {
+			nm = fmt.Sprintf("%s %s", name, label)
+		}
+		a, err := m.St.AddAccount(store.Account{Kind: kind, Provider: p.ID, Name: nm, Config: string(cj), Secret: m.V.Seal(raw)})
+		if err != nil {
+			return out, err
+		}
+		out = append(out, a)
+	}
+	if len(out) == 0 {
+		return nil, errors.New("nothing to connect")
+	}
+	return out, nil
 }
 
 // SyncNow syncs one account and records the outcome; it returns a one-line summary.
