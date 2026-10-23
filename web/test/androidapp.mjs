@@ -14,7 +14,7 @@ async function hook(name) {
   throw new Error('hook ' + name + ' timed out')
 }
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 1280, height: 800 } })
 const page = await ctx.newPage()
 const problems = []
 page.on('pageerror', (e) => problems.push('pageerror: ' + e.message))
