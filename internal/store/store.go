@@ -40,6 +40,9 @@ func Open(path string) (*Store, error) {
 	if err := st.initPasskeys(); err != nil {
 		return nil, err
 	}
+	if err := st.initConnectors(); err != nil {
+		return nil, err
+	}
 	return st, nil
 }
 
