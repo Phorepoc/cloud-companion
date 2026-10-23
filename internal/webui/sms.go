@@ -20,6 +20,8 @@ package webui
 //	POST /sms/send            {device, number, body}  -> queued for that device (the phone's next sync picks it up)
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -63,6 +65,31 @@ func (s *smsAPI) names() map[string]string {
 }
 
 func (s *smsAPI) routes(mux *http.ServeMux) {
+	// Pairing for a phone service that cannot speak the frame protocol (the Android app): the same one-time code `phecloud paircode`
+	// prints, the same device key. The code must come from a non-admin context (a first-ever device still becomes the admin, as
+	// everywhere else). Wrong codes are rate-limited like the passkey codes.
+	mux.HandleFunc("/sms/pair", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ Code, Name string }
+		if r.Method != http.MethodPost || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil {
+			bad(w, 400, "bad request")
+			return
+		}
+		if s.a.limited(r) {
+			bad(w, 429, "too many attempts, wait a minute")
+			return
+		}
+		name := strings.TrimSpace(in.Name)
+		if name == "" || len(name) > 40 {
+			name = "Android phone"
+		}
+		id, key, _, err := s.st.Pair(strings.ToUpper(strings.TrimSpace(in.Code)), name)
+		if err != nil {
+			s.a.failed(r)
+			bad(w, 403, "that pairing code did not work")
+			return
+		}
+		reply(w, 200, map[string]any{"dev": id, "key": hex.EncodeToString(key)})
+	})
 	mux.HandleFunc("/sms/sync", func(w http.ResponseWriter, r *http.Request) {
 		dev, _, ok := s.a.signedDevice(r)
 		if !ok || r.Method != http.MethodPost {

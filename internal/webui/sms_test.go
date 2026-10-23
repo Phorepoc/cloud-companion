@@ -199,3 +199,47 @@ func TestSMSSync(t *testing.T) {
 		t.Fatalf("a forged signature was accepted (%d)", resp.StatusCode)
 	}
 }
+
+func TestSMSPair(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	mux := http.NewServeMux()
+	(&smsAPI{a: newAuth(st), st: st}).routes(mux)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	post := func(code string) (int, map[string]any) {
+		b, _ := json.Marshal(map[string]string{"code": code, "name": "Pixel"})
+		resp, err := http.Post(srv.URL+"/sms/pair", "application/json", bytes.NewReader(b))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var out map[string]any
+		json.NewDecoder(resp.Body).Decode(&out)
+		return resp.StatusCode, out
+	}
+	if c, _ := post("NOPE-NOPE"); c != 403 {
+		t.Fatalf("a wrong code: %d", c)
+	}
+	code, err := st.NewPairCode(time.Minute, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, r := post(code)
+	if c != 200 || r["dev"] == nil || len(r["key"].(string)) != 64 {
+		t.Fatalf("pair: %d %v", c, r)
+	}
+	if c, _ := post(code); c != 403 {
+		t.Fatalf("a code works once: %d", c)
+	}
+	// the new device can sync with its key
+	key, _ := hex.DecodeString(r["key"].(string))
+	d := &fakeDevice{r["dev"].(string), key, srv}
+	// (no /sms/sync route differences: the routes are the same mux)
+	if c, out := d.call(t, "POST", "/sms/sync", map[string]any{}); c != 200 || out["accepted"].(float64) != 0 {
+		t.Fatalf("sync after pairing: %d %v", c, out)
+	}
+}
