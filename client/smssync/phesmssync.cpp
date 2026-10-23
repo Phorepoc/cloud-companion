@@ -66,6 +66,7 @@ extern "C" int ss_read_ini(char* aBuf, int aCap)
 _LIT(KStateDir, "C:\\data\\phesmssync\\");
 _LIT(KStateFile, "C:\\data\\phesmssync\\state.txt");
 const TInt KCycleSeconds = 10;
+const TInt KIdleSeconds = 300;     // no (or an unusable) C:\data\phecloud.ini: look again every 5 minutes, quietly
 const TInt KBatch = 4;            // messages per upload (one frame must stay small)
 const TInt KMaxAcks = 16;
 const TInt KMaxPending = 4;
@@ -135,7 +136,7 @@ private:
 		}
 	void Wait()
 		{
-		iTimer.After(iStatus, (iDirty ? 1 : KCycleSeconds) * 1000000);
+		iTimer.After(iStatus, (iDirty ? 1 : (iUnconfigured ? KIdleSeconds : KCycleSeconds)) * 1000000);
 		iDirty = EFalse;
 		SetActive();
 		}
@@ -255,9 +256,12 @@ private:
 		const int rc = ss_sync(batch, n, acks, na, pend, KMaxPending, &np, &accepted);
 		for (TInt i = 0; i < nkeep; i++)
 			delete keep[i];
+		iUnconfigured = (rc <= -11 && rc >= -17);       // not paired yet: the service sleeps until the pairing screen has written the ini
 		if (rc != 0)
 			{
-			LOG("[phesmssync] sync failed (%d): offline, will retry; %d messages stay queued", rc, n);
+			if (!iUnconfigured || !iLoggedIdle)
+				LOG("[phesmssync] sync failed (%d): %s; %d messages stay queued", rc, iUnconfigured ? "not paired (no usable C:\data\phecloud.ini), idle" : "offline, will retry", n);
+			iLoggedIdle = iUnconfigured;
 			return;                       // cursor unchanged: the same messages go out again next cycle
 			}
 		LOG("[phesmssync] synced: %d uploaded (%d new), %d acks, %d pending", n, accepted, na, np);
@@ -393,7 +397,7 @@ private:
 	CSmsClientMtm* iMtm = NULL;
 	TMsvId iService = KMsvNullIndexEntryId;
 	TMsvId iCursorIn = 0, iCursorOut = 0;
-	TBool iReady = EFalse, iDirty = EFalse;
+	TBool iReady = EFalse, iDirty = EFalse, iUnconfigured = EFalse, iLoggedIdle = EFalse;
 	RArray<TAck> iAcks;           // sent by us, result not known yet
 	RArray<phc_sms_ack> iDone;    // result known, not reported yet
 	char iIdText[KMaxAcks][16];

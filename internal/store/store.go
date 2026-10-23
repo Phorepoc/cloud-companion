@@ -39,9 +39,16 @@ func Open(dsn string) (*Store, error) {
 		sdb.SetConnMaxLifetime(30 * time.Minute)
 	}
 	st := &Store{db: &DB{sdb, d}, d: d}
-	if err := sdb.Ping(); err != nil {
+	var perr error
+	for i := 0; i < 30; i++ { // a database container that starts together with phecloud needs a moment
+		if perr = sdb.Ping(); perr == nil || d == SQLite {
+			break
+		}
+		time.Sleep(2 * time.Second)
+	}
+	if perr != nil {
 		sdb.Close()
-		return nil, fmt.Errorf("cannot reach the %s database: %w", d, err)
+		return nil, fmt.Errorf("cannot reach the %s database: %w", d, perr)
 	}
 	if err := st.migrate(); err != nil {
 		sdb.Close()

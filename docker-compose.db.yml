@@ -1,0 +1,39 @@
+# SPDX-License-Identifier: Apache-2.0
+# Optional external databases for phecloud (default: SQLite in the data volume). Pick one profile and point PHECLOUD_DB at it:
+#   PostgreSQL: docker compose -f docker-compose.yml -f docker-compose.db.yml --profile db-postgres up -d
+#               PHECLOUD_DB=postgres://phecloud:${PHECLOUD_DB_PASSWORD}@postgres:5432/phecloud?sslmode=disable
+#   MariaDB:    docker compose -f docker-compose.yml -f docker-compose.db.yml --profile db-mariadb up -d
+#               PHECLOUD_DB=mysql://phecloud:${PHECLOUD_DB_PASSWORD}@mariadb:3306/phecloud
+# (docs/database.md). Set PHECLOUD_DB_PASSWORD in the environment or an .env file; the databases are not published outside the compose network.
+services:
+  postgres:
+    profiles: ["db-postgres"]
+    image: postgres:16-alpine
+    container_name: phe-postgres
+    cpus: 1
+    mem_limit: 1g
+    environment:
+      POSTGRES_USER: phecloud
+      POSTGRES_PASSWORD: ${PHECLOUD_DB_PASSWORD:?set PHECLOUD_DB_PASSWORD}
+      POSTGRES_DB: phecloud
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+  mariadb:
+    profiles: ["db-mariadb"]
+    image: mariadb:11
+    container_name: phe-mariadb
+    cpus: 1
+    mem_limit: 1g
+    environment:
+      MARIADB_USER: phecloud
+      MARIADB_PASSWORD: ${PHECLOUD_DB_PASSWORD:?set PHECLOUD_DB_PASSWORD}
+      MARIADB_DATABASE: phecloud
+      MARIADB_RANDOM_ROOT_PASSWORD: "1"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_bin"]
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    restart: unless-stopped
+volumes:
+  postgres-data:
+  mariadb-data:

@@ -32,3 +32,8 @@ the phone's own copy of the message was uploaded used to leave the message queue
 ## Not done
 A phone with a different message store layout (the 701 / PinePhone ROMs: only the x86 image was run); delivery reports (`delivered`);
 a notification when the pairing in `phecloud.ini` is missing (the service logs it and keeps retrying); long messages (over 512 bytes) and MMS.
+
+## Shipping and switching it on
+`phesmssync.exe` is part of the Phorepoc x86 image (registry key `phesmssync`) but **nothing starts it by default**. It is harmless until the phone is paired:
+without a usable `C:\data\phecloud.ini` (written by the Phecloud engine's pairing screen) it logs once and looks again every five minutes. To run it, add `!phesmssync`
+to the startup list (bootui.txt) or start it from the shell; it then keeps running and mirrors SMS as described above.
