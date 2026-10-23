@@ -26,5 +26,6 @@ SOURCEPATH		..
 SOURCE			ss_net.c
 SOURCE			phesmssync.cpp
 
+STATICLIBRARY	libcrt0.lib
 LIBRARY			euser.lib efsrv.lib msgs.lib smcm.lib gsmu.lib estor.lib etext.lib charconv.lib
 LIBRARY			libc.lib libm.lib libpthread.lib libz.lib

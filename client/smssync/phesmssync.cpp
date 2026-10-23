@@ -42,6 +42,27 @@ extern "C" int mbedtls_hardware_poll(void*, unsigned char* aOutput, size_t aLen,
 	return 0;
 	}
 
+// the Phecloud settings file, written by the engine's pairing screen (read with the Symbian file server: Open C's fopen on C:\data did not find it from this exe)
+extern "C" int ss_read_ini(char* aBuf, int aCap)
+	{
+	RFs fs;
+	if (fs.Connect() != KErrNone)
+		return -1;
+	RFile f;
+	TInt r = f.Open(fs, _L("C:\\data\\phecloud.ini"), EFileRead | EFileShareAny);
+	if (r != KErrNone)
+		{
+		RDebug::Printf("[phesmssync] cannot open C:\\data\\phecloud.ini: %d", r);
+		fs.Close();
+		return -1;
+		}
+	TPtr8 p((TUint8*)aBuf, 0, aCap);
+	r = f.Read(p);
+	f.Close();
+	fs.Close();
+	return r == KErrNone ? p.Length() : -1;
+	}
+
 _LIT(KStateDir, "C:\\data\\phesmssync\\");
 _LIT(KStateFile, "C:\\data\\phesmssync\\state.txt");
 const TInt KCycleSeconds = 10;
@@ -202,9 +223,12 @@ private:
 					num.Set(iMtm->SmsHeader().Recipients()[0]->Address());
 				if (num.Length() == 0)
 					num.Set(e.iDetails);
+				if (num.Length() == 0)
+					num.Set(_L("unknown"));     // the server drops a message without a number
 				HBufC* body = HBufC::NewLC(iMtm->Body().DocumentLength() + 1);
 				TPtr bp(body->Des());
 				iMtm->Body().Extract(bp, 0);
+				LOG("[phesmssync] %s message %u from/to %d chars, text %d chars", dir == 0 ? "incoming" : "sent", (unsigned)id, num.Length(), iMtm->Body().DocumentLength());
 				keep[nkeep++] = Utf8L(num);
 				keep[nkeep++] = Utf8L(bp);
 				CleanupStack::PopAndDestroy(body);
@@ -277,6 +301,12 @@ private:
 
 	void SendOneL(const phc_sms_pending& aP)
 		{
+		for (TInt i = 0; i < iAcks.Count(); i++)      // already built and scheduled: the web app's queue still lists it until our report arrives
+			if (iAcks[i].iOutId == aP.out_id)
+				return;
+		for (TInt i = 0; i < iDone.Count(); i++)
+			if (iDone[i].out_id == aP.out_id)
+				return;
 		HBufC* num = HBufC::NewLC(strlen(aP.number) + 1);
 		HBufC* txt = HBufC::NewLC(strlen(aP.body) + 1);
 		TPtr np(num->Des()), tp(txt->Des());
@@ -382,14 +412,11 @@ static void RunL()
 	CleanupStack::PopAndDestroy(2);
 	}
 
-TInt E32Main()
+// An Open C executable: libcrt0 (P.I.P.S.) provides E32Main, initialises the C library (stdio, sockets), creates the cleanup stack and calls main.
+int main(int, char**)
 	{
-	__UHEAP_MARK;
-	CTrapCleanup* cleanup = CTrapCleanup::New();
 	TRAPD(r, RunL());
 	if (r != KErrNone)
 		LOG("[phesmssync] stopped: %d", r);
-	delete cleanup;
-	__UHEAP_MARKEND;
 	return r;
 	}

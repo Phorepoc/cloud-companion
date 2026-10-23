@@ -51,3 +51,24 @@ func TestSMSFrame(t *testing.T) {
 		t.Fatalf("an acked message leaves the queue: %+v", r)
 	}
 }
+
+// The phone uploads its own copy of a message (its Sent folder) BEFORE the ack for the queued message arrives: one message must remain.
+func TestSMSAckAfterOwnCopy(t *testing.T) {
+	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	id, _ := st.SMSQueue("p", "+358410121112", "ReplyFromTheWeb")
+	st.SMSUpload("p", []store.SMS{{DevMsgID: "269484039", Number: "+358410121112", Dir: "out", Body: "ReplyFromTheWeb", TS: 1, Status: "sent"}})
+	if err := st.SMSAck("p", id, "269484039", "sent", ""); err != nil {
+		t.Fatal(err)
+	}
+	if len(st.SMSPending("p")) != 0 {
+		t.Fatal("the message must leave the queue")
+	}
+	th := st.SMSThread(store.NumberKey("+358410121112"), 10)
+	if len(th) != 1 || th[0].Status != "sent" {
+		t.Fatalf("one message, sent: %+v", th)
+	}
+}

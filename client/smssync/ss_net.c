@@ -18,7 +18,6 @@
 #include "../phc_mbedtls.h"
 #include "ss_net.h"
 
-#define INI_PATH "C:\data\phecloud.ini"
 #define RXCAP (16 * 1024)   /* SMS frames are small: no tiles here */
 
 static phc *pc;
@@ -39,19 +38,27 @@ static int unhex(const char *s, uint8_t *out, size_t n)
 }
 static void cp(char *d, size_t cap, const char *s) { strncpy(d, s, cap - 1); d[cap - 1] = 0; }
 
+/* the ini text is read by the Symbian side (RFile: ss_read_ini in phesmssync.cpp); this only parses it */
+extern int ss_read_ini(char *buf, int cap);
+
 static int cfg_read(cfg_t *c)
 {
-    FILE *f = fopen(INI_PATH, "r");
-    char line[256];
+    static char text[1024];
+    char *line, *next;
+    int n = ss_read_ini(text, (int)sizeof text - 1);
     memset(c, 0, sizeof *c);
     cp(c->port, sizeof c->port, "7400");
     cp(c->name, sizeof c->name, "Phorepoc");
-    if (!f) return -1;
-    while (fgets(line, sizeof line, f)) {
-        char *eq = strchr(line, '='), *e;
+    if (n <= 0) return -11;
+    text[n] = 0;
+    for (line = text; line && *line; line = next) {
+        char *eq, *e;
+        next = strchr(line, '\n');
+        if (next) *next++ = 0;
+        eq = strchr(line, '=');
         if (!eq) continue;
         *eq++ = 0;
-        for (e = eq + strlen(eq); e > eq && (e[-1] == '\n' || e[-1] == '\r' || e[-1] == ' '); ) *--e = 0;
+        for (e = eq + strlen(eq); e > eq && (e[-1] == '\r' || e[-1] == ' '); ) *--e = 0;
         if (!strcmp(line, "host")) cp(c->host, sizeof c->host, eq);
         else if (!strcmp(line, "port")) cp(c->port, sizeof c->port, eq);
         else if (!strcmp(line, "pin")) cp(c->pin, sizeof c->pin, eq);
@@ -59,8 +66,12 @@ static int cfg_read(cfg_t *c)
         else if (!strcmp(line, "key")) cp(c->key, sizeof c->key, eq);
         else if (!strcmp(line, "name")) cp(c->name, sizeof c->name, eq);
     }
-    fclose(f);
-    return c->host[0] && c->dev[0] && c->key[0] && c->pin[0] ? 0 : -1;   /* paired and pinned only: this service has no pairing screen */
+    /* paired and pinned only: this service has no pairing screen */
+    if (!c->host[0]) return -12;
+    if (!c->dev[0]) return -13;
+    if (strlen(c->key) != 64) return -14;
+    if (strlen(c->pin) != 64) return -15;
+    return 0;
 }
 
 static void wait_fd(int fd, int want_write, int ms)
@@ -101,8 +112,12 @@ int ss_open(void)
     phc_creds cr;
     struct addrinfo hints, *res, *a;
     phc_raw_io raw;
+    int rc0;
     if (pc) return 0;
-    if (cfg_read(&cfg) != 0 || unhex(cfg.pin, pin, 32) != 0 || unhex(cfg.key, cr.key, 32) != 0) return -1;
+    rc0 = cfg_read(&cfg);
+    if (rc0 != 0) return rc0;
+    if (unhex(cfg.pin, pin, 32) != 0) return -16;
+    if (unhex(cfg.key, cr.key, 32) != 0) return -17;
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
     if (getaddrinfo(cfg.host, cfg.port, &hints, &res) != 0) return -2;

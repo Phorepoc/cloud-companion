@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# A phecloud for the SMS-service boot test: own project (phesms), the phone port published for the emulated phone (QEMU user network -> the box's LAN address).
+services:
+  phecloud:
+    container_name: phe-cloud-sms
+    ports: !override
+      - "7405:7400"
+      - "8085:8080"

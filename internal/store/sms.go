@@ -126,6 +126,16 @@ func (s *Store) SMSAck(device string, hubID int64, devMsgID, status, errText str
 	if status != "sent" && status != "delivered" && status != "failed" {
 		return errors.New("bad status")
 	}
+	if devMsgID != "" { // the phone may already have uploaded its own copy of this message (it shows up in its Sent folder): keep that row, drop the queued one
+		var existing int64
+		if s.db.QueryRow(`SELECT id FROM sms WHERE device=? AND dev_msg_id=? AND id!=?`, device, devMsgID, hubID).Scan(&existing) == nil {
+			if _, err := s.db.Exec(`DELETE FROM sms WHERE id=? AND device=? AND dir='out' AND status='queued'`, hubID, device); err != nil {
+				return err
+			}
+			s.db.Exec(`UPDATE sms SET status=?, error=? WHERE id=? AND status NOT IN ('delivered')`, status, errText, existing)
+			return nil
+		}
+	}
 	res, err := s.db.Exec(`UPDATE sms SET status=?, error=?, dev_msg_id=CASE WHEN ?!='' THEN ? ELSE dev_msg_id END WHERE id=? AND device=? AND dir='out' AND status NOT IN ('delivered') `,
 		status, errText, devMsgID, devMsgID, hubID, device)
 	if err != nil {
