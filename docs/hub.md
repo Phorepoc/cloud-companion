@@ -151,3 +151,25 @@ advertise it.
 - The Z-Push image is large. Z-Push is lightly maintained PHP; our own `pheeas` (Go, EAS 14.1 only) is the planned replacement.
 - App passwords are 43 characters; typing them on a phone keyboard once is the price. Stalwart sets the secret, we cannot choose it.
 - Not built: passkey/OIDC login, devices-list integration, RemoteWipe on revoke, backups, mail from outside (MX, DKIM, SPF).
+
+## Backup and restore
+
+`phecloud hub backup <dir>` writes one directory, `hub-backup-<UTC time>/`, holding:
+
+| file | what | how it stays consistent |
+|---|---|---|
+| `stalwart-data.tgz`, `stalwart-etc.tgz` | Stalwart's data and configuration volumes (mail, contacts, calendars, accounts, API keys) | Stalwart is stopped for the few seconds the two volumes are archived, then started again (also when the archive fails) |
+| `phecloud.db` | phecloud's devices, pairing codes, cookies, settings | SQLite `VACUUM INTO` (`phecloud snapshot <path>`) while the server keeps running |
+| `tls.crt`, `tls.key` | the server certificate (phones pin its fingerprint) | copied as is |
+| `manifest.json` | creation time, Stalwart image, volume names, SHA-256 of every file | |
+
+The directory is mode 0700 and holds the TLS key and the hub's secrets: keep it on a disk you trust, or encrypt it before it leaves the machine.
+
+It drives the `docker` command line (containers `phe-stalwart` and `phe-cloud`; override with `PHE_STALWART`, `PHE_CLOUD`). On a Docker host without Go, use the helper image:
+
+    docker build -t phe-backup:dev -f deploy/hub/Dockerfile.backup .
+    docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /srv/backups:/backup phe-backup:dev phecloud hub backup /backup
+
+`phecloud hub restore <backup dir> [--prefix p-] [--force]` verifies every checksum first (a damaged backup is refused before anything is touched), then creates the volumes `<p->stalwart-data`, `<p->stalwart-etc`, `<p->phecloud-data` and unpacks into them. It refuses volumes that already hold data unless `--force`. To restore for real, run it without a prefix after removing the old stack's volumes (or with `--force`), then start Stalwart on the two volumes and phecloud with its volume at `/data`. The API key and app passwords live in Stalwart's data, so they keep working.
+
+Test: `HUB_ENV_FILE=<hub .env.phecloud> sh deploy/hub/test/backup_test.sh` (hub and phe-cloud running). It counts contacts, events, messages, device rows and the TLS fingerprint, backs up, restores into fresh volumes and a fresh `phe-rt-stalwart` container (1 CPU, 1 GB), and compares; it also checks that restoring over existing data and restoring a corrupted backup are both refused. It removes everything it created. Result on the Deskmini: 4 contacts, 3 events, 6 messages, 82 device rows, same certificate; the hub was down for about 3 s during the backup (archive: 861 KB of data).

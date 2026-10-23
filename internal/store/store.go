@@ -169,3 +169,9 @@ func (s *Store) DeviceName(id string) string {
 	s.db.QueryRow(`SELECT COALESCE(name,'') FROM devices WHERE id=?`, id).Scan(&n)
 	return n
 }
+
+// Snapshot writes a consistent copy of the database to path (SQLite VACUUM INTO; safe while the server runs).
+func (s *Store) Snapshot(path string) error {
+	_, err := s.db.Exec(`VACUUM INTO ?`, path)
+	return err
+}

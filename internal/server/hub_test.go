@@ -260,3 +260,15 @@ func TestOtherDevicesTabs(t *testing.T) {
 		t.Fatalf("a device that left cannot be acted on")
 	}
 }
+
+func TestMailSendHTMLAlternative(t *testing.T) {
+	var puts []string
+	srv := fakeHub(&puts)
+	defer srv.Close()
+	hub := &davhub.Client{URL: srv.URL, Owner: "owner@hub.lan", Token: "tok", HTTP: srv.Client()}
+	r := ask(t, false, hub, proto.Hub{Op: "mail.send", Rcpt: "owner@hub.lan", Subject: "s", Body: "plain", HTMLBody: "<b>x</b>"})
+	last := puts[len(puts)-1]
+	if !r.OK || !strings.Contains(last, "multipart/alternative") || !strings.Contains(last, `"type":"text/html"`) || !strings.Contains(last, "u003cb") {
+		t.Fatalf("html alternative: %+v\n%s", r, last)
+	}
+}

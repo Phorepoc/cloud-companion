@@ -64,6 +64,15 @@ func main() {
 		if fp, err := tlsutil.FingerprintFile(env("PHECLOUD_TLSDIR", "/data")); err == nil {
 			fmt.Fprintln(os.Stderr, "server certificate fingerprint (sha256):", fp)
 		}
+	case "snapshot": // phecloud snapshot <path>: a consistent copy of the database (used by hub backup)
+		if len(os.Args) < 3 {
+			fmt.Fprintln(os.Stderr, "snapshot <path>")
+			os.Exit(2)
+		}
+		if err := st.Snapshot(os.Args[2]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case "devices":
 		ds, _ := st.List()
 		for _, d := range ds {

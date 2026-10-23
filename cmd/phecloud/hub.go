@@ -95,11 +95,19 @@ func hubMain(args []string) {
 		os.Exit(1)
 	}
 	usage := func() {
-		fmt.Fprintln(os.Stderr, "usage: phecloud hub status | apppw add <name> [days] | apppw list | apppw revoke <id>")
+		fmt.Fprintln(os.Stderr, "usage: phecloud hub status | apppw add <name> [days] | apppw list | apppw revoke <id> | backup <dir> | restore <backup> [--prefix p] [--force]")
 		os.Exit(2)
 	}
 	if len(args) == 0 {
 		usage()
+	}
+	switch args[0] { // these two talk to Docker, not to the hub's API
+	case "backup":
+		backupMain(args[1:])
+		return
+	case "restore":
+		restoreMain(args[1:])
+		return
 	}
 	h, err := hubFromEnv()
 	if err != nil {

@@ -440,26 +440,27 @@ type Event struct {
 // Hub: Op = contacts.list | contacts.save | contacts.delete | events.list | events.save | events.delete.
 // list: From/To (events, ISO dates). save: Contact/Event (Href empty = create). delete: Href + ETag.
 type Hub struct {
-	T       string   `cbor:"t"`
-	ID      int      `cbor:"id"`
-	Op      string   `cbor:"op"`
-	Contact *Contact `cbor:"contact,omitempty"`
-	Event   *Event   `cbor:"event,omitempty"`
-	Href    string   `cbor:"href,omitempty"`
-	ETag    string   `cbor:"etag,omitempty"`
-	From    string   `cbor:"from,omitempty"`
-	To      string   `cbor:"to,omitempty"`
-	Name    string   `cbor:"name,omitempty"`   // apppw.add: a label for the device
-	Days    int      `cbor:"days,omitempty"`   // apppw.add: optional expiry in days
-	ID2     string   `cbor:"id2,omitempty"`    // apppw.revoke / mail.read: the object id
-	Folder  string   `cbor:"folder,omitempty"` // mail.list: folder id
-	Pos     int      `cbor:"pos,omitempty"`    // mail.list: offset
-	Flag    string   `cbor:"flag,omitempty"`   // mail.mark: read | unread
-	Role    string   `cbor:"role,omitempty"`   // mail.move: inbox | archive | junk | trash
-	Rcpt    string   `cbor:"rcpt,omitempty"`   // mail.send: recipients, comma separated
-	Subject string   `cbor:"subject,omitempty"`
-	Body    string   `cbor:"body,omitempty"`
-	ReplyTo string   `cbor:"replyto,omitempty"` // mail.send: the Message-ID being answered
+	T        string   `cbor:"t"`
+	ID       int      `cbor:"id"`
+	Op       string   `cbor:"op"`
+	Contact  *Contact `cbor:"contact,omitempty"`
+	Event    *Event   `cbor:"event,omitempty"`
+	Href     string   `cbor:"href,omitempty"`
+	ETag     string   `cbor:"etag,omitempty"`
+	From     string   `cbor:"from,omitempty"`
+	To       string   `cbor:"to,omitempty"`
+	Name     string   `cbor:"name,omitempty"`   // apppw.add: a label for the device
+	Days     int      `cbor:"days,omitempty"`   // apppw.add: optional expiry in days
+	ID2      string   `cbor:"id2,omitempty"`    // apppw.revoke / mail.read: the object id
+	Folder   string   `cbor:"folder,omitempty"` // mail.list: folder id
+	Pos      int      `cbor:"pos,omitempty"`    // mail.list: offset
+	Flag     string   `cbor:"flag,omitempty"`   // mail.mark: read | unread
+	Role     string   `cbor:"role,omitempty"`   // mail.move: inbox | archive | junk | trash
+	Rcpt     string   `cbor:"rcpt,omitempty"`   // mail.send: recipients, comma separated
+	Subject  string   `cbor:"subject,omitempty"`
+	Body     string   `cbor:"body,omitempty"`
+	HTMLBody string   `cbor:"htmlbody,omitempty"` // mail.send: an HTML alternative (used by tests to deliver an HTML message locally)
+	ReplyTo  string   `cbor:"replyto,omitempty"`  // mail.send: the Message-ID being answered
 }
 
 type HubRes struct {

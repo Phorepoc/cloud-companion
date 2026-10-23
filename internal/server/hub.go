@@ -83,7 +83,7 @@ func (s *session) hubRequest(raw []byte) error {
 	case "mail.delete":
 		err = hub.MailDelete(h.ID2)
 	case "mail.send":
-		err = hub.MailSend(h.Rcpt, h.Subject, h.Body, h.ReplyTo)
+		err = hub.MailSend(h.Rcpt, h.Subject, h.Body, h.HTMLBody, h.ReplyTo)
 	default:
 		err = errors.New("unknown hub operation")
 	}

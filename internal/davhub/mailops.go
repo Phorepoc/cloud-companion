@@ -155,7 +155,7 @@ func (c *Client) checkRecipients(rcpt string) ([]string, error) {
 }
 
 // MailSend writes a plain-text message and submits it (EmailSubmission). The copy is filed in Sent.
-func (c *Client) MailSend(rcpt, subject, body, inReplyTo string) error {
+func (c *Client) MailSend(rcpt, subject, body, htmlBody, inReplyTo string) error {
 	to, err := c.checkRecipients(rcpt)
 	if err != nil {
 		return err
@@ -194,6 +194,10 @@ func (c *Client) MailSend(rcpt, subject, body, inReplyTo string) error {
 		"mailboxIds": map[string]bool{drafts: true}, "keywords": map[string]bool{"$draft": true},
 		"from": []map[string]string{{"name": me.Name, "email": me.Email}}, "to": tos, "subject": subject,
 		"bodyStructure": map[string]any{"partId": "1", "type": "text/plain"}, "bodyValues": map[string]any{"1": map[string]any{"value": body}},
+	}
+	if htmlBody != "" {
+		draft["bodyStructure"] = map[string]any{"type": "multipart/alternative", "subParts": []map[string]any{{"partId": "1", "type": "text/plain"}, {"partId": "2", "type": "text/html"}}}
+		draft["bodyValues"] = map[string]any{"1": map[string]any{"value": body}, "2": map[string]any{"value": htmlBody}}
 	}
 	if inReplyTo != "" {
 		draft["inReplyTo"] = []string{strings.Trim(inReplyTo, "<>")}

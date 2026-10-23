@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# phe-backup: the phecloud binary next to the docker CLI, to run `phecloud hub backup|restore` on a Docker host that has no Go:
+#   docker build -t phe-backup:dev -f deploy/hub/Dockerfile.backup .      (needs the phe-cloud:dev image)
+#   docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /srv/backups:/backup phe-backup:dev phecloud hub backup /backup
+FROM docker:27-cli
+COPY --from=phe-cloud:dev /usr/local/bin/phecloud /usr/local/bin/phecloud

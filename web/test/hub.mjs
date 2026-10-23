@@ -344,6 +344,48 @@ try {
       }
       await page.keyboard.press('Escape')
     }
+
+    // ---- an HTML message, delivered locally: the Formatted view must load nothing ----
+    const HSUBJ = `HTML test ${stamp}`
+    const canary = []
+    page.on('request', (r) => { if (r.url().includes('canary.test')) canary.push(r.url()) })
+    const evilHtml = '<p>Hello <b>formatted</b> world</p><img src="http://canary.test/pixel.gif?img"><script>document.title="pwned";fetch("http://canary.test/script")</script>' +
+      '<link rel="stylesheet" href="http://canary.test/x.css"><div style="background:url(http://canary.test/bg)">styled</div>' +
+      '<p><a href="https://example.org/x">a link</a> <a href="javascript:fetch(\'http://canary.test/js\')">bad link</a></p><img src="x" onerror="fetch(\'http://canary.test/onerror\')">' +
+      '<iframe src="http://canary.test/frame"></iframe><form action="http://canary.test/form"><input name="q"></form>'
+    await page.evaluate(([to, s, h]) => window.__phe.hubCall({ op: 'mail.send', rcpt: to, subject: s, body: 'Plain version of the message.', htmlbody: h }), [OWNER, HSUBJ, evilHtml])
+    await page.click('[data-test=mail-refresh]')
+    await waitRow(HSUBJ)
+    await page.locator('[data-test^=mail-row-]', { hasText: HSUBJ }).first().click()
+    await page.waitForSelector('[data-test=mail-view-body]')
+    assert.match(await page.textContent('[data-test=mail-view-body]'), /Plain version of the message/)
+    await page.locator('[data-test=mail-format]').getByText('Formatted view').click()
+    const frame = page.frameLocator('[data-test=mail-frame]')
+    await frame.locator('b').waitFor()
+    assert.equal(await frame.locator('b').textContent(), 'formatted')
+    for (const bad of ['img', 'script', 'link', 'iframe', 'form', 'input', 'style']) {
+      assert.equal(await frame.locator(bad).count(), bad === 'style' ? 1 : 0, `<${bad}> in the formatted view`) // the one <style> is our own, in the page template
+    }
+    const a = frame.locator('a')
+    assert.equal(await a.count(), 1, 'the javascript: link is gone, the https link stays')
+    assert.equal(await a.getAttribute('href'), 'https://example.org/x')
+    assert.equal(await a.getAttribute('target'), '_blank')
+    assert.match(await a.getAttribute('rel'), /noreferrer/)
+    const srcdoc = await page.locator('[data-test=mail-frame]').getAttribute('srcdoc')
+    assert.doesNotMatch(srcdoc, /canary|<img|<script|onerror|javascript:/i, 'nothing remote or active is left in the document')
+    assert.match(srcdoc, /default-src 'none'/)
+    const inner = page.frames().find((f) => f.url() === 'about:srcdoc')
+    assert.notEqual(await inner.evaluate(() => document.title), 'pwned', 'the script did not run')
+    await page.waitForTimeout(2000)
+    assert.deepEqual(canary, [], 'no request to the canary host: no image, style, script, frame or form was loaded')
+    step('formatted view of an HTML message: bold text shown; remote image, script, stylesheet, frame, form and onerror load nothing (0 canary requests)')
+    for (const scheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: scheme })
+      await page.waitForTimeout(250)
+      await page.screenshot({ path: `${OUT}/desktop-${scheme}-mail-formatted.png` })
+    }
+    await page.emulateMedia({ colorScheme: 'light' })
+    await page.keyboard.press('Escape')
   } finally {
     await page.keyboard.press('Escape').catch(() => {})
     await purge().catch((e) => console.error('cleanup:', e.message))
