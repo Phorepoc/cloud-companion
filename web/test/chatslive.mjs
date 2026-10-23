@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Looks at the Chats page of a server that a REAL (emulated) phone syncs with, and optionally sends a message through that phone.
-//   BASE=http://192.168.2.247:8085 CODE=<admin code> OUT=/out SEND="reply text" node chatslive.mjs
+//   BASE=http://localhost:8085 CODE=<admin code> OUT=/out SEND="reply text" node chatslive.mjs
 import { chromium } from 'playwright'
 
 const BASE = process.env.BASE

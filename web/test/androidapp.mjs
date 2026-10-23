@@ -58,10 +58,16 @@ async function layout(label) {
   return g
 }
 
-// desktop, portrait stream
-let g = await layout('desktop portrait')
+// the display follows the window: a desktop window gets a large landscape display, a phone-sized window a portrait one
+const shapeIs = async (wide, label) => {
+  const t0 = Date.now()
+  for (;;) { const c = await canvas(); if ((c.w > c.h) === wide && c.range > 30) return; if (Date.now() - t0 > 40000) throw new Error(label + ': the stream did not become ' + (wide ? 'landscape' : 'portrait')); await page.waitForTimeout(500) }
+}
+await shapeIs(true, 'desktop')
+let g = await layout('desktop')
+assert(g.fw > g.fh, 'a desktop window gets a landscape frame')
 assert(g.fb <= g.vh + 40, 'the whole screen should be (nearly) visible without scrolling on desktop')
-await shots('1-desktop-portrait')
+await shots('1-desktop')
 
 // the app's own controls work: Home, then a swipe on the canvas
 await page.click('[data-test=android-home]'); await page.waitForTimeout(1200)
@@ -74,21 +80,18 @@ assert.notEqual((await canvas()).hash, h0, 'a swipe on the page canvas did not c
 console.log('input through the page: ok')
 await page.click('[data-test=android-home]'); await page.waitForTimeout(1000)
 
-// phone width
-await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(800)
-await layout('phone portrait')
-await shots('2-phone-portrait')
+// phone width: the display becomes phone-shaped (portrait)
+await page.setViewportSize({ width: 390, height: 844 })
+await shapeIs(false, 'phone')
+g = await layout('phone')
+assert(g.fh > g.fw, 'a phone window gets a portrait frame')
+await shots('2-phone')
 
-// rotation follows the device
-await hook('settings'); await page.waitForTimeout(2000) // the home screen itself does not rotate; an app does
-await hook('rot1'); await page.waitForTimeout(3500)
-await layout('phone landscape'); await shots('3-phone-landscape')
-await page.setViewportSize({ width: 1280, height: 800 }); await page.waitForTimeout(800)
-g = await layout('desktop landscape'); assert(g.fw > g.fh, 'landscape frame should be wider than tall')
-await shots('4-desktop-landscape')
-await hook('rot0'); await page.waitForTimeout(3500)
-await hook('home'); await page.waitForTimeout(1000)
-g = await layout('desktop portrait again'); assert(g.fh > g.fw)
+// and back: window resize is followed (debounced) in both directions
+await page.setViewportSize({ width: 1280, height: 800 })
+await shapeIs(true, 'desktop again')
+g = await layout('desktop again'); assert(g.fw > g.fh)
+await shots('3-desktop-again')
 
 // the controls: sound toggles, install dialog, APK upload through the app, reconnect
 await page.click('[data-test=android-sound]')

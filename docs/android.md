@@ -29,7 +29,7 @@ Without a reverse proxy, publish the bridge's port 8090 yourself and open `/?t=<
 - Only an admin device can get a ticket; the bridge refuses a stream without a valid ticket (HMAC with the shared secret). One viewer at a time: a new one replaces the old.
 - A phone on the server holds whatever you sign in to on it. Treat the container's `redroid-data` volume like the data of a phone.
 
-## Behaviour and numbers (Deskmini, Redroid 13, 720x1280, software rendering, no GPU)
+## Behaviour and numbers (a small x86 test server, Redroid 13, 720x1280, software rendering, no GPU)
 Measured with a headless Chromium (it has no H.264 decoder, so the test used VP8 through `&codec=vp8`; every real browser decodes H.264, the default, which the same test checks on the wire:
 codec string `avc1.42c029`, key frames start with the parameter sets).
 - Video 404x720 at up to 30 fps (the encoder sends nothing for a still screen: 0 to a few fps idle), 100 to 500 kbit/s while scrolling.
@@ -49,7 +49,7 @@ survive; running apps and their in-memory state do not (a stopped phone), so not
 (resume is instant, but its memory stays in use).
 The bridge never gets the Docker socket. `docker-compose.android.yml` runs `tecnativa/docker-socket-proxy` (Apache-2.0) that allows container inspect / start / stop / pause and nothing else (no create, exec, images or volumes),
 and the bridge talks to that (`PHE_ANDROID_DOCKER`, `PHE_ANDROID_CONTAINER`). Without `PHE_ANDROID_DOCKER` there is no parking and the container runs all the time.
-Measured on the Deskmini (Redroid 13, 2 cores, one run): the container held about 730 MiB while a viewer was connected and 0 once stopped (the host's overall "used" figure moved by more than that because other things were running; the
+Measured on a small x86 test server (Redroid 13, 2 cores, one run): the container held about 730 MiB while a viewer was connected and 0 once stopped (the host's overall "used" figure moved by more than that because other things were running; the
 container figure is the one to trust); it was parked 46 s after the viewer left with `PHE_ANDROID_PARK_AFTER=30s` (the check runs every 10 s and the stop takes a few seconds); the cold start, from opening the page to the first picture, took 13.8 s,
 and the page said "Starting Android…" for it. Test: `web/test/androidpark.mjs` (run by `web/test/android.sh`).
 
@@ -73,7 +73,12 @@ Android 13 can run apps in real freeform (movable, overlapping) windows, but Red
 `<feature name="android.software.freeform_window_management" />` into `/system/etc/permissions/android.software.freeform_window_management.xml` (build with `--build-arg FREEFORM=1`) and
 `settings put global enable_freeform_support 1; settings put global force_resizable_activities 1`, then a restart, made `am start --windowingMode 5 -n <activity>` open Settings and Contacts as overlapping freeform windows
 with maximize and close buttons on a 1600x1008 display (`mode=freeform` in `dumpsys activity activities`). What is missing for a real desktop is a shell around it: no taskbar or start menu, and apps do not open freeform by themselves.
-The usual answer is a desktop launcher such as Taskbar (F-Droid `com.farmerbb.taskbar`, which launches apps in freeform windows); it was not tried yet. Redroid 14 and 15 images exist (`redroid/redroid:14.0.0-latest`, `15.0.0-latest`); Android 15 has a
+The usual answer is a desktop launcher such as Taskbar (F-Droid `com.farmerbb.taskbar`, which launches apps in freeform windows). **Tried** (image built with `FREEFORM=1`, Taskbar 6.2.2-r2 installed from F-Droid, 1600x1008 display):
+it installs and runs, and with its switch turned on it draws a real taskbar (start button, app buttons, clock and date) above the system bar, over any app, and has "Freeform mode" and "Desktop mode" settings
+(`web/test/screenshots/android/taskbar-on.png`). Not finished: (1) it hides itself on the home screen when the stock launcher is the home app, and making Taskbar the home app needs its `HomeActivity`, which is disabled
+until Taskbar's own settings enable it (the adb shell may not change that component, so it takes a tap in Taskbar's settings once); (2) its own settings (freeform mode, start with the system) live in its app preferences and were
+not scripted; (3) the bridge does not switch anything by viewer kind yet. Taskbar can be started and stopped by broadcast (`am broadcast -a com.farmerbb.taskbar.START|QUIT -p com.farmerbb.taskbar`), which is how a viewer-kind switch would
+do it once its settings are provisioned. Redroid 14 and 15 images exist (`redroid/redroid:14.0.0-latest`, `15.0.0-latest`); Android 15 has a
 desktop-windowing mode in SystemUI behind flags, but 13 already provides the windowing, so they were not pulled.
 
 ## What the page can do

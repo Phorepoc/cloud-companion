@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # CalDAV / CardDAV with a standard client (vdirsyncer, BSD-3-Clause) against the hub through Caddy (https, internal CA: Caddy root CA pinned),
 # discovery through /.well-known, then app-password revocation: the revoked password must stop working.
-#   DAV_URL=https://192.168.2.247:8444/ sh deploy/hub/test/dav_test.sh     (run on the host that runs the hub)
+#   DAV_URL=https://hub.example:8444/ sh deploy/hub/test/dav_test.sh     (run on the host that runs the hub)
 set -eu
 cd "$(dirname "$0")"
 NET="${HUB_NETWORK:-phehub_default}"
-URL="${DAV_URL:?set DAV_URL, e.g. https://192.168.2.247:8444/}"
+URL="${DAV_URL:?set DAV_URL, e.g. https://hub.example:8444/}"
 OWNER=$(grep '^PHECLOUD_HUB_OWNER=' ../.env.phecloud | cut -d= -f2)
 PW="${DAV_PASSWORD:?set DAV_PASSWORD to an app password}"
 CA_PEM=$(docker exec "${CADDY:-phe-caddy-hubtest}" cat /data/caddy/pki/authorities/local/root.crt)

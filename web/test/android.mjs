@@ -16,7 +16,7 @@ const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gestur
 const page = await browser.newPage({ viewport: { width: 700, height: 900 }, ignoreHTTPSErrors: true })
 const msgs = []
 page.on('console', (m) => msgs.push(m.text()))
-const sup = await page.goto(BASE + '/?t=' + TICKET + (process.env.QUERY || '')).then(() => page.evaluate(async () => {
+const sup = await page.goto(BASE + '/?t=' + TICKET + (process.env.QUERY || '') + '&kind=phone').then(() => page.evaluate(async () => {
   if (!('VideoDecoder' in window)) return 'no VideoDecoder'
   const r = {}
   for (const c of ['avc1.42e01f', 'avc1.640028', 'vp8', 'vp09.00.10.08']) r[c] = (await VideoDecoder.isConfigSupported({ codec: c })).supported
@@ -39,7 +39,7 @@ const probe = await page.evaluate((t) => new Promise((resolve) => {
 console.log('h264 probe:', JSON.stringify(probe))
 if (!probe.cfg || !/^avc1\.[0-9a-f]{6}$/.test(probe.cfg.codec) || !probe.first || !probe.first.head.startsWith('00 00 00 01 67')) throw new Error('h264 stream not as expected')
 await page.waitForTimeout(1500)
-await page.goto(BASE + '/?t=' + TICKET + (process.env.QUERY || ''))
+await page.goto(BASE + '/?t=' + TICKET + (process.env.QUERY || '') + '&kind=phone')
 
 const canvasInfo = () => page.evaluate(() => {
   const c = document.getElementById('screen'), x = c.getContext('2d'), d = x.getImageData(0, 0, c.width, c.height).data
@@ -103,7 +103,7 @@ const changed = async (fn, ms = 1500) => { const h0 = (await canvasInfo()).hash;
 const results = {}
 
 // scroll wheel: Settings is a long list
-await hook('settings'); await page.waitForTimeout(2500)
+await hook('applist'); await page.waitForTimeout(2500) // a long list (all apps), so there is something to scroll
 const wb = await page.locator('#screen').boundingBox()
 await page.mouse.move(wb.x + wb.width / 2, wb.y + wb.height / 2)
 results.wheel = await changed(async () => { for (let i = 0; i < 4; i++) { await page.mouse.wheel(0, 300); await page.waitForTimeout(150) } })
@@ -116,7 +116,7 @@ console.log('after rotating the device: canvas', land.w + 'x' + land.h)
 results.rotate = land.w > land.h
 await page.screenshot({ path: OUT + '/android-4-landscape.png' })
 // a tap in landscape still lands where it should: open the first Settings entry area and check the screen changes
-results.landscapeTouch = await changed(async () => { const [x, y] = px(0.5, 0.35); await page.mouse.click(x, y) })
+results.landscapeTouch = await changed(async () => { const [x, y] = px(0.5, 0.2); await page.mouse.click(x, y) }) // the first rows of the app list
 await hook('rot0'); await page.waitForTimeout(3500)
 const port = await canvasInfo()
 results.rotateBack = port.h > port.w
@@ -166,5 +166,7 @@ const af = await page.evaluate(() => window.__audioFrames || 0)
 console.log('audio message from the bridge:', await page.evaluate(() => window.__audioMsg), '| audio frames decoded in the browser:', af, '| page says:', await page.textContent('#msg'))
 results.audio = af > 0
 console.log('RESULTS', JSON.stringify(results))
+const failed = Object.entries(results).filter(([, v]) => !v).map(([k]) => k)
+if (failed.length) throw new Error('failed: ' + failed.join(', '))
 await browser.close()
 console.log('OK')

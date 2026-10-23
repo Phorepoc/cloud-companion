@@ -87,7 +87,7 @@ async function connect() {
     configured.value = j.configured
     if (j.configured) {
       const q = route.query
-      stream.value.connect(j.ticket, { codec: q.codec, size: q.size, fps: q.fps, kbps: q.kbps, audio: q.audio !== '0' })
+      stream.value.connect(j.ticket, { codec: q.codec, size: q.size, fps: q.fps, kbps: q.kbps, kind: q.kind, audio: q.audio !== '0' })
     }
   } catch (e) { problem.value = e.message } finally { busy.value = false; loaded.value = true }
 }

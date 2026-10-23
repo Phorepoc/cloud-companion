@@ -123,7 +123,7 @@ the Kopano backend reports 14.1). The phone's EAS client knows 2.5, 12.0, 12.1 a
 contacts, calendar and tasks all work in 12.1. A 14.1 request is also accepted (the test client ran it), but the server does not
 advertise it.
 
-## Tests (deskmini, 2026-10-22)
+## Tests (a small x86 test server, 2026-10-22)
 
 `deploy/hub/test/` (stdlib Python, run in a container on the compose network):
 - `eas.py`: a small EAS client with a WBXML encoder/decoder for the code pages it needs. `test_hub.py` seeds Stalwart (CardDAV PUT
@@ -175,7 +175,7 @@ It drives the `docker` command line (containers `phe-stalwart` and `phe-cloud`; 
 
 `phecloud hub restore <backup dir> [--prefix p-] [--force]` verifies every checksum first (a damaged backup is refused before anything is touched), then creates the volumes `<p->stalwart-data`, `<p->stalwart-etc`, `<p->phecloud-data` and unpacks into them. It refuses volumes that already hold data unless `--force`. To restore for real, run it without a prefix after removing the old stack's volumes (or with `--force`), then start Stalwart on the two volumes and phecloud with its volume at `/data`. The API key and app passwords live in Stalwart's data, so they keep working.
 
-Test: `HUB_ENV_FILE=<hub .env.phecloud> sh deploy/hub/test/backup_test.sh` (hub and phe-cloud running). It counts contacts, events, messages, device rows and the TLS fingerprint, backs up, restores into fresh volumes and a fresh `phe-rt-stalwart` container (1 CPU, 1 GB), and compares; it also checks that restoring over existing data and restoring a corrupted backup are both refused. It removes everything it created. Result on the Deskmini: 4 contacts, 3 events, 6 messages, 82 device rows, same certificate; the hub was down for about 3 s during the backup (archive: 861 KB of data).
+Test: `HUB_ENV_FILE=<hub .env.phecloud> sh deploy/hub/test/backup_test.sh` (hub and phe-cloud running). It counts contacts, events, messages, device rows and the TLS fingerprint, backs up, restores into fresh volumes and a fresh `phe-rt-stalwart` container (1 CPU, 1 GB), and compares; it also checks that restoring over existing data and restoring a corrupted backup are both refused. It removes everything it created. Result on the test server: 4 contacts, 3 events, 6 messages, 82 device rows, same certificate; the hub was down for about 3 s during the backup (archive: 861 KB of data).
 
 ### Routing note: `/passkey` vs `/auth`
 Caddyfile.hub sends `/auth`, `/oauth` and the OAuth discovery documents to Stalwart. The web app's passkey endpoints therefore live

@@ -30,7 +30,7 @@ the phone's own copy of the message was uploaded used to leave the message queue
 `TestSMSAckAfterOwnCopy`); the sync request is built by `phc_sms_sync` (selftest in `client/test/selftest.c`).
 
 ## Not done
-A phone with a different message store layout (the 701 / PinePhone ROMs: only the x86 image was run); delivery reports (`delivered`);
+A phone with a different message store layout (other Phorepoc ROMs: only the x86 image was run); delivery reports (`delivered`);
 a notification when the pairing in `phecloud.ini` is missing (the service logs it and keeps retrying); long messages (over 512 bytes) and MMS.
 
 ## Shipping and switching it on

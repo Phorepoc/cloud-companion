@@ -54,7 +54,7 @@ const stream = new AndroidStream($('screen'), {
   onStats: (m) => { last = { ...last, ...m }; show() },
   onNote: (t) => { $('msg').textContent = t },
 })
-const connect = () => stream.connect(q.get('t') || '', { codec: q.get('codec'), size: q.get('size'), fps: q.get('fps'), kbps: q.get('kbps'), audio: q.get('audio') !== '0' })
+const connect = () => stream.connect(q.get('t') || '', { codec: q.get('codec'), size: q.get('size'), fps: q.get('fps'), kbps: q.get('kbps'), kind: q.get('kind'), audio: q.get('audio') !== '0' })
 document.querySelectorAll('button[data-k]').forEach((b) => b.addEventListener('click', () => stream.key(+b.dataset.k)))
 $('sound').addEventListener('click', (e) => { const on = !stream.soundOn; stream.setSound(on); e.target.textContent = on ? 'Sound on' : 'Sound off'; e.target.setAttribute('aria-pressed', String(on)) })
 $('copyfrom').addEventListener('click', () => stream.copyFromPhone())

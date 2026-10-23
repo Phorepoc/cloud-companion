@@ -6,7 +6,7 @@
 package connectors
 
 // End to end against a REAL hub (Stalwart) and a REAL CardDAV/CalDAV server (Radicale). Needs the hub's environment
-// (PHECLOUD_HUB_URL, _OWNER, _TOKEN) and RADICALE_URL (default http://192.168.2.247:5232), RADICALE_USER/RADICALE_PASS (phone/phonepass).
+// (PHECLOUD_HUB_URL, _OWNER, _TOKEN) and RADICALE_URL (default http://127.0.0.1:5232), RADICALE_USER/RADICALE_PASS (phone/phonepass).
 // Run: web/test/hubtest-run.sh  (golang container on the throwaway hub's network).
 
 import (
@@ -33,7 +33,7 @@ func env(k, d string) string {
 
 func rad(t *testing.T, method, p, body string, hdr map[string]string) (int, string, http.Header) {
 	t.Helper()
-	req, _ := http.NewRequest(method, env("RADICALE_URL", "http://192.168.2.247:5232")+p, strings.NewReader(body))
+	req, _ := http.NewRequest(method, env("RADICALE_URL", "http://127.0.0.1:5232")+p, strings.NewReader(body))
 	req.SetBasicAuth(env("RADICALE_USER", "phone"), env("RADICALE_PASS", "phonepass"))
 	for k, v := range hdr {
 		req.Header.Set(k, v)
@@ -124,13 +124,13 @@ func TestHubEndToEnd(t *testing.T) {
 	put(card+"a.vcf", vc("e2e-a", "Anna Mueller", "+49 171 5550101"), "text/vcard")
 	put(card+"b.vcf", vc("e2e-b", "A. Mueller", "0171 5550101"), "text/vcard")
 	put(cal+"ev.ics", "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\nBEGIN:VEVENT\r\nUID:e2e-ev@test\r\nDTSTAMP:20261023T100000Z\r\nDTSTART:20261101T090000Z\r\nDTEND:20261101T100000Z\r\nSUMMARY:E2E event\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n", "text/calendar")
-	dc := DAVCfg{URL: env("RADICALE_URL", "http://192.168.2.247:5232") + card, User: env("RADICALE_USER", "phone")}
+	dc := DAVCfg{URL: env("RADICALE_URL", "http://127.0.0.1:5232") + card, User: env("RADICALE_USER", "phone")}
 	pw := env("RADICALE_PASS", "phonepass")
 	ch, rm, err := SyncDAV(ctx, "accC", "card", dc, pw, hub, st)
 	if err != nil || ch != 2 || rm != 0 {
 		t.Fatalf("carddav -> hub: %d %d %v", ch, rm, err)
 	}
-	cc := DAVCfg{URL: env("RADICALE_URL", "http://192.168.2.247:5232") + cal, User: dc.User}
+	cc := DAVCfg{URL: env("RADICALE_URL", "http://127.0.0.1:5232") + cal, User: dc.User}
 	if ch, _, err := SyncDAV(ctx, "accK", "cal", cc, pw, hub, st); err != nil || ch != 1 {
 		t.Fatalf("caldav -> hub: %d %v", ch, err)
 	}

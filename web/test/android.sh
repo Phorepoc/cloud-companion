@@ -1,7 +1,7 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
 # SPDX-License-Identifier: Apache-2.0
-# Android stream test on the Deskmini: a Redroid container and the pheandroid bridge in their OWN network (phepa, containers phe-redroid-t / phe-android-t, so a
+# Android stream test on a small x86 server: a Redroid container and the pheandroid bridge in their OWN network (phepa, containers phe-redroid-t / phe-android-t, so a
 # running stack's phe-redroid is not touched), capped, then a Playwright browser. A small loop runs the adb hooks the browser test asks for (settings, rotate, ...).
 # Needs: image phe-redroid-native:13 (deploy/android/Dockerfile.redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), an APK for the upload test
 # (APK=/path, any small app), the repo root as cwd.
@@ -43,6 +43,7 @@ until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; 
         pkgs) c='pm list packages -3' ;;
         tone) c='input keyevent 24; input keyevent 25' ;;
         wmsize) c='wm size; wm density' ;;
+        applist) c='am start -a android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS' ;;
         settingssearch) c='am start -a android.settings.SETTINGS >/dev/null; sleep 2; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep -i "Search settings" | head -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;
         *) c='true' ;;
       esac
@@ -69,6 +70,7 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:p
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out \
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node android.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
 docker stats --no-stream --format 'redroid {{.CPUPerc}} {{.MemUsage}}' phe-redroid-t
+[ "${ONLY:-}" = android ] && exit 0
 # the web app's own page: phecloud (with the web app) + Caddy in front, as in the hub; the standalone run above has finished, so the single viewer slot is free
 docker build -q -t phe-cloud-t:dev . >/dev/null
 docker run -d --name phe-cloud-t --network phepa --cpus 1 --memory 512m -e PHECLOUD_ANDROID_SECRET=testsecret phe-cloud-t:dev >/dev/null
