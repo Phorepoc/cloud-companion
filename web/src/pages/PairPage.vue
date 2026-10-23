@@ -7,6 +7,7 @@
       <h1>Connect this browser</h1>
       <p class="ph-muted">{{ brand.tagline }}</p>
 
+      <p v-if="blocker" class="ph-note" role="note" data-test="passkey-blocker"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> {{ blocker }}</p>
       <section v-if="status.owner" class="ph-signin" aria-labelledby="signin-h">
         <h2 id="signin-h" class="ph-h2">Sign in</h2>
         <q-btn v-if="supported" unelevated color="primary" icon="sym_o_passkey" label="Sign in with a passkey" class="full-width"
@@ -61,7 +62,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, pair, authStatus, passkeysSupported, passkeyRegister, passkeyLogin, recoverLogin } from '../cloud.js'
+import { state, pair, authStatus, passkeysSupported, passkeyRegister, passkeyLogin, recoverLogin, passkeyBlocker } from '../cloud.js'
 import { brand } from '../brand.js'
 import BrandLogo from '../components/BrandLogo.vue'
 
@@ -69,7 +70,8 @@ const router = useRouter()
 const code = ref('')
 const name = ref('Web browser')
 const status = ref({ owner: false, passkeys: 0 })
-const supported = passkeysSupported()
+const blocker = passkeyBlocker()
+const supported = passkeysSupported() && !blocker
 const busy = ref('')
 const message = ref('')
 const showRecovery = ref(false)
@@ -133,6 +135,7 @@ function savedIt() { recoveryDialog.value = false; shownCode.value = ''; router.
 .ph-stack { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-h2 { font-size: var(--ph-text-h3, 1.1rem); margin: 0; }
 .ph-sep { margin: var(--ph-s2) 0; }
+.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
 .ph-dialog { width: min(92vw, 440px); background: var(--ph-surface); color: var(--ph-text); }
 .ph-dialog p { margin: var(--ph-s3) 0 0; }

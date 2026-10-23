@@ -187,3 +187,58 @@ func (s *Store) NewDevice(name string, admin bool) (id string, key []byte, err e
 }
 
 var ErrNoOwner = errors.New("no owner")
+
+// PasskeyInfo is what the Security page lists.
+type PasskeyInfo struct {
+	ID       string `json:"id"` // hex of the credential id
+	Name     string `json:"name"`
+	Created  int64  `json:"created"`
+	LastUsed int64  `json:"last_used"`
+}
+
+func (s *Store) PasskeyList() []PasskeyInfo {
+	rows, err := s.db.Query(`SELECT id, COALESCE(name,''), COALESCE(created,0), COALESCE(last_used,0) FROM passkeys ORDER BY created`)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	out := []PasskeyInfo{}
+	for rows.Next() {
+		var id []byte
+		var p PasskeyInfo
+		if rows.Scan(&id, &p.Name, &p.Created, &p.LastUsed) == nil {
+			p.ID = hex.EncodeToString(id)
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
+// RemovePasskey deletes one credential (the owner and the recovery code stay).
+func (s *Store) RemovePasskey(idHex string) error {
+	id, err := hex.DecodeString(idHex)
+	if err != nil {
+		return err
+	}
+	res, err := s.db.Exec(`DELETE FROM passkeys WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("no such passkey")
+	}
+	return nil
+}
+
+// RegenerateRecovery replaces the recovery code (the old one stops working) and returns the new one.
+func (s *Store) RegenerateRecovery() (string, error) {
+	code := NewRecoveryCode()
+	res, err := s.db.Exec(`UPDATE owner SET recovery=? WHERE id=1`, recHash(code))
+	if err != nil {
+		return "", err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return "", ErrNoOwner
+	}
+	return code, nil
+}

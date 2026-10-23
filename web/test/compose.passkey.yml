@@ -1,0 +1,4 @@
+services:
+  phecloud:
+    container_name: phe-cloud-pk
+    ports: !override []

@@ -35,3 +35,15 @@ non-admin code, unchanged pairing; light and dark screenshots in `web/test/scree
 
 The endpoints live under `/passkey/` on purpose: the hub's reverse proxy (`deploy/hub/Caddyfile.hub`) sends `/auth` and `/oauth` to the mail
 server (its OAuth endpoints), so a phecloud route under `/auth` would never reach phecloud.
+
+## Settings, Security (signed in as the owner)
+A browser that is signed in as an admin has **Settings, Security**:
+- **Passkeys**: name, date added and last used, with **Remove** (asks first; browsers that are already signed in stay signed in).
+- **Add a passkey**: no pairing code needed when you are already signed in as an admin; give it a name. An authenticator that already
+  holds a passkey for this site refuses a duplicate (use another device or key). The request is signed with this browser's device
+  key (`X-Phe-Auth`, HMAC-SHA256 over the device id, the time and the request line, valid one minute), so it needs a secure page.
+- **Recovery code**: the server keeps only a hash, so the code cannot be shown again. **Make a new recovery code** shows a new one
+  once and the old one stops working.
+- If the page was opened by an **IP address**, a note explains that passkeys need a domain name (and https or localhost); the
+  buttons are disabled. The same note appears on the sign-in page.
+Screenshots: `web/test/screenshots/passkeys/passkey-*-4-security.png`, `-5-new-recovery`, `-6-remove-confirm`, `passkey-light-7-ip-note.png`.

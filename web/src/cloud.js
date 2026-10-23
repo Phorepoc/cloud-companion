@@ -302,3 +302,53 @@ export async function passkeyLogin(name) {
 export async function recoverLogin(code, name) {
   return adopt(await authCall('/passkey/recover', { code, name }))
 }
+
+// ---- Settings -> Security: calls signed with this browser's device key (an admin device) ----
+async function signed(method, path, body) {
+  if (!creds.value || !crypto.subtle) throw new Error('This needs a secure page (https or localhost) and a signed-in browser.')
+  const ts = String(Math.floor(Date.now() / 1000))
+  const k = await crypto.subtle.importKey('raw', creds.value.key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`${creds.value.dev}.${ts}.${method} ${path}`)))
+  const hdr = { 'X-Phe-Auth': `${creds.value.dev}.${ts}.${Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('')}` }
+  return { headers: hdr, body }
+}
+
+async function signedJSON(method, path, body) {
+  const s = await signed(method, path)
+  const r = await fetch(path, { method, headers: { ...s.headers, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
+  return j
+}
+
+export const passkeyList = () => signedJSON('GET', '/passkey/list')
+export const passkeyRemove = (id) => signedJSON('POST', '/passkey/remove', { id })
+export const recoveryRegenerate = () => signedJSON('POST', '/passkey/recovery', {})
+
+// add a passkey while signed in as an admin: no pairing code
+export async function passkeyAdd(name) {
+  let s = await signed('POST', '/passkey/register/begin')
+  let r = await fetch('/passkey/register/begin', { method: 'POST', headers: { ...s.headers, 'Content-Type': 'application/json' }, body: '{}' })
+  let j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
+  const pk = j.options.publicKey
+  pk.challenge = b64u.dec(pk.challenge)
+  pk.user.id = b64u.dec(pk.user.id)
+  ;(pk.excludeCredentials || []).forEach((c) => { c.id = b64u.dec(c.id) })
+  const cred = await navigator.credentials.create({ publicKey: pk })
+  const path = '/passkey/register/finish'
+  s = await signed('POST', path)
+  r = await fetch(`${path}?sid=${j.sid}&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { ...s.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(credJSON(cred)) })
+  const f = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(f.error || 'The server did not accept that.')
+  return f.recovery || ''
+}
+
+// passkeys need a secure origin and a domain name (not an IP address)
+export function passkeyBlocker() {
+  const h = location.hostname
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h) || h.includes(':')) return 'You opened this page by an IP address. Passkeys only work with a domain name (for example cloud.example.org or localhost), because a passkey belongs to the name of the site. Open the page by its name to use passkeys.'
+  if (!window.isSecureContext) return 'This page is not secure (http). Passkeys need https, or the address localhost.'
+  if (!window.PublicKeyCredential) return 'This browser does not support passkeys.'
+  return ''
+}

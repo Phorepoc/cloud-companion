@@ -23,9 +23,8 @@ const step = (s) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${s
 
 const cdp = await ctx.newCDPSession(page)
 await cdp.send('WebAuthn.enable')
-const { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', {
-  options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
-})
+const AUTH_OPTS = { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true }
+let { authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: AUTH_OPTS })
 const creds = async () => (await cdp.send('WebAuthn.getCredentials', { authenticatorId })).credentials
 
 async function shots(name) {
@@ -64,7 +63,7 @@ step('a non-admin code is refused, no credential was made')
 await page.fill('[data-test=code]', ADMIN)
 await page.click('[data-test=passkey-register]')
 await page.waitForSelector('[data-test=recovery-dialog]')
-const rec1 = (await page.textContent('[data-test=recovery-shown]')).trim()
+let rec1 = (await page.textContent('[data-test=recovery-shown]')).trim()
 assert.match(rec1, /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/)
 assert.equal((await creds()).length, 1)
 await shots('2-recovery-code')
@@ -84,6 +83,58 @@ assert.equal(await page.evaluate(() => window.__phe.state.admin), true)
 const cred = (await creds())[0]
 assert(cred.signCount >= 1, 'the assertion bumped the sign counter')
 step('sign in with the passkey')
+
+// 4b. Settings -> Security: list, add (signed in, no code), new recovery code, remove
+await page.goto(BASE + '/#/settings')
+await page.waitForSelector('[data-test=security]')
+await online()
+await page.waitForSelector('[data-test=passkey-row]')
+assert.equal(await page.locator('[data-test=passkey-row]').count(), 1)
+assert.equal(await page.locator('[data-test=passkey-blocker]').count(), 0, 'localhost is fine for passkeys')
+// a second passkey needs another authenticator (the first one refuses a duplicate): swap in a fresh virtual device
+await cdp.send('WebAuthn.removeVirtualAuthenticator', { authenticatorId })
+;({ authenticatorId } = await cdp.send('WebAuthn.addVirtualAuthenticator', { options: AUTH_OPTS }))
+await page.fill('[data-test=passkey-name]', 'Second key')
+await page.click('[data-test=passkey-add]')
+await page.waitForSelector('[data-test=passkey-row]:nth-child(2), [data-test=security-error]')
+assert.equal(await page.locator('[data-test=security-error]').count(), 0, 'add failed: ' + (await page.locator('[data-test=security-error]').allTextContents()).join())
+await page.waitForFunction(() => document.querySelectorAll('[data-test=passkey-row]').length === 2)
+assert.equal((await creds()).length, 1, 'the second authenticator holds the new passkey')
+assert.equal(await page.locator('[data-test=recovery-dialog]').count(), 0, 'adding a second passkey shows no new recovery code')
+assert.match(await page.locator('[data-test=passkey-row]').nth(1).textContent(), /Second key/)
+assert.match(await page.locator('[data-test=passkey-row]').first().textContent(), /last used/)
+await page.locator('[data-test=security]').scrollIntoViewIfNeeded()
+await shots('4-security')
+step('Security: two passkeys listed (name, added, last used); one added while signed in, no code')
+await page.click('[data-test=recovery-regen]')
+await page.waitForSelector('[data-test=recovery-dialog]')
+const recNew = (await page.textContent('[data-test=recovery-shown]')).trim()
+assert.match(recNew, /^[A-Z2-9]{4}(-[A-Z2-9]{4}){3}$/)
+assert.notEqual(recNew, rec1)
+await shots('5-new-recovery')
+await page.click('[data-test=recovery-saved]')
+const stale = await page.evaluate(async (c) => (await fetch('/passkey/recover', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: c, name: 'x' }) })).status, rec1)
+assert.equal(stale, 403, 'the old recovery code stopped working')
+step('a new recovery code replaces the old one')
+await page.locator('[data-test=passkey-remove]').nth(1).click()
+await page.waitForSelector('[data-test=remove-dialog]')
+await shots('6-remove-confirm')
+await page.click('[data-test=remove-confirm]')
+await page.waitForFunction(() => document.querySelectorAll('[data-test=passkey-row]').length === 1)
+step('a passkey is removed after confirmation')
+// the recovery code that exists now is recNew (rec1 was replaced): keep it for step 5
+rec1 = recNew
+// a browser that is not signed in cannot use these endpoints
+const anon = await page.evaluate(async () => (await fetch('/passkey/list')).status)
+assert.equal(anon, 403)
+// opened by an IP address: passkeys need a domain name
+const ip = await ctx.newPage()
+await ip.goto('http://127.0.0.1:8080/#/pair')
+await ip.waitForSelector('[data-test=passkey-blocker]')
+assert.match(await ip.textContent('[data-test=passkey-blocker]'), /IP address/)
+await ip.screenshot({ path: `${OUT}/passkey-light-7-ip-note.png` })
+await ip.close()
+step('an IP address shows the "passkeys need a domain name" note')
 
 // 5. recovery code: typed sloppily, works once, a new one replaces it
 await forget()

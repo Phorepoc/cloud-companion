@@ -18,12 +18,15 @@ package webui
 // PHECLOUD_RP_ORIGINS (comma separated) override what is derived from the request.
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +49,7 @@ func (o *owner) WebAuthnCredentials() []webauthn.Credential { return o.creds }
 func (o *owner) WebAuthnIcon() string                       { return "" }
 
 type pending struct {
+	authed bool // started by a signed-in admin device (no pairing code)
 	data   *webauthn.SessionData
 	handle []byte
 	code   string
@@ -131,6 +135,26 @@ func (a *auth) failed(r *http.Request) {
 	a.mu.Unlock()
 }
 
+// adminDevice checks the X-Phe-Auth header: "<dev>.<unix ts>.<hex HMAC-SHA256(device key, dev.ts.METHOD path)>" of an admin device, at most a
+// minute old. The key never leaves the browser; the signature binds the request line.
+func (a *auth) adminDevice(r *http.Request) bool {
+	parts := strings.Split(r.Header.Get("X-Phe-Auth"), ".")
+	if len(parts) != 3 {
+		return false
+	}
+	ts, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || time.Since(time.Unix(ts, 0)).Abs() > time.Minute {
+		return false
+	}
+	key, admin, err := a.st.Key(parts[0])
+	if err != nil || !admin {
+		return false
+	}
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte(parts[0] + "." + parts[1] + "." + r.Method + " " + r.URL.Path))
+	return hmac.Equal([]byte(hex.EncodeToString(m.Sum(nil))), []byte(parts[2]))
+}
+
 func reply(w http.ResponseWriter, code int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -173,7 +197,8 @@ func (a *auth) routes(mux *http.ServeMux) {
 			return
 		}
 		code := strings.ToUpper(strings.TrimSpace(in.Code))
-		if !a.st.CheckAdminCode(code) {
+		authed := a.adminDevice(r)
+		if !authed && !a.st.CheckAdminCode(code) {
 			a.failed(r)
 			bad(w, 403, "that code did not work: it must be an unused admin code from `phecloud paircode --admin`")
 			return
@@ -200,7 +225,7 @@ func (a *auth) routes(mux *http.ServeMux) {
 			bad(w, 500, err.Error())
 			return
 		}
-		reply(w, 200, map[string]any{"sid": a.keep(&pending{data: data, handle: o.handle, code: code}), "options": opts})
+		reply(w, 200, map[string]any{"sid": a.keep(&pending{data: data, handle: o.handle, code: code, authed: authed}), "options": opts})
 	})
 	mux.HandleFunc("/passkey/register/finish", func(w http.ResponseWriter, r *http.Request) {
 		p := a.take(r.URL.Query().Get("sid"))
@@ -220,7 +245,12 @@ func (a *auth) routes(mux *http.ServeMux) {
 			bad(w, 400, "the passkey could not be verified")
 			return
 		}
-		if err := a.st.ConsumeAdminCode(p.code); err != nil {
+		if p.authed {
+			if !a.adminDevice(r) {
+				bad(w, 403, "sign in again")
+				return
+			}
+		} else if err := a.st.ConsumeAdminCode(p.code); err != nil {
 			bad(w, 403, "the code was used or expired")
 			return
 		}
@@ -229,7 +259,42 @@ func (a *auth) routes(mux *http.ServeMux) {
 			bad(w, 500, "could not store the passkey")
 			return
 		}
+		if p.authed { // a signed-in admin adds a passkey: no new device, no new recovery code
+			reply(w, 200, map[string]any{"ok": true, "recovery": rec})
+			return
+		}
 		a.device(w, "Web browser", map[string]any{"recovery": rec})
+	})
+	mux.HandleFunc("/passkey/list", func(w http.ResponseWriter, r *http.Request) {
+		if !a.adminDevice(r) {
+			bad(w, 403, "sign in as the owner")
+			return
+		}
+		reply(w, 200, map[string]any{"passkeys": a.st.PasskeyList(), "owner": a.st.OwnerExists()})
+	})
+	mux.HandleFunc("/passkey/remove", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ ID string }
+		if r.Method != http.MethodPost || !a.adminDevice(r) || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil {
+			bad(w, 403, "sign in as the owner")
+			return
+		}
+		if err := a.st.RemovePasskey(in.ID); err != nil {
+			bad(w, 404, err.Error())
+			return
+		}
+		reply(w, 200, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/passkey/recovery", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || !a.adminDevice(r) {
+			bad(w, 403, "sign in as the owner")
+			return
+		}
+		code, err := a.st.RegenerateRecovery()
+		if err != nil {
+			bad(w, 409, "there is no owner passkey yet")
+			return
+		}
+		reply(w, 200, map[string]any{"recovery": code})
 	})
 	mux.HandleFunc("/passkey/login/begin", func(w http.ResponseWriter, r *http.Request) {
 		h, err := a.st.OwnerHandle()
