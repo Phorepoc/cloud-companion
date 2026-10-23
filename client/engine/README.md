@@ -96,3 +96,9 @@ written ini carried the pin that was confirmed). An ini with a pin keeps the str
 In the SSM regress image the boot list's cycler starts the app under test, then SSM starts Logs, which takes the foreground: a scripted
 run that starts driving as soon as the app logs its first event drives Logs instead. Put a throwaway line first (`*45|calcsoft`, then
 `*700|<app>`) so the app starts after SSM has settled. Not ours to fix; recorded here so the scripts keep the workaround.
+
+## VirtualBox
+The same ROM boots in VirtualBox (private VM, NAT e1000, the browser's own disk copy with the test files): the engine loads, the
+setup screen appears, a host typed into the browser's editor and the pairing code typed with the keyboard give the fingerprint
+confirmation (`docs/shots/engine-vbox-confirm.png`), Trust pairs and the page loads (`engine-vbox-after-trust.png`); the heap after
+pairing and after the first screen matches QEMU (1.48 MB and 2.61 MB allocated).
