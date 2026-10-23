@@ -1,0 +1,208 @@
+<!-- Copyright The Phorepoc Authors
+     SPDX-License-Identifier: Apache-2.0 -->
+<template>
+  <q-page class="ph-page">
+    <h1>Connections</h1>
+    <p class="ph-muted">
+      Connect the accounts you already have. Phecloud copies your mail, contacts and calendars from them into your own server and sends
+      mail through each account's own outgoing server. It does not host your mail.
+    </p>
+
+    <p v-if="!hubOn" class="ph-note" role="note" data-test="no-hub"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> The hub is not set up on this server, so accounts can be added and tested but nothing is copied yet.</p>
+
+    <section class="ph-card ph-section" aria-labelledby="acc-h">
+      <div class="ph-row">
+        <h2 id="acc-h">Your accounts</h2>
+        <q-btn unelevated color="primary" icon="sym_o_add" label="Add an account" data-test="add-account" @click="openAdd" />
+      </div>
+      <p v-if="!accounts.length" class="ph-muted" data-test="no-accounts">No account connected yet.</p>
+      <ul v-else class="ph-list" aria-label="Connected accounts">
+        <li v-for="a in accounts" :key="a.id" data-test="account-row">
+          <div class="ph-grow">
+            <strong>{{ a.name }}</strong>
+            <span class="ph-chip" :class="'ph-' + a.status" data-test="account-status">{{ statusText(a) }}</span>
+            <div class="ph-muted ph-small">{{ kindText(a.kind) }} · {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
+            <div v-if="a.last_error" class="ph-error ph-small" role="alert">{{ a.last_error }}</div>
+          </div>
+          <q-btn flat round icon="sym_o_sync" :aria-label="'Sync ' + a.name" :loading="syncing === a.id" data-test="account-sync" @click="sync(a)" />
+          <q-btn flat round color="negative" icon="sym_o_delete" :aria-label="'Remove ' + a.name" data-test="account-remove" @click="askRemove = a" />
+        </li>
+      </ul>
+      <p v-if="error" class="ph-error" role="alert" data-test="conn-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</p>
+    </section>
+
+    <section class="ph-card ph-section" aria-labelledby="dup-h">
+      <div class="ph-row">
+        <h2 id="dup-h">Duplicate contacts</h2>
+        <q-btn outline color="primary" icon="sym_o_search" label="Look for duplicates" :loading="finding" data-test="find-dups" @click="findDups" />
+      </div>
+      <p class="ph-muted">Entries that look like the same person (same number, same email, same name). Merging keeps one contact with everything from both; the sources stay linked to it.</p>
+      <p v-if="dups !== null && !dups.length" class="ph-muted" data-test="no-dups">No duplicates found.</p>
+      <ul v-if="dups && dups.length" class="ph-list" aria-label="Possible duplicates">
+        <li v-for="d in dups" :key="d.a + d.b" data-test="dup-row">
+          <div class="ph-grow">
+            <strong>{{ d.name_a }}</strong> and <strong>{{ d.name_b }}</strong>
+            <div class="ph-muted ph-small">{{ d.reason }}</div>
+          </div>
+          <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_a)" data-test="dup-keep-a" @click="merge(d, d.a, d.b)" />
+          <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_b)" data-test="dup-keep-b" @click="merge(d, d.b, d.a)" />
+          <q-btn flat no-caps label="Not the same" data-test="dup-dismiss" @click="dismiss(d)" />
+        </li>
+      </ul>
+      <p v-if="dupError" class="ph-error" role="alert" data-test="dup-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ dupError }}</p>
+    </section>
+
+    <q-dialog v-model="adding" persistent>
+      <q-card class="ph-dialog" data-test="add-dialog">
+        <q-card-section class="ph-form">
+          <h2 class="ph-h3">Add an account</h2>
+          <q-select v-model="f.kind" :options="kinds" emit-value map-options outlined dense label="Type" data-test="f-kind" />
+          <q-input v-model="f.name" outlined dense label="Name" hint="For example: Work mail" data-test="f-name" />
+          <template v-if="f.kind === 'imap'">
+            <div class="ph-two">
+              <q-input v-model="f.imapHost" outlined dense label="IMAP server" data-test="f-imap-host" />
+              <q-input v-model.number="f.imapPort" outlined dense type="number" label="Port" data-test="f-imap-port" />
+            </div>
+            <q-select v-model="f.imapTLS" :options="securities" emit-value map-options outlined dense label="Security" data-test="f-imap-tls" />
+            <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.secret" outlined dense type="password" label="Password or app password" autocomplete="new-password" data-test="f-secret" />
+            <div class="ph-two">
+              <q-input v-model="f.smtpHost" outlined dense label="Outgoing (SMTP) server" data-test="f-smtp-host" />
+              <q-input v-model.number="f.smtpPort" outlined dense type="number" label="Port" data-test="f-smtp-port" />
+            </div>
+            <q-select v-model="f.smtpTLS" :options="securities" emit-value map-options outlined dense label="Outgoing security" data-test="f-smtp-tls" />
+            <q-input v-model="f.from" outlined dense label="Send as (address)" data-test="f-from" />
+            <q-input v-model="f.folders" outlined dense label="Folders to copy" hint="Comma separated. Default: INBOX" data-test="f-folders" />
+            <q-input v-model.number="f.months" outlined dense type="number" label="Months back" data-test="f-months" />
+          </template>
+          <template v-else>
+            <q-input v-model="f.url" outlined dense :label="f.kind === 'carddav' ? 'Address book URL' : 'Calendar URL'" data-test="f-url" />
+            <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.secret" outlined dense type="password" label="Password or app password" autocomplete="new-password" data-test="f-secret" />
+          </template>
+          <p v-if="testResult" :class="testResult.ok ? 'ph-ok' : 'ph-error'" role="status" data-test="test-result">
+            <q-icon :name="testResult.ok ? 'sym_o_check_circle' : 'sym_o_error'" size="20px" aria-hidden="true" /> {{ testResult.detail }}
+          </p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" @click="adding = false" />
+          <q-btn outline color="primary" label="Test" :loading="busy === 'test'" data-test="f-test" @click="doTest" />
+          <q-btn unelevated color="primary" label="Add" :loading="busy === 'add'" data-test="f-add" @click="doAdd" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog :model-value="!!askRemove" @update:model-value="askRemove = null">
+      <q-card class="ph-dialog" data-test="remove-dialog">
+        <q-card-section>
+          <h2 class="ph-h3">Remove this account?</h2>
+          <p>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" @click="askRemove = null" />
+          <q-btn unelevated color="negative" label="Remove" data-test="remove-confirm" @click="doRemove" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+  </q-page>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { apiCall } from '../cloud.js'
+
+const accounts = ref([])
+const hubOn = ref(true)
+const error = ref('')
+const syncing = ref('')
+const askRemove = ref(null)
+const adding = ref(false)
+const busy = ref('')
+const testResult = ref(null)
+const dups = ref(null)
+const dupError = ref('')
+const finding = ref(false)
+let timer = null
+
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }]
+const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
+const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '' })
+const f = reactive(blank())
+
+const kindText = (k) => ({ imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar' }[k] || k)
+const statusText = (a) => ({ new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }[a.status] || a.status)
+const short = (n) => (n || '').split(' ')[0] || 'this one'
+function ago(t) {
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - t))
+  if (s < 90) return 'just now'
+  if (s < 5400) return Math.round(s / 60) + ' min ago'
+  if (s < 129600) return Math.round(s / 3600) + ' h ago'
+  return Math.round(s / 86400) + ' days ago'
+}
+
+async function load() {
+  try { const j = await apiCall('GET', '/api/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = e.message }
+}
+function openAdd() { Object.assign(f, blank()); testResult.value = null; adding.value = true }
+
+function payload() {
+  if (f.kind === 'imap') {
+    const cfg = {
+      imap: { host: f.imapHost.trim(), port: f.imapPort, tls: f.imapTLS, user: f.user.trim() },
+      smtp: f.smtpHost.trim() ? { host: f.smtpHost.trim(), port: f.smtpPort, tls: f.smtpTLS, user: f.user.trim() } : { host: '', port: 0, tls: 'tls', user: '' },
+      folders: f.folders.split(',').map((x) => x.trim()).filter(Boolean), months: f.months || 3, from: f.from.trim(),
+    }
+    return { kind: 'imap', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
+  }
+  return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
+}
+async function doTest() {
+  busy.value = 'test'; testResult.value = null
+  try { testResult.value = await apiCall('POST', '/api/connections/test', payload()) } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
+}
+async function doAdd() {
+  busy.value = 'add'; testResult.value = null
+  try { await apiCall('POST', '/api/connections', payload()); adding.value = false; await load() } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
+}
+async function sync(a) {
+  syncing.value = a.id; error.value = ''
+  try { const r = await apiCall('POST', '/api/connections/sync', { id: a.id }); if (!r.ok) error.value = a.name + ': ' + r.detail } catch (e) { error.value = e.message } finally { syncing.value = ''; await load() }
+}
+async function doRemove() {
+  const a = askRemove.value
+  askRemove.value = null
+  try { await apiCall('POST', '/api/connections/remove', { id: a.id }) } catch (e) { error.value = e.message }
+  await load()
+}
+async function findDups() {
+  finding.value = true; dupError.value = ''
+  try { dups.value = (await apiCall('GET', '/api/duplicates')).suggestions } catch (e) { dupError.value = e.message } finally { finding.value = false }
+}
+async function merge(d, keep, drop) {
+  dupError.value = ''
+  try { await apiCall('POST', '/api/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = e.message }
+}
+async function dismiss(d) {
+  try { await apiCall('POST', '/api/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = dups.value.filter((x) => x !== d) } catch (e) { dupError.value = e.message }
+}
+
+onMounted(() => { load(); timer = setInterval(load, 10000) })
+onBeforeUnmount(() => clearInterval(timer))
+</script>
+
+<style scoped>
+.ph-section { margin-top: var(--ph-s4); display: flex; flex-direction: column; gap: var(--ph-s3); }
+.ph-section p { margin: 0; }
+.ph-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); flex-wrap: wrap; }
+.ph-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
+.ph-list li { display: flex; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3); border: 1px solid var(--ph-border); border-radius: var(--ph-r-control); flex-wrap: wrap; }
+.ph-grow { flex: 1 1 220px; min-width: 0; }
+.ph-chip { display: inline-block; margin-left: var(--ph-s2); padding: 2px var(--ph-s2); border-radius: 999px; font-size: var(--ph-text-small); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-ok { color: var(--ph-positive, #1b7f3b); display: flex; gap: var(--ph-s2); align-items: flex-start; }
+.ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
+.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-dialog { width: min(94vw, 480px); background: var(--ph-surface); color: var(--ph-text); max-height: 90vh; overflow: auto; }
+.ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }
+.ph-two { display: grid; grid-template-columns: 1fr 110px; gap: var(--ph-s2); }
+.ph-h3 { font-size: var(--ph-text-h3, 1.1rem); margin: 0; }
+</style>

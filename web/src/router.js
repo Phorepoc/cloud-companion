@@ -16,6 +16,7 @@ const router = createRouter({
     { path: '/calendar', component: () => import('./pages/CalendarPage.vue') },
     { path: '/contacts', component: () => import('./pages/ContactsPage.vue') },
     section('files'),
+    { path: '/connections', component: () => import('./pages/ConnectionsPage.vue') },
     { path: '/devices', component: () => import('./pages/DevicesPage.vue') },
     { path: '/settings', component: () => import('./pages/SettingsPage.vue') },
   ],

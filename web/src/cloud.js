@@ -352,3 +352,6 @@ export function passkeyBlocker() {
   if (!window.PublicKeyCredential) return 'This browser does not support passkeys.'
   return ''
 }
+
+// the Connections API (admin devices; internal/webui/connections.go)
+export const apiCall = (method, path, body) => signedJSON(method, path, body)

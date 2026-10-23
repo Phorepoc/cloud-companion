@@ -10,6 +10,7 @@ export const sections = [
   { id: 'calendar', label: 'Calendar', icon: 'sym_o_calendar_month', path: '/calendar', primary: true },
   { id: 'contacts', label: 'Contacts', icon: 'sym_o_contacts', path: '/contacts' },
   { id: 'files', label: 'Files', icon: 'sym_o_folder', path: '/files' },
+  { id: 'connections', label: 'Connections', icon: 'sym_o_sync_alt', path: '/connections', admin: true },
   { id: 'devices', label: 'Devices', icon: 'sym_o_devices', path: '/devices', admin: true },
   { id: 'settings', label: 'Settings', icon: 'sym_o_settings', path: '/settings' },
 ]
