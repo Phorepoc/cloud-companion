@@ -163,6 +163,9 @@ advertise it.
 | `tls.crt`, `tls.key` | the server certificate (phones pin its fingerprint) | copied as is |
 | `manifest.json` | creation time, Stalwart image, volume names, SHA-256 of every file | |
 
+**Before an update, snapshot the database:** `sh deploy/hub/snapshot.sh [backup-dir] [container]` writes a new timestamped file (`phehub-YYYYmmdd-HHMMSS.db`, never overwriting an earlier one) and keeps the newest 10
+(`KEEP=n` changes that). Restore = stop phecloud, copy a snapshot over `phecloud.db` in its data volume, start it.
+
 The directory is mode 0700 and holds the TLS key and the hub's secrets: keep it on a disk you trust, or encrypt it before it leaves the machine.
 
 It drives the `docker` command line (containers `phe-stalwart` and `phe-cloud`; override with `PHE_STALWART`, `PHE_CLOUD`). On a Docker host without Go, use the helper image:
