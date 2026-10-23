@@ -15,6 +15,10 @@
         <h2 id="acc-h">Your accounts</h2>
         <q-btn unelevated color="primary" icon="sym_o_add" label="Add an account" data-test="add-account" @click="openAdd" />
       </div>
+      <div v-if="providers.length" class="ph-oauth" data-test="oauth-box">
+        <q-btn v-for="p in providers" :key="p.id" outline color="primary" no-caps :icon="'sym_o_login'" :label="'Sign in with ' + p.label" :data-test="'oauth-' + p.id" @click="openOAuth(p)" />
+      </div>
+      <p v-if="oauthMsg" :class="oauthMsg.ok ? 'ph-ok' : 'ph-error'" role="status" data-test="oauth-result"><q-icon :name="oauthMsg.ok ? 'sym_o_check_circle' : 'sym_o_error'" size="20px" aria-hidden="true" /> {{ oauthMsg.text }}</p>
       <p v-if="!accounts.length" class="ph-muted" data-test="no-accounts">No account connected yet.</p>
       <ul v-else class="ph-list" aria-label="Connected accounts">
         <li v-for="a in accounts" :key="a.id" data-test="account-row">
@@ -97,6 +101,23 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog :model-value="!!oauthFor" @update:model-value="oauthFor = null">
+      <q-card class="ph-dialog" data-test="oauth-dialog">
+        <q-card-section class="ph-form">
+          <h2 class="ph-h3">Sign in with {{ oauthFor && oauthFor.label }}</h2>
+          <p class="ph-muted">You will be sent to {{ oauthFor && oauthFor.label }} to allow access. Phecloud never sees your password and keeps only a revocable token on your server.</p>
+          <q-input v-model="oauthName" outlined dense label="Name" hint="For example: Personal Gmail" data-test="oauth-name" />
+          <q-option-group v-model="oauthKinds" type="checkbox" :options="oauthKindOptions" data-test="oauth-kinds" />
+          <p v-if="oauthFor && oauthFor.id === 'microsoft'" class="ph-muted ph-small">Outlook contacts and calendar use Microsoft Graph, which is not supported yet: only mail is offered.</p>
+          <p v-if="oauthError" class="ph-error" role="alert" data-test="oauth-error">{{ oauthError }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" @click="oauthFor = null" />
+          <q-btn unelevated color="primary" label="Continue" :disable="!oauthKinds.length" data-test="oauth-go" @click="startOAuth" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog :model-value="!!devPreview" @update:model-value="devPreview = null">
       <q-card class="ph-dialog" data-test="devmerge-dialog">
         <q-card-section>
@@ -127,7 +148,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import { apiCall } from '../cloud.js'
 
 const accounts = ref([])
@@ -144,6 +166,14 @@ const finding = ref(false)
 const devPreview = ref(null)
 const devSource = ref('')
 const undoable = ref(null)
+const providers = ref([])
+const oauthFor = ref(null)
+const oauthName = ref('')
+const oauthKinds = ref(['mail'])
+const oauthError = ref('')
+const oauthMsg = ref(null)
+const route = useRoute()
+const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer = null
 
 const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }]
@@ -204,6 +234,14 @@ async function merge(d, keep, drop) {
   dupError.value = ''
   try { await apiCall('POST', '/phe/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = e.message }
 }
+function openOAuth(p) { oauthFor.value = p; oauthName.value = ''; oauthKinds.value = ['mail']; oauthError.value = '' }
+async function startOAuth() {
+  oauthError.value = ''
+  try {
+    const j = await apiCall('POST', '/phe/oauth/start', { provider: oauthFor.value.id, kinds: oauthKinds.value, name: oauthName.value })
+    window.location.href = j.url
+  } catch (e) { oauthError.value = e.message }
+}
 async function previewDevice(d) {
   dupError.value = ''
   try { devPreview.value = await apiCall('POST', '/phe/devmerge/preview', { account: d.same_source, a: d.a, b: d.b }); devSource.value = d.source_name } catch (e) { dupError.value = e.message }
@@ -226,7 +264,13 @@ async function dismiss(d) {
   try { await apiCall('POST', '/phe/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = dups.value.filter((x) => x !== d) } catch (e) { dupError.value = e.message }
 }
 
-onMounted(() => { load(); timer = setInterval(load, 10000) })
+onMounted(async () => {
+  load()
+  timer = setInterval(load, 10000)
+  try { providers.value = (await apiCall('GET', '/phe/oauth/providers')).providers } catch (e) { providers.value = [] }
+  if (route.query.oauth === 'ok') oauthMsg.value = { ok: true, text: 'Signed in. The new accounts are syncing.' }
+  else if (route.query.oauth === 'error') oauthMsg.value = { ok: false, text: String(route.query.msg || 'The sign-in did not complete.') }
+})
 onBeforeUnmount(() => clearInterval(timer))
 </script>
 
@@ -244,6 +288,7 @@ onBeforeUnmount(() => clearInterval(timer))
 .ph-dialog { width: min(94vw, 480px); background: var(--ph-surface); color: var(--ph-text); max-height: 90vh; overflow: auto; }
 .ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-two { display: grid; grid-template-columns: 1fr 110px; gap: var(--ph-s2); }
+.ph-oauth { display: flex; flex-wrap: wrap; gap: var(--ph-s2); }
 .ph-changes { margin: var(--ph-s2) 0 0; padding-left: var(--ph-s4); display: flex; flex-direction: column; gap: var(--ph-s1, 4px); }
 .ph-h3 { font-size: var(--ph-text-h3, 1.1rem); margin: 0; }
 </style>

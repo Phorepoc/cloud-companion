@@ -56,3 +56,39 @@ both guarded by their ETags, so a change made on the device in the meantime stop
 puts both original cards back. The hub copies follow with the account's next sync (run right away). Properties the app does not model are kept.
 
 The Connections API is under `/phe/` (not `/api/`): the hub's Caddy sends `/api` to the mail server.
+
+## Sign in with Google / Microsoft (OAuth)
+Gmail and Outlook no longer accept an ordinary password for IMAP/SMTP; they want an OAuth token. Phecloud does the sign-in with **your own app registration**
+(a client id and secret you create at the provider; nothing is shared with anyone else). Set the variables, restart phecloud, and the Connections page
+offers **Sign in with Google** / **Sign in with Microsoft** (only for the providers that are configured):
+
+| variable | meaning |
+|---|---|
+| `PHECLOUD_OAUTH_GOOGLE_ID`, `PHECLOUD_OAUTH_GOOGLE_SECRET` | Google OAuth client |
+| `PHECLOUD_OAUTH_MS_ID`, `PHECLOUD_OAUTH_MS_SECRET`, `PHECLOUD_OAUTH_MS_TENANT` | Microsoft app (tenant defaults to `common`: work, school and personal accounts) |
+| `PHECLOUD_PUBLIC_URL` | the public address (for example `https://cloud.example.org`) when it cannot be derived; behind a reverse proxy set `PHECLOUD_TRUSTED_PROXIES` instead (docs/reverse-proxy.md) |
+
+**The redirect address** you register at the provider is `<public address>/phe/oauth/callback`, for example `https://cloud.example.org/phe/oauth/callback`. Both
+providers want a real domain name with https (Google also allows `http://localhost`); an IP address does not work.
+
+**Register the app at Google.** Google Cloud console, new project, *APIs & Services*: enable the *Gmail API*, the *CardDAV API* and the *Google Calendar API*
+(for the parts you want); *OAuth consent screen* (External); add the scopes `https://mail.google.com/`, `https://www.googleapis.com/auth/carddav` and
+`https://www.googleapis.com/auth/calendar`; *Credentials*, *Create credentials*, *OAuth client ID*, type *Web application*, add the redirect address above; copy the id and secret.
+Notes: `https://mail.google.com/` is a *restricted* scope, so a published app needs Google's verification; for your own account keep the app in **Testing**, add yourself as
+a test user, and expect to sign in again every 7 days (Google expires refresh tokens of apps in Testing). A Workspace (company) admin can mark an *Internal* app, which has no such limit.
+
+**Register the app at Microsoft.** Microsoft Entra admin center, *App registrations*, *New registration*; supported account types as you need; redirect URI of type *Web* with the
+address above; *Certificates & secrets*, new client secret (copy the *value*); *API permissions*, *Add a permission*, *APIs my organization uses*, *Office 365 Exchange Online*,
+*Delegated permissions*: `IMAP.AccessAsUser.All` and `SMTP.Send`; also `offline_access`. Notes: a Microsoft 365 mailbox must allow *Authenticated SMTP* for sending; a company
+tenant may require an admin to consent.
+
+**What you get.** Pick Mail, Contacts and/or Calendar: each becomes a normal account on the page (the Gmail one is IMAP imap.gmail.com + SMTP smtp.gmail.com with
+XOAUTH2; Google contacts and calendar are read over CardDAV and CalDAV with a Bearer token). Outlook **contacts and calendar are not supported**: Microsoft offers them only
+through its Graph API (JSON), not CardDAV/CalDAV, so only Mail is offered for Microsoft.
+**Tokens.** The access token (about an hour) is renewed automatically with the refresh token before it expires; both are sealed with the same key as passwords and never
+sent to the browser. If you revoke the app at Google/Microsoft, or the refresh token expires, the account shows the problem ("could not renew the sign-in ... sign in again") and you
+sign in again. Removing the account deletes the tokens (revoke the app at the provider too if you want it gone there).
+
+**Tested** with a fake OAuth provider and fake IMAP, SMTP and DAV servers (no real Google or Microsoft credentials): code exchange with PKCE, id_token address, refresh and re-sealing,
+a revoked grant, XOAUTH2 login on IMAP and SMTP, Bearer on DAV, the redirect and the one-use state, and the Connections page (`web/test/oauth.sh`, `internal/connectors/oauth_test.go`,
+`internal/webui/oauth_test.go`). **Not tested against the real providers**: the endpoints, scopes and host names are from their documentation.

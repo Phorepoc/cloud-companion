@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# A phecloud configured for "Sign in with Google" against a FAKE provider that the test script runs on 127.0.0.1:9099 (the test container shares this
+# container's network namespace). No real Google credentials are involved.
+services:
+  phecloud:
+    environment:
+      PHECLOUD_OAUTH_GOOGLE_ID: test-client
+      PHECLOUD_OAUTH_GOOGLE_SECRET: test-secret
+      PHECLOUD_OAUTH_GOOGLE_AUTH_URL: http://localhost:9099/auth
+      PHECLOUD_OAUTH_GOOGLE_TOKEN_URL: http://localhost:9099/token

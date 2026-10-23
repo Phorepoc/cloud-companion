@@ -22,6 +22,13 @@ services:
       PHECLOUD_TRUSTED_PROXIES: ${PHECLOUD_TRUSTED_PROXIES:-}
       # the database: a SQLite file (default), or postgres://... / mysql://... (docker-compose.db.yml, docs/database.md)
       PHECLOUD_DB: ${PHECLOUD_DB:-/data/phecloud.db}
+      # "Sign in with Google / Microsoft" on the Connections page: your own OAuth client registrations (docs/connections.md); empty = not offered
+      PHECLOUD_OAUTH_GOOGLE_ID: ${PHECLOUD_OAUTH_GOOGLE_ID:-}
+      PHECLOUD_OAUTH_GOOGLE_SECRET: ${PHECLOUD_OAUTH_GOOGLE_SECRET:-}
+      PHECLOUD_OAUTH_MS_ID: ${PHECLOUD_OAUTH_MS_ID:-}
+      PHECLOUD_OAUTH_MS_SECRET: ${PHECLOUD_OAUTH_MS_SECRET:-}
+      PHECLOUD_OAUTH_MS_TENANT: ${PHECLOUD_OAUTH_MS_TENANT:-common}
+      PHECLOUD_PUBLIC_URL: ${PHECLOUD_PUBLIC_URL:-}
     restart: unless-stopped
     # environment:
     #   PHECLOUD_PLAIN_LISTEN: ":7401"   # development only: plain TCP for client/test/run.sh
