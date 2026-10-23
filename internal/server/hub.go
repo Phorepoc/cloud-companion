@@ -6,6 +6,7 @@ package server
 import (
 	"errors"
 	"os"
+	"strings"
 
 	"github.com/phorepoc/phecloud/internal/proto"
 )
@@ -82,7 +83,24 @@ func (s *session) hubRequest(raw []byte) error {
 		err = hub.MailMove(h.ID2, h.Role)
 	case "mail.delete":
 		err = hub.MailDelete(h.ID2)
+	case "mail.accounts":
+		if s.srv.Sender != nil {
+			res.Accounts = s.srv.Sender.MailAccounts()
+		}
 	case "mail.send":
+		if h.Account != "" { // through an outside account: its SMTP server, the copy in its Sent; no hub-domain restriction applies
+			if s.srv.Sender == nil {
+				return fail(errors.New("no mail account is connected"))
+			}
+			var to []string
+			for _, r := range strings.Split(h.Rcpt, ",") {
+				if r = strings.TrimSpace(r); r != "" {
+					to = append(to, r)
+				}
+			}
+			err = s.srv.Sender.SendAs(h.Account, to, h.Subject, h.Body)
+			break
+		}
 		err = hub.MailSend(h.Rcpt, h.Subject, h.Body, h.HTMLBody, h.ReplyTo)
 	default:
 		err = errors.New("unknown hub operation")

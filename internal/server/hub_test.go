@@ -6,6 +6,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -270,5 +271,55 @@ func TestMailSendHTMLAlternative(t *testing.T) {
 	last := puts[len(puts)-1]
 	if !r.OK || !strings.Contains(last, "multipart/alternative") || !strings.Contains(last, `"type":"text/html"`) || !strings.Contains(last, "u003cb") {
 		t.Fatalf("html alternative: %+v\n%s", r, last)
+	}
+}
+
+type fakeSender struct {
+	acct, subj, body string
+	to               []string
+	fail             bool
+}
+
+func (f *fakeSender) MailAccounts() []proto.MailAccount {
+	return []proto.MailAccount{{ID: "a1", Name: "Work", From: "me@work.example"}}
+}
+func (f *fakeSender) SendAs(a string, to []string, s, b string) error {
+	if f.fail {
+		return errors.New("SMTP login refused")
+	}
+	f.acct, f.to, f.subj, f.body = a, to, s, b
+	return nil
+}
+
+func TestHubSendAs(t *testing.T) {
+	var puts []string
+	srv := fakeHub(&puts)
+	defer srv.Close()
+	hub := &davhub.Client{URL: srv.URL, Owner: "owner@hub.lan", Token: "tok", HTTP: srv.Client()}
+	fs := &fakeSender{}
+	do := func(h proto.Hub) proto.HubRes {
+		fio := &fakeIO{}
+		s := &session{srv: &Server{Hub: hub, Sender: fs}, c: &conn{io: fio}, log: slog.Default()}
+		h.T, h.ID = proto.THub, 7
+		raw, _ := proto.Marshal(h)
+		if err := s.hubRequest(raw); err != nil {
+			t.Fatal(err)
+		}
+		return fio.sent[len(fio.sent)-1].(proto.HubRes)
+	}
+	if r := do(proto.Hub{Op: "mail.accounts"}); !r.OK || len(r.Accounts) != 1 || r.Accounts[0].From != "me@work.example" {
+		t.Fatalf("accounts: %+v", r)
+	}
+	n := len(puts)
+	r := do(proto.Hub{Op: "mail.send", Account: "a1", Rcpt: "x@outside.example, y@outside.example", Subject: "Hi", Body: "text"})
+	if !r.OK || fs.acct != "a1" || len(fs.to) != 2 || fs.to[1] != "y@outside.example" || fs.subj != "Hi" {
+		t.Fatalf("send as: %+v %+v", r, fs)
+	}
+	if len(puts) != n {
+		t.Fatal("a send through an outside account must not touch the hub's own mail")
+	}
+	fs.fail = true
+	if r := do(proto.Hub{Op: "mail.send", Account: "a1", Rcpt: "x@outside.example", Subject: "Hi", Body: "t"}); r.OK || !strings.Contains(r.Err, "login refused") {
+		t.Fatalf("a relay failure must reach the user: %+v", r)
 	}
 }

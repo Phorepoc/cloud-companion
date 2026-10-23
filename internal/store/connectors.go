@@ -175,3 +175,44 @@ func (s *Store) LinkTarget(source, entryID string) (string, bool) {
 	}
 	return h, true
 }
+
+// ---- explicit merges of two entries ON ONE DEVICE/SERVICE (with an undo window) ----
+
+type DevMerge struct {
+	ID         string `json:"id"`
+	Account    string `json:"account"`
+	AHref      string `json:"a_href"`
+	ABody      string `json:"-"`
+	AETag      string `json:"-"`
+	BHref      string `json:"b_href"`
+	BBody      string `json:"-"`
+	BETag      string `json:"-"`
+	MergedBody string `json:"-"`
+	MergedETag string `json:"-"`
+	State      string `json:"state"` // preview | applied | undone
+	Expires    int64  `json:"expires"`
+}
+
+func (s *Store) initDevMerge() error {
+	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS dev_merges(id TEXT PRIMARY KEY, account TEXT, a_href TEXT, a_body TEXT, a_etag TEXT, b_href TEXT, b_body TEXT, b_etag TEXT, merged_body TEXT, merged_etag TEXT, state TEXT, expires INTEGER)`)
+	return err
+}
+
+func (s *Store) DevMergeSave(m DevMerge) DevMerge {
+	if m.ID == "" {
+		b := make([]byte, 6)
+		rand.Read(b)
+		m.ID = hex.EncodeToString(b)
+	}
+	s.db.Exec(`INSERT INTO dev_merges(id,account,a_href,a_body,a_etag,b_href,b_body,b_etag,merged_body,merged_etag,state,expires) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+	  ON CONFLICT(id) DO UPDATE SET state=excluded.state, merged_etag=excluded.merged_etag, expires=excluded.expires`,
+		m.ID, m.Account, m.AHref, m.ABody, m.AETag, m.BHref, m.BBody, m.BETag, m.MergedBody, m.MergedETag, m.State, m.Expires)
+	return m
+}
+
+func (s *Store) DevMergeGet(id string) (DevMerge, bool) {
+	var m DevMerge
+	err := s.db.QueryRow(`SELECT id,account,a_href,a_body,a_etag,b_href,b_body,b_etag,merged_body,COALESCE(merged_etag,''),state,expires FROM dev_merges WHERE id=?`, id).
+		Scan(&m.ID, &m.Account, &m.AHref, &m.ABody, &m.AETag, &m.BHref, &m.BBody, &m.BETag, &m.MergedBody, &m.MergedETag, &m.State, &m.Expires)
+	return m, err == nil
+}

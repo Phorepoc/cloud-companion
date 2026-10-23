@@ -77,6 +77,8 @@
         <form @submit.prevent="send">
           <q-card-section class="ph-formcol">
             <h2>{{ draft.replyTo ? 'Reply' : 'New message' }}</h2>
+            <q-select v-if="accounts.length" v-model="draft.account" :options="fromOptions" emit-value map-options outlined label="From" data-test="mail-from"
+                      hint="Mail through a connected account goes out through that account's own server and is filed in its Sent folder." />
             <q-input v-model="draft.rcpt" label="To" outlined type="email" multiple autofocus hint="Separate addresses with commas." data-test="mail-to" />
             <q-input v-model="draft.subject" label="Subject" outlined data-test="mail-subject" />
             <q-input v-model="draft.body" label="Message" type="textarea" outlined autogrow :input-style="{ minHeight: '160px' }" data-test="mail-body" />
@@ -112,7 +114,9 @@ const formatted = ref(false)
 const composeOpen = ref(false)
 const sending = ref(false)
 const sendError = ref('')
-const draft = ref({ rcpt: '', subject: '', body: '', replyTo: '' })
+const draft = ref({ rcpt: '', subject: '', body: '', replyTo: '', account: '' })
+const accounts = ref([]) // connected accounts that can send (Connections)
+const fromOptions = computed(() => [{ label: 'Hub address (stays on this server)', value: '' }, ...accounts.value.map((a) => ({ label: `${a.name} <${a.from}>`, value: a.id }))])
 
 const order = { inbox: 0, drafts: 1, sent: 2, archive: 3, junk: 4, trash: 5 }
 const folderOptions = computed(() => [...folders.value].sort((a, b) => (order[a.role] ?? 9) - (order[b.role] ?? 9) || a.name.localeCompare(b.name))
@@ -131,6 +135,7 @@ async function init() {
   error.value = ''
   try {
     folders.value = (await hubCall({ op: 'mail.folders' })).folders || []
+    try { accounts.value = (await hubCall({ op: 'mail.accounts' })).accounts || [] } catch (e) { accounts.value = [] }
     if (!folder.value) folder.value = (folders.value.find((f) => f.role === 'inbox') || folders.value[0] || {}).id || ''
     if (folder.value) await loadList(true)
   } catch (e) {
@@ -203,7 +208,7 @@ function move(t) {
 }
 
 function openCompose(init) {
-  draft.value = { rcpt: '', subject: '', body: '', replyTo: '', ...init }
+  draft.value = { rcpt: '', subject: '', body: '', replyTo: '', account: accounts.value.length === 1 && !init ? '' : '', ...init }
   sendError.value = ''
   open.value = false
   composeOpen.value = true
@@ -211,14 +216,17 @@ function openCompose(init) {
 function reply() {
   const m = msg.value
   const quoted = (m.text || '').split('\n').map((l) => '> ' + l).join('\n')
-  openCompose({ rcpt: m.fromaddr || '', subject: /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject, replyTo: m.msgid || '',
+  // an answer goes out through the account the message came from (its hub folder is named "<account> / <folder>")
+  const fname = (folders.value.find((f) => f.id === folder.value) || {}).name || ''
+  const acct = accounts.value.find((a) => fname.startsWith(a.name + ' / '))
+  openCompose({ account: acct ? acct.id : '', rcpt: m.fromaddr || '', subject: /^re:/i.test(m.subject) ? m.subject : 'Re: ' + m.subject, replyTo: m.msgid || '',
     body: `\n\nOn ${new Date(m.date).toLocaleString()}, ${m.from} wrote:\n${quoted}` })
 }
 async function send() {
   sending.value = true
   sendError.value = ''
   try {
-    await hubCall({ op: 'mail.send', rcpt: draft.value.rcpt, subject: draft.value.subject, body: draft.value.body, replyto: draft.value.replyTo || undefined })
+    await hubCall({ op: 'mail.send', rcpt: draft.value.rcpt, subject: draft.value.subject, body: draft.value.body, replyto: draft.value.replyTo || undefined, acct: draft.value.account || undefined })
     composeOpen.value = false
     toast('Message sent')
     await refresh()

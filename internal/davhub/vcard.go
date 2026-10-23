@@ -150,3 +150,8 @@ func writeVCard(c proto.Contact, uid string, extra []string) string {
 	line("END:VCARD")
 	return b.String()
 }
+
+// ParseVCard and WriteVCard expose the vCard mapping to the connectors (a merge on a device writes a card back through its own
+// CardDAV connector). extra carries the properties the app does not model, so a rewrite does not lose them.
+func ParseVCard(data string) (proto.Contact, string, []string)      { return parseVCard(data) }
+func WriteVCard(c proto.Contact, uid string, extra []string) string { return writeVCard(c, uid, extra) }

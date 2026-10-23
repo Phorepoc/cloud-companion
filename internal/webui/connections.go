@@ -139,7 +139,24 @@ func (c *conns) routes(mux *http.ServeMux) {
 			}
 			out = append(out, s)
 		}
-		reply(w, 200, map[string]any{"suggestions": out, "contacts": len(cs)})
+		// both entries on ONE device/service? then an explicit merge on that device is possible
+		type sug struct {
+			connectors.Suggestion
+			SameSource string `json:"same_source,omitempty"`
+			SourceName string `json:"source_name,omitempty"`
+		}
+		res := make([]sug, 0, len(out))
+		for _, s := range out {
+			x := sug{Suggestion: s}
+			la, lb := c.st.Links(s.A), c.st.Links(s.B)
+			if len(la) == 1 && len(lb) == 1 && la[0].Source == lb[0].Source {
+				if a, ok := c.st.Account(la[0].Source); ok && a.Kind == "carddav" {
+					x.SameSource, x.SourceName = a.ID, a.Name
+				}
+			}
+			res = append(res, x)
+		}
+		reply(w, 200, map[string]any{"suggestions": res, "contacts": len(cs)})
 	})
 	mux.HandleFunc("/api/duplicates/dismiss", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ A, B string }
@@ -169,10 +186,79 @@ func (c *conns) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"ok": true, "contact": merged.Name})
 	})
+	mux.HandleFunc("/api/devmerge/preview", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ Account, A, B string }
+		if !c.admin(w, r) || !readJSON(w, r, &in) {
+			return
+		}
+		dav, pass, err := c.m.DAV(in.Account)
+		if err != nil {
+			bad(w, 404, err.Error())
+			return
+		}
+		href := func(hub string) string {
+			for _, l := range c.st.Links(hub) {
+				if l.Source == in.Account {
+					return l.EntryID
+				}
+			}
+			return ""
+		}
+		ha, hb := href(in.A), href(in.B)
+		if ha == "" || hb == "" {
+			bad(w, 404, "these contacts are not both entries of that account")
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+		p, err := connectors.PreviewDeviceMerge(ctx, c.st, in.Account, dav, pass, ha, hb)
+		if err != nil {
+			bad(w, 502, err.Error())
+			return
+		}
+		reply(w, 200, p)
+	})
+	mux.HandleFunc("/api/devmerge/apply", func(w http.ResponseWriter, r *http.Request) { c.devMerge(w, r, false) })
+	mux.HandleFunc("/api/devmerge/undo", func(w http.ResponseWriter, r *http.Request) { c.devMerge(w, r, true) })
 	mux.HandleFunc("/api/links", func(w http.ResponseWriter, r *http.Request) {
 		if !c.admin(w, r) {
 			return
 		}
 		reply(w, 200, map[string]any{"links": c.st.Links(r.URL.Query().Get("hub"))})
 	})
+}
+
+// devMerge applies or undoes a previewed merge on the device, then syncs that account so the hub copies follow.
+func (c *conns) devMerge(w http.ResponseWriter, r *http.Request, undo bool) {
+	var in struct{ ID string }
+	if !c.admin(w, r) || !readJSON(w, r, &in) {
+		return
+	}
+	m, ok := c.st.DevMergeGet(in.ID)
+	if !ok {
+		bad(w, 404, "unknown merge")
+		return
+	}
+	dav, pass, err := c.m.DAV(m.Account)
+	if err != nil {
+		bad(w, 404, err.Error())
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+	defer cancel()
+	if undo {
+		err = connectors.UndoDeviceMerge(ctx, c.st, in.ID, dav, pass)
+	} else {
+		err = connectors.ApplyDeviceMerge(ctx, c.st, in.ID, dav, pass)
+	}
+	if err != nil {
+		bad(w, 409, err.Error())
+		return
+	}
+	go func() {
+		bg, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		c.m.SyncNow(bg, m.Account)
+	}()
+	reply(w, 200, map[string]any{"ok": true, "id": in.ID, "undo_until": time.Now().Add(connectors.UndoWindow).Unix()})
 }

@@ -138,6 +138,7 @@ func main() {
 				log.Error("connectors disabled", "err", verr)
 			} else {
 				mgr = connectors.NewManager(st, srv.Hub, vault)
+				srv.Sender = mgr
 				if srv.Hub != nil {
 					go mgr.Loop(context.Background(), 15*time.Minute)
 				}

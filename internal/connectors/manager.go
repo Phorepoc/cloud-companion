@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/davhub"
+	"github.com/phorepoc/phecloud/internal/proto"
 	"github.com/phorepoc/phecloud/internal/store"
 )
 
@@ -181,4 +182,38 @@ func (m *Manager) Send(accountID string, to []string, subject, body string) erro
 		return err
 	}
 	return Relay(c, pass, c.From, to, BuildMessage(c.From, to, subject, body))
+}
+
+// MailAccounts lists the accounts that can send (an IMAP account with an SMTP server and a sender address).
+func (m *Manager) MailAccounts() []proto.MailAccount {
+	var out []proto.MailAccount
+	for _, a := range m.St.Accounts() {
+		if a.Kind != "imap" {
+			continue
+		}
+		var c MailCfg
+		if json.Unmarshal([]byte(a.Config), &c) == nil && c.SMTP.Host != "" && c.From != "" {
+			out = append(out, proto.MailAccount{ID: a.ID, Name: a.Name, From: c.From})
+		}
+	}
+	return out
+}
+
+// SendAs is Send under the name the server's MailSender interface uses.
+func (m *Manager) SendAs(account string, to []string, subject, body string) error {
+	return m.Send(account, to, subject, body)
+}
+
+// DAV returns the configuration and password of a CardDAV account (for writes that go back to the device).
+func (m *Manager) DAV(accountID string) (DAVCfg, string, error) {
+	a, ok := m.St.Account(accountID)
+	if !ok || a.Kind != "carddav" {
+		return DAVCfg{}, "", errors.New("no such contacts account")
+	}
+	var c DAVCfg
+	if err := json.Unmarshal([]byte(a.Config), &c); err != nil {
+		return c, "", err
+	}
+	p, err := m.secret(a)
+	return c, p, err
 }

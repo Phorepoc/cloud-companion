@@ -46,6 +46,9 @@ func Open(path string) (*Store, error) {
 	if err := st.initSMS(); err != nil {
 		return nil, err
 	}
+	if err := st.initDevMerge(); err != nil {
+		return nil, err
+	}
 	return st, nil
 }
 

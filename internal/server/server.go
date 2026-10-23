@@ -30,7 +30,15 @@ type Server struct {
 	Browser browser.Factory
 	Log     *slog.Logger
 	Hub     *davhub.Client // the personal hub (contacts, calendar); nil when not configured
+	Sender  MailSender     // connected mail accounts that can relay outgoing mail; nil when there are none
 	reg     registry
+}
+
+// MailSender relays mail through a connected account's own SMTP server and files the copy in that account's Sent folder
+// (connectors.Manager).
+type MailSender interface {
+	MailAccounts() []proto.MailAccount
+	SendAs(account string, to []string, subject, body string) error
 }
 
 func MAC(key, nonce []byte) []byte {

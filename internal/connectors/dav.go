@@ -208,3 +208,24 @@ func SyncDAV(ctx context.Context, account, kind string, c DAVCfg, pass string, h
 	}
 	return changed, removed, nil
 }
+
+// davDoH is davDo that also returns the response headers (ETag after a PUT, for the guarded merges).
+func davDoH(ctx context.Context, c DAVCfg, pass, method, u, body string, hdr map[string]string) (int, []byte, http.Header, error) {
+	req, err := http.NewRequestWithContext(ctx, method, u, strings.NewReader(body))
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	if c.User != "" {
+		req.SetBasicAuth(c.User, pass)
+	}
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := davClient().Do(req)
+	if err != nil {
+		return 0, nil, nil, err
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+	return resp.StatusCode, b, resp.Header, nil
+}

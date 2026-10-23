@@ -46,9 +46,14 @@
           </div>
           <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_a)" data-test="dup-keep-a" @click="merge(d, d.a, d.b)" />
           <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_b)" data-test="dup-keep-b" @click="merge(d, d.b, d.a)" />
+          <q-btn v-if="d.same_source" flat no-caps color="warning" icon="sym_o_merge" :label="'Merge on ' + d.source_name + '…'" data-test="dup-device-merge" @click="previewDevice(d)" />
           <q-btn flat no-caps label="Not the same" data-test="dup-dismiss" @click="dismiss(d)" />
         </li>
       </ul>
+      <p v-if="undoable" class="ph-note" role="status" data-test="undo-bar">
+        <q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Merged on {{ undoable.source }}. You can undo this for 10 minutes.
+        <q-btn flat no-caps color="primary" label="Undo" data-test="devmerge-undo" @click="undoDevice" />
+      </p>
       <p v-if="dupError" class="ph-error" role="alert" data-test="dup-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ dupError }}</p>
     </section>
 
@@ -92,6 +97,20 @@
       </q-card>
     </q-dialog>
 
+    <q-dialog :model-value="!!devPreview" @update:model-value="devPreview = null">
+      <q-card class="ph-dialog" data-test="devmerge-dialog">
+        <q-card-section>
+          <h2 class="ph-h3">Merge on {{ devPreview && devSource }}?</h2>
+          <p class="ph-muted">This changes the contact list on that account itself. Exactly this will happen:</p>
+          <ul class="ph-changes" data-test="devmerge-changes"><li v-for="(c, i) in (devPreview ? devPreview.changes : [])" :key="i">{{ c }}</li></ul>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" @click="devPreview = null" />
+          <q-btn unelevated color="primary" label="Merge on the account" data-test="devmerge-confirm" @click="applyDevice" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog :model-value="!!askRemove" @update:model-value="askRemove = null">
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
@@ -122,6 +141,9 @@ const testResult = ref(null)
 const dups = ref(null)
 const dupError = ref('')
 const finding = ref(false)
+const devPreview = ref(null)
+const devSource = ref('')
+const undoable = ref(null)
 let timer = null
 
 const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }]
@@ -182,6 +204,24 @@ async function merge(d, keep, drop) {
   dupError.value = ''
   try { await apiCall('POST', '/api/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = e.message }
 }
+async function previewDevice(d) {
+  dupError.value = ''
+  try { devPreview.value = await apiCall('POST', '/api/devmerge/preview', { account: d.same_source, a: d.a, b: d.b }); devSource.value = d.source_name } catch (e) { dupError.value = e.message }
+}
+async function applyDevice() {
+  const p = devPreview.value
+  devPreview.value = null
+  try {
+    await apiCall('POST', '/api/devmerge/apply', { id: p.id })
+    undoable.value = { id: p.id, source: devSource.value }
+    setTimeout(() => { if (undoable.value && undoable.value.id === p.id) undoable.value = null }, 10 * 60 * 1000)
+    await findDups()
+  } catch (e) { dupError.value = e.message }
+}
+async function undoDevice() {
+  const u = undoable.value
+  try { await apiCall('POST', '/api/devmerge/undo', { id: u.id }); undoable.value = null; await findDups() } catch (e) { dupError.value = e.message }
+}
 async function dismiss(d) {
   try { await apiCall('POST', '/api/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = dups.value.filter((x) => x !== d) } catch (e) { dupError.value = e.message }
 }
@@ -204,5 +244,6 @@ onBeforeUnmount(() => clearInterval(timer))
 .ph-dialog { width: min(94vw, 480px); background: var(--ph-surface); color: var(--ph-text); max-height: 90vh; overflow: auto; }
 .ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-two { display: grid; grid-template-columns: 1fr 110px; gap: var(--ph-s2); }
+.ph-changes { margin: var(--ph-s2) 0 0; padding-left: var(--ph-s4); display: flex; flex-direction: column; gap: var(--ph-s1, 4px); }
 .ph-h3 { font-size: var(--ph-text-h3, 1.1rem); margin: 0; }
 </style>

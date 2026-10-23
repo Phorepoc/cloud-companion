@@ -460,26 +460,35 @@ type Hub struct {
 	Subject  string   `cbor:"subject,omitempty"`
 	Body     string   `cbor:"body,omitempty"`
 	HTMLBody string   `cbor:"htmlbody,omitempty"` // mail.send: an HTML alternative (used by tests to deliver an HTML message locally)
+	Account  string   `cbor:"acct,omitempty"`     // mail.send: send through this connected mail account (its own SMTP server, copy in its Sent)
 	ReplyTo  string   `cbor:"replyto,omitempty"`  // mail.send: the Message-ID being answered
 }
 
+// MailAccount is a connected account that can send (shown in the composer's "From").
+type MailAccount struct {
+	ID   string `cbor:"id"`
+	Name string `cbor:"name"`
+	From string `cbor:"from"`
+}
+
 type HubRes struct {
-	T        string       `cbor:"t"`
-	ID       int          `cbor:"id"`
-	OK       bool         `cbor:"ok"`
-	Err      string       `cbor:"err,omitempty"`
-	Contacts []Contact    `cbor:"contacts,omitempty"`
-	Events   []Event      `cbor:"events,omitempty"`
-	Contact  *Contact     `cbor:"contact,omitempty"`
-	Event    *Event       `cbor:"event,omitempty"`
-	AppPws   []AppPw      `cbor:"apppws,omitempty"`
-	Secret   string       `cbor:"secret,omitempty"` // apppw.add: shown once
-	Owner    string       `cbor:"owner,omitempty"`
-	Domain   string       `cbor:"domain,omitempty"`
-	Folders  []MailFolder `cbor:"folders,omitempty"`
-	Mails    []MailItem   `cbor:"mails,omitempty"`
-	Total    int          `cbor:"total,omitempty"`
-	Mail     *MailBody    `cbor:"mail,omitempty"`
+	Accounts []MailAccount `cbor:"accounts,omitempty"`
+	T        string        `cbor:"t"`
+	ID       int           `cbor:"id"`
+	OK       bool          `cbor:"ok"`
+	Err      string        `cbor:"err,omitempty"`
+	Contacts []Contact     `cbor:"contacts,omitempty"`
+	Events   []Event       `cbor:"events,omitempty"`
+	Contact  *Contact      `cbor:"contact,omitempty"`
+	Event    *Event        `cbor:"event,omitempty"`
+	AppPws   []AppPw       `cbor:"apppws,omitempty"`
+	Secret   string        `cbor:"secret,omitempty"` // apppw.add: shown once
+	Owner    string        `cbor:"owner,omitempty"`
+	Domain   string        `cbor:"domain,omitempty"`
+	Folders  []MailFolder  `cbor:"folders,omitempty"`
+	Mails    []MailItem    `cbor:"mails,omitempty"`
+	Total    int           `cbor:"total,omitempty"`
+	Mail     *MailBody     `cbor:"mail,omitempty"`
 }
 
 // ---- hub: app passwords (admin devices) and mail (read-only) ----
