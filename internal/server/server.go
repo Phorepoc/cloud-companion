@@ -32,6 +32,7 @@ type Server struct {
 	Hub     *davhub.Client // the personal hub (contacts, calendar); nil when not configured
 	Sender  MailSender     // connected mail accounts that can relay outgoing mail; nil when there are none
 	reg     registry
+	fails   authFails
 }
 
 // MailSender relays mail through a connected account's own SMTP server and files the copy in that account's Sent folder
@@ -96,11 +97,16 @@ func (s *Server) ServeConn(fio FrameIO, remote string) {
 	if c.send(proto.Challenge{T: proto.TChallenge, Proto: proto.Version, Nonce: nonce}) != nil {
 		return
 	}
+	if s.fails.blocked(remote) { // too many failed sign-ins or pairings from this address in the last minute
+		c.send(proto.Error{T: proto.TError, Msg: "too many failed attempts, wait a minute"})
+		return
+	}
 	authTimer := time.AfterFunc(20*time.Second, func() { fio.Close() })
 	dev, admin, err := s.auth(c, fio, nonce)
 	authTimer.Stop()
 	if err != nil {
 		log.Warn("auth failed", "err", err)
+		s.fails.add(remote)
 		c.send(proto.Error{T: proto.TError, Msg: err.Error()})
 		return
 	}
