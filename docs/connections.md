@@ -103,7 +103,7 @@ one access token per resource (Graph and Outlook mail are different resources), 
 Tested against a fake Graph server (`internal/connectors/graph_test.go`: paging, delta, removal, 410, bad token, mapping); not against the real service.
 
 ## Proton
-Proton encrypts end to end, so it offers no IMAP, CalDAV or CardDAV of its own and no public API. What works, and what does not:
+Proton encrypts end to end, so it offers no IMAP of its own and no public API. Mail works through Proton's official Bridge:
 
 ### Mail: through Proton Mail Bridge (official)
 Run Proton's own **Mail Bridge** (paid Proton plans) on a machine you control; it decrypts locally and speaks IMAP/SMTP on the machine's loopback (usually `127.0.0.1`, IMAP 1143 and SMTP 1025, both STARTTLS).
@@ -114,16 +114,8 @@ Add it as an ordinary Mail account:
 - **Sending** goes through the Bridge's SMTP the same way (same fingerprint, same bridge password, "Outgoing security" STARTTLS); the copy is appended to Sent as for any account.
 Tested with an IMAP server presenting a self-signed certificate (`proton_test.go`: unknown certificate reported with its fingerprint, pinned works, wrong pin refused, wrong password a login error). Not tested against the real Bridge.
 
-### Calendar: a share link (read-only, official)
-Proton Calendar can make a **share link** (an `.ics` address) for a calendar. Add it as **Calendar link (ICS subscription)**: phecloud fetches the feed every sync, writes each event into the hub calendar and deletes
-events that disappear from the feed. One way only, and it follows what Proton publishes (the feed is a snapshot that may lag; turning the link off ends the sync, and the error says so). Any other `.ics` link works too.
+### Calendar, Contacts, Drive, Lumo
+Not supported: they wait for official Proton support (Proton offers no third-party API for them yet).
 
-### Calendar and contacts, read and write: an unofficial bridge (optional, your choice)
-Proton has no CalDAV/CardDAV. Third-party bridges that speak Proton's **private** API and expose DAV on localhost exist; the one looked at is
-[carbonate](https://github.com/develonrails/carbonate) (Go, MIT licence, created September 2026, last push 2026-10-17, 7 stars; its own README says it is a work in progress with no tagged release, tracks `main`,
-and that Proton can change the private API without warning). It builds on hydroxide (archived) and protoxide. **Unofficial, uses a private API, holds the keys to your calendar and contacts: treat it as an experiment and
-keep the web app as a way back.** Phecloud does not bundle it. If you choose to run it as a separate container, connect it with the ordinary **Contacts (CardDAV)** and **Calendar (CalDAV)** connectors (its address, its bridge
-password, which is not the Proton password). Note that these connectors pull one way into the hub; writing back to Proton is not done by phecloud.
-
-### Drive and Lumo: later
-There is no official API for third parties to Proton Drive or Lumo. Proton has said a Drive SDK opens around the end of 2026 or early 2027. Nothing is built; revisit when it is published.
+## Calendar link (ICS subscription)
+Any read-only `.ics` / `webcal://` feed can be added as **Calendar link (ICS subscription)**: each sync writes its events into the hub calendar and deletes events that left the feed. One way only.
