@@ -11,7 +11,7 @@ const router = createRouter({
     { path: '/', redirect: '/browse' },
     { path: '/pair', component: () => import('./pages/PairPage.vue') },
     { path: '/browse', component: () => import('./pages/BrowserPage.vue') },
-    section('chats'),
+    { path: '/chats', component: () => import('./pages/ChatsPage.vue') },
     { path: '/mail', component: () => import('./pages/MailPage.vue') },
     { path: '/calendar', component: () => import('./pages/CalendarPage.vue') },
     { path: '/contacts', component: () => import('./pages/ContactsPage.vue') },

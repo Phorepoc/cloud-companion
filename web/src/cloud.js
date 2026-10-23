@@ -210,7 +210,7 @@ export const api = {
 }
 
 // test/debug hook (the Playwright smoke test reads it)
-window.__phe = Object.assign(window.__phe || {}, { state, hubCall: (m) => hubCall(m) })
+window.__phe = Object.assign(window.__phe || {}, { state, hubCall: (m) => hubCall(m), apiCall: (m, p, b) => apiCall(m, p, b) })
 
 // ---- the personal hub (contacts, calendar): one request, one answer, matched by id ----
 const hubPending = new Map()
@@ -308,7 +308,7 @@ async function signed(method, path, body) {
   if (!creds.value || !crypto.subtle) throw new Error('This needs a secure page (https or localhost) and a signed-in browser.')
   const ts = String(Math.floor(Date.now() / 1000))
   const k = await crypto.subtle.importKey('raw', creds.value.key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`${creds.value.dev}.${ts}.${method} ${path}`)))
+  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`${creds.value.dev}.${ts}.${method} ${path.split('?')[0]}`)))
   const hdr = { 'X-Phe-Auth': `${creds.value.dev}.${ts}.${Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('')}` }
   return { headers: hdr, body }
 }
