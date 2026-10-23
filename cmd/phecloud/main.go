@@ -14,6 +14,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log/slog"
@@ -24,6 +25,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/browser"
+	"github.com/phorepoc/phecloud/internal/connectors"
 	"github.com/phorepoc/phecloud/internal/davhub"
 	"github.com/phorepoc/phecloud/internal/server"
 	"github.com/phorepoc/phecloud/internal/store"
@@ -130,7 +132,17 @@ func main() {
 				os.Exit(1)
 			}
 			log.Info("web app listening", "addr", hln.Addr().String())
-			go http.Serve(hln, webui.Handler(srv))
+			vault, verr := connectors.OpenVault(env("PHECLOUD_TLSDIR", "/data"))
+			var mgr *connectors.Manager
+			if verr != nil {
+				log.Error("connectors disabled", "err", verr)
+			} else {
+				mgr = connectors.NewManager(st, srv.Hub, vault)
+				if srv.Hub != nil {
+					go mgr.Loop(context.Background(), 15*time.Minute)
+				}
+			}
+			go http.Serve(hln, webui.Handler(srv, mgr))
 		}
 		log.Error("serve", "err", srv.Serve(ln))
 	default:

@@ -13,6 +13,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/phorepoc/phecloud/internal/connectors"
 	"github.com/phorepoc/phecloud/internal/proto"
 	"github.com/phorepoc/phecloud/internal/server"
 )
@@ -45,7 +46,7 @@ func (w *wsIO) Write(v any) error {
 func (w *wsIO) Close() error { return w.c.CloseNow() }
 
 // Handler serves the web app at / and the frame WebSocket at /ws.
-func Handler(s *server.Server) http.Handler {
+func Handler(s *server.Server, m *connectors.Manager) http.Handler {
 	mux := http.NewServeMux()
 	sub, _ := fs.Sub(distFS, "dist")
 	files := http.FileServer(http.FS(sub))
@@ -55,7 +56,11 @@ func Handler(s *server.Server) http.Handler {
 		}
 		files.ServeHTTP(w, r)
 	}))
-	newAuth(s.Store).routes(mux)
+	a := newAuth(s.Store)
+	a.routes(mux)
+	if m != nil {
+		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
+	}
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, nil)
 		if err != nil {

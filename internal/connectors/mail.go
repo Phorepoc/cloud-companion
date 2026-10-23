@@ -220,7 +220,8 @@ func TestSMTP(c ServerCfg, pass string) error {
 			return fmt.Errorf("login refused: %w", err)
 		}
 	}
-	return cl.Quit()
+	cl.Quit() // the server may close without a clean reply; the login already worked
+	return nil
 }
 
 // Relay sends the message through the account's SMTP server and appends a copy to the account's Sent folder.

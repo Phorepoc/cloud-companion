@@ -166,3 +166,12 @@ func (s *Store) MoveLinks(from, to string) {
 func (s *Store) UnlinkSource(source string) {
 	s.db.Exec(`DELETE FROM contact_links WHERE source=?`, source)
 }
+
+// LinkTarget returns the hub contact a source entry is linked to.
+func (s *Store) LinkTarget(source, entryID string) (string, bool) {
+	var h string
+	if err := s.db.QueryRow(`SELECT hub_id FROM contact_links WHERE source=? AND entry_id=?`, source, entryID).Scan(&h); err != nil {
+		return "", false
+	}
+	return h, true
+}
