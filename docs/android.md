@@ -53,9 +53,19 @@ swipes and presses Home through pointer events and checks that the screen change
 - **Install apps**: *Install an APK file* uploads a file (up to 512 MB) and runs `adb install -r -g`; *Install from F-Droid* takes a package name (for example `org.fossify.notes`), downloads the suggested build from f-droid.org
   (the bridge container needs internet access) and installs it. Apps whose suggested build is ARM-only fail with the install error text, since the image has no translation layer. Installing needs the viewer's session (given by the open stream), not just a ticket.
 
+## In the web app
+**Android** (admin devices) is a native page of the app, not an embedded page: `web/src/pages/AndroidPage.vue` imports the stream module `web/src/android/stream.js` (framework-free: WebCodecs video and audio,
+the WebSocket, pointer / wheel / keyboard / clipboard events, installs). The app fetches the ticket itself (`/phe/android/ticket`), draws into a canvas inside a phone-shaped frame that takes the stream's own aspect ratio
+(so it follows rotation) and is as large as the content area allows (desktop, tablet and phone widths), and offers the controls as app buttons: Back, Home, Recent, Sound, Copy from phone, Paste to phone, Install apps (a dialog for an
+APK file or an F-Droid package name). A status chip shows Connecting / Connected / the reason it closed (including "Another viewer took over this Android"), and **Reconnect** fetches a fresh ticket.
+The page's address accepts `#/android?codec=vp8&size=720&fps=30&kbps=2000&audio=0`. The bridge's standalone page at `/android/` (plain controls, no app around it) uses the same module: `cmd/pheandroid/stream.js` is an
+embedded copy, and a Go test fails if the two differ.
+
 ## Verified, and what only a real browser can check
-Automated (headless Chromium, `web/test/android.sh`): scroll wheel changes the screen; rotating the device gives a 720x404 canvas and back to 404x720, and a tap in landscape lands correctly; browser clipboard text arrives in a focused
-text field on the phone (read back from the UI hierarchy) and the phone's selected text comes back to the browser; APK upload and F-Droid install both end in `Success` and the packages are listed; a bad package name is refused;
-audio: Opus decoded in the browser (254,000 samples in 4 s of mostly silence).
-**Not verified (needs a real Chrome/Firefox/Safari, which the test image does not have):** H.264 decoding (the default codec; only the bytes on the wire are checked, and the test decodes VP8 instead), audible output, the
-browser's clipboard permission prompts, and the iframe-in-the-web-app path with a real admin device's ticket (the ticket endpoint and format are unit-tested and a minted ticket works through the hub's Caddy).
+**Verified by the user in a real browser:** H.264 decoding (the default codec) and the ticket path from the web app (the stream played). The framing of the page (iframe) was rejected, hence the native page above.
+Automated (headless Chromium, `web/test/android.sh`, which runs `android.mjs` against the bridge directly and `androidapp.mjs` against phecloud + Caddy, as in the hub): scroll wheel changes the screen; rotating the device gives a
+landscape canvas and back, and a tap in landscape lands correctly; browser clipboard text arrives in a focused text field on the phone (read back from the UI hierarchy) and the phone's selected text comes back to the browser;
+APK upload and F-Droid install end in `Success` and the packages are listed; a bad package name is refused; audio: Opus decoded in the browser. The app page is checked at 1280x800 and 390x844, portrait and landscape, light and dark
+(screenshots in `web/test/screenshots/android/androidapp-*.png`): the frame has the stream's aspect ratio, nothing scrolls sideways, the whole screen fits on desktop, the Home / swipe controls change the screen, the install dialog
+installs an APK, Reconnect brings the stream back, and a second viewer shows the first one "Another viewer took over this Android".
+**Not verified (a real browser is needed):** audible output, the browser's clipboard permission prompts, Safari and Firefox.
