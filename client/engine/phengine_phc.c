@@ -58,7 +58,8 @@
 extern void phc_log(const char *msg);
 extern void phc_mem(const char *tag);       /* heap use of this thread, logged */       /* phewebengine_phecloud.cpp: RDebug + C:\data\phecloud_trace.txt */
 
-enum { RQ_LOAD = 1, RQ_ACTION, RQ_DOWN, RQ_TAP, RQ_CANCEL, RQ_TEXT, RQ_KEY, RQ_SCROLL, RQ_DIALOG, RQ_SUSPEND, RQ_STOP };
+enum { RQ_LOAD = 1, RQ_ACTION, RQ_DOWN, RQ_TAP, RQ_CANCEL, RQ_TEXT, RQ_KEY, RQ_SCROLL, RQ_DIALOG, RQ_SUSPEND, RQ_STOP, RQ_CHAR, RQ_BKSP };
+enum { ST_NONE = 0, ST_FORM, ST_CONFIRM };      /* the pairing screen's state */
 
 typedef struct { int kind, a, b, ok; char s[PHC_URL_MAX]; char s2[64]; } req_t;
 
@@ -68,6 +69,8 @@ typedef struct {
     uint32_t *dec; unsigned stamp;    /* decoded BGRA, or NULL */
     int used;
 } tile_t;
+
+typedef struct { char host[128], port[8], pin[80], code[32], dev[48], key[80], name[48]; } cfg_t;
 
 typedef struct view {
     int used;
@@ -86,6 +89,9 @@ typedef struct view {
     int dlg_id, dlg_kind;
     int loading, progress, can_back, can_fwd, sec, scroll_y, page_h, page_trunc, focus, dirty;
     int discarded, pid;
+    int setup, sfocus;                 /* the pairing screen: ST_*, focused field (0 none, 1 server, 2 code) */
+    char shost[96], scode[32], smsg[96], sfp[68], spending[PHC_URL_MAX];
+    cfg_t scfg;
     int down, down_x, down_y, moved, hl_active, hl_x, hl_y, hl_w, hl_h;
     long scroll_sent_ms; int scroll_unsent;
     /* pixels */
@@ -183,7 +189,6 @@ static void copy_str(char *dst, size_t cap, const char *src)
 }
 
 /* ---- configuration -------------------------------------------------------------------------------------------------- */
-typedef struct { char host[128], port[8], pin[80], code[32], dev[48], key[80], name[48]; } cfg_t;
 
 static int hexval(int c)
 {
@@ -467,6 +472,8 @@ static void tint(view_t *v, int x, int y, int w, int h)      /* tap feedback: a 
         }
 }
 
+static void setup_draw(view_t *v);
+
 /* thread-owned phc state is read here (layers); called only from the view's thread */
 static void compose(view_t *v)
 {
@@ -478,6 +485,7 @@ static void compose(view_t *v)
     pthread_mutex_unlock(&v->mu);
     pthread_mutex_lock(&v->pixmu);
     if (!v->px) { pthread_mutex_unlock(&v->pixmu); return; }
+    if (v->setup) { setup_draw(v); pthread_mutex_unlock(&v->pixmu); post(v, PHE_EV_REPAINT, 0, 0, 0); return; }
     v->stamp++;
     PHC_TRACE({ char m[96]; snprintf(m, sizeof m, "compose sy=%d tiles=%d layers=%d view=%dx%d", sy, v->ntiles, c->nlayers, v->w, v->h); phc_log(m); })
     for (i = 0; i < v->w * v->h; i++) v->px[i] = 0xFFFFFFFFu;
@@ -657,37 +665,36 @@ static void fail(view_t *v, const char *msg, int code)
     trace("fail", msg);
 }
 
-static int session_open(view_t *v, const char *url)
+/* connect + TLS handshake; pin = NULL: nothing to compare (the caller shows the fingerprint). 0 or -1 (the reason is in *why) */
+static int session_connect(view_t *v, const cfg_t *cfg, const uint8_t *pin, const char **why)
 {
-    cfg_t cfg;
-    uint8_t pin[32];
     int rc, vi = (int)(v - views);
-    if (cfg_read(&cfg) != 0) { fail(v, "No server set: put host=, pin= and code= in C:\\data\\phecloud.ini", -1); return -1; }
-    v->sock = net_connect(cfg.host, cfg.port);
-    if (v->sock < 0) { fail(v, "Cannot reach the phecloud server", -2); return -1; }
+    v->sock = net_connect(cfg->host, cfg->port);
+    if (v->sock < 0) { *why = "Cannot reach the phecloud server"; return -1; }
     rs_store[vi].fd = v->sock;
     v->c = (phc *)calloc(1, sizeof(phc));
     v->rx = (uint8_t *)malloc(RXCAP);
-    if (!v->c || !v->rx) { fail(v, "Out of memory", -3); teardown(v); return -1; }
+    if (!v->c || !v->rx) { *why = "Out of memory"; teardown(v); return -1; }
     {
         phc_raw_io raw;
         raw.ctx = &rs_store[vi]; raw.send = raw_send; raw.recv = raw_recv; raw.wait = raw_wait;
-        if (phc_tls_init(&v->tls, raw, cfg.pin[0] && unhex(cfg.pin, pin, 32) == 0 ? pin : NULL) != 0) {
-            fail(v, "TLS setup failed", -4); free(v->c); v->c = NULL; free(v->rx); v->rx = NULL; close(v->sock); v->sock = -1; return -1;
+        if (phc_tls_init(&v->tls, raw, pin) != 0) {
+            *why = "TLS setup failed"; free(v->c); v->c = NULL; free(v->rx); v->rx = NULL; close(v->sock); v->sock = -1; return -1;
         }
     }
     rc = phc_tls_handshake(&v->tls);
     if (rc != PHC_OK) {
-        fail(v, rc == PHC_ERR_AUTH ? "The server certificate does not match the pinned fingerprint" : "TLS handshake failed", rc);
+        *why = rc == PHC_ERR_AUTH ? "The server certificate does not match the pinned fingerprint" : "TLS handshake failed";
         teardown(v);
         return -1;
     }
-    if (!cfg.pin[0]) {          /* trust on first use: remember the fingerprint (only reached when no pin was configured) */
-        uint8_t seen[32];
-        phc_tls_peer_fingerprint(&v->tls, seen);
-        tohex(seen, 32, cfg.pin);
-        cfg_write(&cfg);
-    }
+    return 0;
+}
+
+/* authenticate (or pair with cfg->code), remember the credentials, open the page */
+static int session_finish(view_t *v, cfg_t *cfg, const char *url, const char **why)
+{
+    int rc;
     phc_init(v->c, phc_tls_transport(&v->tls, 0), v->rx, RXCAP);
     {
         phc_events ev;
@@ -697,22 +704,245 @@ static int session_open(view_t *v, const char *url)
         phc_set_events(v->c, ev);
     }
     memset(&v->cr, 0, sizeof v->cr);
-    if (cfg.dev[0] && cfg.key[0] && unhex(cfg.key, v->cr.key, 32) == 0) { copy_str(v->cr.dev, sizeof v->cr.dev, cfg.dev); v->cr.have = 1; }
-    if (v->cr.have) rc = phc_auth(v->c, &v->cr, NULL, cfg.name);
-    else if (cfg.code[0]) rc = phc_auth(v->c, &v->cr, cfg.code, cfg.name);
-    else { fail(v, "Not paired: add code=<pairing code> to C:\\data\\phecloud.ini", -5); teardown(v); return -1; }
-    if (rc != PHC_OK) { fail(v, v->c->errmsg[0] ? v->c->errmsg : "Pairing or authentication failed", rc); teardown(v); return -1; }
-    if (!cfg.dev[0] || strcmp(cfg.dev, v->cr.dev) != 0) {     /* paired just now: keep the credentials, drop the one-time code */
-        copy_str(cfg.dev, sizeof cfg.dev, v->cr.dev);
-        tohex(v->cr.key, 32, cfg.key);
-        cfg.code[0] = 0;
-        cfg_write(&cfg);
+    if (cfg->dev[0] && cfg->key[0] && unhex(cfg->key, v->cr.key, 32) == 0) { copy_str(v->cr.dev, sizeof v->cr.dev, cfg->dev); v->cr.have = 1; }
+    if (v->cr.have) rc = phc_auth(v->c, &v->cr, NULL, cfg->name);
+    else if (cfg->code[0]) rc = phc_auth(v->c, &v->cr, cfg->code, cfg->name);
+    else { *why = "Not paired"; teardown(v); return -1; }
+    if (rc != PHC_OK) { *why = v->c->errmsg[0] ? v->c->errmsg : "Pairing or authentication failed"; teardown(v); return -1; }
+    if (!cfg->dev[0] || strcmp(cfg->dev, v->cr.dev) != 0) {     /* paired just now: keep the credentials, drop the one-time code */
+        copy_str(cfg->dev, sizeof cfg->dev, v->cr.dev);
+        tohex(v->cr.key, 32, cfg->key);
+        cfg->code[0] = 0;
+        cfg_write(cfg);
     }
     phc_mem("after pairing");
     v->c->io = phc_tls_transport(&v->tls, 1);     /* from here on recv returns PHC_WOULDBLOCK between frames */
     rc = phc_open(v->c, url, PAGE_W);
-    if (rc != PHC_OK) { fail(v, "Cannot open the page", rc); teardown(v); return -1; }
+    if (rc != PHC_OK) { *why = "Cannot open the page"; teardown(v); return -1; }
     return 0;
+}
+
+static void setup_enter(view_t *v, const char *msg, const char *pending_url);
+
+/* 0 = open; -1 = failed (reported); -2 = the pairing screen is up instead */
+static int session_open(view_t *v, const char *url)
+{
+    cfg_t cfg;
+    uint8_t pin[32];
+    const char *why = "";
+    int have_pin;
+    if (!strcmp(url, "phecloud:setup")) { setup_enter(v, "", "https://example.com/"); return -2; }
+    if (cfg_read(&cfg) != 0 || (!(cfg.dev[0] && cfg.key[0]) && !cfg.code[0])) { setup_enter(v, "", url); return -2; }
+    have_pin = cfg.pin[0] && unhex(cfg.pin, pin, 32) == 0;
+    if (session_connect(v, &cfg, have_pin ? pin : NULL, &why) != 0) { fail(v, why, -2); return -1; }
+    if (!cfg.pin[0]) {          /* an ini without a pin: trust on first use */
+        uint8_t seen[32];
+        phc_tls_peer_fingerprint(&v->tls, seen);
+        tohex(seen, 32, cfg.pin);
+        cfg_write(&cfg);
+    }
+    if (session_finish(v, &cfg, url, &why) != 0) { fail(v, why, -5); return -1; }
+    return 0;
+}
+
+/* ---- the pairing screen ----------------------------------------------------------------------------------------------
+ * Drawn by the engine into the view buffer (a 5x7 bitmap font, scaled): server (host[:port]), pairing code, Pair; then the
+ * server's certificate fingerprint to confirm (Trust / Cancel); on Trust the pairing finishes, C:\data\phecloud.ini is
+ * written (host, port, pin, device id and key) and the page that was asked for opens. A tap on a field raises PHE_EV_FOCUS
+ * (the browser opens its editor and sends the text back); hardware keys edit the focused field directly. */
+static const uint8_t font5x7[95][5] = {
+#include "font5x7.inc"
+};
+
+#define COL_BG 0xFFF4F5F7u
+#define COL_FG 0xFF202124u
+#define COL_DIM 0xFF80868Bu
+#define COL_ACC 0xFF1A73E8u
+#define COL_ERR 0xFFB3261Eu
+
+static void px_rect(view_t *v, int x, int y, int w, int h, uint32_t c)
+{
+    int xx, yy;
+    for (yy = y < 0 ? 0 : y; yy < y + h && yy < v->h; yy++)
+        for (xx = x < 0 ? 0 : x; xx < x + w && xx < v->w; xx++) v->px[(size_t)yy * (size_t)v->w + xx] = c;
+}
+
+static void px_text(view_t *v, int x, int y, int sc, uint32_t col, const char *s, int maxc)
+{
+    int n = 0;
+    for (; *s && n < maxc; s++, n++, x += 6 * sc) {
+        unsigned ch = (unsigned char)*s;
+        int cx, cy;
+        if (ch < 32 || ch > 126) ch = '?';
+        for (cx = 0; cx < 5; cx++)
+            for (cy = 0; cy < 7; cy++)
+                if (font5x7[ch - 32][cx] >> cy & 1) px_rect(v, x + cx * sc, y + cy * sc, sc, sc, col);
+    }
+}
+
+static void px_frame(view_t *v, int x, int y, int w, int h, uint32_t col, int t)
+{
+    px_rect(v, x, y, w, t, col); px_rect(v, x, y + h - t, w, t, col);
+    px_rect(v, x, y, t, h, col); px_rect(v, x + w - t, y, t, h, col);
+}
+
+typedef struct { int x, y, w, h; } rect_t;
+static int in_rect(const rect_t *r, int x, int y) { return x >= r->x && x < r->x + r->w && y >= r->y && y < r->y + r->h; }
+
+static void setup_layout(view_t *v, rect_t *f_host, rect_t *f_code, rect_t *b1, rect_t *b2)
+{
+    f_host->x = 20; f_host->y = 112; f_host->w = v->w - 40; f_host->h = 44;
+    f_code->x = 20; f_code->y = 206; f_code->w = v->w - 40; f_code->h = 44;
+    b1->x = 20; b1->y = 282; b1->w = v->w - 40; b1->h = 52;
+    b2->x = 20; b2->y = 450; b2->w = v->w - 40; b2->h = 52;
+    if (v->setup == ST_CONFIRM) { b1->y = 380; b1->h = 52; b2->y = 450; }
+}
+
+static void setup_draw(view_t *v)      /* pixmu held */
+{
+    rect_t fh, fc, b1, b2;
+    int i, cap = (v->w - 40) / 12 - 1;
+    setup_layout(v, &fh, &fc, &b1, &b2);
+    px_rect(v, 0, 0, v->w, v->h, COL_BG);
+    if (v->setup == ST_FORM) {
+        px_text(v, 20, 24, 3, COL_FG, "Phecloud setup", 40);
+        px_text(v, 20, 84, 2, COL_DIM, "Server (host or host:port)", 40);
+        px_rect(v, fh.x, fh.y, fh.w, fh.h, 0xFFFFFFFFu); px_frame(v, fh.x, fh.y, fh.w, fh.h, v->sfocus == 1 ? COL_ACC : COL_DIM, v->sfocus == 1 ? 3 : 1);
+        px_text(v, fh.x + 10, fh.y + 14, 2, v->shost[0] ? COL_FG : COL_DIM, v->shost[0] ? v->shost : "192.168.1.10:7400", cap);
+        px_text(v, 20, 178, 2, COL_DIM, "Pairing code", 40);
+        px_rect(v, fc.x, fc.y, fc.w, fc.h, 0xFFFFFFFFu); px_frame(v, fc.x, fc.y, fc.w, fc.h, v->sfocus == 2 ? COL_ACC : COL_DIM, v->sfocus == 2 ? 3 : 1);
+        px_text(v, fc.x + 10, fc.y + 14, 2, v->scode[0] ? COL_FG : COL_DIM, v->scode[0] ? v->scode : "XXXX-XXXX", cap);
+        px_rect(v, b1.x, b1.y, b1.w, b1.h, COL_ACC);
+        px_text(v, b1.x + (b1.w - 4 * 18) / 2, b1.y + 15, 3, 0xFFFFFFFFu, "Pair", 4);
+        px_text(v, 20, 360, 2, COL_ERR, v->smsg, cap);
+        px_text(v, 20, 384, 2, COL_ERR, v->smsg + (strlen(v->smsg) > (size_t)cap ? (size_t)cap : strlen(v->smsg)), cap);
+        px_text(v, 20, 540, 1, COL_DIM, "Create the code on the server: phecloud paircode", 60);
+    } else {
+        px_text(v, 20, 24, 3, COL_FG, "Trust this server?", 40);
+        px_text(v, 20, 84, 2, COL_DIM, v->shost, cap);
+        px_text(v, 20, 128, 2, COL_DIM, "Certificate fingerprint", 40);
+        px_text(v, 20, 150, 2, COL_DIM, "(SHA-256):", 40);
+        for (i = 0; i < 4; i++) {
+            char line[17];
+            memcpy(line, v->sfp + i * 16, 16); line[16] = 0;
+            px_text(v, 20, 186 + i * 36, 3, COL_FG, line, 16);
+        }
+        px_text(v, 20, 340, 1, COL_DIM, "Must equal the fingerprint the server prints.", 52);
+        px_rect(v, b1.x, b1.y, b1.w, b1.h, COL_ACC);
+        px_text(v, b1.x + (b1.w - 5 * 18) / 2, b1.y + 15, 3, 0xFFFFFFFFu, "Trust", 5);
+        px_frame(v, b2.x, b2.y, b2.w, b2.h, COL_DIM, 2);
+        px_text(v, b2.x + (b2.w - 6 * 18) / 2, b2.y + 15, 3, COL_FG, "Cancel", 6);
+        px_text(v, 20, 530, 2, COL_ERR, v->smsg, cap);
+    }
+}
+
+static void setup_enter(view_t *v, const char *msg, const char *pending_url)
+{
+    pthread_mutex_lock(&v->mu);
+    v->setup = ST_FORM;
+    copy_str(v->smsg, sizeof v->smsg, msg);
+    copy_str(v->spending, sizeof v->spending, pending_url);
+    copy_str(v->url, sizeof v->url, "phecloud:setup");
+    copy_str(v->title, sizeof v->title, "Phecloud setup");
+    v->loading = 0; v->page_h = 0; v->scroll_y = 0; v->dirty = 1;
+    pthread_mutex_unlock(&v->mu);
+    post(v, PHE_EV_COMMIT, 0, PHE_SEC_NONE, 0);
+    post(v, PHE_EV_TITLE, 0, 0, 0);
+    post(v, PHE_EV_FINISHED, 0, 0, 0);
+}
+
+static void setup_focus(view_t *v, int f)
+{
+    pthread_mutex_lock(&v->mu); v->sfocus = f; v->dirty = 1; pthread_mutex_unlock(&v->mu);
+    post(v, PHE_EV_FOCUS, f ? 2 : 0, 0, 0);
+}
+
+static void setup_pair(view_t *v)      /* the Pair button: connect and show the fingerprint */
+{
+    cfg_t cfg;
+    const char *why = "";
+    uint8_t seen[32];
+    char host[96], *colon;
+    if (!v->shost[0] || !v->scode[0]) { copy_str(v->smsg, sizeof v->smsg, "Enter the server and the pairing code"); v->dirty = 1; return; }
+    memset(&cfg, 0, sizeof cfg);
+    copy_str(host, sizeof host, v->shost);
+    colon = strrchr(host, ':');
+    copy_str(cfg.port, sizeof cfg.port, "7400");
+    if (colon) { *colon = 0; copy_str(cfg.port, sizeof cfg.port, colon + 1); }
+    copy_str(cfg.host, sizeof cfg.host, host);
+    copy_str(cfg.code, sizeof cfg.code, v->scode);
+    copy_str(cfg.name, sizeof cfg.name, "Phorepoc");
+    copy_str(v->smsg, sizeof v->smsg, "Connecting...");
+    v->dirty = 1;
+    pthread_mutex_lock(&v->pixmu); setup_draw(v); pthread_mutex_unlock(&v->pixmu);
+    post(v, PHE_EV_REPAINT, 0, 0, 0);
+    if (session_connect(v, &cfg, NULL, &why) != 0) { copy_str(v->smsg, sizeof v->smsg, why); v->dirty = 1; return; }
+    phc_tls_peer_fingerprint(&v->tls, seen);
+    tohex(seen, 32, v->sfp);
+    v->scfg = cfg;
+    v->setup = ST_CONFIRM;
+    v->smsg[0] = 0;
+    v->dirty = 1;
+}
+
+static void setup_trust(view_t *v)
+{
+    const char *why = "";
+    cfg_t cfg = v->scfg;
+    char url[PHC_URL_MAX];
+    copy_str(cfg.pin, sizeof cfg.pin, v->sfp);
+    copy_str(url, sizeof url, v->spending[0] ? v->spending : "https://example.com/");
+    if (session_finish(v, &cfg, url, &why) != 0) {
+        v->setup = ST_FORM; copy_str(v->smsg, sizeof v->smsg, why); v->dirty = 1;
+        return;
+    }
+    v->setup = ST_NONE;           /* paired and open: the normal page flow takes over */
+    pthread_mutex_lock(&v->mu); v->loading = 1; v->progress = 10; v->err[0] = 0; v->focus = 0; pthread_mutex_unlock(&v->mu);
+    post(v, PHE_EV_START, 0, 0, 0);
+}
+
+static void setup_cancel(view_t *v)
+{
+    teardown(v);
+    v->setup = ST_FORM; v->smsg[0] = 0; v->dirty = 1;
+}
+
+static void setup_request(view_t *v, const req_t *r)     /* thread */
+{
+    rect_t fh, fc, b1, b2;
+    setup_layout(v, &fh, &fc, &b1, &b2);
+    switch (r->kind) {
+    case RQ_TAP:
+        if (v->setup == ST_FORM) {
+            if (in_rect(&fh, r->a, r->b)) setup_focus(v, 1);
+            else if (in_rect(&fc, r->a, r->b)) setup_focus(v, 2);
+            else if (in_rect(&b1, r->a, r->b)) { setup_focus(v, 0); setup_pair(v); }
+            else setup_focus(v, 0);
+        } else if (v->setup == ST_CONFIRM) {
+            if (in_rect(&b1, r->a, r->b)) setup_trust(v);
+            else if (in_rect(&b2, r->a, r->b)) setup_cancel(v);
+        }
+        break;
+    case RQ_TEXT:          /* the browser's editor: the whole new value of the focused field */
+        if (v->setup == ST_FORM && v->sfocus) {
+            copy_str(v->sfocus == 1 ? v->shost : v->scode, v->sfocus == 1 ? sizeof v->shost : sizeof v->scode, r->s);
+            v->dirty = 1;
+        }
+        break;
+    case RQ_CHAR: case RQ_BKSP:
+        if (v->setup == ST_FORM && v->sfocus) {
+            char *f = v->sfocus == 1 ? v->shost : v->scode;
+            size_t cap = v->sfocus == 1 ? sizeof v->shost : sizeof v->scode, n = strlen(f);
+            if (r->kind == RQ_BKSP) { if (n) f[n - 1] = 0; }
+            else if (n + 1 < cap) { f[n] = r->s[0]; f[n + 1] = 0; }
+            v->dirty = 1;
+        }
+        break;
+    case RQ_KEY:
+        if (v->setup == ST_FORM && !strcmp(r->s, "Enter")) { setup_focus(v, 0); setup_pair(v); }
+        break;
+    default: break;
+    }
 }
 
 /* ---- the view thread ------------------------------------------------------------------------------------------------ */
@@ -748,9 +978,11 @@ static void do_request(view_t *v, const req_t *r)
 {
     phc *c = v->c;
     int sy, vh;
+    if (v->setup && r->kind != RQ_LOAD && r->kind != RQ_SUSPEND) { setup_request(v, r); return; }
     pthread_mutex_lock(&v->mu); sy = v->scroll_y; vh = v->h; pthread_mutex_unlock(&v->mu);
     switch (r->kind) {
     case RQ_LOAD:
+        if (v->setup) { if (v->c) { teardown(v); c = NULL; } v->setup = ST_NONE; }
         if (!c) { if (session_open(v, r->s) != 0) return; }
         else phc_navigate(c, r->s);
         pthread_mutex_lock(&v->mu); v->loading = 1; v->progress = 10; v->err[0] = 0; pthread_mutex_unlock(&v->mu);
@@ -818,7 +1050,13 @@ static void *view_main(void *arg)
             do_request(v, &r);
         }
         if (v->quit) break;
-        if (!v->c) { usleep(30000); continue; }
+        if (!v->c || v->setup) {
+            int d;
+            pthread_mutex_lock(&v->mu); d = v->dirty; pthread_mutex_unlock(&v->mu);
+            if (d) compose(v);
+            usleep(30000);
+            continue;
+        }
         rc = phc_pump(v->c);
         if (rc == PHC_OK) {
             int more = v->c->done.more;
@@ -1132,6 +1370,13 @@ static void e_key(PheView id, int scan, int unicode, int down)
     const char *name = NULL;
     int focused;
     if (!v || !down) return;
+    if (v->setup) {              /* the pairing screen edits its focused field from the keyboard */
+        char ch[2];
+        if (unicode >= 32 && unicode < 127) { ch[0] = (char)unicode; ch[1] = 0; rq_push(v, RQ_CHAR, 0, 0, ch, NULL); }
+        else if (scan == 0x01 || unicode == 8) rq_push(v, RQ_BKSP, 0, 0, NULL, NULL);
+        else if (scan == 0x03 || unicode == 13) rq_push(v, RQ_KEY, 0, 0, "Enter", NULL);
+        return;
+    }
     pthread_mutex_lock(&v->mu); focused = v->focus == 2; pthread_mutex_unlock(&v->mu);
     switch (scan) {              /* TStdScanCode */
     case 0x01: name = "Backspace"; break;

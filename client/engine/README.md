@@ -76,3 +76,23 @@ Live heap (`User::AllocSize` on the process heap, logged by the engine as `mem .
 So one view costs about 2.0 MB over the browser for a short page: 0.49 MB fixed (connection) + 0.37 MB per decoded tile
 (at most 12 kept: about 4.4 MB more on a long page) + the encoded tiles (about 10-20 KB each) + the 0.84 MB view buffer
 (already in the 0.99 MB above).
+
+## Pairing screen
+With no `C:\data\phecloud.ini` (or no pairing code and no device key in it), or when the address is `phecloud:setup`, the engine
+draws its own setup screen into the view (a 5x7 bitmap font, `font5x7.inc`, public domain; no frontend change):
+1. **Server** (host or host:port) and **Pairing code** fields: a tap raises the focus event, the browser opens its editor and
+   returns the text; hardware keys edit the focused field directly. Enter or the **Pair** button connects.
+2. **Trust this server?**: the server certificate's SHA-256 fingerprint (4 lines of 16 hex digits) to compare with the one the
+   server prints at start-up. **Trust** pairs, writes `phecloud.ini` (host, port, pin, device id, key) and opens the page that
+   was asked for; **Cancel** drops the connection.
+Tested on Phorepoc x86: `docs/shots/engine-pair-*.png` (empty form, host typed, fingerprint confirmation, the page after Trust; the
+written ini carried the pin that was confirmed). An ini with a pin keeps the strict pin check; an ini with no pin still trusts on first use.
+
+## ARM (PinePhone) build
+`emitter/build_mmp.py phewebengine_phecloud_arm` (Phorepoc mode, soft-float, the ARM archives of mbedTLS/libpng/libjpeg): builds clean,
+456 KB of code, 42 KB bss, 93 imports, 0 link stubs. Build only: not booted on the phone.
+
+## Test note: the foreground after the cycler launch
+In the SSM regress image the boot list's cycler starts the app under test, then SSM starts Logs, which takes the foreground: a scripted
+run that starts driving as soon as the app logs its first event drives Logs instead. Put a throwaway line first (`*45|calcsoft`, then
+`*700|<app>`) so the app starts after SSM has settled. Not ours to fix; recorded here so the scripts keep the workaround.
