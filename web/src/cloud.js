@@ -18,7 +18,7 @@ export const state = reactive({
   regions: [],
   focus: { kind: 'none', id: 0, type: '', value: '' },
   loading: false,
-  dialogs: [],              // pending JS/auth/cert dialogs
+  dialogs: [],              // pending JS/passkey/cert dialogs
   downloadNote: '',
   deviceList: [],
   adminError: '',
@@ -250,7 +250,7 @@ async function authCall(path, body) {
 
 export const passkeysSupported = () => !!(window.PublicKeyCredential && navigator.credentials)
 
-export function authStatus() { return authCall('/auth/status') }
+export function authStatus() { return authCall('/passkey/status') }
 
 // the device a sign-in produced is used like a paired one
 async function adopt(w) {
@@ -280,25 +280,25 @@ async function finish(path, sid, name, cred) {
 
 // register a passkey with an admin pairing code; returns the recovery code (first passkey only, else '')
 export async function passkeyRegister(code, name) {
-  const { sid, options } = await authCall('/auth/register/begin', { code })
+  const { sid, options } = await authCall('/passkey/register/begin', { code })
   const pk = options.publicKey
   pk.challenge = b64u.dec(pk.challenge)
   pk.user.id = b64u.dec(pk.user.id)
   ;(pk.excludeCredentials || []).forEach((c) => { c.id = b64u.dec(c.id) })
   const cred = await navigator.credentials.create({ publicKey: pk })
-  return adopt(await finish('/auth/register/finish', sid, name, cred))
+  return adopt(await finish('/passkey/register/finish', sid, name, cred))
 }
 
 export async function passkeyLogin(name) {
-  const { sid, options } = await authCall('/auth/login/begin', {})
+  const { sid, options } = await authCall('/passkey/login/begin', {})
   const pk = options.publicKey
   pk.challenge = b64u.dec(pk.challenge)
   ;(pk.allowCredentials || []).forEach((c) => { c.id = b64u.dec(c.id) })
   const cred = await navigator.credentials.get({ publicKey: pk })
-  await adopt(await finish('/auth/login/finish', sid, name, cred))
+  await adopt(await finish('/passkey/login/finish', sid, name, cred))
 }
 
 // sign in with the recovery code; returns the NEW recovery code (the old one is used up)
 export async function recoverLogin(code, name) {
-  return adopt(await authCall('/auth/recover', { code, name }))
+  return adopt(await authCall('/passkey/recover', { code, name }))
 }

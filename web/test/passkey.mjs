@@ -42,7 +42,7 @@ const forget = async () => {
   await page.goto(BASE)
   await page.waitForSelector('[data-test=code]')
 }
-const status = async () => (await page.evaluate(() => fetch('/auth/status').then((r) => r.json())))
+const status = async () => (await page.evaluate(() => fetch('/passkey/status').then((r) => r.json())))
 
 // 1. no owner yet: the pairing page offers to set up a passkey
 await page.goto(BASE)

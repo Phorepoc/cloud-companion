@@ -5,12 +5,12 @@ package webui
 
 // Owner sign-in for the web app: passkeys (WebAuthn) with a recovery code as the fallback.
 //
-//	GET  /auth/status                  {owner, passkeys}
-//	POST /auth/register/begin {code}   an unused ADMIN pairing code (from `phecloud paircode --admin`) allows registering a passkey
-//	POST /auth/register/finish?sid&name   (body: the credential)  -> {dev, key, recovery}   recovery only for the first passkey
-//	POST /auth/login/begin
-//	POST /auth/login/finish?sid&name   (body: the assertion)       -> {dev, key}
-//	POST /auth/recover {code, name}    a recovery code (one use, replaced by a new one) -> {dev, key, recovery}
+//	GET  /passkey/status                  {owner, passkeys}
+//	POST /passkey/register/begin {code}   an unused ADMIN pairing code (from `phecloud paircode --admin`) allows registering a passkey
+//	POST /passkey/register/finish?sid&name   (body: the credential)  -> {dev, key, recovery}   recovery only for the first passkey
+//	POST /passkey/login/begin
+//	POST /passkey/login/finish?sid&name   (body: the assertion)       -> {dev, key}
+//	POST /passkey/recover {code, name}    a recovery code (one use, replaced by a new one) -> {dev, key, recovery}
 //
 // A successful sign-in creates an admin web "device" (id + key, as a pairing would) which the app keeps and uses for the usual
 // frame connection: device pairing is unchanged, this is one more way to obtain a device. WebAuthn needs a secure origin
@@ -159,10 +159,10 @@ func (a *auth) device(w http.ResponseWriter, name string, extra map[string]any) 
 }
 
 func (a *auth) routes(mux *http.ServeMux) {
-	mux.HandleFunc("/auth/status", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/passkey/status", func(w http.ResponseWriter, r *http.Request) {
 		reply(w, 200, map[string]any{"owner": a.st.OwnerExists(), "passkeys": len(a.st.Passkeys())})
 	})
-	mux.HandleFunc("/auth/register/begin", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/passkey/register/begin", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Code string }
 		if r.Method != http.MethodPost || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil {
 			bad(w, 400, "bad request")
@@ -202,7 +202,7 @@ func (a *auth) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"sid": a.keep(&pending{data: data, handle: o.handle, code: code}), "options": opts})
 	})
-	mux.HandleFunc("/auth/register/finish", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/passkey/register/finish", func(w http.ResponseWriter, r *http.Request) {
 		p := a.take(r.URL.Query().Get("sid"))
 		if r.Method != http.MethodPost || p == nil {
 			bad(w, 400, "the registration expired, start again")
@@ -231,7 +231,7 @@ func (a *auth) routes(mux *http.ServeMux) {
 		}
 		a.device(w, "Web browser", map[string]any{"recovery": rec})
 	})
-	mux.HandleFunc("/auth/login/begin", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/passkey/login/begin", func(w http.ResponseWriter, r *http.Request) {
 		h, err := a.st.OwnerHandle()
 		if err != nil {
 			bad(w, 404, "no passkey has been registered yet")
@@ -249,7 +249,7 @@ func (a *auth) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"sid": a.keep(&pending{data: data, handle: h}), "options": opts})
 	})
-	mux.HandleFunc("/auth/login/finish", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/passkey/login/finish", func(w http.ResponseWriter, r *http.Request) {
 		p := a.take(r.URL.Query().Get("sid"))
 		if r.Method != http.MethodPost || p == nil {
 			bad(w, 400, "the sign-in expired, start again")
@@ -274,7 +274,7 @@ func (a *auth) routes(mux *http.ServeMux) {
 		a.st.PasskeyUsed(cred)
 		a.device(w, r.URL.Query().Get("name"), nil)
 	})
-	mux.HandleFunc("/auth/recover", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/passkey/recover", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Code, Name string }
 		if r.Method != http.MethodPost || json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in) != nil {
 			bad(w, 400, "bad request")

@@ -173,3 +173,8 @@ It drives the `docker` command line (containers `phe-stalwart` and `phe-cloud`; 
 `phecloud hub restore <backup dir> [--prefix p-] [--force]` verifies every checksum first (a damaged backup is refused before anything is touched), then creates the volumes `<p->stalwart-data`, `<p->stalwart-etc`, `<p->phecloud-data` and unpacks into them. It refuses volumes that already hold data unless `--force`. To restore for real, run it without a prefix after removing the old stack's volumes (or with `--force`), then start Stalwart on the two volumes and phecloud with its volume at `/data`. The API key and app passwords live in Stalwart's data, so they keep working.
 
 Test: `HUB_ENV_FILE=<hub .env.phecloud> sh deploy/hub/test/backup_test.sh` (hub and phe-cloud running). It counts contacts, events, messages, device rows and the TLS fingerprint, backs up, restores into fresh volumes and a fresh `phe-rt-stalwart` container (1 CPU, 1 GB), and compares; it also checks that restoring over existing data and restoring a corrupted backup are both refused. It removes everything it created. Result on the Deskmini: 4 contacts, 3 events, 6 messages, 82 device rows, same certificate; the hub was down for about 3 s during the backup (archive: 861 KB of data).
+
+### Routing note: `/passkey` vs `/auth`
+Caddyfile.hub sends `/auth`, `/oauth` and the OAuth discovery documents to Stalwart. The web app's passkey endpoints therefore live
+under `/passkey/*` (not `/auth/*`), which falls through to phecloud. Check: `curl -k https://<host>/passkey/status` answers
+`{"owner":...}` (phecloud) and `curl -k https://<host>/.well-known/oauth-authorization-server` answers Stalwart's metadata.

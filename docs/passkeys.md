@@ -26,9 +26,12 @@ more than eight wrong attempts from one address within a minute are refused for 
   state (see `docs/hub.md`, Backup).
 
 ## How it works (short)
-`/auth/*` on the web port: `register/begin|finish` (needs an unused admin code, consumed on success), `login/begin|finish`,
+`/passkey/*` on the web port: `register/begin|finish` (needs an unused admin code, consumed on success), `login/begin|finish`,
 `recover`, `status`. Verification is done by github.com/go-webauthn/webauthn (BSD-3-Clause); the recovery code is 100 random bits,
 stored as a SHA-256 hash and compared in constant time. A successful sign-in creates an admin device (id and key) exactly like a
 pairing would; revoke it from the Devices page like any other. Tested with a Chromium virtual authenticator
 (`web/test/passkey.sh`): registration, sign-in, sign counter, recovery code (sloppy input, single use, replacement), refusal of a
 non-admin code, unchanged pairing; light and dark screenshots in `web/test/screenshots/passkeys/`.
+
+The endpoints live under `/passkey/` on purpose: the hub's reverse proxy (`deploy/hub/Caddyfile.hub`) sends `/auth` and `/oauth` to the mail
+server (its OAuth endpoints), so a phecloud route under `/auth` would never reach phecloud.
