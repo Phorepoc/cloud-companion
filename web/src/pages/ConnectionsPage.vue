@@ -75,6 +75,7 @@
             <q-select v-model="f.imapTLS" :options="securities" emit-value map-options outlined dense label="Security" data-test="f-imap-tls" />
             <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" label="Password or app password" autocomplete="new-password" data-test="f-secret" />
+            <q-input v-model="f.pin" outlined dense label="Server certificate fingerprint (only for your own server)" hint="SHA-256, for a self-signed certificate such as Proton Mail Bridge. Leave empty otherwise: the Test button shows the fingerprint to paste." data-test="f-pin" />
             <div class="ph-two">
               <q-input v-model="f.smtpHost" outlined dense label="Outgoing (SMTP) server" data-test="f-smtp-host" />
               <q-input v-model.number="f.smtpPort" outlined dense type="number" label="Port" data-test="f-smtp-port" />
@@ -83,6 +84,9 @@
             <q-input v-model="f.from" outlined dense label="Send as (address)" data-test="f-from" />
             <q-input v-model="f.folders" outlined dense label="Folders to copy" hint="Comma separated. Default: INBOX" data-test="f-folders" />
             <q-input v-model.number="f.months" outlined dense type="number" label="Months back" data-test="f-months" />
+          </template>
+          <template v-else-if="f.kind === 'ics'">
+            <q-input v-model="f.url" outlined dense label="Calendar link (https:// or webcal://)" hint="A read-only calendar feed, for example a Proton calendar share link" data-test="f-url" />
           </template>
           <template v-else>
             <q-input v-model="f.url" outlined dense :label="f.kind === 'carddav' ? 'Address book URL' : 'Calendar URL'" data-test="f-url" />
@@ -176,12 +180,12 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer = null
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
-const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '' })
+const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '' })
 const f = reactive(blank())
 
-const kindText = (k) => ({ imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar' }[k] || k)
+const kindText = (k) => ({ imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link' }[k] || k)
 const statusText = (a) => ({ new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }[a.status] || a.status)
 const short = (n) => (n || '').split(' ')[0] || 'this one'
 function ago(t) {
@@ -200,12 +204,13 @@ function openAdd() { Object.assign(f, blank()); testResult.value = null; adding.
 function payload() {
   if (f.kind === 'imap') {
     const cfg = {
-      imap: { host: f.imapHost.trim(), port: f.imapPort, tls: f.imapTLS, user: f.user.trim() },
-      smtp: f.smtpHost.trim() ? { host: f.smtpHost.trim(), port: f.smtpPort, tls: f.smtpTLS, user: f.user.trim() } : { host: '', port: 0, tls: 'tls', user: '' },
+      imap: { host: f.imapHost.trim(), port: f.imapPort, tls: f.imapTLS, user: f.user.trim(), pin: f.pin.trim() },
+      smtp: f.smtpHost.trim() ? { host: f.smtpHost.trim(), port: f.smtpPort, tls: f.smtpTLS, user: f.user.trim(), pin: f.pin.trim() } : { host: '', port: 0, tls: 'tls', user: '' },
       folders: f.folders.split(',').map((x) => x.trim()).filter(Boolean), months: f.months || 3, from: f.from.trim(),
     }
     return { kind: 'imap', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
   }
+  if (f.kind === 'ics') return { kind: 'ics', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim() }), secret: '' }
   return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
 }
 async function doTest() {

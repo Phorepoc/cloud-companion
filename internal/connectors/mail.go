@@ -9,7 +9,10 @@ package connectors
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -28,6 +31,7 @@ type ServerCfg struct {
 	Port int    `json:"port"`
 	TLS  string `json:"tls"` // "tls" (implicit), "starttls", "plain" (tests, localhost only)
 	User string `json:"user"`
+	Pin  string `json:"pin,omitempty"` // SHA-256 of the server certificate (hex): trust exactly this certificate, for a server with a self-signed one (Proton Mail Bridge)
 }
 
 // MailCfg is the config of an "imap" account.
@@ -55,7 +59,7 @@ type Seen interface {
 func (s ServerCfg) addr() string { return net.JoinHostPort(s.Host, strconv.Itoa(s.Port)) }
 
 func dialIMAP(c ServerCfg, pass string) (*imapclient.Client, error) {
-	opts := &imapclient.Options{TLSConfig: &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12}}
+	opts := &imapclient.Options{TLSConfig: tlsConfig(c)}
 	var cl *imapclient.Client
 	var err error
 	switch c.TLS {
@@ -190,7 +194,7 @@ func SyncIMAP(ctx context.Context, account, accName string, c MailCfg, pass stri
 func smtpClient(c ServerCfg) (*smtp.Client, error) {
 	switch c.TLS {
 	case "tls":
-		conn, err := tls.Dial("tcp", c.addr(), &tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12})
+		conn, err := tls.Dial("tcp", c.addr(), tlsConfig(c))
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +209,7 @@ func smtpClient(c ServerCfg) (*smtp.Client, error) {
 			return nil, err
 		}
 		if c.TLS == "starttls" {
-			if err := cl.StartTLS(&tls.Config{ServerName: c.Host, MinVersion: tls.VersionTLS12}); err != nil {
+			if err := cl.StartTLS(tlsConfig(c)); err != nil {
 				cl.Close()
 				return nil, err
 			}
@@ -317,4 +321,34 @@ func smtpAuth(user, pass, host string) smtp.Auth {
 		return smtpXOAuth2{user, tok}
 	}
 	return smtp.PlainAuth("", user, pass, host)
+}
+
+// tlsConfig verifies the server's certificate the usual way, or, with a pin, accepts exactly the certificate with that SHA-256 fingerprint. A
+// certificate that is not trusted is reported with its fingerprint, so the user can pin it after checking it is their own server.
+func tlsConfig(c ServerCfg) *tls.Config {
+	return &tls.Config{
+		ServerName: c.Host, MinVersion: tls.VersionTLS12, InsecureSkipVerify: true, // verified below
+		VerifyConnection: func(cs tls.ConnectionState) error {
+			if len(cs.PeerCertificates) == 0 {
+				return errors.New("the server sent no certificate")
+			}
+			leaf := cs.PeerCertificates[0]
+			sum := sha256.Sum256(leaf.Raw)
+			fp := hex.EncodeToString(sum[:])
+			if pin := strings.ToLower(strings.NewReplacer(":", "", " ", "").Replace(c.Pin)); pin != "" {
+				if pin == fp {
+					return nil
+				}
+				return fmt.Errorf("the server's certificate (SHA-256 %s) is not the pinned one", fp)
+			}
+			inter := x509.NewCertPool()
+			for _, x := range cs.PeerCertificates[1:] {
+				inter.AddCert(x)
+			}
+			if _, err := leaf.Verify(x509.VerifyOptions{DNSName: c.Host, Intermediates: inter}); err != nil {
+				return fmt.Errorf("the server's certificate is not trusted (%v). Its SHA-256 fingerprint is %s: if this is your own server (for example Proton Mail Bridge), paste it into the fingerprint field to trust exactly this certificate", err, fp)
+			}
+			return nil
+		},
+	}
 }

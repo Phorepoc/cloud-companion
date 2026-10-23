@@ -55,6 +55,16 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			d += "; SMTP login works"
 		}
 		return d, nil
+	case "ics":
+		var c DAVCfg
+		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
+			return "", err
+		}
+		n, err := TestICS(ctx, c)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("the feed works, %d events", n), nil
 	case "carddav", "caldav":
 		var c DAVCfg
 		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
@@ -77,7 +87,7 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	if strings.TrimSpace(name) == "" {
 		return store.Account{}, errors.New("give the account a name")
 	}
-	if kind != "imap" && kind != "carddav" && kind != "caldav" {
+	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" {
 		return store.Account{}, errors.New("unknown kind " + kind)
 	}
 	if !json.Valid([]byte(cfgJSON)) {
@@ -214,6 +224,13 @@ func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
 		}
 		n, err := SyncIMAP(ctx, a.ID, a.Name, c, pass, m.Hub, m.St, m.MaxMails)
 		return fmt.Sprintf("%d new messages", n), err
+	case "ics":
+		var c DAVCfg
+		if err := json.Unmarshal([]byte(a.Config), &c); err != nil {
+			return "", err
+		}
+		ch, rm, err := SyncICS(ctx, a.ID, c, m.Hub, m.St)
+		return fmt.Sprintf("%d changed, %d removed", ch, rm), err
 	case "carddav", "caldav":
 		var c DAVCfg
 		if err := json.Unmarshal([]byte(a.Config), &c); err != nil {

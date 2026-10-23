@@ -101,3 +101,29 @@ home / business phones and email addresses become the vCard (`<account>-<id>.vcf
 all-day as a DATE, location, description). Occurrences of recurring events arrive expanded inside the window as separate events (no recurrence rule is written). **Tokens**: Microsoft gives
 one access token per resource (Graph and Outlook mail are different resources), so every account renews its own token with its own scopes; the first renewal happens right after sign-in.
 Tested against a fake Graph server (`internal/connectors/graph_test.go`: paging, delta, removal, 410, bad token, mapping); not against the real service.
+
+## Proton
+Proton encrypts end to end, so it offers no IMAP, CalDAV or CardDAV of its own and no public API. What works, and what does not:
+
+### Mail: through Proton Mail Bridge (official)
+Run Proton's own **Mail Bridge** (paid Proton plans) on a machine you control; it decrypts locally and speaks IMAP/SMTP on the machine's loopback (usually `127.0.0.1`, IMAP 1143 and SMTP 1025, both STARTTLS).
+Add it as an ordinary Mail account:
+- **Bridge password**: the Bridge shows its own username and password for each account (Bridge, then account, then "Mailbox configuration"). Use those, **not** your Proton password.
+- **Reachability**: the Bridge listens on loopback only by default, and phecloud runs in a container, so `127.0.0.1` is the container itself. Run the Bridge where the container can reach it (the Bridge's "split address mode" and bind address are not needed: use Docker's `host-gateway`, a published socket proxy such as `socat TCP-LISTEN:1143,fork,bind=<docker bridge ip> TCP:127.0.0.1:1143`, or run the Bridge's headless build (`bridge --cli`) as a container on the same network). Use the host name or address that reaches it, and Security "STARTTLS".
+- **Certificate**: the Bridge uses its own self-signed certificate, which no CA vouches for. Press **Test** once: it fails and prints the certificate's SHA-256 fingerprint. Compare it with the one the Bridge shows (Settings, Export TLS certificates) and paste it into the **fingerprint** field. From then on phecloud trusts exactly that certificate (a different one is refused), nothing else is relaxed.
+- **Sending** goes through the Bridge's SMTP the same way (same fingerprint, same bridge password, "Outgoing security" STARTTLS); the copy is appended to Sent as for any account.
+Tested with an IMAP server presenting a self-signed certificate (`proton_test.go`: unknown certificate reported with its fingerprint, pinned works, wrong pin refused, wrong password a login error). Not tested against the real Bridge.
+
+### Calendar: a share link (read-only, official)
+Proton Calendar can make a **share link** (an `.ics` address) for a calendar. Add it as **Calendar link (ICS subscription)**: phecloud fetches the feed every sync, writes each event into the hub calendar and deletes
+events that disappear from the feed. One way only, and it follows what Proton publishes (the feed is a snapshot that may lag; turning the link off ends the sync, and the error says so). Any other `.ics` link works too.
+
+### Calendar and contacts, read and write: an unofficial bridge (optional, your choice)
+Proton has no CalDAV/CardDAV. Third-party bridges that speak Proton's **private** API and expose DAV on localhost exist; the one looked at is
+[carbonate](https://github.com/develonrails/carbonate) (Go, MIT licence, created September 2026, last push 2026-10-17, 7 stars; its own README says it is a work in progress with no tagged release, tracks `main`,
+and that Proton can change the private API without warning). It builds on hydroxide (archived) and protoxide. **Unofficial, uses a private API, holds the keys to your calendar and contacts: treat it as an experiment and
+keep the web app as a way back.** Phecloud does not bundle it. If you choose to run it as a separate container, connect it with the ordinary **Contacts (CardDAV)** and **Calendar (CalDAV)** connectors (its address, its bridge
+password, which is not the Proton password). Note that these connectors pull one way into the hub; writing back to Proton is not done by phecloud.
+
+### Drive and Lumo: later
+There is no official API for third parties to Proton Drive or Lumo. Proton has said a Drive SDK opens around the end of 2026 or early 2027. Nothing is built; revisit when it is published.
