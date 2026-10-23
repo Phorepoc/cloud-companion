@@ -135,21 +135,30 @@ func (a *auth) failed(r *http.Request) {
 // adminDevice checks the X-Phe-Auth header: "<dev>.<unix ts>.<hex HMAC-SHA256(device key, dev.ts.METHOD path)>" of an admin device, at most a
 // minute old. The key never leaves the browser; the signature binds the request line.
 func (a *auth) adminDevice(r *http.Request) bool {
+	_, admin, ok := a.signedDevice(r)
+	return ok && admin
+}
+
+// signedDevice verifies the X-Phe-Auth header of any paired device and returns its id and whether it is an admin.
+func (a *auth) signedDevice(r *http.Request) (id string, admin, ok bool) {
 	parts := strings.Split(r.Header.Get("X-Phe-Auth"), ".")
 	if len(parts) != 3 {
-		return false
+		return "", false, false
 	}
 	ts, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || time.Since(time.Unix(ts, 0)).Abs() > time.Minute {
-		return false
+		return "", false, false
 	}
-	key, admin, err := a.st.Key(parts[0])
-	if err != nil || !admin {
-		return false
+	key, adm, err := a.st.Key(parts[0])
+	if err != nil {
+		return "", false, false
 	}
 	m := hmac.New(sha256.New, key)
 	m.Write([]byte(parts[0] + "." + parts[1] + "." + r.Method + " " + r.URL.Path))
-	return hmac.Equal([]byte(hex.EncodeToString(m.Sum(nil))), []byte(parts[2]))
+	if !hmac.Equal([]byte(hex.EncodeToString(m.Sum(nil))), []byte(parts[2])) {
+		return "", false, false
+	}
+	return parts[0], adm, true
 }
 
 func reply(w http.ResponseWriter, code int, v any) {
