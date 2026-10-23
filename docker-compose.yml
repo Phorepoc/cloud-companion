@@ -17,6 +17,9 @@ services:
     env_file:
       - path: deploy/hub/.env.phecloud   # written by deploy/hub/hub-init.sh; optional
         required: false
+    environment:
+      # behind a reverse proxy: its address(es), so its X-Forwarded-* headers are believed (docs/reverse-proxy.md); empty = trust nobody
+      PHECLOUD_TRUSTED_PROXIES: ${PHECLOUD_TRUSTED_PROXIES:-}
     restart: unless-stopped
     # environment:
     #   PHECLOUD_PLAIN_LISTEN: ":7401"   # development only: plain TCP for client/test/run.sh
