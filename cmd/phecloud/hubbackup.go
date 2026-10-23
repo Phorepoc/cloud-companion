@@ -102,10 +102,20 @@ func backupMain(args []string) {
 	if err := dockerOut(nil, io.Discard, "exec", cloud, "sh", "-c", "rm -f "+tmp); err != nil {
 		fail(err)
 	}
+	external := false
 	if err := dockerOut(nil, io.Discard, "exec", cloud, "phecloud", "snapshot", tmp); err != nil {
-		fail(err)
+		if strings.Contains(err.Error(), "exit status 3") { // PHECLOUD_DB is PostgreSQL / MariaDB: not in this backup
+			external = true
+			fmt.Println("note: phecloud's database is an external server; back it up with pg_dump / mariadb-dump (docs/database.md). The Stalwart data and the certificate are saved below.")
+		} else {
+			fail(err)
+		}
 	}
-	for _, f := range []struct{ src, name string }{{tmp, "phecloud.db"}, {"/data/tls.crt", "tls.crt"}, {"/data/tls.key", "tls.key"}} {
+	files := []struct{ src, name string }{{tmp, "phecloud.db"}, {"/data/tls.crt", "tls.crt"}, {"/data/tls.key", "tls.key"}, {"/data/connectors.key", "connectors.key"}}
+	if external {
+		files = files[1:]
+	}
+	for _, f := range files {
 		out, err := os.OpenFile(filepath.Join(dir, f.name), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 		if err != nil {
 			fail(err)
@@ -155,7 +165,7 @@ func backupMain(args []string) {
 	if archErr != nil {
 		fail(archErr)
 	}
-	for _, n := range []string{"phecloud.db", "tls.crt", "tls.key"} {
+	for _, n := range []string{"phecloud.db", "tls.crt", "tls.key", "connectors.key"} {
 		if s, err := fileSum(filepath.Join(dir, n)); err == nil {
 			m.Files[n] = s
 		}
@@ -225,7 +235,7 @@ func restoreMain(args []string) {
 			fail(err)
 		}
 	}
-	for _, n := range []string{"phecloud.db", "tls.crt", "tls.key"} {
+	for _, n := range []string{"phecloud.db", "tls.crt", "tls.key", "connectors.key"} {
 		f, err := os.Open(filepath.Join(dir, n))
 		if err != nil {
 			continue

@@ -16,6 +16,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -73,6 +74,9 @@ func main() {
 		}
 		if err := st.Snapshot(os.Args[2]); err != nil {
 			fmt.Fprintln(os.Stderr, err)
+			if errors.Is(err, store.ErrExternalDB) {
+				os.Exit(3) // hub backup: not a failure, the operator backs the external database up
+			}
 			os.Exit(1)
 		}
 	case "devices":
