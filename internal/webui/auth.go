@@ -68,15 +68,12 @@ func newAuth(st *store.Store) *auth {
 }
 
 func (a *auth) wa(r *http.Request) (*webauthn.WebAuthn, error) {
-	host := r.Host
+	in := infoOf(r) // the public host and scheme (from a trusted proxy's headers, else the request itself)
+	host := in.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
-	scheme := "http"
-	if r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https" {
-		scheme = "https"
-	}
-	rpid, origins := host, []string{scheme + "://" + r.Host}
+	rpid, origins := strings.Trim(host, "[]"), []string{in.Scheme + "://" + in.Host}
 	if v := os.Getenv("PHECLOUD_RP_ID"); v != "" {
 		rpid = v
 	}
@@ -115,7 +112,7 @@ func (a *auth) take(sid string) *pending {
 
 // limited: at most 8 failed attempts per client address per minute
 func (a *auth) limited(r *http.Request) bool {
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	ip := infoOf(r).ClientIP
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var keep []time.Time
@@ -129,7 +126,7 @@ func (a *auth) limited(r *http.Request) bool {
 }
 
 func (a *auth) failed(r *http.Request) {
-	ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+	ip := infoOf(r).ClientIP
 	a.mu.Lock()
 	a.fail[ip] = append(a.fail[ip], time.Now())
 	a.mu.Unlock()

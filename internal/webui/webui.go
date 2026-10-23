@@ -8,7 +8,9 @@ import (
 	"context"
 	"embed"
 	"io/fs"
+	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/coder/websocket"
@@ -47,6 +49,11 @@ func (w *wsIO) Close() error { return w.c.CloseNow() }
 
 // Handler serves the web app at / and the frame WebSocket at /ws.
 func Handler(s *server.Server, m *connectors.Manager) http.Handler {
+	trust, err := ParseTrust(os.Getenv("PHECLOUD_TRUSTED_PROXIES"))
+	if err != nil {
+		slog.Error("PHECLOUD_TRUSTED_PROXIES ignored (nobody is trusted)", "err", err)
+		trust = &Trust{}
+	}
 	mux := http.NewServeMux()
 	sub, _ := fs.Sub(distFS, "dist")
 	files := http.FileServer(http.FS(sub))
@@ -62,12 +69,13 @@ func Handler(s *server.Server, m *connectors.Manager) http.Handler {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 	}
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		c, err := websocket.Accept(w, r, nil)
+		in := infoOf(r)
+		c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{in.Host}})
 		if err != nil {
 			return
 		}
 		c.SetReadLimit(1 << 20)
-		s.ServeConn(&wsIO{c: c, ctx: r.Context()}, r.RemoteAddr)
+		s.ServeConn(&wsIO{c: c, ctx: r.Context()}, in.ClientIP)
 	})
-	return mux
+	return trust.withInfo(mux)
 }

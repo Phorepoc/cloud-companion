@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+http:
+  routers:
+    phecloud:
+      rule: Host(`phecloud.test`)
+      entryPoints: [websecure]
+      tls: {}            # Traefik's default self-signed certificate (a real setup: certificatesResolvers, or tailscale cert files)
+      service: phecloud
+  services:
+    phecloud:
+      loadBalancer:
+        servers:
+          - url: http://phe-cloud-px:8080

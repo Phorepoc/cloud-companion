@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# phecloud behind Traefik (TLS terminated there, plain HTTP to phecloud). Own project (phepk3), fixed addresses so that ONLY Traefik is a
+# trusted proxy: the test container reaches phecloud directly as an untrusted peer.
+services:
+  phecloud:
+    container_name: phe-cloud-px
+    ports: !override []
+    environment:
+      PHECLOUD_TRUSTED_PROXIES: 172.31.77.10/32
+    networks:
+      default: {}
+  traefik:
+    image: traefik:v3.1
+    container_name: phe-traefik-px
+    cpus: 1
+    mem_limit: 256m
+    command:
+      - --entrypoints.websecure.address=:443
+      - --providers.file.filename=/etc/traefik/dynamic.yml
+      - --log.level=INFO
+    volumes:
+      - ./web/test/traefik/dynamic.yml:/etc/traefik/dynamic.yml:ro
+    networks:
+      default:
+        ipv4_address: 172.31.77.10
+    depends_on: [phecloud]
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.77.0/24
