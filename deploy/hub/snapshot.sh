@@ -7,8 +7,8 @@ DIR=${1:-./backups}
 C=${2:-phe-cloud}
 KEEP=${KEEP:-10}
 mkdir -p "$DIR"
-F="$DIR/phehub-$(date +%Y%m%d-%H%M%S).db"
-[ ! -e "$F" ] || { echo "snapshot $F exists" >&2; exit 1; }
+B="$DIR/phehub-$(date +%Y%m%d-%H%M%S)"; F="$B.db"; n=0
+while [ -e "$F" ]; do n=$((n+1)); F="$B-$n.db"; done   # two snapshots in one second get a suffix, never overwrite
 docker exec "$C" phecloud snapshot /tmp/snap.db
 docker cp "$C:/tmp/snap.db" "$F"
 docker exec "$C" rm -f /tmp/snap.db
