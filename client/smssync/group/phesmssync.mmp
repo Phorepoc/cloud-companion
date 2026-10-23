@@ -1,0 +1,30 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: Apache-2.0
+//
+// phesmssync.mmp -- the Phorepoc SMS service for Phecloud: mirrors the phone's SMS (message server Inbox and Sent) into the owner's hub and
+// sends what the web app queues. Apache-2.0; links mbedTLS, the phc core and the Open C libc (the build supplies mbedTLS' headers/archive
+// and the Messaging headers: the Phorepoc build registry, key phesmssync).
+TARGET			phesmssync.exe
+TARGETTYPE		exe
+UID				0x1000007a 0xE7016B31
+CAPABILITY		ReadUserData WriteUserData NetworkServices LocalServices
+VENDORID		0
+EPOCSTACKSIZE	0x14000
+EPOCHEAPSIZE	0x20000 0x1000000
+
+OS_LAYER_SYSTEMINCLUDE_SYMBIAN
+OS_LAYER_LIBC_SYSTEMINCLUDE
+USERINCLUDE		..
+USERINCLUDE		../..
+
+SOURCEPATH		../..
+SOURCE			phc.c
+SOURCE			phc_cbor.c
+SOURCE			phc_sha256.c
+SOURCE			phc_mbedtls.c
+SOURCEPATH		..
+SOURCE			ss_net.c
+SOURCE			phesmssync.cpp
+
+LIBRARY			euser.lib efsrv.lib msgs.lib smcm.lib gsmu.lib estor.lib etext.lib charconv.lib
+LIBRARY			libc.lib libm.lib libpthread.lib libz.lib
