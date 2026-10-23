@@ -168,7 +168,15 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := r.URL.Query()
-	if err := session(ctx, c, q.Get("size"), q.Get("fps"), q.Get("kbps"), q.Get("codec"), q.Get("audio") != "0", r.Context()); err != nil && ctx.Err() == nil {
+	size := q.Get("size")
+	if vw, err1 := strconv.ParseFloat(q.Get("vw"), 64); err1 == nil {
+		vh, _ := strconv.ParseFloat(q.Get("vh"), 64)
+		applyViewport(vw, vh, q.Get("kind"))
+		if size == "" && q.Get("kind") == "large" {
+			size = "1280" // the stream of a large display is scaled down to this long edge unless the page asks for more
+		}
+	}
+	if err := session(ctx, c, size, q.Get("fps"), q.Get("kbps"), q.Get("codec"), q.Get("audio") != "0", r.Context()); err != nil && ctx.Err() == nil {
 		log.Println("session:", err)
 		dev.Lock()
 		dev.ready = false // the device may have been stopped behind our back: check again next time
@@ -498,6 +506,10 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 				DY     float64 `json:"dy"`
 				Paste  bool    `json:"paste"`
 				Cut    bool    `json:"cut"`
+				Meta   int     `json:"meta"`
+				W      float64 `json:"w"`
+				H      float64 `json:"h"`
+				Kind   string  `json:"kind"`
 			}
 			if json.Unmarshal(p, &m) != nil {
 				continue
@@ -515,6 +527,14 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 				}
 				mu.Unlock()
 				msg = touchMsg(m.A, m.X, m.Y, w, h)
+			case "ime": // is a text field focused, is something selected (for the page's own context menu)
+				go func() {
+					ed, sel := imeState()
+					r, _ := json.Marshal(map[string]any{"t": "ime", "editor": ed, "selection": sel})
+					wsend(websocket.MessageText, r)
+				}()
+			case "viewport": // the viewer's window changed: the display follows (debounced by the page)
+				go applyViewport(m.W, m.H, m.Kind)
 			case "scroll": // dx, dy in wheel steps (browser pixels / 100, sign as scrcpy: positive dy scrolls up)
 				mu.Lock()
 				w, h := width, height
@@ -530,7 +550,7 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 					msg[1] = 2
 				}
 			case "key": // a: 0 down, 1 up; code: Android keycode
-				msg = keyMsg(m.A, m.Code)
+				msg = keyMsg(m.A, m.Code, m.Meta)
 			case "text":
 				if len(m.S) > 0 && len(m.S) < 256 {
 					msg = append([]byte{1, 0, 0, 0, byte(len(m.S))}, m.S...)
@@ -576,11 +596,12 @@ func touchMsg(action int, x, y float64, w, h int) []byte {
 	return b
 }
 
-func keyMsg(action, code int) []byte {
+func keyMsg(action, code, meta int) []byte {
 	b := make([]byte, 14)
 	b[0] = 0
 	b[1] = byte(action)
 	binary.BigEndian.PutUint32(b[2:], uint32(code))
+	binary.BigEndian.PutUint32(b[10:], uint32(meta))
 	return b
 }
 

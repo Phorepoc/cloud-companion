@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -34,7 +35,7 @@ func TestTicketAndMessages(t *testing.T) {
 	if u := touchMsg(1, 0, 0, 10, 10); binary.BigEndian.Uint16(u[22:]) != 0 {
 		t.Fatalf("touch up has no pressure: %x", u)
 	}
-	k := keyMsg(1, 66)
+	k := keyMsg(1, 66, 0)
 	if len(k) != 14 || k[0] != 0 || k[1] != 1 || binary.BigEndian.Uint32(k[2:]) != 66 {
 		t.Fatalf("key: %x", k)
 	}
@@ -73,5 +74,43 @@ func TestStreamModuleCopy(t *testing.T) {
 	noCR := func(b []byte) []byte { return bytes.ReplaceAll(b, []byte{13}, nil) } // checkouts on Windows may use CRLF
 	if !bytes.Equal(noCR(src), noCR(streamJS)) {
 		t.Fatal("cmd/pheandroid/stream.js differs from web/src/android/stream.js: copy it over")
+	}
+}
+
+func TestDisplayForAndIME(t *testing.T) {
+	cases := []struct {
+		vw, vh float64
+		kind   string
+		w, h   int
+		dpi    int
+	}{
+		{390, 844, "phone", 720, 1552, 320}, // an iPhone-shaped window: 2.16
+		{360, 640, "phone", 720, 1280, 320},
+		{640, 360, "phone", 1280, 720, 320},   // a phone held sideways
+		{1280, 800, "large", 1600, 1008, 213}, // 1.6
+		{1920, 1080, "large", 1600, 896, 213}, // 1.78
+		{2560, 1080, "large", 1600, 848, 213}, // ultrawide is clamped to 1.9
+		{800, 1000, "large", 1280, 1600, 213}, // a tablet upright: 1.25
+	}
+	for _, c := range cases {
+		w, h, d := displayFor(c.vw, c.vh, c.kind)
+		if w != c.w || h != c.h || d != c.dpi {
+			t.Errorf("%v %s: got %dx%d@%d, want %dx%d@%d", [2]float64{c.vw, c.vh}, c.kind, w, h, d, c.w, c.h, c.dpi)
+		}
+	}
+	// the real `dumpsys input_method` lines (Android 13, Redroid): a focused text field with 5 characters selected, then one with the caret only, then no editor
+	edit := `  mServedInputConnection=RemoteInputConnectionImpl{connection=com.android.internal.inputmethod.EditableInputConnection@1846c94 finished=false}
+  mCursorSelStart=0 mCursorSelEnd=5 mCursorCandStart=-1 mCursorCandEnd=-1
+`
+	if e, s := parseIME(edit); !e || !s {
+		t.Fatalf("selection: %v %v", e, s)
+	}
+	if e, s := parseIME(strings.Replace(edit, "mCursorSelEnd=5", "mCursorSelEnd=0", 1)); !e || s {
+		t.Fatalf("caret only: %v %v", e, s)
+	}
+	if e, s := parseIME(`  mFallbackInputConnection=RemoteInputConnectionImpl{connection=android.view.inputmethod.BaseInputConnection@6ca20}
+  mCursorSelStart=0 mCursorSelEnd=5
+`); e || s {
+		t.Fatalf("no editor: %v %v", e, s)
 	}
 }

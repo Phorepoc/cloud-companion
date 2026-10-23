@@ -42,6 +42,8 @@ until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; 
         selectall) c='input keycombination CTRL_LEFT A' ;;
         pkgs) c='pm list packages -3' ;;
         tone) c='input keyevent 24; input keyevent 25' ;;
+        wmsize) c='wm size; wm density' ;;
+        settingssearch) c='am start -a android.settings.SETTINGS >/dev/null; sleep 2; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep -i "Search settings" | head -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;
         *) c='true' ;;
       esac
       rm -f "$f"
@@ -52,6 +54,15 @@ until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; 
   done
 ) &
 HOOKPID=$!
+# the display follows the viewer, and the page's own context menu (ONLY=view runs just this)
+run_view() {
+EXP=$(( $(date +%s) + 3000 ))
+SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
+docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host \
+    -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out \
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidview.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
+}
+if [ "${ONLY:-}" = view ]; then run_view; exit $?; fi
 EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host \
@@ -81,3 +92,4 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:p
 EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidpark.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
+run_view
