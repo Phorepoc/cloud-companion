@@ -33,7 +33,7 @@ func TestICalEditKeepsRuleAlarmAndZone(t *testing.T) {
 	src := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTIMEZONE\r\nTZID:Europe/London\r\nEND:VTIMEZONE\r\nBEGIN:VEVENT\r\nUID:e1\r\nDTSTART;TZID=Europe/London:20261024T090000\r\n" +
 		"DTEND;TZID=Europe/London:20261024T100000\r\nSUMMARY:Stand-up\r\nRRULE:FREQ=WEEKLY\r\nBEGIN:VALARM\r\nTRIGGER:-PT10M\r\nEND:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
 	o := parseICal(src)
-	if !o.hasEvent || o.ev.Title != "Stand-up" || o.ev.Start != "2026-10-24T09:00:00" || !o.ev.Recurs || o.startTZ != "Europe/London" {
+	if !o.hasEvent || o.ev.Title != "Stand-up" || o.ev.Start != "2026-10-24T08:00:00Z" || o.ev.TZ != "Europe/London" || !o.ev.Recurs || o.startTZ != "Europe/London" {
 		t.Fatalf("parsed %+v", o)
 	}
 	e := o.ev

@@ -12,7 +12,7 @@ const router = createRouter({
     { path: '/pair', component: () => import('./pages/PairPage.vue') },
     { path: '/browse', component: () => import('./pages/BrowserPage.vue') },
     section('chats'),
-    section('mail'),
+    { path: '/mail', component: () => import('./pages/MailPage.vue') },
     { path: '/calendar', component: () => import('./pages/CalendarPage.vue') },
     { path: '/contacts', component: () => import('./pages/ContactsPage.vue') },
     section('files'),

@@ -431,6 +431,7 @@ type Event struct {
 	Location string `cbor:"location,omitempty"`
 	Notes    string `cbor:"notes,omitempty"`
 	Recurs   bool   `cbor:"recurs,omitempty"` // has a recurrence rule (shown once; editing keeps the rule)
+	TZ       string `cbor:"tz,omitempty"`     // IANA zone: on write the local times are in this zone (TZID); on read set when the event had one (start/end are then UTC)
 }
 
 // Hub: Op = contacts.list | contacts.save | contacts.delete | events.list | events.save | events.delete.
@@ -445,15 +446,64 @@ type Hub struct {
 	ETag    string   `cbor:"etag,omitempty"`
 	From    string   `cbor:"from,omitempty"`
 	To      string   `cbor:"to,omitempty"`
+	Name    string   `cbor:"name,omitempty"`   // apppw.add: a label for the device
+	Days    int      `cbor:"days,omitempty"`   // apppw.add: optional expiry in days
+	ID2     string   `cbor:"id2,omitempty"`    // apppw.revoke / mail.read: the object id
+	Folder  string   `cbor:"folder,omitempty"` // mail.list: folder id
+	Pos     int      `cbor:"pos,omitempty"`    // mail.list: offset
 }
 
 type HubRes struct {
-	T        string    `cbor:"t"`
-	ID       int       `cbor:"id"`
-	OK       bool      `cbor:"ok"`
-	Err      string    `cbor:"err,omitempty"`
-	Contacts []Contact `cbor:"contacts,omitempty"`
-	Events   []Event   `cbor:"events,omitempty"`
-	Contact  *Contact  `cbor:"contact,omitempty"`
-	Event    *Event    `cbor:"event,omitempty"`
+	T        string       `cbor:"t"`
+	ID       int          `cbor:"id"`
+	OK       bool         `cbor:"ok"`
+	Err      string       `cbor:"err,omitempty"`
+	Contacts []Contact    `cbor:"contacts,omitempty"`
+	Events   []Event      `cbor:"events,omitempty"`
+	Contact  *Contact     `cbor:"contact,omitempty"`
+	Event    *Event       `cbor:"event,omitempty"`
+	AppPws   []AppPw      `cbor:"apppws,omitempty"`
+	Secret   string       `cbor:"secret,omitempty"` // apppw.add: shown once
+	Owner    string       `cbor:"owner,omitempty"`
+	Domain   string       `cbor:"domain,omitempty"`
+	Folders  []MailFolder `cbor:"folders,omitempty"`
+	Mails    []MailItem   `cbor:"mails,omitempty"`
+	Total    int          `cbor:"total,omitempty"`
+	Mail     *MailBody    `cbor:"mail,omitempty"`
+}
+
+// ---- hub: app passwords (admin devices) and mail (read-only) ----
+
+type AppPw struct {
+	ID      string `cbor:"id"`
+	Name    string `cbor:"name"`
+	Created string `cbor:"created,omitempty"`
+	Expires string `cbor:"expires,omitempty"`
+}
+
+type MailFolder struct {
+	ID     string `cbor:"id"`
+	Name   string `cbor:"name"`
+	Role   string `cbor:"role,omitempty"` // inbox | sent | drafts | trash | junk | archive
+	Total  int    `cbor:"total"`
+	Unread int    `cbor:"unread"`
+	Parent string `cbor:"parent,omitempty"`
+}
+
+type MailItem struct {
+	ID      string `cbor:"id"`
+	Subject string `cbor:"subject"`
+	From    string `cbor:"from"`
+	Date    string `cbor:"date"` // RFC 3339
+	Preview string `cbor:"preview,omitempty"`
+	Unread  bool   `cbor:"unread,omitempty"`
+	Attach  bool   `cbor:"attach,omitempty"`
+}
+
+type MailBody struct {
+	MailItem
+	To   []string `cbor:"to,omitempty"`
+	Cc   []string `cbor:"cc,omitempty"`
+	Text string   `cbor:"text"`
+	HTML bool     `cbor:"html,omitempty"` // the text was made from an HTML body
 }

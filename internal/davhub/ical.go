@@ -4,8 +4,10 @@
 package davhub
 
 import (
+	"fmt"
 	"strings"
 	"time"
+	_ "time/tzdata" // zone rules inside the binary: the runtime image has no tzdata
 
 	"github.com/phorepoc/phecloud/internal/proto"
 )
@@ -104,9 +106,15 @@ func parseICal(data string) ical {
 				o.ev.Notes = unescape(val)
 			case "DTSTART":
 				o.ev.Start, o.ev.AllDay = isoFromICal(val)
+				if tz := tzParam(params); tz != "" && !o.ev.AllDay {
+					o.ev.Start, o.ev.TZ = toUTC(o.ev.Start, tz), tz
+				}
 				o.startTZ = tzParam(params)
 			case "DTEND":
 				o.ev.End, _ = isoFromICal(val)
+				if tz := tzParam(params); tz != "" && len(val) > 8 {
+					o.ev.End = toUTC(o.ev.End, tz)
+				}
 				o.endTZ = tzParam(params)
 			case "DTSTAMP", "LAST-MODIFIED":
 			case "RRULE", "RDATE":
@@ -128,6 +136,21 @@ func writeICal(o ical, e proto.Event) string {
 	if len(o.head) == 0 {
 		o.head = []string{"BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//phecloud//web//EN"}
 		o.tail = []string{"END:VCALENDAR"}
+	}
+	switch {
+	case e.AllDay || strings.HasSuffix(e.Start, "Z"):
+		o.startTZ, o.endTZ = "", ""
+	case e.TZ != "":
+		o.startTZ, o.endTZ = e.TZ, e.TZ
+		have := false
+		for _, l := range o.head {
+			if strings.EqualFold(l, "TZID:"+e.TZ) {
+				have = true
+			}
+		}
+		if !have {
+			o.head = append(append([]string{}, o.head...), vtimezone(e.TZ, e.Start)...)
+		}
 	}
 	for _, l := range o.head {
 		line(l)
@@ -163,4 +186,41 @@ func writeICal(o ical, e proto.Event) string {
 		line(l)
 	}
 	return b.String()
+}
+
+// toUTC converts a floating ISO time in the zone tz to UTC ("...Z"); unknown zones leave it floating.
+func toUTC(iso, tz string) string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil || strings.HasSuffix(iso, "Z") {
+		return iso
+	}
+	t, err := time.ParseInLocation("2006-01-02T15:04:05", iso, loc)
+	if err != nil {
+		return iso
+	}
+	return t.UTC().Format("2006-01-02T15:04:05Z")
+}
+
+func offsetStr(sec int) string {
+	sign := "+"
+	if sec < 0 {
+		sign, sec = "-", -sec
+	}
+	return fmt.Sprintf("%s%02d%02d", sign, sec/3600, sec%3600/60)
+}
+
+// vtimezone is a minimal VTIMEZONE for tz with the offset in force at the given local time (enough for the one event that refers
+// to it; other clients that know the zone use their own rules).
+func vtimezone(tz, localISO string) []string {
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return nil
+	}
+	t, err := time.ParseInLocation("2006-01-02T15:04:05", localISO, loc)
+	if err != nil {
+		return nil
+	}
+	abbr, off := t.Zone()
+	o := offsetStr(off)
+	return []string{"BEGIN:VTIMEZONE", "TZID:" + tz, "BEGIN:STANDARD", "DTSTART:19700101T000000", "TZOFFSETFROM:" + o, "TZOFFSETTO:" + o, "TZNAME:" + abbr, "END:STANDARD", "END:VTIMEZONE"}
 }

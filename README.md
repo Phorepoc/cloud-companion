@@ -87,6 +87,14 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
   delete. Existing items keep what the editor does not show (vCard lines such as photos, iCalendar recurrence rules, alarms and time
   zone definitions are written back unchanged). Deleting is deferred for the length of the "Undo" toast. Tests: `go test ./internal/davhub`
   and `HUB_ENV_FILE=<hub's .env.phecloud> sh web/test/hubstep.sh` (Playwright against a running hub; screenshots in `web/test/screenshots/hub`).
+- **Round 11**: *App passwords* are rows in Devices (admin devices only): list, add (name and optional expiry; the secret is shown once with the
+  user name and server, and can be copied), switch off (Stalwart's `AppPassword` objects through the server's `hub` frames
+  `apppw.list|add|revoke`). *Calendar*: a Monday-first month grid (dots on phones, chips on larger screens, a selected-day list below) with the
+  agenda kept as a toggle; timed events are written with the browser's time zone as `TZID` plus a minimal `VTIMEZONE` (offset at the event's
+  start), and events that have a `TZID` are read as UTC and shown in the viewer's zone. *Mail* (read-only): folders, a message list with
+  "show older", and a reader that shows plain text (HTML bodies are reduced to text; no pictures, links or scripts load), over JMAP; messages are
+  not marked as read. Go tests: `go test ./internal/server` drives the `hub` frames against a fake Stalwart (CardDAV, CalDAV, JMAP), including
+  the admin check, UID-preserving edits, the foreign-address refusal, time zones, app passwords and mail.
 - **Icons and toasts**: the Material Symbols font is subset to the icons in use at build time (6.5 KB instead of 3.6 MB), and toasts follow STYLE.md (4 seconds, Undo, paused on hover or focus).
 - Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use the Caddy profile below for anything but localhost, or
   `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).

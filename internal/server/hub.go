@@ -5,6 +5,7 @@ package server
 
 import (
 	"errors"
+	"os"
 
 	"github.com/phorepoc/phecloud/internal/proto"
 )
@@ -52,6 +53,29 @@ func (s *session) hubRequest(raw []byte) error {
 		}
 	case "events.delete":
 		err = hub.Delete("cal", h.Href, h.ETag)
+	case "apppw.list", "apppw.add", "apppw.revoke":
+		if !s.admin {
+			return fail(errors.New("only an admin device can manage app passwords"))
+		}
+		res.Owner, res.Domain = hub.Owner, os.Getenv("PHECLOUD_HUB_DOMAIN")
+		switch h.Op {
+		case "apppw.list":
+			res.AppPws, err = hub.AppPasswords()
+		case "apppw.add":
+			var id, secret string
+			if id, secret, err = hub.AddAppPassword(h.Name, h.Days); err == nil {
+				res.Secret = secret
+				res.AppPws = []proto.AppPw{{ID: id, Name: h.Name}}
+			}
+		case "apppw.revoke":
+			err = hub.RevokeAppPassword(h.ID2)
+		}
+	case "mail.folders":
+		res.Folders, err = hub.MailFolders()
+	case "mail.list":
+		res.Mails, res.Total, err = hub.MailList(h.Folder, h.Pos)
+	case "mail.read":
+		res.Mail, err = hub.MailRead(h.ID2)
 	default:
 		err = errors.New("unknown hub operation")
 	}
