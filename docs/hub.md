@@ -178,3 +178,7 @@ Test: `HUB_ENV_FILE=<hub .env.phecloud> sh deploy/hub/test/backup_test.sh` (hub 
 Caddyfile.hub sends `/auth`, `/oauth` and the OAuth discovery documents to Stalwart. The web app's passkey endpoints therefore live
 under `/passkey/*` (not `/auth/*`), which falls through to phecloud. Check: `curl -k https://<host>/passkey/status` answers
 `{"owner":...}` (phecloud) and `curl -k https://<host>/.well-known/oauth-authorization-server` answers Stalwart's metadata.
+
+### Passkeys and the Caddy hub
+Caddy reaches phecloud over plain HTTP, so phecloud only learns the public `https` origin from Caddy's headers when Caddy is a trusted proxy:
+set `PHECLOUD_TRUSTED_PROXIES` to Caddy's address on the compose network (see docs/reverse-proxy.md). Browse the hub by a **domain name** (not an IP).
