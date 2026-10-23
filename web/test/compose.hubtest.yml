@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Throwaway hub for end-to-end tests: its own compose project (phetest), own volumes, own container names, nothing published.
+services:
+  stalwart:
+    container_name: phe-stalwart-t
+  phecloud:
+    container_name: phe-cloud-t
+    ports: !override []

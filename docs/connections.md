@@ -23,8 +23,21 @@ merged away is not re-created by later syncs.
 ## API (admin devices, signed requests as for passkeys)
 `GET/POST /api/connections`, `POST /api/connections/test|sync|remove`, `GET /api/duplicates`, `POST /api/duplicates/merge|dismiss`, `GET /api/links?hub=<id>`.
 
+## Merging and the sources
+Every device and every connected service keeps its **own** contact list. A merge only changes the hub: the data goes into the kept hub contact,
+the other hub contact is deleted, and the link table now points every source entry of both to the kept contact. Entries in the sources
+(Radicale, Google, a phone) are **never written or deleted** by a merge, and later syncs do not bring the merged-away hub contact back. (Merging
+duplicates inside one device's own list is a separate, explicit action that is not built yet.)
+
 ## Tested
-Go: IMAP pull (window, no repeats, per-run cap) and SMTP relay with the Sent copy against in-process IMAP and SMTP servers (go-imap, go-smtp);
-DAV pull (create, unchanged, change, delete, links) against a fake server; sealing; duplicate finder and merge. Playwright (`web/test/connections.sh`):
-add, test (wrong and right password), sync, remove through the UI against Radicale and a go-imap server, with light and dark screenshots.
-Not yet exercised: the hub side (`MailImport`, `PutRaw`, merge on real contacts) against a live Stalwart, and CalDAV against a real server.
+- Go unit tests: IMAP pull (window, no repeats, per-run cap) and SMTP relay with the Sent copy against in-process IMAP and SMTP servers
+  (go-imap, go-smtp); DAV pull against a fake server; sealing; duplicate finder and merge.
+- **End to end against a real Stalwart and a real Radicale** (throwaway hub from `web/test/hubtest-up.sh`, `web/test/hubtest-run.sh`):
+  IMAP messages imported into a hub folder and read back (3 messages, no repeats on the second run); CardDAV cards and a CalDAV event pulled
+  from Radicale into the hub; duplicate finder sees the two cards; the merge on the real hub contacts leaves one contact, both source
+  entries linked to it, the Radicale entries byte-identical and still present, and a later sync with a changed source entry does not resurrect
+  the merged contact.
+- Playwright: `web/test/connections.sh` (add, test with wrong and right password, sync, remove through the UI against Radicale and a go-imap server)
+  and `web/test/dups.sh` (the duplicate review against the real hub: both pairs proposed with reasons, Keep merges one pair, Not the same hides
+  the other without deleting anything). Light and dark screenshots in `web/test/screenshots/`.
+Still not exercised: a real Dovecot/Postfix and the big providers (OAuth is not built).

@@ -19,7 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"path"
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/connectors"
@@ -159,38 +158,15 @@ func (c *conns) routes(mux *http.ServeMux) {
 			bad(w, 400, "bad request")
 			return
 		}
-		cs, err := c.hub.Contacts()
+		merged, err := connectors.MergeHub(c.hub, c.st, in.Keep, in.Drop)
+		if err == connectors.ErrGone {
+			bad(w, 404, err.Error())
+			return
+		}
 		if err != nil {
 			bad(w, 502, err.Error())
 			return
 		}
-		var a, b *int
-		for i := range cs {
-			switch connectors.HubID(cs[i].Href) {
-			case in.Keep:
-				x := i
-				a = &x
-			case in.Drop:
-				x := i
-				b = &x
-			}
-		}
-		if a == nil || b == nil {
-			bad(w, 404, "one of the contacts no longer exists")
-			return
-		}
-		merged := connectors.Merge(cs[*a], cs[*b])
-		if _, err := c.hub.SaveContact(merged); err != nil {
-			bad(w, 502, err.Error())
-			return
-		}
-		if err := c.hub.DeleteRaw("card", path.Base(cs[*b].Href)); err != nil {
-			bad(w, 502, err.Error())
-			return
-		}
-		c.st.MoveLinks(in.Drop, in.Keep)
-		// the dropped entry's source keeps pointing at the merged contact: the next sync of that account would re-create the
-		// dropped hub contact, so remember where its entries went
 		reply(w, 200, map[string]any{"ok": true, "contact": merged.Name})
 	})
 	mux.HandleFunc("/api/links", func(w http.ResponseWriter, r *http.Request) {

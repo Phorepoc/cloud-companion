@@ -4,6 +4,7 @@
 package connectors
 
 import (
+	"errors"
 	"path"
 	"sort"
 	"strings"
@@ -159,4 +160,47 @@ func Merge(a, b proto.Contact) proto.Contact {
 		}
 	}
 	return a
+}
+
+// HubContacts is the hub side of a merge (davhub.Client).
+type HubContacts interface {
+	Contacts() ([]proto.Contact, error)
+	SaveContact(proto.Contact) (proto.Contact, error)
+	DeleteRaw(kind, name string) error
+}
+
+// LinkMover re-points links (store.Store).
+type LinkMover interface{ MoveLinks(from, to string) }
+
+var ErrGone = errors.New("one of the contacts no longer exists")
+
+// MergeHub folds the hub contact `drop` into `keep`. Only the HUB's copy is touched: the data goes into `keep`, `drop` is deleted from the
+// hub, and every link of `drop` (device or service entry) is re-pointed to `keep`. The entries in the sources are never written or deleted:
+// every device and service keeps its own list (hub-design.md); a later sync does not bring `drop` back.
+func MergeHub(hub HubContacts, links LinkMover, keep, drop string) (proto.Contact, error) {
+	cs, err := hub.Contacts()
+	if err != nil {
+		return proto.Contact{}, err
+	}
+	var a, b *proto.Contact
+	for i := range cs {
+		switch HubID(cs[i].Href) {
+		case keep:
+			a = &cs[i]
+		case drop:
+			b = &cs[i]
+		}
+	}
+	if a == nil || b == nil || keep == drop {
+		return proto.Contact{}, ErrGone
+	}
+	merged := Merge(*a, *b)
+	if _, err := hub.SaveContact(merged); err != nil {
+		return merged, err
+	}
+	if err := hub.DeleteRaw("card", path.Base(b.Href)); err != nil {
+		return merged, err
+	}
+	links.MoveLinks(drop, keep)
+	return merged, nil
 }
