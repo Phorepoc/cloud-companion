@@ -17,7 +17,7 @@ cleanup() { [ -n "${HOOKPID:-}" ] && kill "$HOOKPID" 2>/dev/null || true; docker
 cleanup; trap cleanup EXIT
 cp "$APK" "$ROOT/web/test/markor.apk"
 docker network create phepa >/dev/null
-docker run -d --name phe-redroid-t --network phepa --privileged --cpus 2 --memory 3g phe-redroid-native:13 \
+docker run -d --name phe-redroid-t --network phepa --privileged --cpus 2 --memory 3g ${REDROID_IMAGE:-phe-redroid-native:13-ff} \
     androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320 androidboot.use_memfd=1 >/dev/null
 docker run -d --name phe-dockerproxy-t --network phepa --cpus 0.25 --memory 64m -e CONTAINERS=1 -e POST=1 -e ALLOW_START=1 -e ALLOW_STOP=1 -v /var/run/docker.sock:/var/run/docker.sock:ro tecnativa/docker-socket-proxy:0.3.0 >/dev/null
 docker build -q -f cmd/pheandroid/Dockerfile -t phe-android-bridge:dev . >/dev/null
@@ -43,6 +43,10 @@ until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; 
         pkgs) c='pm list packages -3' ;;
         tone) c='input keyevent 24; input keyevent 25' ;;
         wmsize) c='wm size; wm density' ;;
+        gohome) c='input keyevent 3; sleep 2; dumpsys window | grep mCurrentFocus | head -1' ;;
+        settingsff) c='am start --windowingMode 5 -n com.android.settings/.Settings' ;;
+        freeformcount) c='dumpsys activity activities | grep -c mode=freeform' ;;
+        taskbarwin) c='dumpsys window windows | grep -c "Window{.* Taskbar}"' ;;
         applist) c='am start -a android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS' ;;
         settingssearch) c='am start -a android.settings.SETTINGS >/dev/null; sleep 2; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep -i "Search settings" | head -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;
         *) c='true' ;;
@@ -56,6 +60,13 @@ until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; 
 ) &
 HOOKPID=$!
 # the display follows the viewer, and the page's own context menu (ONLY=view runs just this)
+run_desktop() {
+EXP=$(( $(date +%s) + 3000 ))
+SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
+docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host \
+    -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out \
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androiddesktop.mjs' || { docker logs phe-android-t 2>&1 | tail -12; exit 1; }
+}
 run_view() {
 EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
@@ -64,6 +75,7 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:p
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidview.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
 }
 if [ "${ONLY:-}" = view ]; then run_view; exit $?; fi
+if [ "${ONLY:-}" = desktop ]; then run_desktop; exit $?; fi
 EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host \
@@ -95,3 +107,4 @@ EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidpark.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
 run_view
+run_desktop

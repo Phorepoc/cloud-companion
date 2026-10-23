@@ -63,6 +63,12 @@ var disp struct {
 
 // applyViewport sets the display for this viewer unless it already has (nearly) that size; it reports the display size now in force.
 func applyViewport(vw, vh float64, kind string) (w, h, dpi int) {
+	w, h, dpi = applyDisplay(vw, vh, kind)
+	setDesktopMode(kind) // desktop viewers get Taskbar and freeform windows, phone viewers the stock launcher
+	return
+}
+
+func applyDisplay(vw, vh float64, kind string) (w, h, dpi int) {
 	if kind != "large" {
 		kind = "phone"
 	}

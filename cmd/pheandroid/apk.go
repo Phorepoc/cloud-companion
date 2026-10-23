@@ -11,6 +11,7 @@ package main
 // Both need the session id the WebSocket handed out (so only the signed-in viewer can install), run `adb install -r -g`, and answer {ok, detail}.
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -72,11 +73,21 @@ func handleFDroid(w http.ResponseWriter, r *http.Request) {
 		jsonReply(w, 400, false, "that is not an Android package name (for example org.fossify.notes)")
 		return
 	}
+	ok, d := fdroidInstall(r.Context(), id)
+	code := 200
+	if !ok && strings.HasPrefix(d, "F-Droid has no app") {
+		code = 404
+	}
+	jsonReply(w, code, ok, d)
+}
+
+// fdroidInstall downloads the suggested build of a package from f-droid.org (the multi-ABI file) and installs it with adb.
+func fdroidInstall(ctx context.Context, id string) (bool, string) {
 	hc := &http.Client{Timeout: 5 * time.Minute}
-	resp, err := hc.Get("https://f-droid.org/api/v1/packages/" + id)
+	req, _ := http.NewRequestWithContext(ctx, "GET", "https://f-droid.org/api/v1/packages/"+id, nil)
+	resp, err := hc.Do(req)
 	if err != nil {
-		jsonReply(w, 502, false, "f-droid.org is not reachable")
-		return
+		return false, "f-droid.org is not reachable"
 	}
 	var meta struct {
 		Suggested int `json:"suggestedVersionCode"`
@@ -84,32 +95,26 @@ func handleFDroid(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&meta)
 	resp.Body.Close()
 	if resp.StatusCode == 404 || (err == nil && meta.Suggested == 0) {
-		jsonReply(w, 404, false, "F-Droid has no app with that package name")
-		return
+		return false, "F-Droid has no app with that package name"
 	}
 	if err != nil || resp.StatusCode != 200 {
-		jsonReply(w, 502, false, "F-Droid did not answer")
-		return
+		return false, "F-Droid did not answer"
 	}
-	// the multi-ABI build is the file without an ABI suffix; the suggested versionCode names it
-	resp, err = hc.Get(fmt.Sprintf("https://f-droid.org/repo/%s_%d.apk", id, meta.Suggested))
+	req, _ = http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://f-droid.org/repo/%s_%d.apk", id, meta.Suggested), nil)
+	resp, err = hc.Do(req)
 	if err != nil || resp.StatusCode != 200 {
-		jsonReply(w, 502, false, "the download failed")
-		return
+		return false, "the download failed"
 	}
 	defer resp.Body.Close()
 	f, err := os.CreateTemp("", "fd-*.apk")
 	if err != nil {
-		jsonReply(w, 500, false, err.Error())
-		return
+		return false, err.Error()
 	}
 	defer os.Remove(f.Name())
 	if _, err := io.Copy(f, io.LimitReader(resp.Body, maxAPK)); err != nil {
 		f.Close()
-		jsonReply(w, 502, false, "the download failed")
-		return
+		return false, "the download failed"
 	}
 	f.Close()
-	ok, d := installFile(f.Name())
-	jsonReply(w, 200, ok, d)
+	return installFile(f.Name())
 }
