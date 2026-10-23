@@ -25,20 +25,6 @@ type Account struct {
 	Created   int64  `json:"created"`
 }
 
-func (s *Store) initConnectors() error {
-	for _, q := range []string{
-		`CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY, kind TEXT NOT NULL, provider TEXT, name TEXT, config TEXT, secret BLOB, status TEXT, last_sync INTEGER, last_error TEXT, created INTEGER)`,
-		`CREATE TABLE IF NOT EXISTS synced(account TEXT NOT NULL, key TEXT NOT NULL, value TEXT, PRIMARY KEY(account, key))`,
-		`CREATE TABLE IF NOT EXISTS contact_links(hub_id TEXT NOT NULL, source TEXT NOT NULL, entry_id TEXT NOT NULL, created INTEGER, PRIMARY KEY(source, entry_id))`,
-		`CREATE INDEX IF NOT EXISTS contact_links_hub ON contact_links(hub_id)`,
-	} {
-		if _, err := s.db.Exec(q); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func (s *Store) AddAccount(a Account) (Account, error) {
 	b := make([]byte, 6)
 	rand.Read(b)
@@ -191,11 +177,6 @@ type DevMerge struct {
 	MergedETag string `json:"-"`
 	State      string `json:"state"` // preview | applied | undone
 	Expires    int64  `json:"expires"`
-}
-
-func (s *Store) initDevMerge() error {
-	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS dev_merges(id TEXT PRIMARY KEY, account TEXT, a_href TEXT, a_body TEXT, a_etag TEXT, b_href TEXT, b_body TEXT, b_etag TEXT, merged_body TEXT, merged_etag TEXT, state TEXT, expires INTEGER)`)
-	return err
 }
 
 func (s *Store) DevMergeSave(m DevMerge) DevMerge {

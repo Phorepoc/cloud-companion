@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -108,11 +107,7 @@ func TestSyncDAV(t *testing.T) {
 		w.WriteHeader(404)
 	}))
 	defer srv.Close()
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 	hub := &fakeHubDAV{puts: map[string]string{}}
 	cfg := DAVCfg{URL: srv.URL + "/book/", User: "u"}
 	if _, err := TestDAV(context.Background(), cfg, "wrong"); err == nil {

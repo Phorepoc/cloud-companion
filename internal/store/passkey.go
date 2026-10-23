@@ -18,18 +18,6 @@ import (
 // The single owner of the server: a WebAuthn user handle, any number of passkeys, and one recovery code (stored as a SHA-256 hash;
 // the code itself has 80 bits of randomness and is shown once).
 
-func (s *Store) initPasskeys() error {
-	for _, q := range []string{
-		`CREATE TABLE IF NOT EXISTS owner(id INTEGER PRIMARY KEY CHECK(id=1), handle BLOB NOT NULL, recovery TEXT NOT NULL, created INTEGER)`,
-		`CREATE TABLE IF NOT EXISTS passkeys(id BLOB PRIMARY KEY, cred TEXT NOT NULL, name TEXT, created INTEGER, last_used INTEGER)`,
-	} {
-		if _, err := s.db.Exec(q); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // OwnerExists reports whether an owner passkey has been registered.
 func (s *Store) OwnerExists() bool {
 	var n int

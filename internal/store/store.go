@@ -9,48 +9,49 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db *DB
+	d  Dialect
+}
 
 const alphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
 
-func Open(path string) (*Store, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+func nowUnix() int64 { return time.Now().Unix() }
+
+// Open opens the database named by dsn: a SQLite file path, a postgres:// URL or a mysql:// URL (see db.go), and brings its schema up to date.
+func Open(dsn string) (*Store, error) {
+	d, driver, ddsn, err := parseDSN(dsn)
 	if err != nil {
 		return nil, err
 	}
-	db.SetMaxOpenConns(1)
-	for _, q := range []string{
-		`CREATE TABLE IF NOT EXISTS devices(id TEXT PRIMARY KEY, name TEXT, key BLOB NOT NULL, created INTEGER, revoked INTEGER DEFAULT 0, last_seen INTEGER)`,
-		`CREATE TABLE IF NOT EXISTS cookies(dev TEXT PRIMARY KEY, data BLOB, updated INTEGER)`,
-		`CREATE TABLE IF NOT EXISTS settings(dev TEXT PRIMARY KEY, data BLOB)`,
-		`CREATE TABLE IF NOT EXISTS pair_codes(code TEXT PRIMARY KEY, expires INTEGER NOT NULL, used INTEGER DEFAULT 0)`,
-	} {
-		if _, err := db.Exec(q); err != nil {
-			return nil, err
-		}
-	}
-	db.Exec(`ALTER TABLE devices ADD COLUMN admin INTEGER DEFAULT 0`) // errors (column exists) are fine
-	db.Exec(`ALTER TABLE pair_codes ADD COLUMN admin INTEGER DEFAULT 0`)
-	st := &Store{db}
-	if err := st.initPasskeys(); err != nil {
+	sdb, err := sql.Open(driver, ddsn)
+	if err != nil {
 		return nil, err
 	}
-	if err := st.initConnectors(); err != nil {
-		return nil, err
+	if d == SQLite {
+		sdb.SetMaxOpenConns(1) // one writer; WAL keeps readers out of the way
+	} else {
+		sdb.SetMaxOpenConns(10)
+		sdb.SetConnMaxLifetime(30 * time.Minute)
 	}
-	if err := st.initSMS(); err != nil {
-		return nil, err
+	st := &Store{db: &DB{sdb, d}, d: d}
+	if err := sdb.Ping(); err != nil {
+		sdb.Close()
+		return nil, fmt.Errorf("cannot reach the %s database: %w", d, err)
 	}
-	if err := st.initDevMerge(); err != nil {
+	if err := st.migrate(); err != nil {
+		sdb.Close()
 		return nil, err
 	}
 	return st, nil
 }
+
+// Dialect says which database this store talks to.
+func (s *Store) Dialect() Dialect { return s.d }
 
 func (s *Store) Close() error { return s.db.Close() }
 
@@ -183,8 +184,12 @@ func (s *Store) DeviceName(id string) string {
 	return n
 }
 
-// Snapshot writes a consistent copy of the database to path (SQLite VACUUM INTO; safe while the server runs).
+// Snapshot writes a consistent copy of a SQLite database to path (VACUUM INTO; safe while the server runs). An external database returns
+// ErrExternalDB: back it up with pg_dump / mariadb-dump.
 func (s *Store) Snapshot(path string) error {
+	if s.d != SQLite {
+		return ErrExternalDB
+	}
 	_, err := s.db.Exec(`VACUUM INTO ?`, path)
 	return err
 }

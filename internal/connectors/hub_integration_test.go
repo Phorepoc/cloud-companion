@@ -15,7 +15,6 @@ import (
 	"github.com/emersion/go-imap/v2"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -54,11 +53,7 @@ func TestHubEndToEnd(t *testing.T) {
 		t.Skip("no hub in the environment")
 	}
 	ctx := context.Background()
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 
 	// ---- 1. IMAP into the hub cache ----
 	icfg, u := startIMAP(t)

@@ -28,20 +28,6 @@ type SMS struct {
 	Error    string `json:"error,omitempty"`
 }
 
-func (s *Store) initSMS() error {
-	for _, q := range []string{
-		`CREATE TABLE IF NOT EXISTS sms(id INTEGER PRIMARY KEY AUTOINCREMENT, device TEXT NOT NULL, dev_msg_id TEXT, number TEXT NOT NULL, key TEXT NOT NULL, dir TEXT NOT NULL, body TEXT, ts INTEGER, status TEXT, error TEXT)`,
-		`CREATE UNIQUE INDEX IF NOT EXISTS sms_dev ON sms(device, dev_msg_id) WHERE dev_msg_id IS NOT NULL AND dev_msg_id != ''`,
-		`CREATE INDEX IF NOT EXISTS sms_key ON sms(key, ts)`,
-		`CREATE TABLE IF NOT EXISTS sms_devices(device TEXT PRIMARY KEY, label TEXT, number TEXT, last_sync INTEGER)`,
-	} {
-		if _, err := s.db.Exec(q); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // NumberKey reduces a phone number for matching: the last 9 digits (+49 171 ... equals 0171 ...); shorter numbers (short codes) stay whole.
 func NumberKey(n string) string {
 	var b strings.Builder
@@ -96,8 +82,14 @@ func (s *Store) SMSQueue(device, number, body string) (int64, error) {
 	if strings.TrimSpace(number) == "" || strings.TrimSpace(body) == "" {
 		return 0, errors.New("a number and a text are needed")
 	}
-	res, err := s.db.Exec(`INSERT INTO sms(device,dev_msg_id,number,key,dir,body,ts,status) VALUES(?,NULL,?,?,'out',?,?,'queued')`,
-		device, strings.TrimSpace(number), NumberKey(number), body, time.Now().Unix())
+	const q = `INSERT INTO sms(device,dev_msg_id,number,key,dir,body,ts,status) VALUES(?,NULL,?,?,'out',?,?,'queued')`
+	args := []any{device, strings.TrimSpace(number), NumberKey(number), body, time.Now().Unix()}
+	if s.d == Postgres { // pgx has no LastInsertId
+		var id int64
+		err := s.db.QueryRow(q+` RETURNING id`, args...).Scan(&id)
+		return id, err
+	}
+	res, err := s.db.Exec(q, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -212,7 +204,7 @@ func (s *Store) SMSConversations() []SMSConversation {
 
 // SMSThread returns the messages of a conversation (oldest first).
 func (s *Store) SMSThread(key string, limit int) []SMS {
-	rows, err := s.db.Query(`SELECT id,device,COALESCE(dev_msg_id,''),number,key,dir,COALESCE(body,''),COALESCE(ts,0),COALESCE(status,''),COALESCE(error,'') FROM (SELECT * FROM sms WHERE key=? ORDER BY ts DESC, id DESC LIMIT ?) ORDER BY ts, id`, key, limit)
+	rows, err := s.db.Query(`SELECT id,device,COALESCE(dev_msg_id,''),number,key,dir,COALESCE(body,''),COALESCE(ts,0),COALESCE(status,''),COALESCE(error,'') FROM (SELECT * FROM sms WHERE key=? ORDER BY ts DESC, id DESC LIMIT ?) AS recent ORDER BY ts, id`, key, limit)
 	if err != nil {
 		return nil
 	}

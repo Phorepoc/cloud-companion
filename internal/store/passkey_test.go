@@ -4,7 +4,6 @@
 package store
 
 import (
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,11 +11,7 @@ import (
 )
 
 func TestOwnerRecovery(t *testing.T) {
-	st, err := Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := OpenTest(t)
 	if st.OwnerExists() {
 		t.Fatal("owner before any passkey")
 	}

@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -65,11 +64,7 @@ func indexByte(s string, c byte) int {
 }
 
 func TestSMSSync(t *testing.T) {
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 	mux := http.NewServeMux()
 	(&smsAPI{a: newAuth(st), st: st}).routes(mux)
 	srv := httptest.NewServer(mux)
@@ -201,11 +196,7 @@ func TestSMSSync(t *testing.T) {
 }
 
 func TestSMSPair(t *testing.T) {
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 	mux := http.NewServeMux()
 	(&smsAPI{a: newAuth(st), st: st}).routes(mux)
 	srv := httptest.NewServer(mux)

@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -89,11 +88,7 @@ func TestDeviceMerge(t *testing.T) {
 	}}
 	srv := httptest.NewServer(dev)
 	defer srv.Close()
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 	ctx, cfg := context.Background(), DAVCfg{URL: srv.URL + "/book/"}
 	origA, origB := dev.cards["/book/a.vcf"].body, dev.cards["/book/b.vcf"].body
 

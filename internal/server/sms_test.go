@@ -5,7 +5,6 @@ package server
 
 import (
 	"log/slog"
-	"path/filepath"
 	"testing"
 
 	"github.com/phorepoc/phecloud/internal/proto"
@@ -13,11 +12,7 @@ import (
 )
 
 func TestSMSFrame(t *testing.T) {
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 	sync := func(dev string, in proto.SMSSync) proto.SMSSyncRes {
 		fio := &fakeIO{}
 		s := &session{srv: &Server{Store: st}, c: &conn{io: fio}, log: slog.Default(), dev: dev}
@@ -54,11 +49,7 @@ func TestSMSFrame(t *testing.T) {
 
 // The phone uploads its own copy of a message (its Sent folder) BEFORE the ack for the queued message arrives: one message must remain.
 func TestSMSAckAfterOwnCopy(t *testing.T) {
-	st, err := store.Open(filepath.Join(t.TempDir(), "t.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st := store.OpenTest(t)
 	id, _ := st.SMSQueue("p", "+358410121112", "ReplyFromTheWeb")
 	st.SMSUpload("p", []store.SMS{{DevMsgID: "269484039", Number: "+358410121112", Dir: "out", Body: "ReplyFromTheWeb", TS: 1, Status: "sent"}})
 	if err := st.SMSAck("p", id, "269484039", "sent", ""); err != nil {
