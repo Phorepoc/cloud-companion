@@ -42,6 +42,17 @@ codec string `avc1.42c029`, key frames start with the parameter sets).
 `JAR=/path/to/scrcpy-server-v5.0.1 QUERY='&codec=vp8' sh web/test/android.sh` (own Docker network `phepa`, capped containers, cleaned up afterwards): probes the H.264 stream, decodes VP8 on a canvas,
 swipes and presses Home through pointer events and checks that the screen changes, prints latency numbers.
 
+## Parking (saves memory when nobody is looking)
+The bridge stops the Android container when no viewer has been connected for `PHE_ANDROID_PARK_AFTER` (default `15m`, `0` turns parking off) and starts it again when the next viewer connects: the page shows
+**Starting Android…** while the bridge starts the container and waits for `sys.boot_completed` (it polls, no fixed sleep), pushes the scrcpy server and begins streaming. The data volume is kept, so installed apps and their data
+survive; running apps and their in-memory state do not (a stopped phone), so nothing keeps running in the background while parked (no music, no downloads). `PHE_ANDROID_PARK=pause` freezes the container instead
+(resume is instant, but its memory stays in use).
+The bridge never gets the Docker socket. `docker-compose.android.yml` runs `tecnativa/docker-socket-proxy` (Apache-2.0) that allows container inspect / start / stop / pause and nothing else (no create, exec, images or volumes),
+and the bridge talks to that (`PHE_ANDROID_DOCKER`, `PHE_ANDROID_CONTAINER`). Without `PHE_ANDROID_DOCKER` there is no parking and the container runs all the time.
+Measured on the Deskmini (Redroid 13, 2 cores, one run): the container held about 730 MiB while a viewer was connected and 0 once stopped (the host's overall "used" figure moved by more than that because other things were running; the
+container figure is the one to trust); it was parked 46 s after the viewer left with `PHE_ANDROID_PARK_AFTER=30s` (the check runs every 10 s and the stop takes a few seconds); the cold start, from opening the page to the first picture, took 13.8 s,
+and the page said "Starting Android…" for it. Test: `web/test/androidpark.mjs` (run by `web/test/android.sh`).
+
 ## What the page can do
 - **Touch and keys**: mouse or touch on the screen; typed characters go to the focused field; Back / Home / Recent buttons.
 - **Scroll wheel**: over the screen, scrolls the view under the pointer.

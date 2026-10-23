@@ -81,6 +81,7 @@ export class AndroidStream {
       else if (m.t === 'stats') this.cb.onStats({ ...m, rtt: this.rtt, w: this.W, h: this.H })
       else if (m.t === 'pong') this.rtt = performance.now() - m.ts
       else if (m.t === 'bye') this.bye = m.reason
+      else if (m.t === 'starting') this.setState('starting', m.phase) // the Android container was parked: it is being started / is booting
       return
     }
     const u = new Uint8Array(d)

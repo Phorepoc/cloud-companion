@@ -111,26 +111,23 @@ func main() {
 	mux.HandleFunc("/fdroid", handleFDroid)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
 	addr := env("PHE_ANDROID_ADDR", ":8090")
-	go prepare()
-	log.Println("pheandroid on", addr, "device", serial)
-	log.Fatal(http.ListenAndServe(addr, mux))
-}
-
-// prepare connects adb to the device and pushes the server jar (retries: the device may still be booting).
-func prepare() {
-	for {
-		exec.Command("adb", "connect", serial).Run()
-		out, _ := adb("shell", "getprop", "sys.boot_completed").Output()
-		if strings.TrimSpace(string(out)) == "1" {
-			if o, err := adb("push", jar, "/data/local/tmp/scrcpy-server.jar").CombinedOutput(); err != nil {
-				log.Println("push:", err, string(o))
-			} else {
-				log.Println("device ready, server jar pushed")
+	go func() {
+		if dockerURL != "" { // a container that is already parked stays parked until a viewer comes
+			if st, err := containerState(); err == nil && !st.Running {
+				log.Println("the Android container is stopped: it starts with the next viewer")
 				return
 			}
 		}
-		time.Sleep(3 * time.Second)
+		if err := ensureDevice(context.Background(), nil); err != nil {
+			log.Println("device:", err)
+		}
+	}()
+	if parkingOn() {
+		go parker()
+		log.Printf("parking: %s is %s after %s without a viewer", container, map[string]string{"pause": "paused", "stop": "stopped"}[parkMode], parkAfter)
 	}
+	log.Println("pheandroid on", addr, "device", serial)
+	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
 func handleWS(w http.ResponseWriter, r *http.Request) {
@@ -153,9 +150,29 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	active.cancel = func() { replaced.Store(true); cancel() }
 	active.Unlock()
+	viewers.Add(1)
+	defer func() { viewers.Add(-1); touchViewer() }()
+	notify := func(phase string) {
+		m, _ := json.Marshal(map[string]any{"t": "starting", "phase": phase})
+		cx, cc := context.WithTimeout(r.Context(), 5*time.Second)
+		defer cc()
+		c.Write(cx, websocket.MessageText, m)
+	}
+	if err := ensureDevice(ctx, notify); err != nil {
+		if ctx.Err() == nil {
+			log.Println("device:", err)
+			c.Close(websocket.StatusInternalError, trunc(err.Error(), 100))
+		} else if replaced.Load() {
+			c.Close(websocket.StatusPolicyViolation, "Another viewer took over this Android.")
+		}
+		return
+	}
 	q := r.URL.Query()
 	if err := session(ctx, c, q.Get("size"), q.Get("fps"), q.Get("kbps"), q.Get("codec"), q.Get("audio") != "0", r.Context()); err != nil && ctx.Err() == nil {
 		log.Println("session:", err)
+		dev.Lock()
+		dev.ready = false // the device may have been stopped behind our back: check again next time
+		dev.Unlock()
 		c.Close(websocket.StatusInternalError, trunc(err.Error(), 100))
 	}
 	if replaced.Load() {

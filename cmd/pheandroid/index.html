@@ -40,6 +40,7 @@ const $ = (id) => document.getElementById(id), q = new URLSearchParams(location.
 let last = {}
 const show = () => {
   const s = stream.state, bits = []
+  if (s === 'starting') { $('info').textContent = 'Starting Android… (it was switched off to save resources)'; return }
   if (s !== 'live') { $('info').textContent = s === 'connecting' ? 'Connecting' : (last.msg || 'Disconnected.') + ' Open this page again from Phecloud.'; return }
   bits.push('connected ' + last.w + 'x' + last.h)
   if (last.fps !== undefined) bits.push(last.fps.toFixed(0) + ' fps', last.kbps.toFixed(0) + ' kbit/s')

@@ -13,14 +13,16 @@ ROOT=$(pwd)
 OUT=$ROOT/web/test/out
 mkdir -p "$OUT"
 rm -f "$OUT"/hook-*
-cleanup() { [ -n "${HOOKPID:-}" ] && kill "$HOOKPID" 2>/dev/null || true; docker rm -f phe-redroid-t phe-android-t phe-cloud-t phe-caddy-t >/dev/null 2>&1 || true; docker network rm phepa >/dev/null 2>&1 || true; rm -f "$ROOT/web/test/markor.apk" "$ROOT/web/test/out/Caddyfile.t"; }
+cleanup() { [ -n "${HOOKPID:-}" ] && kill "$HOOKPID" 2>/dev/null || true; docker rm -f phe-redroid-t phe-android-t phe-cloud-t phe-caddy-t phe-dockerproxy-t >/dev/null 2>&1 || true; docker network rm phepa >/dev/null 2>&1 || true; rm -f "$ROOT/web/test/markor.apk" "$ROOT/web/test/out/Caddyfile.t"; }
 cleanup; trap cleanup EXIT
 cp "$APK" "$ROOT/web/test/markor.apk"
 docker network create phepa >/dev/null
 docker run -d --name phe-redroid-t --network phepa --privileged --cpus 2 --memory 3g phe-redroid-native:13 \
     androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320 androidboot.use_memfd=1 >/dev/null
+docker run -d --name phe-dockerproxy-t --network phepa --cpus 0.25 --memory 64m -e CONTAINERS=1 -e POST=1 -e ALLOW_START=1 -e ALLOW_STOP=1 -v /var/run/docker.sock:/var/run/docker.sock:ro tecnativa/docker-socket-proxy:0.3.0 >/dev/null
 docker build -q -f cmd/pheandroid/Dockerfile -t phe-android-bridge:dev . >/dev/null
 docker run -d --name phe-android-t --network phepa --cpus 1 --memory 256m -e PHE_ANDROID_SECRET=testsecret -e PHE_ANDROID_SERIAL=phe-redroid-t:5555 \
+    -e PHE_ANDROID_DOCKER=http://phe-dockerproxy-t:2375 -e PHE_ANDROID_CONTAINER=phe-redroid-t -e PHE_ANDROID_PARK_AFTER=${PARK_AFTER:-30s} \
     -v "$JAR":/scrcpy-server.jar:ro phe-android-bridge:dev >/dev/null
 until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; done
 (
@@ -29,6 +31,9 @@ until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; 
       [ -e "$f" ] || continue
       n=${f##*/hook-}; n=${n%.req}
       case $n in
+        ctstate) docker inspect -f '{{.State.Status}}' phe-redroid-t > "$OUT/hook-$n.out" 2>&1 || true; rm -f "$f"; : > "$OUT/hook-$n.done"; continue ;;
+        ctmem) docker stats --no-stream --format '{{.MemUsage}}' phe-redroid-t > "$OUT/hook-$n.out" 2>&1 || true; rm -f "$f"; : > "$OUT/hook-$n.done"; continue ;;
+        hostmem) free -m | awk '/Mem:/{print $3}' > "$OUT/hook-$n.out"; rm -f "$f"; : > "$OUT/hook-$n.done"; continue ;;
         settings) c='am start -a android.settings.SETTINGS' ;;
         rot1) c='wm user-rotation lock 1' ;;
         rot0) c='wm user-rotation lock 0' ;;
@@ -72,3 +77,7 @@ docker run -d --name phe-caddy-t --network phepa --cpus 0.5 --memory 128m -v "$O
 sleep 8
 CODE=$(docker exec phe-cloud-t phecloud paircode --admin 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-caddy-t --ipc=host     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8080 -e CODE="$CODE" -e OUT=/out     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidapp.mjs' || { docker logs phe-android-t 2>&1 | tail -5; docker logs phe-cloud-t 2>&1 | tail -5; exit 1; }
+# parking: the standalone page against the bridge again (the app run above has finished); parking after $PARK_AFTER (default 30s here, 15m in production)
+EXP=$(( $(date +%s) + 3000 ))
+SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
+docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidpark.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }

@@ -6,7 +6,7 @@
       <h1>Android</h1>
       <q-space />
       <span class="ph-conn" :class="'is-' + conn" role="status" data-test="android-state">
-        <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
+        <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' || conn === 'starting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
         {{ connText }}
       </span>
       <q-btn v-if="configured" flat no-caps icon="sym_o_refresh" label="Reconnect" :loading="busy" data-test="android-reconnect" @click="connect" />
@@ -30,6 +30,11 @@
 
     <div v-show="configured" class="ph-stage">
       <div class="ph-frame" :class="{ 'is-wide': w > h }">
+        <div v-if="conn === 'starting'" class="ph-starting" role="status" data-test="android-starting">
+          <q-spinner size="32px" color="white" aria-hidden="true" />
+          <span>Starting Android…</span>
+          <span class="ph-small">It was switched off to save resources. This takes about half a minute.</span>
+        </div>
         <canvas ref="cv" width="360" height="640" tabindex="0" role="application" data-test="android-screen"
                 aria-label="Android screen: click or touch to tap, scroll with the wheel, type to enter text"></canvas>
       </div>
@@ -65,7 +70,7 @@ const configured = ref(false), loaded = ref(false), busy = ref(false), problem =
 const w = ref(360), h = ref(640), note = ref(''), stats = ref(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
 const stream = shallowRef(new AndroidStream(document.createElement('canvas'), { base: '/android/' })) // replaced once the canvas exists
 
-const connText = computed(() => ({ idle: 'Not connected', connecting: 'Connecting', live: 'Connected', closed: connMsg.value || 'Disconnected', error: connMsg.value || 'Problem' }[conn.value]))
+const connText = computed(() => ({ idle: 'Not connected', connecting: 'Connecting', starting: 'Starting Android…', live: 'Connected', closed: connMsg.value || 'Disconnected', error: connMsg.value || 'Problem' }[conn.value]))
 const statsText = computed(() => {
   const s = stats.value
   if (conn.value !== 'live' || !s) return ''
@@ -119,6 +124,8 @@ onBeforeUnmount(() => stream.value.dispose())
   background: #000; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-card); box-shadow: var(--ph-elev-1); overflow: hidden;
 }
 @media (max-width: 599px) { .ph-frame { --chrome: 330px; } }
+.ph-frame { position: relative; }
+.ph-starting { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ph-s2); padding: var(--ph-s4); text-align: center; color: #fff; background: rgba(0, 0, 0, 0.78); }
 .ph-frame canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }
 .ph-line { text-align: center; min-height: 1.5em; margin: var(--ph-s2) 0 0; }
 </style>
