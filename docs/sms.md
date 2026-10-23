@@ -29,7 +29,9 @@ POST /sms/sync
 - Short codes and alphanumeric sender ids (`BANK`) are conversations too.
 - Reading conversations and sending need the **owner** (admin device): a phone's key cannot read other messages.
 
+Pairing for the Android app (it cannot speak the frame protocol): `POST /sms/pair {"code":"ABCD-EF12","name":"Pixel"}` -> `{"dev":"...","key":"<64 hex>"}`, the same one-time code as `phecloud paircode`; wrong codes are rate-limited. The app is in `android/`.
+
 ## Not built yet
-The phone-side services (Phorepoc messaging service, Android app), group messages / MMS, encryption of message bodies at rest and the
+The Phorepoc messaging service on the phone, group messages / MMS, encryption of message bodies at rest and the
 per-sender "do not sync" list for one-time codes (hub-design.md section 2). Test with a fake phone: `web/test/chats.sh`; the API rules
 are covered by `internal/webui/sms_test.go`.
