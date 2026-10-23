@@ -27,6 +27,21 @@ cd android
 docker run --rm -v phe-android-gradle:/opt/gradle-home -v "$PWD":/work phe-android-build gradle --no-daemon test           # 11 JVM unit tests
 docker run --rm -v phe-android-gradle:/opt/gradle-home -v "$PWD":/work phe-android-build gradle --no-daemon assembleDebug  # app/build/outputs/apk/debug/app-debug.apk
 ```
+### Release build (signed with a local key, never committed)
+`assembleRelease` signs with the key described in `android/keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`;
+gitignored, like `signing/`, `*.jks`); without that file it produces an unsigned APK. A test key:
+```
+keytool -genkeypair -keystore signing/test.jks -storepass <pw> -keypass <pw> -alias phesms-test -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Phecloud SMS test key"
+printf 'storeFile=signing/test.jks
+storePassword=<pw>
+keyAlias=phesms-test
+keyPassword=<pw>
+' > keystore.properties
+gradle --no-daemon assembleRelease && $ANDROID_HOME/build-tools/34.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk
+```
+(run inside the build image). A debug APK (installable with `adb install`) is signed with the SDK's debug key. The release build forbids `http://`
+(network security config); only the debug build allows a plain-http LAN / VPN hub.
+
 (Use `MSYS_NO_PATHCONV=1` and `$(pwd -W)` from Git Bash on Windows.) `app/src/test/.../CoreTest.kt` runs the sync logic (`Core.kt`) against fake
 provider, hub and sender: upload once, offline queue across a restart, 500-message batches, first-run limit, exclude list, outbound
 once-only handling, acks across restarts. The Android glue (`Android.kt`, `SyncJob.kt`, `MainActivity.kt`) holds no logic.
@@ -34,15 +49,18 @@ once-only handling, acks across restarts. The Android glue (`Android.kt`, `SyncJ
 ## Tested on Redroid (Android 13, no SIM)
 2026-10-23, `redroid/redroid:13.0.0_64only-240527` on the shared Linux box with a throw-away hub over its self-signed TLS (pinned):
 install, grants, signed sync, the hub's queued message arriving on the phone, `SmsManager` failing (no radio: `send failed (32)`), and the
-failure showing in the hub's thread (`status: failed`, with the reason) and conversation list. **Not tested:** the pairing screen (the
-device id and key were obtained with `POST /sms/pair` and put into the app's preferences with `run-as`); reading the SMS provider (the
-shell cannot insert into `content://sms` and Redroid has no default SMS app); real sent and delivered reports (needs a SIM); the
-15-minute periodic job and `SMS_RECEIVED` wake-ups.
+failure showing in the hub's thread (`status: failed`, with the reason) and conversation list.
+**Pairing screen, end to end** (uiautomator dump + `input tap` / `input text` on the same Redroid): enter the hub address, *Fetch fingerprint*
+(the app shows the certificate the hub presents -- it was the hub's own fingerprint), enter the pairing code, *Pair*: the hub lists the new
+device, the app shows "Paired as device ...", the first sync ran, the key in the preferences file is `k1:`-wrapped, and a restart of the app
+still syncs (the Keystore key decrypts it). **Not tested:** reading the SMS provider (the shell cannot insert into `content://sms` and Redroid has
+no default SMS app); real sent and delivered reports (needs a SIM); the 15-minute periodic job and `SMS_RECEIVED` wake-ups; the release APK
+on a device (built and `apksigner`-verified only; its network security config forbids cleartext).
 
 ## Limits and next steps
 - Group messages and MMS are not synced. A message the app sends is not written to the phone's own sent box (only the default SMS app does);
   the hub holds it from the ack. If the user later makes it the default SMS app, the sent copy would need the ack's id mapping.
-- The device key is in the app's private preferences; Android Keystore wrapping is a follow-up. Cleartext HTTP is allowed in the manifest
-  for LAN/VPN testing; release builds should turn it off.
+- The device key is stored encrypted (AES-GCM under a non-exportable Android Keystore key, `KeyBox` in `Android.kt`); a restore onto another
+  phone, or a wiped Keystore, leaves the app unpaired. The hub's `phecloud revoke <id>` ends a lost phone's access.
 - WorkManager / a foreground service were left out to keep the app dependency-free; Doze can delay the 15-minute job (a received message still
   wakes it at once).

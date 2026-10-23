@@ -33,12 +33,45 @@ class Prefs(ctx: Context) : State {
     var hub: String get() = getString("hub", ""); set(v) = putString("hub", v)
     var pin: String get() = getString("pin", ""); set(v) = putString("pin", v.lowercase().filter { it.isLetterOrDigit() })
     var dev: String get() = getString("dev", ""); set(v) = putString("dev", v)
-    var key: String get() = getString("key", ""); set(v) = putString("key", v)
+    /** The device key (hex), kept encrypted under an Android Keystore key ("k1:" + base64); a plain value from an older build is still read. */
+    var key: String
+        get() = getString("key", "").let { if (it.startsWith("k1:")) KeyBox.open(it.substring(3)) else it }
+        set(v) = putString("key", if (v.isEmpty()) "" else "k1:" + KeyBox.seal(v))
     var exclude: String get() = getString("exclude", ""); set(v) = putString("exclude", v)   // one entry per line
     val paired get() = hub.isNotEmpty() && dev.isNotEmpty() && key.isNotEmpty()
     fun excludeList(): List<String> = exclude.lines().map { it.trim() }.filter { it.isNotEmpty() }
     fun status(): String = getString("status", "")
     fun setStatus(s: String) = putString("status", s)
+}
+
+/** AES-GCM with a non-exportable key in the Android Keystore: the device key in the preferences file is useless without this phone's hardware-backed key. */
+object KeyBox {
+    private const val ALIAS = "phesms-devkey"
+
+    private fun key(): javax.crypto.SecretKey {
+        val ks = java.security.KeyStore.getInstance("AndroidKeyStore").also { it.load(null) }
+        (ks.getKey(ALIAS, null) as? javax.crypto.SecretKey)?.let { return it }
+        val g = javax.crypto.KeyGenerator.getInstance(android.security.keystore.KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        g.init(android.security.keystore.KeyGenParameterSpec.Builder(ALIAS,
+            android.security.keystore.KeyProperties.PURPOSE_ENCRYPT or android.security.keystore.KeyProperties.PURPOSE_DECRYPT)
+            .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE).setKeySize(256).build())
+        return g.generateKey()
+    }
+
+    fun seal(plain: String): String {
+        val c = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(javax.crypto.Cipher.ENCRYPT_MODE, key())
+        val ct = c.doFinal(plain.toByteArray(Charsets.UTF_8))
+        return android.util.Base64.encodeToString(c.iv + ct, android.util.Base64.NO_WRAP)
+    }
+
+    fun open(boxed: String): String = try {
+        val raw = android.util.Base64.decode(boxed, android.util.Base64.NO_WRAP)
+        val c = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(javax.crypto.Cipher.DECRYPT_MODE, key(), javax.crypto.spec.GCMParameterSpec(128, raw, 0, 12))
+        String(c.doFinal(raw, 12, raw.size - 12), Charsets.UTF_8)
+    } catch (e: Exception) { "" }                  // the Keystore key is gone (restore, wipe): the phone counts as unpaired
 }
 
 /** Reads the inbox (content://sms/inbox) and the sent box (content://sms/sent). */

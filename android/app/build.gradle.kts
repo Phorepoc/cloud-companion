@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -13,8 +15,22 @@ android {
         versionCode = 1
         versionName = "0.1"
     }
+    // Release signing: a local key described in keystore.properties (storeFile, storePassword, keyAlias, keyPassword), never committed.
+    // Without that file `assembleRelease` makes an unsigned APK. See README.md "Release build".
+    val ksProps = Properties().also { p -> rootProject.file("keystore.properties").takeIf { it.exists() }?.inputStream()?.use { p.load(it) } }
+    signingConfigs {
+        if (ksProps.isNotEmpty()) create("release") {
+            storeFile = rootProject.file(ksProps.getProperty("storeFile"))
+            storePassword = ksProps.getProperty("storePassword")
+            keyAlias = ksProps.getProperty("keyAlias")
+            keyPassword = ksProps.getProperty("keyPassword")
+        }
+    }
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = false
+            if (ksProps.isNotEmpty()) signingConfig = signingConfigs.getByName("release")
+        }
     }
     sourceSets {
         getByName("main").java.srcDirs("src/main/kotlin")
