@@ -53,6 +53,29 @@ Measured on the Deskmini (Redroid 13, 2 cores, one run): the container held abou
 container figure is the one to trust); it was parked 46 s after the viewer left with `PHE_ANDROID_PARK_AFTER=30s` (the check runs every 10 s and the stop takes a few seconds); the cold start, from opening the page to the first picture, took 13.8 s,
 and the page said "Starting Android…" for it. Test: `web/test/androidpark.mjs` (run by `web/test/android.sh`).
 
+## The display follows the viewing device
+The page tells the bridge the size of its window and what kind of device it is (`kind=phone` when the screen's short edge is under 600 CSS pixels, else `large`; `&kind=phone|large` in the address overrides). The bridge sets the main display with
+`wm size` / `wm density` before it starts streaming, and again, debounced (700 ms, only for changes of more than 5 %), when the window is resized; the scrcpy server follows the change (new session packet and video configuration), and the page
+resizes its canvas and decoder. **Phone**: short edge 720, long edge from the window's aspect ratio (1.4 to 2.2), 320 dpi. **Large** (tablet, laptop, desktop): long edge up to `PHE_ANDROID_MAX_DISPLAY` (1600), aspect from the window (1.2 to 1.9),
+213 dpi (about 1200 dp wide, so apps choose their tablet layouts), streamed at up to 1280 on the long edge unless `&size=` says more. Measured (Redroid 13): a 1280x800 window gives a 1600x1008 display, a 390x844 window a 720x1552 one, and back,
+each within a few seconds; the stream shape follows. A larger display costs more CPU (software rendering and encoding): lower `PHE_ANDROID_MAX_DISPLAY` on a small host. The override stays in Android until the next viewer sets its own.
+`wm size` was chosen over scrcpy's virtual display (`new_display`, 3.x): it is one adb command, needs no extra windowing, and rotation and apps behave as on a real tablet; a virtual display would let several viewers each have their own size
+(not needed: one viewer at a time) but starts with an empty display that needs its own launcher.
+
+## Context menu (right click)
+Right-clicking the screen opens the page's own menu (not the browser's): **Copy** and **Cut** when something is selected, **Paste** and **Select all** when a text field has focus, always **Back**, **Home**, **Recent apps**. Android's state
+comes from `dumpsys input_method` on the bridge (about 0.2 s, asked for when the menu opens): the served input connection is an `EditableInputConnection` while a text field is focused, and `mCursorSelStart` / `mCursorSelEnd` give the selection.
+Cheaper signals (scrcpy's clipboard messages) do not say whether anything is selected; uiautomator dumps are slower and do not show selections. Cut and Copy use scrcpy's copy / cut keys; Select all sends Ctrl+A.
+Long-pressing on a touch screen still works as on a phone (it is sent through as a touch). Test: `web/test/androidview.mjs` (`ONLY=view sh web/test/android.sh`).
+
+## Desktop mode (freeform windows): what Redroid 13 supports
+Android 13 can run apps in real freeform (movable, overlapping) windows, but Redroid's image lacks the feature flag. Tested on `phe-redroid-native:13` (throwaway container): copying
+`<feature name="android.software.freeform_window_management" />` into `/system/etc/permissions/android.software.freeform_window_management.xml` (build with `--build-arg FREEFORM=1`) and
+`settings put global enable_freeform_support 1; settings put global force_resizable_activities 1`, then a restart, made `am start --windowingMode 5 -n <activity>` open Settings and Contacts as overlapping freeform windows
+with maximize and close buttons on a 1600x1008 display (`mode=freeform` in `dumpsys activity activities`). What is missing for a real desktop is a shell around it: no taskbar or start menu, and apps do not open freeform by themselves.
+The usual answer is a desktop launcher such as Taskbar (F-Droid `com.farmerbb.taskbar`, which launches apps in freeform windows); it was not tried yet. Redroid 14 and 15 images exist (`redroid/redroid:14.0.0-latest`, `15.0.0-latest`); Android 15 has a
+desktop-windowing mode in SystemUI behind flags, but 13 already provides the windowing, so they were not pulled.
+
 ## What the page can do
 - **Touch and keys**: mouse or touch on the screen; typed characters go to the focused field; Back / Home / Recent buttons.
 - **Scroll wheel**: over the screen, scrolls the view under the pointer.

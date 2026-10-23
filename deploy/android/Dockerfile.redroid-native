@@ -12,6 +12,9 @@ RUN set -e; cd /r; \
     echo "ro.enable.native.bridge.exec=0" >> vendor/build.prop; \
     sed -i -e "s/^\(ro\.[a-z.]*abilist\(64\)\?\)=x86_64,arm64-v8a/\1=x86_64/" system/build.prop vendor/build.prop vendor/odm/etc/build.prop; \
     grep -rn "native.bridge\|abilist" system/build.prop vendor/build.prop vendor/odm/etc/build.prop
+# FREEFORM=1: tell Android 13 it may run freeform (movable, overlapping) windows (desktop-style use; docs/android.md, "Desktop mode")
+ARG FREEFORM=0
+RUN if [ "$FREEFORM" = 1 ]; then printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<permissions>' '    <feature name="android.software.freeform_window_management" />' '</permissions>' > /r/system/etc/permissions/android.software.freeform_window_management.xml; fi
 FROM scratch
 COPY --from=edit /r /
 ENTRYPOINT ["/init","qemu=1","androidboot.hardware=redroid"]
