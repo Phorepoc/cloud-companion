@@ -36,7 +36,11 @@ func Open(path string) (*Store, error) {
 	}
 	db.Exec(`ALTER TABLE devices ADD COLUMN admin INTEGER DEFAULT 0`) // errors (column exists) are fine
 	db.Exec(`ALTER TABLE pair_codes ADD COLUMN admin INTEGER DEFAULT 0`)
-	return &Store{db}, nil
+	st := &Store{db}
+	if err := st.initPasskeys(); err != nil {
+		return nil, err
+	}
+	return st, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }

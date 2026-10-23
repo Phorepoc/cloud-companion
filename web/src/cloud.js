@@ -137,7 +137,7 @@ async function finishConnect(w) {
   client.onframe = onFrame
   client.onclose = () => { state.status = 'offline' }
   if (state.settings.q !== 70 || state.settings.gray) client.settings(state.settings.q, state.settings.gray)
-  window.__phe = Object.assign(window.__phe || {}, { state })
+  window.__phe = Object.assign(window.__phe || {}, { state, forget })
 }
 
 // Pair with a code; stores the device key in IndexedDB.
@@ -233,4 +233,72 @@ export async function openInNewTab(url) {
   api.tab('new')
   for (let i = 0; i < 80 && state.tabs.length <= before.n && state.activeView === before.v; i++) await new Promise((r) => setTimeout(r, 50))
   api.open(url)
+}
+
+// ---- owner sign-in: passkeys (WebAuthn) and the recovery code (server: internal/webui/auth.go) ----
+const b64u = {
+  dec: (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0)).buffer,
+  enc: (b) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''),
+}
+
+async function authCall(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
+  return j
+}
+
+export const passkeysSupported = () => !!(window.PublicKeyCredential && navigator.credentials)
+
+export function authStatus() { return authCall('/auth/status') }
+
+// the device a sign-in produced is used like a paired one
+async function adopt(w) {
+  const key = Uint8Array.from(w.key.match(/../g).map((h) => parseInt(h, 16)))
+  creds.value = { dev: w.dev, key }
+  await idbSet('creds', creds.value)
+  await connect()
+  return w.recovery || ''
+}
+
+function credJSON(c) {
+  if (c.toJSON) return c.toJSON()
+  const r = c.response
+  const out = { id: c.id, rawId: b64u.enc(c.rawId), type: c.type, clientExtensionResults: c.getClientExtensionResults() }
+  out.response = r.attestationObject
+    ? { attestationObject: b64u.enc(r.attestationObject), clientDataJSON: b64u.enc(r.clientDataJSON), transports: r.getTransports ? r.getTransports() : [] }
+    : { authenticatorData: b64u.enc(r.authenticatorData), clientDataJSON: b64u.enc(r.clientDataJSON), signature: b64u.enc(r.signature), userHandle: r.userHandle ? b64u.enc(r.userHandle) : '' }
+  return out
+}
+
+async function finish(path, sid, name, cred) {
+  const r = await fetch(`${path}?sid=${sid}&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(credJSON(cred)) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
+  return j
+}
+
+// register a passkey with an admin pairing code; returns the recovery code (first passkey only, else '')
+export async function passkeyRegister(code, name) {
+  const { sid, options } = await authCall('/auth/register/begin', { code })
+  const pk = options.publicKey
+  pk.challenge = b64u.dec(pk.challenge)
+  pk.user.id = b64u.dec(pk.user.id)
+  ;(pk.excludeCredentials || []).forEach((c) => { c.id = b64u.dec(c.id) })
+  const cred = await navigator.credentials.create({ publicKey: pk })
+  return adopt(await finish('/auth/register/finish', sid, name, cred))
+}
+
+export async function passkeyLogin(name) {
+  const { sid, options } = await authCall('/auth/login/begin', {})
+  const pk = options.publicKey
+  pk.challenge = b64u.dec(pk.challenge)
+  ;(pk.allowCredentials || []).forEach((c) => { c.id = b64u.dec(c.id) })
+  const cred = await navigator.credentials.get({ publicKey: pk })
+  await adopt(await finish('/auth/login/finish', sid, name, cred))
+}
+
+// sign in with the recovery code; returns the NEW recovery code (the old one is used up)
+export async function recoverLogin(code, name) {
+  return adopt(await authCall('/auth/recover', { code, name }))
 }

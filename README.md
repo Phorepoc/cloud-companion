@@ -194,7 +194,7 @@ through IMAP, CalDAV and CardDAV). One instance serves one person: one Stalwart 
 `/dav/...` with the `/.well-known/caldav` and `/.well-known/carddav` redirects, and JMAP. A phone with an old TLS stack cannot use Caddy's TLS 1.2+
 listener: use the tunnel (plain HTTP inside it) or the optional TLS 1.0 listener (`--profile hub-legacy`). Tested: 25 of 25 checks (ActiveSync
 Provision, FolderSync, Sync of contacts, calendar and mail, SendMail, push; CalDAV/CardDAV with vdirsyncer), about 170 MiB idle.
-Using it from a Phorepoc phone (server start, pairing, fingerprint check): [docs/phorepoc-phone.md](docs/phorepoc-phone.md). Licences, exact phone settings, TLS details, numbers and open issues: [docs/hub.md](docs/hub.md).
+Signing in to the web app with passkeys and a recovery code: [docs/passkeys.md](docs/passkeys.md). Using it from a Phorepoc phone (server start, pairing, fingerprint check): [docs/phorepoc-phone.md](docs/phorepoc-phone.md). Licences, exact phone settings, TLS details, numbers and open issues: [docs/hub.md](docs/hub.md).
 
 ## License
 Apache-2.0, see `LICENSE`.

@@ -55,6 +55,7 @@ func Handler(s *server.Server) http.Handler {
 		}
 		files.ServeHTTP(w, r)
 	}))
+	newAuth(s.Store).routes(mux)
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		c, err := websocket.Accept(w, r, nil)
 		if err != nil {
