@@ -3,7 +3,7 @@
 import { createApp } from 'vue'
 import { Quasar, Dark } from 'quasar'
 import iconSet from 'quasar/icon-set/material-symbols-outlined'
-import '@quasar/extras/material-symbols-outlined/material-symbols-outlined.css'
+import './css/symbols.css'
 import 'quasar/dist/quasar.css'
 import './css/tokens.css'
 import './css/app.css'

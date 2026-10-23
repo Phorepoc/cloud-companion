@@ -14,3 +14,4 @@
 deploy/hub/.env.hub
 deploy/hub/.env.phecloud
 deploy/hub/.env.stalwart
+/web/src/css/symbols.woff2

@@ -195,6 +195,8 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		return s.srv.Store.Revoke(r.ID)
 	case proto.TPing:
 		return s.c.send(proto.Header{T: proto.TPong})
+	case proto.THub:
+		return s.hubRequest(raw)
 	case proto.TTab:
 		return s.tabAction(ctx, raw)
 	case proto.TOpen:

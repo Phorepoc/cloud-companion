@@ -156,7 +156,7 @@ sentence that says what to do. One column. Autocomplete and `inputmode` attribut
 * Loading: a spinner and what is loading ("Loading devices"); content that already exists stays visible while it refreshes.
 * Error: say what happened and what to do ("Could not reach the server. Check your network and try again."), with the retry action.
 
-**Notices and toasts.** A notice that needs action is an inline banner (`role="alert"`) at the top of the content with a "Dismiss" or a
+**Notices and toasts** (toasts: `src/toast.js` + `components/ToastHost.vue`; `toast(message, { undo, onExpire })`). A notice that needs action is an inline banner (`role="alert"`) at the top of the content with a "Dismiss" or a
 fix. A toast is only for the result of something the person just did ("Saved"), appears at the bottom above the bar for 4 seconds, can be
 reached by keyboard, and offers "Undo" when the action can be undone. Errors are never toasts.
 
@@ -169,8 +169,10 @@ a device is signed out) are text badges.
 with `sym_o_`). One style only: outlined, weight 400. Sizes 20 px inline with text, 24 px in bars and buttons, 48 px in empty states.
 An icon is paired with a text label, or has an `aria-label`; purely decorative icons are `aria-hidden`. Used today: `language`, `chat`, `mail`,
 `calendar_month`, `contacts`, `folder`, `devices`, `settings`, `more_horiz`, `arrow_back`, `arrow_forward`, `refresh`, `add`, `close`, `zoom_in`,
-`zoom_out`, `cloud_done`, `cloud_off`, `sync`, `error`, `download`, `lock`, `check_circle`, `inbox`, `contrast`, `light_mode`, `dark_mode`. The font is
-shipped whole today; subset it before a production release.
+`zoom_out`, `cloud_done`, `cloud_off`, `sync`, `error`, `download`, `lock`, `check_circle`, `inbox`, `contrast`, `light_mode`, `dark_mode`, `search`, `call`,
+`location_on`, `chevron_left`, `chevron_right`. The font is subset to exactly the icons found in `src/` (and Quasar's own icon set) by
+`tools/subset-icons.py`, run by the Docker build: 6.5 KB instead of 3.6 MB. Add an icon by using its `sym_o_` name; the next build includes it. (The
+script freezes the variable axes to regular weight, no fill, 24 px.)
 
 ## 7. Dark mode
 

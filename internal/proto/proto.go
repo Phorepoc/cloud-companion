@@ -46,6 +46,8 @@ const (
 	TDeviceList  = "devicelist"  // S->C
 	TRevoke      = "revoke"      // C->S  (admin) revoke a device
 	TTab         = "tab"         // C->S  new | close | switch | list a view
+	THub         = "hub"         // C->S  contacts / calendar request (the personal hub)
+	THubRes      = "hubres"      // S->C  its answer
 	TTabs        = "tabs"        // S->C  the views of this connection
 	TZoom        = "zoom"        // C->S  re-render the view at a scale (percent; needs the "zoom" feature)
 )
@@ -396,4 +398,62 @@ type Zoom struct {
 	T   string `cbor:"t"`
 	V   int    `cbor:"v,omitempty"`
 	Pct int    `cbor:"pct"`
+}
+
+// ---- the personal hub: contacts (CardDAV) and calendar (CalDAV) through the server ----
+
+type Labeled struct {
+	Type  string `cbor:"type,omitempty"`
+	Value string `cbor:"value"`
+}
+
+type Contact struct {
+	Href   string    `cbor:"href,omitempty"`
+	ETag   string    `cbor:"etag,omitempty"`
+	Name   string    `cbor:"name"` // display name (FN)
+	Given  string    `cbor:"given,omitempty"`
+	Family string    `cbor:"family,omitempty"`
+	Org    string    `cbor:"org,omitempty"`
+	Note   string    `cbor:"note,omitempty"`
+	Phones []Labeled `cbor:"phones,omitempty"`
+	Emails []Labeled `cbor:"emails,omitempty"`
+}
+
+// Event times are ISO 8601 as in the calendar: "2026-10-24" (all day), "2026-10-24T09:00:00" (floating local time) or with a
+// trailing Z (UTC).
+type Event struct {
+	Href     string `cbor:"href,omitempty"`
+	ETag     string `cbor:"etag,omitempty"`
+	Title    string `cbor:"title"`
+	Start    string `cbor:"start"`
+	End      string `cbor:"end,omitempty"`
+	AllDay   bool   `cbor:"allday,omitempty"`
+	Location string `cbor:"location,omitempty"`
+	Notes    string `cbor:"notes,omitempty"`
+	Recurs   bool   `cbor:"recurs,omitempty"` // has a recurrence rule (shown once; editing keeps the rule)
+}
+
+// Hub: Op = contacts.list | contacts.save | contacts.delete | events.list | events.save | events.delete.
+// list: From/To (events, ISO dates). save: Contact/Event (Href empty = create). delete: Href + ETag.
+type Hub struct {
+	T       string   `cbor:"t"`
+	ID      int      `cbor:"id"`
+	Op      string   `cbor:"op"`
+	Contact *Contact `cbor:"contact,omitempty"`
+	Event   *Event   `cbor:"event,omitempty"`
+	Href    string   `cbor:"href,omitempty"`
+	ETag    string   `cbor:"etag,omitempty"`
+	From    string   `cbor:"from,omitempty"`
+	To      string   `cbor:"to,omitempty"`
+}
+
+type HubRes struct {
+	T        string    `cbor:"t"`
+	ID       int       `cbor:"id"`
+	OK       bool      `cbor:"ok"`
+	Err      string    `cbor:"err,omitempty"`
+	Contacts []Contact `cbor:"contacts,omitempty"`
+	Events   []Event   `cbor:"events,omitempty"`
+	Contact  *Contact  `cbor:"contact,omitempty"`
+	Event    *Event    `cbor:"event,omitempty"`
 }

@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/browser"
+	"github.com/phorepoc/phecloud/internal/davhub"
 	"github.com/phorepoc/phecloud/internal/server"
 	"github.com/phorepoc/phecloud/internal/store"
 	"github.com/phorepoc/phecloud/internal/tlsutil"
@@ -94,7 +95,7 @@ func main() {
 			os.Exit(1)
 		}
 		log.Info("phecloud listening", "addr", ln.Addr().String())
-		srv := &server.Server{Store: st, Browser: br, Log: log}
+		srv := &server.Server{Store: st, Browser: br, Log: log, Hub: davhub.FromEnv()}
 		if pl := os.Getenv("PHECLOUD_PLAIN_LISTEN"); pl != "" {
 			// DEVELOPMENT ONLY: an unencrypted listener for the C client's host test (no TLS stack there).
 			pln, err := net.Listen("tcp", pl)

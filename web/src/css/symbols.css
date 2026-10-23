@@ -1,0 +1,30 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Material Symbols Outlined (Apache-2.0), subset to the icons the app uses by tools/subset-icons.py (run by the Docker build; for a
+ * local build run it once after `npm ci`). Replaces @quasar/extras/material-symbols-outlined/material-symbols-outlined.css.
+ */
+@font-face {
+  font-family: 'Material Symbols Outlined';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url('./symbols.woff2') format('woff2');
+}
+
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'liga';
+}

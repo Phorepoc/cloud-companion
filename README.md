@@ -80,6 +80,14 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
   (Apache-2.0) and the writing style. Dark mode follows the system and has a toggle in Settings. The product name and logo are one replaceable
   token (`web/src/brand.js`: it feeds the page title, the manifest and the icon). Before/after screenshots (light and dark, 390 px and
   1280 px) are in `web/test/screenshots/before` and `.../after` (`sh web/test/shots.sh before|after`).
+- **Contacts and Calendar** (needs the hub, see `docs/hub.md`): the server talks CardDAV and CalDAV to Stalwart as the hub's single owner
+  (`internal/davhub`, using `PHECLOUD_HUB_URL` and the API key from `hub-init.sh`; the credentials never reach the browser). New frames
+  `hub` / `hubres` carry `contacts.list|save|delete` and `events.list|save|delete`. Contacts: searchable list, view, create, edit (phones,
+  emails, company, note), delete. Calendar: month agenda with previous/next/today, create, edit (title, all day, start/end, place, notes),
+  delete. Existing items keep what the editor does not show (vCard lines such as photos, iCalendar recurrence rules, alarms and time
+  zone definitions are written back unchanged). Deleting is deferred for the length of the "Undo" toast. Tests: `go test ./internal/davhub`
+  and `HUB_ENV_FILE=<hub's .env.phecloud> sh web/test/hubstep.sh` (Playwright against a running hub; screenshots in `web/test/screenshots/hub`).
+- **Icons and toasts**: the Material Symbols font is subset to the icons in use at build time (6.5 KB instead of 3.6 MB), and toasts follow STYLE.md (4 seconds, Undo, paused on hover or focus).
 - Web server: `PHECLOUD_HTTP_LISTEN` (default `:8080`, plain HTTP: use the Caddy profile below for anything but localhost, or
   `PHECLOUD_HTTP_TLS=1` for the self-signed certificate).
 - **Zoom** (pinch with two pointers, ctrl + wheel, or the zoom buttons): the cached tiles scale locally while the gesture runs; when it

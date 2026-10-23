@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/phecloud/internal/browser"
+	"github.com/phorepoc/phecloud/internal/davhub"
 	"github.com/phorepoc/phecloud/internal/proto"
 	"github.com/phorepoc/phecloud/internal/store"
 )
@@ -28,6 +29,7 @@ type Server struct {
 	Store   *store.Store
 	Browser browser.Factory
 	Log     *slog.Logger
+	Hub     *davhub.Client // the personal hub (contacts, calendar); nil when not configured
 }
 
 func MAC(key, nonce []byte) []byte {

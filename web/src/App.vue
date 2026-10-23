@@ -48,6 +48,8 @@
       </nav>
     </q-footer>
 
+    <ToastHost />
+
     <q-dialog v-model="moreOpen" position="bottom">
       <q-card class="ph-sheet" role="dialog" aria-label="More sections">
         <q-list>
@@ -69,6 +71,7 @@ import { state, creds } from './cloud.js'
 import { sections } from './nav.js'
 import { brand } from './brand.js'
 import BrandLogo from './components/BrandLogo.vue'
+import ToastHost from './components/ToastHost.vue'
 
 const $q = useQuasar()
 const route = useRoute()

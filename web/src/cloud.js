@@ -63,6 +63,15 @@ const VIEW_FRAMES = ['page', 'tile', 'layers', 'regions', 'focus', 'done']
 function onFrame(f) {
   if (VIEW_FRAMES.includes(f.t) && f.v && f.v !== state.activeView) return // another view's frame
   switch (f.t) {
+    case 'hubres': {
+      const p = hubPending.get(f.id)
+      if (p) {
+        hubPending.delete(f.id)
+        if (f.ok) p.resolve(f)
+        else p.reject(new Error(f.err || 'The hub did not accept that.'))
+      }
+      break
+    }
     case 'tabs':
       state.tabs = f.list || []
       if (f.active && f.active !== state.activeView) showView(f.active)
@@ -196,3 +205,18 @@ export const api = {
 
 // test/debug hook (the Playwright smoke test reads it)
 window.__phe = Object.assign(window.__phe || {}, { state })
+
+// ---- the personal hub (contacts, calendar): one request, one answer, matched by id ----
+const hubPending = new Map()
+let hubSeq = 0
+
+export async function hubCall(msg) {
+  if (state.status !== 'online') await connect()
+  return new Promise((resolve, reject) => {
+    if (!client) return reject(new Error('Not connected to the server.'))
+    const id = ++hubSeq
+    hubPending.set(id, { resolve, reject })
+    client.send({ t: 'hub', id, ...msg })
+    setTimeout(() => { if (hubPending.delete(id)) reject(new Error('The server did not answer. Try again.')) }, 25000)
+  })
+}
