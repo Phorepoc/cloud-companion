@@ -13,7 +13,7 @@ ROOT=$(pwd)
 OUT=$ROOT/web/test/out
 mkdir -p "$OUT"
 rm -f "$OUT"/hook-*
-cleanup() { [ -n "${HOOKPID:-}" ] && kill "$HOOKPID" 2>/dev/null || true; docker rm -f phe-redroid-t phe-android-t >/dev/null 2>&1 || true; docker network rm phepa >/dev/null 2>&1 || true; rm -f "$ROOT/web/test/markor.apk"; }
+cleanup() { [ -n "${HOOKPID:-}" ] && kill "$HOOKPID" 2>/dev/null || true; docker rm -f phe-redroid-t phe-android-t phe-cloud-t phe-caddy-t >/dev/null 2>&1 || true; docker network rm phepa >/dev/null 2>&1 || true; rm -f "$ROOT/web/test/markor.apk" "$ROOT/web/test/out/Caddyfile.t"; }
 cleanup; trap cleanup EXIT
 cp "$APK" "$ROOT/web/test/markor.apk"
 docker network create phepa >/dev/null
@@ -53,3 +53,22 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:p
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out \
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node android.mjs' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
 docker stats --no-stream --format 'redroid {{.CPUPerc}} {{.MemUsage}}' phe-redroid-t
+# the web app's own page: phecloud (with the web app) + Caddy in front, as in the hub; the standalone run above has finished, so the single viewer slot is free
+docker build -q -t phe-cloud-t:dev . >/dev/null
+docker run -d --name phe-cloud-t --network phepa --cpus 1 --memory 512m -e PHECLOUD_ANDROID_SECRET=testsecret phe-cloud-t:dev >/dev/null
+cat > "$OUT/Caddyfile.t" <<'EOC'
+:8080 {
+	handle_path /android/* {
+		reverse_proxy phe-android-t:8090 {
+			flush_interval -1
+		}
+	}
+	handle {
+		reverse_proxy phe-cloud-t:8080
+	}
+}
+EOC
+docker run -d --name phe-caddy-t --network phepa --cpus 0.5 --memory 128m -v "$OUT/Caddyfile.t":/etc/caddy/Caddyfile:ro caddy:2 >/dev/null
+sleep 8
+CODE=$(docker exec phe-cloud-t phecloud paircode --admin 2>/dev/null)
+docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-caddy-t --ipc=host     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8080 -e CODE="$CODE" -e OUT=/out     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node androidapp.mjs' || { docker logs phe-android-t 2>&1 | tail -5; docker logs phe-cloud-t 2>&1 | tail -5; exit 1; }

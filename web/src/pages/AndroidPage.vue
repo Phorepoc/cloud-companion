@@ -1,38 +1,124 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
-  <q-page class="ph-page">
-    <h1>Android</h1>
-    <p class="ph-muted">An Android phone that runs on your server, shown here. Tap and type on the screen below; the apps keep running when you close this page.</p>
-    <q-banner v-if="error" class="bg-negative text-white q-mb-md" rounded role="alert" data-test="android-error">{{ error }}</q-banner>
+  <q-page class="ph-page ph-android" :style="{ '--ar': w / h }">
+    <div class="ph-head">
+      <h1>Android</h1>
+      <q-space />
+      <span class="ph-conn" :class="'is-' + conn" role="status" data-test="android-state">
+        <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
+        {{ connText }}
+      </span>
+      <q-btn v-if="configured" flat no-caps icon="sym_o_refresh" label="Reconnect" :loading="busy" data-test="android-reconnect" @click="connect" />
+    </div>
+
     <p v-if="state.admin === false" class="ph-note" role="note">Only an admin device can open Android.</p>
     <p v-if="loaded && !configured" class="ph-note" role="note" data-test="android-off">
       <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> Android is not set up on this server. See docs/android.md for the two extra containers it needs.
     </p>
-    <div v-if="src" class="ph-android">
-      <iframe :src="src" title="Android screen" allow="clipboard-read; clipboard-write" data-test="android-frame"></iframe>
+    <q-banner v-if="problem" class="bg-negative text-white q-mb-md" rounded role="alert" data-test="android-error">{{ problem }}</q-banner>
+
+    <div v-show="configured" class="ph-toolbar2" role="toolbar" aria-label="Android controls">
+      <q-btn flat no-caps icon="sym_o_arrow_back" label="Back" data-test="android-back" @click="stream.key(4)" />
+      <q-btn flat no-caps icon="sym_o_home" label="Home" data-test="android-home" @click="stream.key(3)" />
+      <q-btn flat no-caps icon="sym_o_crop_square" label="Recent" data-test="android-recent" @click="stream.key(187)" />
+      <q-btn flat no-caps :icon="sound ? 'sym_o_volume_up' : 'sym_o_volume_off'" :label="sound ? 'Sound on' : 'Sound off'" :aria-pressed="String(sound)" data-test="android-sound" @click="toggleSound" />
+      <q-btn flat no-caps icon="sym_o_content_copy" label="Copy from phone" data-test="android-copy" @click="stream.copyFromPhone()" />
+      <q-btn flat no-caps icon="sym_o_content_paste" label="Paste to phone" data-test="android-paste" @click="stream.pasteToPhone()" />
+      <q-btn flat no-caps icon="sym_o_download" label="Install apps" data-test="android-install" @click="installOpen = true" />
     </div>
-    <q-btn v-if="configured" unelevated color="primary" :label="src ? 'Reconnect' : 'Open Android'" icon="sym_o_smartphone" :loading="busy" data-test="android-open" @click="open" />
+
+    <div v-show="configured" class="ph-stage">
+      <div class="ph-frame" :class="{ 'is-wide': w > h }">
+        <canvas ref="cv" width="360" height="640" tabindex="0" role="application" data-test="android-screen"
+                aria-label="Android screen: click or touch to tap, scroll with the wheel, type to enter text"></canvas>
+      </div>
+    </div>
+    <p v-if="configured" class="ph-muted ph-small ph-line" aria-live="polite" data-test="android-note">{{ note || statsText }}</p>
+
+    <q-dialog v-model="installOpen">
+      <q-card class="ph-dialog" data-test="android-install-dialog">
+        <q-card-section class="ph-form">
+          <h2 class="ph-h3">Install apps</h2>
+          <p class="ph-muted">Apps run on your server and keep running when you close this page. Only apps that include x86_64 code install.</p>
+          <input ref="file" type="file" accept=".apk,application/vnd.android.package-archive" hidden data-test="android-apk" @change="pickApk" />
+          <q-btn outline color="primary" no-caps icon="sym_o_upload_file" label="Install an APK file" @click="file.click()" />
+          <q-input v-model="pkg" outlined dense label="F-Droid package name" hint="For example org.fossify.notes" autocomplete="off" data-test="android-pkg" @keyup.enter="fdroid" />
+          <q-btn unelevated color="primary" no-caps icon="sym_o_download" label="Install from F-Droid" :disable="!pkg.trim()" data-test="android-fdroid" @click="fdroid" />
+          <p class="ph-small" aria-live="polite" data-test="android-install-note">{{ note }}</p>
+        </q-card-section>
+        <q-card-actions align="right"><q-btn flat no-caps label="Close" @click="installOpen = false" /></q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useRoute } from 'vue-router'
 import { apiCall, state } from '../cloud.js'
+import { AndroidStream } from '../android/stream.js'
 
-const configured = ref(false), loaded = ref(false), busy = ref(false), error = ref(''), src = ref('')
-async function open() {
-  busy.value = true; error.value = ''
+const route = useRoute()
+const cv = ref(null), file = ref(null)
+const configured = ref(false), loaded = ref(false), busy = ref(false), problem = ref(''), conn = ref('idle'), connMsg = ref('')
+const w = ref(360), h = ref(640), note = ref(''), stats = ref(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
+const stream = shallowRef(new AndroidStream(document.createElement('canvas'), { base: '/android/' })) // replaced once the canvas exists
+
+const connText = computed(() => ({ idle: 'Not connected', connecting: 'Connecting', live: 'Connected', closed: connMsg.value || 'Disconnected', error: connMsg.value || 'Problem' }[conn.value]))
+const statsText = computed(() => {
+  const s = stats.value
+  if (conn.value !== 'live' || !s) return ''
+  const bits = [s.w + ' x ' + s.h, s.fps.toFixed(0) + ' fps', s.kbps.toFixed(0) + ' kbit/s']
+  if (s.i2f_n) bits.push('input to picture ' + s.i2f_ms.toFixed(0) + ' ms')
+  bits.push('round trip ' + s.rtt.toFixed(0) + ' ms')
+  return bits.join(' · ')
+})
+
+async function connect() {
+  busy.value = true; problem.value = ''; note.value = ''
   try {
-    const j = await apiCall('GET', '/phe/android/ticket')
+    const j = await apiCall('GET', '/phe/android/ticket') // a fresh two-minute ticket, from this signed-in device
     configured.value = j.configured
-    if (j.configured) src.value = j.path + '?t=' + encodeURIComponent(j.ticket) + '&_=' + Date.now()
-  } catch (e) { error.value = e.message } finally { busy.value = false; loaded.value = true }
+    if (j.configured) {
+      const q = route.query
+      stream.value.connect(j.ticket, { codec: q.codec, size: q.size, fps: q.fps, kbps: q.kbps, audio: q.audio !== '0' })
+    }
+  } catch (e) { problem.value = e.message } finally { busy.value = false; loaded.value = true }
 }
-onMounted(open)
+function toggleSound() { sound.value = !sound.value; stream.value.setSound(sound.value) }
+async function pickApk(e) { const f = e.target.files[0]; if (f) await stream.value.installApk(f); e.target.value = '' }
+async function fdroid() { if (pkg.value.trim()) await stream.value.installFdroid(pkg.value.trim()) }
+
+onMounted(() => {
+  stream.value.dispose()
+  stream.value = new AndroidStream(cv.value, {
+    base: '/android/',
+    onState: (s, m) => { conn.value = s; connMsg.value = m; if (s === 'error') problem.value = m },
+    onStats: (m) => { stats.value = m },
+    onNote: (t) => { note.value = t },
+    onSize: (a, b) => { w.value = a; h.value = b },
+  })
+  connect()
+})
+onBeforeUnmount(() => stream.value.dispose())
 </script>
 
 <style scoped>
-.ph-android { margin: 12px 0; }
-.ph-android iframe { width: 100%; max-width: 480px; height: min(820px, calc(100vh - 260px)); min-height: 480px; border: 1px solid var(--ph-line, #d5dae0); border-radius: 12px; background: #000; }
+.ph-head { display: flex; align-items: center; gap: var(--ph-s2); flex-wrap: wrap; }
+.ph-conn { display: inline-flex; align-items: center; gap: var(--ph-s1); font-size: var(--ph-text-small); color: var(--ph-text-muted); }
+.ph-conn.is-live { color: var(--ph-positive); }
+.ph-conn.is-closed, .ph-conn.is-error { color: var(--ph-negative); }
+.ph-toolbar2 { display: flex; flex-wrap: wrap; gap: var(--ph-s1); margin: var(--ph-s2) 0; }
+.ph-stage { display: flex; justify-content: center; }
+/* the frame is the phone's shape (the stream's own aspect ratio, so it follows rotation) and as large as the content area allows */
+.ph-frame {
+  --chrome: 250px;                                   /* bars, heading, toolbar, note: what is not the screen */
+  width: min(100%, calc((100dvh - var(--chrome)) * var(--ar)));
+  min-width: min(100%, 220px);
+  background: #000; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-card); box-shadow: var(--ph-elev-1); overflow: hidden;
+}
+@media (max-width: 599px) { .ph-frame { --chrome: 330px; } }
+.ph-frame canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }
+.ph-line { text-align: center; min-height: 1.5em; margin: var(--ph-s2) 0 0; }
 </style>

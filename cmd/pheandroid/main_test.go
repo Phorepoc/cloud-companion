@@ -4,7 +4,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
+	"os"
 	"testing"
 )
 
@@ -59,5 +61,17 @@ func TestScrollClipboardMessages(t *testing.T) {
 	}
 	if fixed16(0) != 0 || fixed16(-1) >= 0 || fixed16(100) != 0x7fff || fixed16(-100) != -0x8000 {
 		t.Fatal("fixed16")
+	}
+}
+
+// The web app imports web/src/android/stream.js; the bridge embeds and serves a copy for its standalone page. They must stay identical.
+func TestStreamModuleCopy(t *testing.T) {
+	src, err := os.ReadFile("../../web/src/android/stream.js")
+	if err != nil {
+		t.Skip("the web sources are not here")
+	}
+	noCR := func(b []byte) []byte { return bytes.ReplaceAll(b, []byte{13}, nil) } // checkouts on Windows may use CRLF
+	if !bytes.Equal(noCR(src), noCR(streamJS)) {
+		t.Fatal("cmd/pheandroid/stream.js differs from web/src/android/stream.js: copy it over")
 	}
 }

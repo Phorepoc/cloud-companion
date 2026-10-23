@@ -9,173 +9,59 @@
 @media (prefers-color-scheme: dark) { :root { --bg:#14171a; --fg:#e8eaed; --muted:#9aa4af; --card:#1d2227; --line:#323a42; --accent:#7ab0ff; } }
 * { box-sizing: border-box; }
 body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.4 system-ui, sans-serif; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:12px 16px; gap:10px; }
-#bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; }
-button { font:inherit; color:var(--fg); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 14px; min-height:44px; cursor:pointer; }
-.b { display:inline-flex; align-items:center; font:inherit; color:var(--fg); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 14px; min-height:44px; }
-label.btn:focus-within .b { outline:3px solid var(--accent); outline-offset:2px; }
-button:focus-visible, canvas:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
-#screen { background:#000; border:1px solid var(--line); border-radius:10px; max-width:100%; max-height:calc(100vh - 150px); touch-action:none; cursor:pointer; }
-#info { color:var(--muted); font-size:14px; text-align:center; min-height:1.4em; }
+.row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:center; }
+button, .b { font:inherit; color:var(--fg); background:var(--card); border:1px solid var(--line); border-radius:8px; padding:8px 14px; min-height:44px; cursor:pointer; display:inline-flex; align-items:center; }
+button:focus-visible, canvas:focus-visible, label:focus-within .b { outline:3px solid var(--accent); outline-offset:2px; }
+#screen { background:#000; border:1px solid var(--line); border-radius:10px; max-width:100%; max-height:calc(100vh - 190px); touch-action:none; cursor:pointer; }
+#info, #msg { color:var(--muted); font-size:14px; text-align:center; min-height:1.4em; }
+input[type=text] { font:inherit; padding:8px; min-height:44px; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
 </style>
 </head>
 <body>
 <h1 style="font-size:1.1rem;margin:0">Android</h1>
-<div id="bar" role="toolbar" aria-label="Android keys">
-  <button data-k="4" title="Back">Back</button>
-  <button data-k="3" title="Home">Home</button>
-  <button data-k="187" title="Recent apps">Recent</button>
-  <button id="sound" aria-pressed="false" title="Play the phone's sound">Sound off</button>
-  <button id="copyfrom" title="Copy the phone's clipboard to this computer">Copy from phone</button>
-  <button id="pasteto" title="Paste this computer's clipboard into the phone">Paste to phone</button>
+<div class="row" role="toolbar" aria-label="Android keys">
+  <button data-k="4">Back</button><button data-k="3">Home</button><button data-k="187">Recent</button>
+  <button id="sound" aria-pressed="false">Sound off</button>
+  <button id="copyfrom">Copy from phone</button><button id="pasteto">Paste to phone</button>
   <button id="reconnect">Reconnect</button>
 </div>
-<div id="apps" role="group" aria-label="Install apps" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center">
-  <label class="btn" style="cursor:pointer"><input id="apk" type="file" accept=".apk,application/vnd.android.package-archive" hidden><span class="b">Install an APK file</span></label>
-  <input id="pkg" type="text" placeholder="F-Droid package, e.g. org.fossify.notes" aria-label="F-Droid package name" size="34" autocomplete="off" spellcheck="false" style="font:inherit;padding:8px;min-height:44px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg)">
+<div class="row" role="group" aria-label="Install apps">
+  <label style="cursor:pointer"><input id="apk" type="file" accept=".apk,application/vnd.android.package-archive" hidden><span class="b">Install an APK file</span></label>
+  <input id="pkg" type="text" placeholder="F-Droid package, e.g. org.fossify.notes" aria-label="F-Droid package name" size="34" autocomplete="off" spellcheck="false">
   <button id="fd">Install from F-Droid</button>
 </div>
-<div id="msg" role="status" style="color:var(--muted);font-size:14px;min-height:1.4em"></div>
+<div id="msg" role="status"></div>
 <canvas id="screen" width="360" height="640" tabindex="0" role="application" aria-label="Android screen: click or touch to tap, type to enter text"></canvas>
 <div id="info" role="status">Connecting</div>
-<script>
-'use strict';
-const cv = document.getElementById('screen'), ctx2d = cv.getContext('2d'), info = document.getElementById('info');
-const q = new URLSearchParams(location.search);
-const ticket = q.get('t') || '';
-let audioCfg = null, sid = '', ac = null, adec = null, aNext = 0, audioOn = false, soundOn = false, phoneClip = '', ws = null, dec = null, gotKey = false, W = 360, H = 640, rtt = 0, stats = {}, ts = 0;
-const KEY = { Escape:4, Enter:66, Backspace:67, Delete:112, Tab:61, ArrowUp:19, ArrowDown:20, ArrowLeft:21, ArrowRight:22, Home:3, ' ':62 };
-
-function say(s) { info.textContent = s; }
-function show() {
-  if (!ws || ws.readyState !== 1) return;
-  const bits = ['connected ' + W + 'x' + H];
-  if (stats.fps !== undefined) bits.push(stats.fps.toFixed(0) + ' fps', stats.kbps.toFixed(0) + ' kbit/s');
-  if (stats.i2f_n) bits.push('input to next frame ' + stats.i2f_ms.toFixed(0) + ' ms');
-  bits.push('round trip ' + rtt.toFixed(0) + ' ms');
-  say(bits.join(' · '));
+<script type="module">
+// The standalone page: the same module the web app uses (stream.js), with plain controls around it.
+import { AndroidStream } from './stream.js'
+const $ = (id) => document.getElementById(id), q = new URLSearchParams(location.search)
+let last = {}
+const show = () => {
+  const s = stream.state, bits = []
+  if (s !== 'live') { $('info').textContent = s === 'connecting' ? 'Connecting' : (last.msg || 'Disconnected.') + ' Open this page again from Phecloud.'; return }
+  bits.push('connected ' + last.w + 'x' + last.h)
+  if (last.fps !== undefined) bits.push(last.fps.toFixed(0) + ' fps', last.kbps.toFixed(0) + ' kbit/s')
+  if (last.i2f_n) bits.push('input to next frame ' + last.i2f_ms.toFixed(0) + ' ms')
+  bits.push('round trip ' + last.rtt.toFixed(0) + ' ms')
+  $('info').textContent = bits.join(' · ')
 }
-function connect() {
-  if (ws) { try { ws.close(); } catch (e) {} }
-  if (dec) { try { dec.close(); } catch (e) {} dec = null; }
-  if (!('VideoDecoder' in window)) { say('This browser has no WebCodecs video decoder (needs a secure https page and a current browser).'); return; }
-  gotKey = false; stats = {}; sid = ''; audioCfg = null; if (adec) { try { adec.close(); } catch (e) {} adec = null; }
-  const url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^/]*$/, '') + 'ws?t=' + encodeURIComponent(ticket) +
-    ['size', 'fps', 'kbps', 'codec', 'audio'].filter((k) => q.get(k)).map((k) => '&' + k + '=' + encodeURIComponent(q.get(k))).join('');
-  say('Connecting');
-  ws = new WebSocket(url); ws.binaryType = 'arraybuffer';
-  const mine = ws;
-  ws.onclose = (e) => { if (mine === ws) say(e.code === 1006 || e.code === 1008 ? 'Not allowed or not reachable. Open this page again from Phecloud.' : 'Disconnected (' + (e.reason || e.code) + ').'); };
-  ws.onmessage = (e) => {
-    if (typeof e.data === 'string') {
-      const m = JSON.parse(e.data);
-      if (m.t === 'cfg') {
-        W = m.w; H = m.h; cv.width = W; cv.height = H;
-        if (dec) { try { dec.close(); } catch (e2) {} }
-        dec = new VideoDecoder({ output: (f) => { ctx2d.drawImage(f, 0, 0, W, H); f.close(); }, error: (er) => say('Decoder: ' + er.message) });
-        dec.configure({ codec: m.codec, optimizeForLatency: true });
-        gotKey = false;
-      } else if (m.t === 'hello') { sid = m.sid; }
-      else if (m.t === 'audio') { audioOn = m.on; window.__audioMsg = m.on; if (!m.on) note('This Android has no audio capture; video only.'); }
-      else if (m.t === 'clip') { phoneClip = m.s; window.__clip = m.s; tryWriteClip(); }
-      else if (m.t === 'stats') { stats = m; show(); }
-      else if (m.t === 'pong') { rtt = performance.now() - m.ts; }
-      return;
-    }
-    const u = new Uint8Array(e.data);
-    if (u[0] & 0x10) { audioPacket(u); return; }
-    if (!dec || dec.state !== 'configured') return;
-    const key = (u[0] & 2) !== 0;
-    if (!gotKey && !key) return;
-    gotKey = true;
-    dec.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: ts += 33333, data: u.subarray(1) }));
-  };
-  ws.onopen = () => { ws.send(JSON.stringify({ t: 'ping', ts: performance.now() })); };
-}
-function note(t) { document.getElementById('msg').textContent = t; }
-// audio: Opus packets -> AudioDecoder -> scheduled AudioBuffers. Starts only after the Sound button (a browser needs a click before it plays sound).
-function audioPacket(u) {
-  const cfg = (u[0] & 1) !== 0, body = u.subarray(9);
-  if (cfg) audioCfg = u.slice();   // kept: the stream sends it once, before the Sound button is pressed
-  if (!soundOn || !('AudioDecoder' in window)) return;
-  if (cfg) {
-    if (adec) { try { adec.close(); } catch (e) {} }
-    adec = new AudioDecoder({ output: playAudio, error: (er) => note('Audio decoder: ' + er.message) });
-    adec.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, description: body.slice() });
-    return;
-  }
-  if (!adec || adec.state !== 'configured') return;
-  const pts = Number(new DataView(u.buffer, u.byteOffset + 1, 8).getBigUint64(0));
-  adec.decode(new EncodedAudioChunk({ type: 'key', timestamp: pts, data: body }));
-}
-function playAudio(d) {
-  try {
-    if (!ac) { d.close(); return; }
-    const buf = ac.createBuffer(d.numberOfChannels, d.numberOfFrames, d.sampleRate);
-    for (let c = 0; c < d.numberOfChannels; c++) { const a = new Float32Array(d.numberOfFrames); d.copyTo(a, { planeIndex: c, format: 'f32-planar' }); buf.copyToChannel(a, c); }
-    const src = ac.createBufferSource(); src.buffer = buf; src.connect(ac.destination);
-    const now = ac.currentTime;
-    if (aNext < now + 0.02 || aNext > now + 0.5) aNext = now + 0.06; // (re)start with a small cushion; drop the backlog if we fell behind
-    src.start(aNext); aNext += buf.duration;
-    window.__audioFrames = (window.__audioFrames || 0) + d.numberOfFrames;
-  } finally { d.close(); }
-}
-document.getElementById('sound').addEventListener('click', (e) => {
-  soundOn = !soundOn; e.target.textContent = soundOn ? 'Sound on' : 'Sound off'; e.target.setAttribute('aria-pressed', String(soundOn));
-  if (soundOn && audioCfg) audioPacket(audioCfg);
-  if (soundOn) { ac = ac || new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 }); ac.resume(); if (!audioOn && !audioCfg) note('Waiting for audio from the phone (nothing may be playing).'); }
-  else if (ac) ac.suspend();
-});
-// clipboard: the phone's changes arrive as "clip"; writing to this computer's clipboard needs a recent click, so it is tried, and the button does it on demand
-let wantCopy = false;
-async function tryWriteClip() {
-  if (!phoneClip) return;
-  try { await navigator.clipboard.writeText(phoneClip); note('Copied from the phone: ' + phoneClip.slice(0, 60)); wantCopy = false; }
-  catch (e) { note('The phone copied text. Press "Copy from phone" to put it on this computer.'); }
-}
-document.getElementById('copyfrom').addEventListener('click', async () => { if (phoneClip) { await tryWriteClip(); } send({ t: 'clip_get' }); wantCopy = true; });
-document.getElementById('pasteto').addEventListener('click', async () => {
-  try { const t = await navigator.clipboard.readText(); if (t) { send({ t: 'clip_set', s: t, paste: true }); note('Pasted ' + t.length + ' characters.'); } }
-  catch (e) { note('This browser did not allow reading the clipboard. Click the screen and press Ctrl+V instead.'); }
-});
-document.addEventListener('paste', (e) => {
-  if (document.activeElement !== cv) return;
-  const t = e.clipboardData && e.clipboardData.getData('text');
-  if (t) { send({ t: 'clip_set', s: t, paste: true }); e.preventDefault(); }
-});
-// installing apps
-async function post(url, body, what) {
-  note(what + ' ...');
-  try {
-    const r = await fetch(url, { method: 'POST', headers: { 'X-Session': sid }, body });
-    const j = await r.json();
-    note(what + ': ' + (j.ok ? 'installed. ' : 'failed. ') + (j.detail || ''));
-  } catch (e) { note(what + ' failed: ' + e.message); }
-}
-document.getElementById('apk').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) post('apk', f, 'Installing ' + f.name); e.target.value = ''; });
-document.getElementById('fd').addEventListener('click', () => { const id = document.getElementById('pkg').value.trim(); if (id) post('fdroid?id=' + encodeURIComponent(id), '', 'Installing ' + id + ' from F-Droid'); });
-cv.addEventListener('wheel', (e) => {
-  const k = e.deltaMode === 1 ? 1 / 3 * 1 : 1 / 100, p = pos(e);   // lines: 3 per step; pixels: 100 per step
-  send({ t: 'scroll', x: p.x, y: p.y, dx: -e.deltaX * (e.deltaMode === 1 ? 1 / 3 : k), dy: -e.deltaY * (e.deltaMode === 1 ? 1 / 3 : k) });
-  e.preventDefault();
-}, { passive: false });
-setInterval(() => { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', ts: performance.now() })); }, 2000);
-function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
-function pos(e) { const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; }
-let down = false;
-cv.addEventListener('pointerdown', (e) => { cv.focus(); down = true; cv.setPointerCapture(e.pointerId); send({ t: 'touch', a: 0, ...pos(e) }); e.preventDefault(); });
-cv.addEventListener('pointermove', (e) => { if (down) send({ t: 'touch', a: 2, ...pos(e) }); });
-cv.addEventListener('pointerup', (e) => { if (down) { down = false; send({ t: 'touch', a: 1, ...pos(e) }); } });
-cv.addEventListener('pointercancel', (e) => { if (down) { down = false; send({ t: 'touch', a: 1, ...pos(e) }); } });
-cv.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'x')) { send({ t: 'clip_get', cut: e.key === 'x' }); wantCopy = true; return; }
-  if (e.ctrlKey || e.metaKey || e.altKey) return;
-  if (KEY[e.key] !== undefined) { send({ t: 'key', a: 0, code: KEY[e.key] }); e.preventDefault(); }
-  else if (e.key.length === 1) { send({ t: 'text', s: e.key }); e.preventDefault(); }
-});
-cv.addEventListener('keyup', (e) => { if (KEY[e.key] !== undefined) { send({ t: 'key', a: 1, code: KEY[e.key] }); e.preventDefault(); } });
-document.querySelectorAll('button[data-k]').forEach((b) => b.addEventListener('click', () => { const c = +b.dataset.k; send({ t: 'key', a: 0, code: c }); send({ t: 'key', a: 1, code: c }); }));
-document.getElementById('reconnect').addEventListener('click', connect);
-connect();
+const stream = new AndroidStream($('screen'), {
+  base: './',
+  onState: (s, m) => { last.msg = m; show() },
+  onStats: (m) => { last = { ...last, ...m }; show() },
+  onNote: (t) => { $('msg').textContent = t },
+})
+const connect = () => stream.connect(q.get('t') || '', { codec: q.get('codec'), size: q.get('size'), fps: q.get('fps'), kbps: q.get('kbps'), audio: q.get('audio') !== '0' })
+document.querySelectorAll('button[data-k]').forEach((b) => b.addEventListener('click', () => stream.key(+b.dataset.k)))
+$('sound').addEventListener('click', (e) => { const on = !stream.soundOn; stream.setSound(on); e.target.textContent = on ? 'Sound on' : 'Sound off'; e.target.setAttribute('aria-pressed', String(on)) })
+$('copyfrom').addEventListener('click', () => stream.copyFromPhone())
+$('pasteto').addEventListener('click', () => stream.pasteToPhone())
+$('reconnect').addEventListener('click', connect)
+$('apk').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) stream.installApk(f); e.target.value = '' })
+$('fd').addEventListener('click', () => { const id = $('pkg').value.trim(); if (id) stream.installFdroid(id) })
+connect()
 </script>
 </body>
 </html>

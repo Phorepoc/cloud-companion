@@ -33,6 +33,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -40,6 +41,9 @@ import (
 
 //go:embed index.html
 var page []byte
+
+//go:embed stream.js
+var streamJS []byte
 
 var (
 	serial  = env("PHE_ANDROID_SERIAL", "phe-redroid:5555")
@@ -98,6 +102,11 @@ func main() {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Write(page)
 	})
+	mux.HandleFunc("/stream.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(streamJS)
+	})
 	mux.HandleFunc("/apk", handleAPK)
 	mux.HandleFunc("/fdroid", handleFDroid)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")) })
@@ -137,16 +146,23 @@ func handleWS(w http.ResponseWriter, r *http.Request) {
 	c.SetReadLimit(1 << 17)
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
+	var replaced atomic.Bool
 	active.Lock() // one viewer at a time: a new one replaces the old
 	if active.cancel != nil {
 		active.cancel()
 	}
-	active.cancel = cancel
+	active.cancel = func() { replaced.Store(true); cancel() }
 	active.Unlock()
 	q := r.URL.Query()
-	if err := session(ctx, c, q.Get("size"), q.Get("fps"), q.Get("kbps"), q.Get("codec"), q.Get("audio") != "0"); err != nil && ctx.Err() == nil {
+	if err := session(ctx, c, q.Get("size"), q.Get("fps"), q.Get("kbps"), q.Get("codec"), q.Get("audio") != "0", r.Context()); err != nil && ctx.Err() == nil {
 		log.Println("session:", err)
 		c.Close(websocket.StatusInternalError, trunc(err.Error(), 100))
+	}
+	if replaced.Load() {
+		cx, cc := context.WithTimeout(r.Context(), 3*time.Second)
+		c.Write(cx, websocket.MessageText, []byte(`{"t":"bye","reason":"Another viewer took over this Android."}`)) // a proxy may drop the close reason: say it in a message too
+		cc()
+		c.Close(websocket.StatusPolicyViolation, "Another viewer took over this Android.")
 	}
 }
 
@@ -165,7 +181,7 @@ func num(s string, d, lo, hi int) int {
 	return v
 }
 
-func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec string, wantAudio bool) error {
+func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec string, wantAudio bool, reqCtx context.Context) error {
 	if codec != "vp8" && codec != "vp9" {
 		codec = "h264"
 	}
@@ -258,7 +274,7 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 		cfg     []byte
 	)
 	wsend := func(typ websocket.MessageType, p []byte) error {
-		cx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		cx, cancel := context.WithTimeout(reqCtx, 10*time.Second)
 		defer cancel()
 		return ws.Write(cx, typ, p)
 	}
@@ -444,7 +460,7 @@ func session(ctx context.Context, ws *websocket.Conn, size, fps, kbps, codec str
 	// browser -> device
 	go func() {
 		for {
-			typ, p, err := ws.Read(ctx)
+			typ, p, err := ws.Read(reqCtx) // not ctx: cancelling a read context closes the socket, and a replaced viewer should get a close reason
 			if err != nil {
 				errc <- err
 				return
