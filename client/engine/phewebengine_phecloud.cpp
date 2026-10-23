@@ -42,6 +42,18 @@ extern "C" void phc_log(const char* aMsg)
 	fs.Close();
 	}
 
+// heap numbers of the calling thread's heap (the view thread allocates the phc object, tiles, TLS state and the view buffer)
+extern "C" void phc_mem(const char* aTag)
+	{
+	TInt bytes = 0, biggest = 0;
+	const TInt cells = User::AllocSize(bytes);        // returns the cell count, sets the byte total
+	const TInt freeBytes = User::Available(biggest);
+	TBuf8<120> b;
+	b.Format(_L8("mem %s: allocated %d B in %d cells, free %d B (largest %d B)"), aTag, bytes, cells, freeBytes, biggest);
+	b.Append(TChar(0));
+	phc_log((const char*)b.Ptr());
+	}
+
 // mbedTLS's entropy source: the kernel's random number generator (MBEDTLS_ENTROPY_HARDWARE_ALT)
 extern "C" int mbedtls_hardware_poll(void* /*aData*/, unsigned char* aOutput, size_t aLen, size_t* aOLen)
 	{

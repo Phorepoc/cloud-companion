@@ -55,7 +55,8 @@
 #define PHC_TRACE(x)
 #define PHC_TRACE_ON 0
 #endif
-extern void phc_log(const char *msg);       /* phewebengine_phecloud.cpp: RDebug + C:\data\phecloud_trace.txt */
+extern void phc_log(const char *msg);
+extern void phc_mem(const char *tag);       /* heap use of this thread, logged */       /* phewebengine_phecloud.cpp: RDebug + C:\data\phecloud_trace.txt */
 
 enum { RQ_LOAD = 1, RQ_ACTION, RQ_DOWN, RQ_TAP, RQ_CANCEL, RQ_TEXT, RQ_KEY, RQ_SCROLL, RQ_DIALOG, RQ_SUSPEND, RQ_STOP };
 
@@ -707,6 +708,7 @@ static int session_open(view_t *v, const char *url)
         cfg.code[0] = 0;
         cfg_write(&cfg);
     }
+    phc_mem("after pairing");
     v->c->io = phc_tls_transport(&v->tls, 1);     /* from here on recv returns PHC_WOULDBLOCK between frames */
     rc = phc_open(v->c, url, PAGE_W);
     if (rc != PHC_OK) { fail(v, "Cannot open the page", rc); teardown(v); return -1; }
@@ -803,6 +805,7 @@ static void *view_main(void *arg)
     view_t *v = (view_t *)arg;
     req_t r;
     long last_idle = 0;
+    phc_mem("thread start");
     while (!v->quit) {
         int rc;
         while (rq_pop(v, &r)) {
@@ -824,6 +827,7 @@ static void *view_main(void *arg)
             v->progress = more ? 60 : 100;
             pthread_mutex_unlock(&v->mu);
             compose(v);
+            phc_mem(more ? "first screen" : "page done");
             post(v, PHE_EV_PROGRESS, more ? 60 : 100, 0, 0);
             if (!more) post(v, PHE_EV_FINISHED, 0, 0, 0);
             continue;
@@ -918,6 +922,7 @@ static void e_view_create(PheView id, int w, int h, int is_private, const unsign
     pthread_mutex_init(&v->mu, NULL); pthread_mutex_init(&v->pixmu, NULL);
     v->px = (uint32_t *)calloc((size_t)v->w * (size_t)v->h, 4);
     v->tiles = (tile_t *)calloc(PHC_MAX_TILES, sizeof(tile_t));
+    phc_mem("view_create (UI thread: view buffer + tile table)");
     if (state && state_len > 5 && !memcmp(state, "PHC1\n", 5)) {       /* "PHC1\n<scroll_y>\n<url>" */
         char buf[PHC_URL_MAX + 24];
         char *nl;

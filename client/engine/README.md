@@ -56,3 +56,23 @@ Memory per view (x32, computed from the structures; not yet measured in a live h
 buffer 192 KB + TLS state about 40 KB + the view buffer (360x584x4 = 841 KB) + encoded tiles (about 32 KB for
 example.com) + up to 12 decoded tiles (368 KB each, 3 were live here = 1.1 MB): about 2.4 MB for a short page, at most
 about 7 MB for a long one (12 decoded tiles) before the view buffer. The DLL itself is 512 KB of code, 39 KB bss.
+
+## Input and heap, driven in the guest (Phorepoc x86, QEMU; test site `web/test/site`)
+Scripted with the QEMU monitor (absolute pointer drags and taps, `sendkey`), screenshots in `docs/shots/engine-s*.png`:
+- **scroll-drag**: a 400 px drag moves the page locally from cached tiles (`engine-s1_scrolled_down.png`), and back;
+- **tap on a link** that navigates: "Go to page two" opens page two (`engine-s3_link_page_two.png`);
+- **Back** (right soft key): returns to the first page;
+- **text input**: a tap on the search field makes the engine raise the focus event, the browser opens its editor
+  (`engine-s5_field_focused.png`), "symbian" typed (`engine-s6_typed.png`) and Enter submits the form: the result page
+  shows the query (`engine-s7_search_result.png`), Back returns to the form (`engine-s8_back_to_form.png`).
+
+Live heap (`User::AllocSize` on the process heap, logged by the engine as `mem ...`; the heap is shared with the browser):
+| moment | allocated |
+|---|---|
+| view created (browser + view buffer + tile table) | 0.99 MB |
+| after TLS + pairing (phc object, receive buffer, TLS state) | 1.48 MB (+0.49 MB) |
+| first screen composed (3 decoded tiles) | 2.61 MB (+1.13 MB) |
+| page complete (4 tiles) | 2.99 MB |
+So one view costs about 2.0 MB over the browser for a short page: 0.49 MB fixed (connection) + 0.37 MB per decoded tile
+(at most 12 kept: about 4.4 MB more on a long page) + the encoded tiles (about 10-20 KB each) + the 0.84 MB view buffer
+(already in the 0.99 MB above).
