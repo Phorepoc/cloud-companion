@@ -41,3 +41,16 @@ duplicates inside one device's own list is a separate, explicit action that is n
   and `web/test/dups.sh` (the duplicate review against the real hub: both pairs proposed with reasons, Keep merges one pair, Not the same hides
   the other without deleting anything). Light and dark screenshots in `web/test/screenshots/`.
 Still not exercised: a real Dovecot/Postfix and the big providers (OAuth is not built).
+
+## Send as
+The mail composer has a **From** list when a mail account with an SMTP server and a sender address is connected: the hub address (stays on
+this server, as before) or an account. A message sent from an account is relayed through **that account's own SMTP server** and a copy is filed in
+its Sent folder. **Replies default to the account the message came from** (the hub folder is named `<account> / <folder>`). A failure from the
+account's server (login refused, recipient refused) is shown in the composer.
+
+## Merging duplicates on one device
+A suggestion whose two entries both come from the same contacts account also offers **Merge on <account>**. That is the one action that changes
+the device's own list, so it is explicit: the dialog lists exactly what will happen (the entry that is rewritten and what it gains, the entry that
+is deleted). **Merge on the account** then writes it through the connector: the merged card replaces the first entry and the second is deleted,
+both guarded by their ETags, so a change made on the device in the meantime stops the merge and nothing is touched. For 10 minutes an **Undo**
+puts both original cards back. The hub copies follow with the account's next sync (run right away). Properties the app does not model are kept.
