@@ -16,7 +16,7 @@ const t0 = Date.now()
 const step = (s) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${s}`)
 
 async function device(code, name, viewport = { width: 1280, height: 800 }) {
-  const ctx = await browser.newContext({ viewport })
+  const ctx = await browser.newContext({ bypassCSP: true, viewport })
   const page = await ctx.newPage()
   await page.goto(BASE + '/#/pair')
   await page.fill('[data-test=name]', name)

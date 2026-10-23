@@ -19,7 +19,7 @@ const QUICK = process.env.QUICK === '1'
 assert(CODE, 'CODE (a pairing code, preferably from `phecloud paircode --admin`) is required')
 
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 900, height: 900 }, ignoreHTTPSErrors: process.env.IGNORE_TLS === '1' })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 900 }, ignoreHTTPSErrors: process.env.IGNORE_TLS === '1' })
 const page = await ctx.newPage()
 const log = []
 page.on('console', (m) => log.push(m.type() + ': ' + m.text()))

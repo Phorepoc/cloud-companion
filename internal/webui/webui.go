@@ -80,5 +80,21 @@ func Handler(s *server.Server, m *connectors.Manager) http.Handler {
 		c.SetReadLimit(1 << 20)
 		s.ServeConn(&wsIO{c: c, ctx: r.Context()}, in.ClientIP)
 	})
-	return trust.withInfo(mux)
+	return securityHeaders(trust.withInfo(mux))
+}
+
+// securityHeaders adds the headers every response of the web app should carry: no content sniffing, no framing, no referrer leaks, a content policy that only allows what the app
+// itself loads (its own scripts and styles, images and sockets from its own origin).
+func securityHeaders(h http.Handler) http.Handler {
+	const csp = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; " +
+		"connect-src 'self' ws: wss:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hd := w.Header()
+		hd.Set("X-Content-Type-Options", "nosniff")
+		hd.Set("X-Frame-Options", "DENY")
+		hd.Set("Referrer-Policy", "no-referrer")
+		hd.Set("Content-Security-Policy", csp)
+		hd.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+		h.ServeHTTP(w, r)
+	})
 }

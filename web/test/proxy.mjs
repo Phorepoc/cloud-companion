@@ -33,7 +33,7 @@ step('an untrusted peer cannot choose the relying party id with X-Forwarded-Host
 
 // 2. through Traefik: the browser uses https://phecloud.test (name resolved to the Traefik container)
 const browser = await chromium.launch({ args: [`--host-resolver-rules=MAP phecloud.test ${TRAEFIK}`, '--ignore-certificate-errors'] })
-const ctx = await browser.newContext({ viewport: { width: 900, height: 1000 }, ignoreHTTPSErrors: true })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1000 }, ignoreHTTPSErrors: true })
 const page = await ctx.newPage()
 const log = []
 page.on('pageerror', (e) => log.push('pageerror: ' + e.message))

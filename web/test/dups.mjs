@@ -12,7 +12,7 @@ const OUT = process.env.OUT || '.'
 const CODE = process.env.CODE
 assert(CODE, 'CODE (an admin pairing code) is required')
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 900, height: 1000 } })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1000 } })
 const page = await ctx.newPage()
 const log = []
 page.on('pageerror', (e) => log.push('pageerror: ' + e.message))

@@ -1,0 +1,80 @@
+# SPDX-License-Identifier: Apache-2.0
+# CI on a plain Linux runner. Everything here runs without Redroid, a GPU, a phone or any secret. (The Android stream suite, web/test/android.sh, needs the binder kernel module and
+# a Docker host you control: run it there, see docs/android.md.)
+name: ci
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: "Go: format, vet, tests (SQLite), licences"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: the embedded web app directory must exist for the build
+        run: mkdir -p internal/webui/dist && touch internal/webui/dist/placeholder.txt
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd internal)" || { gofmt -l cmd internal; exit 1; }
+      - run: go vet ./...
+      - run: go test -count=1 ./...
+      - name: dependency licences (allow-list; see NOTICE)
+        run: |
+          go install github.com/google/go-licenses@latest
+          go-licenses check ./cmd/... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0 --ignore modernc.org/mathutil
+
+  images:
+    name: Container images build (phecloud with the web app, Android bridge)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t phe-cloud:ci .
+      - run: docker build -t phe-android-bridge:ci -f cmd/pheandroid/Dockerfile .
+      - name: the image starts and answers
+        run: |
+          docker run -d --name ci-cloud -p 127.0.0.1:8080:8080 phe-cloud:ci
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
+          curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy"
+          docker logs ci-cloud | tail -5
+
+  browser:
+    name: Browser suite (${{ matrix.script }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        script: [csp.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh web/test/${{ matrix.script }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots-${{ matrix.script }}
+          path: web/test/out/*.png
+          if-no-files-found: ignore
+
+  databases:
+    name: Go tests on PostgreSQL and MariaDB
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh web/test/db_test.sh postgres
+      - run: sh web/test/db_test.sh mariadb
+
+  client:
+    name: C client core (self-test, sanitizers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc make
+      - run: make -C client check

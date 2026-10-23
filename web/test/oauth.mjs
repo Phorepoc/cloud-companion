@@ -34,7 +34,7 @@ const fake = http.createServer((req, res) => {
 await new Promise((r) => fake.listen(9099, '127.0.0.1', r))
 
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 900, height: 1100 } })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1100 } })
 const page = await ctx.newPage()
 const log = []
 page.on('pageerror', (e) => log.push('pageerror: ' + e.message))

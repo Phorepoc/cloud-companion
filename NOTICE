@@ -1,0 +1,28 @@
+phecloud
+Copyright The Phorepoc Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE). Every source file carries an SPDX-License-Identifier header; test fixtures (testdata/, web/test/site/)
+are part of the project and under the same licence.
+
+Third-party software built into the phecloud binary (Go modules, as reported by google/go-licenses; re-run it in CI, see .github/workflows/ci.yml):
+  MIT:           chromedp, cdproto, sysutil; emersion go-imap, go-message, go-sasl, go-smtp; fxamacker/cbor; jackc pgx, pgpassfile, pgservicefile, puddle; golang-jwt/jwt; gobwas httphead, pool, ws;
+                 aymerick/douceur; dustin/go-humanize; go-viper/mapstructure; josharian/intern; mailru/easyjson; philhofer/fwd; tinylib/msgp; x448/float16; modernc.org/libc
+  BSD-3-Clause:  go-webauthn/webauthn and x/encoding/asn1; microcosm-cc/bluemonday; google/uuid; gorilla/css; filippo.io/edwards25519; golang.org/x/{crypto,net,sync,sys,text};
+                 modernc.org/sqlite, memory, mathutil; remyoudompheng/bigfft
+  BSD-2-Clause:  go-webauthn/x/revoke
+  ISC:           coder/websocket; go-webauthn/x/crypto/secp256k1
+  Apache-2.0:    google/go-tpm
+  MPL-2.0:       go-sql-driver/mysql (file-level copyleft; used unmodified as a library)
+
+Third-party software built into the web app (web/, bundled by Vite): Vue, Vue Router, Quasar and @quasar/extras (MIT); cbor-x (MIT); @noble/hashes (MIT);
+Material Symbols icon font, subset to the icons the app uses (Apache-2.0).
+
+Third-party software in the phone client (client/): mbedTLS (Apache-2.0 OR GPL-2.0-or-later; used under Apache-2.0), libpng (libpng licence) and libjpeg-turbo (BSD-3-Clause / IJG) in the
+Symbian web-engine plug-in builds. The C client core (client/phc*.c) is ours.
+
+Container images. The phecloud image contains Chromium headless-shell (chromedp/headless-shell, BSD-3-Clause and the Chromium third-party licences) and the fonts Liberation, DejaVu and Noto
+(SIL OFL / free licences). Separate containers that the compose files can start, each under its own licence and not part of this project: Stalwart Mail Server (AGPL-3.0), Z-Push (AGPL-3.0),
+Radicale (GPL-3.0), Caddy (Apache-2.0), PostgreSQL (PostgreSQL licence), MariaDB (GPL-2.0), tecnativa/docker-socket-proxy, Redroid and the Android it runs (Apache-2.0 and Android's component licences).
+Optional runtime downloads, never shipped by us: the scrcpy server jar (Apache-2.0), adb from Debian (Apache-2.0), Taskbar from F-Droid (Apache-2.0), and the apps a user installs.
+
+The services in the Docker images are separate programs that talk to phecloud over network protocols; nothing AGPL or GPL is linked into the phecloud binary.

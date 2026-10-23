@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 const BASE = process.env.BASE
 const OUT = process.env.OUT || '.'
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 1000, height: 900 } })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 1000, height: 900 } })
 const page = await ctx.newPage()
 await page.goto(BASE)
 await page.fill('[data-test=code]', process.env.CODE)

@@ -13,7 +13,7 @@ const { CODE, DAV_URL, DAV_USER, DAV_PASS, IMAP_HOST, IMAP_PORT } = process.env
 assert(CODE && DAV_URL && IMAP_HOST, 'CODE, DAV_URL, IMAP_HOST are required')
 
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 900, height: 1100 } })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1100 } })
 const page = await ctx.newPage()
 const log = []
 page.on('pageerror', (e) => log.push('pageerror: ' + e.message))

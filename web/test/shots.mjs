@@ -19,7 +19,7 @@ for (const [vpName, viewport] of Object.entries(viewports)) {
   for (const scheme of ['light', 'dark']) {
     const code = process.env.CODES.split(',').shift()
     process.env.CODES = process.env.CODES.split(',').slice(1).join(',')
-    const ctx = await browser.newContext({ viewport, colorScheme: scheme, deviceScaleFactor: 1 })
+    const ctx = await browser.newContext({ bypassCSP: true, viewport, colorScheme: scheme, deviceScaleFactor: 1 })
     const page = await ctx.newPage()
     const shot = (route) => page.screenshot({ path: `${OUT}/${vpName}-${scheme}-${route}.png` })
     await page.goto(BASE + '/#/pair')

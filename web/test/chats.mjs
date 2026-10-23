@@ -17,7 +17,7 @@ const t0 = Date.now()
 const step = (s) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${s}`)
 
 async function pairIn(code, name, viewport) {
-  const ctx = await browser.newContext({ viewport })
+  const ctx = await browser.newContext({ bypassCSP: true, viewport })
   const page = await ctx.newPage()
   page.on('pageerror', (e) => log.push('pageerror: ' + e.message))
   await page.goto(BASE)

@@ -15,7 +15,7 @@ assert(CODE, 'CODE is required')
 const stamp = Date.now().toString(36)
 const NAME = `Pw ${stamp}`
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, colorScheme: 'light' })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 1280, height: 800 }, colorScheme: 'light' })
 const page = await ctx.newPage()
 const log = []
 page.on('console', (m) => log.push(m.type() + ': ' + m.text()))

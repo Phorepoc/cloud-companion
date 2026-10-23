@@ -147,7 +147,9 @@ func main() {
 					go mgr.Loop(context.Background(), 15*time.Minute)
 				}
 			}
-			go http.Serve(hln, webui.Handler(srv, mgr))
+			// timeouts: a client that never finishes its request headers must not hold a connection (and a goroutine) forever; WebSockets and long uploads are not limited by these
+			hs := &http.Server{Handler: webui.Handler(srv, mgr), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
+			go hs.Serve(hln)
 		}
 		log.Error("serve", "err", srv.Serve(ln))
 	default:
