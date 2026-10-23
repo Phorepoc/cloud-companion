@@ -73,10 +73,10 @@ The page's address accepts `#/android?codec=vp8&size=720&fps=30&kbps=2000&audio=
 embedded copy, and a Go test fails if the two differ.
 
 ## Verified, and what only a real browser can check
-**Verified by the user in a real browser:** H.264 decoding (the default codec), the ticket path from the web app (the stream played), **audible sound** through the Sound button, and a YouTube video playing smoothly in Android's browser through the stream. The framing of the page (iframe) was rejected, hence the native page above.
+**Verified by the user in a real browser:** H.264 decoding (the default codec), the ticket path from the web app (the stream played), **audible sound** through the Sound button, and a YouTube video playing smoothly in Android's browser through the stream. **Copying text from Android to the host's clipboard works** (checked by the user). The framing of the page (iframe) was rejected, hence the native page above.
 Automated (headless Chromium, `web/test/android.sh`, which runs `android.mjs` against the bridge directly and `androidapp.mjs` against phecloud + Caddy, as in the hub): scroll wheel changes the screen; rotating the device gives a
 landscape canvas and back, and a tap in landscape lands correctly; browser clipboard text arrives in a focused text field on the phone (read back from the UI hierarchy) and the phone's selected text comes back to the browser;
 APK upload and F-Droid install end in `Success` and the packages are listed; a bad package name is refused; audio: Opus decoded in the browser. The app page is checked at 1280x800 and 390x844, portrait and landscape, light and dark
 (screenshots in `web/test/screenshots/android/androidapp-*.png`): the frame has the stream's aspect ratio, nothing scrolls sideways, the whole screen fits on desktop, the Home / swipe controls change the screen, the install dialog
 installs an APK, Reconnect brings the stream back, and a second viewer shows the first one "Another viewer took over this Android".
-**Not verified (a real browser is needed):** the browser's clipboard permission prompts, Safari and Firefox.
+**Not verified (a real browser is needed):** pasting from the host into Android (the prompts of the browser's clipboard permission), Safari and Firefox.
