@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// phesmssync.cpp -- the Phorepoc SMS service for Phecloud (docs/sms.md, hub-design.md section 2).
+// phesmssync.cpp -- the Phorepoc SMS service for Cloud Companion (docs/sms.md, hub-design.md section 2).
 //
 // A background exe. It watches the Symbian message server and mirrors this phone's SMS into the owner's phecloud hub:
 //  - every incoming SMS in the Inbox and every sent SMS in the Sent folder is uploaded once, with its own TMsvId as the message id
@@ -11,7 +11,7 @@
 //    and the result (sent / failed) is reported back when the message server marks the entry.
 // Offline operation: nothing is dropped. The upload cursor (the highest TMsvId uploaded per folder) and the list of messages whose result
 // still has to be reported live in C:\data\phesmssync\state.txt; a failed upload leaves the cursor where it was, so the next cycle sends the
-// same messages again. The link is the Phecloud one (ss_net.c: TLS 1.3, pinned certificate, device key from C:\data\phecloud.ini).
+// same messages again. The link is the Cloud Companion one (ss_net.c: TLS 1.3, pinned certificate, device key from C:\data\phecloud.ini).
 #include <e32base.h>
 #include <e32std.h>
 #include <e32debug.h>
@@ -42,7 +42,7 @@ extern "C" int mbedtls_hardware_poll(void*, unsigned char* aOutput, size_t aLen,
 	return 0;
 	}
 
-// the Phecloud settings file, written by the engine's pairing screen (read with the Symbian file server: Open C's fopen on C:\data did not find it from this exe)
+// the Cloud Companion settings file, written by the engine's pairing screen (read with the Symbian file server: Open C's fopen on C:\data did not find it from this exe)
 extern "C" int ss_read_ini(char* aBuf, int aCap)
 	{
 	RFs fs;

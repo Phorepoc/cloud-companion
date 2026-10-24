@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 func TestVCardRoundTrip(t *testing.T) {

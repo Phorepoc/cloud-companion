@@ -1,4 +1,4 @@
-# Android SDK + Gradle build image for the Phecloud SMS app (kept as a cache: docker build -t phe-android-build android/docker).
+# Android SDK + Gradle build image for the Cloud Companion SMS app (kept as a cache: docker build -t phe-android-build android/docker).
 FROM eclipse-temurin:17-jdk-jammy
 ARG CMDLINE_TOOLS=11076708
 ARG GRADLE=8.7

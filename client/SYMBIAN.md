@@ -18,7 +18,7 @@ tile bytes, XOR of tile pixel hashes, regions and layers).
 
 ## The plug-in shape
 One ECom DLL under interface `0xE7016B01` (its own implementation UID), `Api()` returns a `PheWebEngineApi` named
-`"Phecloud"`. Phorepoc Browser stays unchanged; the user picks "Phecloud" in the engine list like any other engine, and
+`"Cloud Companion"`. Phorepoc Browser stays unchanged; the user picks "Cloud Companion" in the engine list like any other engine, and
 the package comes from the app store. Caps: `PHE_CAP_TLS13` (the link is TLS 1.3), `PHE_CAP_SCRIPT` (scripts run in the
 cloud, so the page is fully scripted), `PHE_CAP_SNAPSHOT` (the first tile scaled down is a free tab thumbnail),
 `PHE_CAP_SUSPEND` and `PHE_CAP_STATE`. Not in v1: zoom, find, downloads, private views (a cloud session is not private
@@ -86,7 +86,7 @@ when the page URL is https, which only means the cloud validated the site's cert
 ## Transport, pairing and storage
 - mbedTLS 3.x, TLS 1.3 only, no certificate chain: one callback compares the SHA-256 of the server certificate with the pinned
   fingerprint (the same rule as the Go client: pin at pairing, refuse a changed certificate).
-- Pairing UI lives in the phebrowser settings (engine page for Phecloud): host:port, the 8-character code from
+- Pairing UI lives in the phebrowser settings (engine page for Cloud Companion): host:port, the 8-character code from
   `phecloud paircode` (the fingerprint is printed next to it; show it so the user can compare), then `phc_auth(code)`.
 - Credentials (device id, 32-byte key, fingerprint, host) go in the engine's private directory on C: (a 100-byte file);
   the key is the only secret on the phone, and `phecloud revoke <id>` kills it server-side.

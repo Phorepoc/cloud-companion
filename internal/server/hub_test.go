@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 type fakeIO struct{ sent []any }

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phorepoc/phecloud/internal/proto"
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 func TestVault(t *testing.T) {

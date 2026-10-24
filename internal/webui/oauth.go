@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/connectors"
 )
 
 type oauthState struct {

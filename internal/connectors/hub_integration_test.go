@@ -20,8 +20,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 func env(k, d string) string {

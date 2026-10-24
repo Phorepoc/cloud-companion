@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/proto"
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 // Manager runs the accounts: test, sync (now or every interval), relay outgoing mail.

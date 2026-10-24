@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// The product name and logo live HERE and nowhere else (see STYLE.md, "Brand token"). The name is undecided (candidates:
+// The product name and logo live HERE and nowhere else (see STYLE.md, "Brand token"). The name is decided: Phorepoc Cloud Companion (earlier candidates:
 // Cloud Companion, Cloud Pal, Porter): change `name`, `short`, `logoPath` and `colors`, rebuild, done. The page title, the web app
 // manifest, the app bar and the pairing page all read this file.
 export const brand = {

@@ -1,4 +1,4 @@
-# Phecloud engine plug-in
+# Cloud Companion engine plug-in
 
 `phewebengine_phecloud.dll`: the cloud browser as an engine for the Phorepoc browser, one ECom implementation (uid
 `0xE7016B21`) of interface `0xE7016B01` (`phewebengine.h`, version 1). Apache-2.0; it links only mbedTLS, libpng, libjpeg
@@ -8,7 +8,7 @@ and the Open C libc (no GPL code).
 |---|---|
 | `phengine_phc.c` | the engine: `PheWebEngineApi` over the `phc` core (`../phc*.c`) and its mbedTLS 1.3 adapter |
 | `phewebengine_phecloud.cpp` | the ECom shell, the trace log (`C:\data\phecloud_trace.txt`) and the entropy source (kernel RNG) |
-| `phewebengine_phecloud.rss` | the ECom registration (display name "Phecloud", caps `script,tls13`) |
+| `phewebengine_phecloud.rss` | the ECom registration (display name "Cloud Companion", caps `script,tls13`) |
 | `group/phewebengine_phecloud.mmp` | the build description (plug-in, user capabilities, Open C libraries) |
 
 ## How it works

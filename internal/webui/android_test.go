@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 func TestAndroidTicket(t *testing.T) {

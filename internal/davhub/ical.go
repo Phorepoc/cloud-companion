@@ -9,7 +9,7 @@ import (
 	"time"
 	_ "time/tzdata" // zone rules inside the binary: the runtime image has no tzdata
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // ical is a parsed calendar object: the first VEVENT as an Event, plus what must be written back around and inside it.

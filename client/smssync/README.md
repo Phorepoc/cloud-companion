@@ -8,7 +8,7 @@ protocol core), `group/phesmssync.mmp`.
 - Opens the **message server** (`CMsvSession`) and, every 10 seconds or when the store reports a change, collects the SMS entries in the
   **Inbox** (incoming) and **Sent** folder (outgoing) that are newer than its cursor. Each message is uploaded with its **own TMsvId** as the
   message id, so the server can ignore repeats.
-- One `sms` frame over the Phecloud link (TLS 1.3, certificate pinned, the device key from `C:\data\phecloud.ini` that the browser engine's
+- One `sms` frame over the Cloud Companion link (TLS 1.3, certificate pinned, the device key from `C:\data\phecloud.ini` that the browser engine's
   pairing screen wrote): upload up to 4 messages, report results, receive this phone's **pending outbound queue**.
 - Each pending message is built as an SMS in Drafts with `CSmsClientMtm` (recipient, text), moved to the Outbox and scheduled with
   `ESmsMtmCommandScheduleCopy`: the real send path (smss, the SMS stack, ETel). When the message server marks the entry **Sent** or **Failed**
@@ -35,5 +35,5 @@ a notification when the pairing in `phecloud.ini` is missing (the service logs i
 
 ## Shipping and switching it on
 `phesmssync.exe` is part of the Phorepoc x86 image (registry key `phesmssync`) but **nothing starts it by default**. It is harmless until the phone is paired:
-without a usable `C:\data\phecloud.ini` (written by the Phecloud engine's pairing screen) it logs once and looks again every five minutes. To run it, add `!phesmssync`
+without a usable `C:\data\phecloud.ini` (written by the Cloud Companion engine's pairing screen) it logs once and looks again every five minutes. To run it, add `!phesmssync`
 to the startup list (bootui.txt) or start it from the shell; it then keeps running and mirrors SMS as described above.

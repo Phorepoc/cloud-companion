@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: Apache-2.0 */
 
 /*
- * phengine_phc.c -- the Phecloud web engine for the Phorepoc browser: phewebengine.h implemented over the portable phc client
+ * phengine_phc.c -- the Cloud Companion web engine for the Phorepoc browser: phewebengine.h implemented over the portable phc client
  * core (../phc*.c) and its mbedTLS 1.3 adapter. The page is rendered by the user's own phecloud server (Chromium); this engine
  * receives tiles, keeps them, composes the visible part into a BGRA view buffer, scrolls locally and sends taps and text.
  *
@@ -805,7 +805,7 @@ static void setup_draw(view_t *v)      /* pixmu held */
     setup_layout(v, &fh, &fc, &b1, &b2);
     px_rect(v, 0, 0, v->w, v->h, COL_BG);
     if (v->setup == ST_FORM) {
-        px_text(v, 20, 24, 3, COL_FG, "Phecloud setup", 40);
+        px_text(v, 20, 24, 3, COL_FG, "Cloud Companion setup", 40);
         px_text(v, 20, 84, 2, COL_DIM, "Server (host or host:port)", 40);
         px_rect(v, fh.x, fh.y, fh.w, fh.h, 0xFFFFFFFFu); px_frame(v, fh.x, fh.y, fh.w, fh.h, v->sfocus == 1 ? COL_ACC : COL_DIM, v->sfocus == 1 ? 3 : 1);
         px_text(v, fh.x + 10, fh.y + 14, 2, v->shost[0] ? COL_FG : COL_DIM, v->shost[0] ? v->shost : "192.168.1.10:7400", cap);
@@ -843,7 +843,7 @@ static void setup_enter(view_t *v, const char *msg, const char *pending_url)
     copy_str(v->smsg, sizeof v->smsg, msg);
     copy_str(v->spending, sizeof v->spending, pending_url);
     copy_str(v->url, sizeof v->url, "phecloud:setup");
-    copy_str(v->title, sizeof v->title, "Phecloud setup");
+    copy_str(v->title, sizeof v->title, "Cloud Companion setup");
     v->loading = 0; v->page_h = 0; v->scroll_y = 0; v->dirty = 1;
     pthread_mutex_unlock(&v->mu);
     post(v, PHE_EV_COMMIT, 0, PHE_SEC_NONE, 0);
@@ -1441,7 +1441,7 @@ static int e_snapshot(PheView id, unsigned int *dst, int w, int h, int stride)
 static void e_clear_data(int bits) { (void)bits; }       /* cookies live in the server's per-device jar: cleared from the phecloud web app */
 
 static const PheWebEngineApi api = {
-    sizeof(PheWebEngineApi), PHE_WEBENGINE_VERSION, "Phecloud", "1.0",
+    sizeof(PheWebEngineApi), PHE_WEBENGINE_VERSION, "Cloud Companion", "1.0",
     PHE_CAP_SCRIPT | PHE_CAP_TLS13 | PHE_CAP_SNAPSHOT | PHE_CAP_SUSPEND | PHE_CAP_STATE, MAXV,
     e_init, e_shutdown, e_set_useragent, e_set_iap, e_memory_pressure,
     e_new_view_id, e_view_create, e_view_destroy, e_view_resize, e_view_visible, e_view_suspend, e_view_save_state,

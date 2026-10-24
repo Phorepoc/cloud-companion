@@ -26,7 +26,7 @@ import (
 	"github.com/emersion/go-imap/v2/imapserver"
 	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
 
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 // A server with a self-signed certificate, like Proton Mail Bridge on 127.0.0.1:1143 (STARTTLS).

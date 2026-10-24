@@ -21,9 +21,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/connectors"
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 type conns struct {

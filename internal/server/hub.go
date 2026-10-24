@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // hubRequest answers one contacts/calendar request from the signed-in device. The owner of the hub is the person using the

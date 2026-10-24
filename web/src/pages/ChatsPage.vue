@@ -8,7 +8,7 @@
     <div v-if="error" class="ph-error" role="alert" data-test="chat-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</div>
 
     <p v-if="loaded && !devices.length" class="ph-note" role="note" data-test="no-sms-devices">
-      <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> No phone is syncing messages yet. Install the Phecloud messages service on a phone and pair it; its messages then appear here.
+      <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> No phone is syncing messages yet. Install the Cloud Companion messages service on a phone and pair it; its messages then appear here.
     </p>
 
     <div class="ph-chat" :class="{ 'ph-open': !!current }">

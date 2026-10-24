@@ -34,7 +34,7 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
 
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 type owner struct {
@@ -44,7 +44,7 @@ type owner struct {
 
 func (o *owner) WebAuthnID() []byte                         { return o.handle }
 func (o *owner) WebAuthnName() string                       { return "owner" }
-func (o *owner) WebAuthnDisplayName() string                { return "Phecloud owner" }
+func (o *owner) WebAuthnDisplayName() string                { return "Cloud Companion owner" }
 func (o *owner) WebAuthnCredentials() []webauthn.Credential { return o.creds }
 func (o *owner) WebAuthnIcon() string                       { return "" }
 
@@ -80,7 +80,7 @@ func (a *auth) wa(r *http.Request) (*webauthn.WebAuthn, error) {
 	if v := os.Getenv("PHECLOUD_RP_ORIGINS"); v != "" {
 		origins = strings.Split(v, ",")
 	}
-	return webauthn.New(&webauthn.Config{RPDisplayName: "Phecloud", RPID: rpid, RPOrigins: origins})
+	return webauthn.New(&webauthn.Config{RPDisplayName: "Cloud Companion", RPID: rpid, RPOrigins: origins})
 }
 
 func (a *auth) keep(p *pending) string {

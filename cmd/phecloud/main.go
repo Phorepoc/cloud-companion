@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Command phecloud: the Phecloud server.
+// Command phecloud: the Cloud Companion server.
 //
 //	phecloud serve              run the phone-protocol server (and the cloud browser)
 //	phecloud paircode [--admin] print a single-use pairing code (valid 10 minutes); --admin: the new device may manage devices
@@ -25,13 +25,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/browser"
-	"github.com/phorepoc/phecloud/internal/connectors"
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/server"
-	"github.com/phorepoc/phecloud/internal/store"
-	"github.com/phorepoc/phecloud/internal/tlsutil"
-	"github.com/phorepoc/phecloud/internal/webui"
+	"github.com/phorepoc/cloud-companion/internal/browser"
+	"github.com/phorepoc/cloud-companion/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/server"
+	"github.com/phorepoc/cloud-companion/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/tlsutil"
+	"github.com/phorepoc/cloud-companion/internal/webui"
 )
 
 func env(k, d string) string {

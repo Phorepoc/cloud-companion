@@ -17,7 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // Client is the owner's CardDAV/CalDAV access to the hub. One person, one account: the server acts for the signed-in web app.

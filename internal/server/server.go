@@ -16,10 +16,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/browser"
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/proto"
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/browser"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 // Features are advertised in the welcome frame.

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // HubID is the id of a hub contact: the name of its resource without the extension.

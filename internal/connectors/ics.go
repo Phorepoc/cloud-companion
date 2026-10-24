@@ -125,7 +125,7 @@ func SyncICS(ctx context.Context, account string, c DAVCfg, hub HubDAV, st SyncS
 			continue
 		}
 		name := account + "-" + e.id + ".ics"
-		body := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Phecloud//ICS subscription//EN\r\n" + zones + e.text + "END:VCALENDAR\r\n"
+		body := "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Cloud Companion//ICS subscription//EN\r\n" + zones + e.text + "END:VCALENDAR\r\n"
 		if err := hub.PutRaw("cal", name, body); err != nil {
 			return changed, removed, err
 		}

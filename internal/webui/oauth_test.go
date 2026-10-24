@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/phorepoc/phecloud/internal/connectors"
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 func TestOAuthFlow(t *testing.T) {

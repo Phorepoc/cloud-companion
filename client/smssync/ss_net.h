@@ -1,7 +1,7 @@
 /* Copyright The Phorepoc Authors
  * SPDX-License-Identifier: Apache-2.0 */
 /* The network half of phesmssync: one TLS 1.3 connection to the phecloud server (pinned certificate, device key from C:\data\phecloud.ini,
- * written by the Phecloud engine's pairing screen), and the SMS sync request over it. Plain C (Open C sockets), blocking with timeouts. */
+ * written by the Cloud Companion engine's pairing screen), and the SMS sync request over it. Plain C (Open C sockets), blocking with timeouts. */
 #ifndef SS_NET_H
 #define SS_NET_H
 #include "../phc.h"

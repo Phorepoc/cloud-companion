@@ -23,7 +23,7 @@ import (
 	"github.com/emersion/go-sasl"
 	"github.com/emersion/go-smtp"
 
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 // fakeOAuth is a token endpoint: authorization_code -> tok1/ref1, refresh_token -> tokN (N counts refreshes), or a refusal.

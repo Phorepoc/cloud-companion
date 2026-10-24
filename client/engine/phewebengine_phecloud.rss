@@ -1,6 +1,6 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
-// phewebengine_phecloud.rss -- the ECom registration of the Phecloud engine package (interface PHE_WEBENGINE_ECOM_IFACE_UID).
+// phewebengine_phecloud.rss -- the ECom registration of the Cloud Companion engine package (interface PHE_WEBENGINE_ECOM_IFACE_UID).
 #include <ecom/registryinfo.rh>
 
 RESOURCE REGISTRY_INFO theInfo
@@ -17,7 +17,7 @@ RESOURCE REGISTRY_INFO theInfo
 					{
 					implementation_uid = 0xE7016B21;
 					version_no = 1;
-					display_name = "Phecloud";
+					display_name = "Cloud Companion";
 					default_data = "caps=script,tls13;api=1";
 					opaque_data = "";
 					}

@@ -1,4 +1,4 @@
-module github.com/phorepoc/phecloud
+module github.com/phorepoc/cloud-companion
 
 go 1.26.0
 

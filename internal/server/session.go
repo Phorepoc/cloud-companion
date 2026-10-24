@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/browser"
-	"github.com/phorepoc/phecloud/internal/proto"
-	"github.com/phorepoc/phecloud/internal/tiles"
+	"github.com/phorepoc/cloud-companion/internal/browser"
+	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/tiles"
 )
 
 type tkey struct{ layer, x, y int }

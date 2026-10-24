@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 // fakeDevice is a paired device that signs its requests with its key, like the app and a phone service would.

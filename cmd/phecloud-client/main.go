@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/proto"
-	"github.com/phorepoc/phecloud/internal/tlsutil"
+	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/tlsutil"
 )
 
 var summaryFlag = flag.Bool("summary", false, "print one machine-readable SUMMARY line per step (compared with the C client)")

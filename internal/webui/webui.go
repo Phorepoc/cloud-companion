@@ -15,9 +15,9 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/phorepoc/phecloud/internal/connectors"
-	"github.com/phorepoc/phecloud/internal/proto"
-	"github.com/phorepoc/phecloud/internal/server"
+	"github.com/phorepoc/cloud-companion/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/server"
 )
 
 //go:embed all:dist

@@ -13,7 +13,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/phorepoc/phecloud/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 type fakeCard struct {

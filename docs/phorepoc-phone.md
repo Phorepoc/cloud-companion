@@ -1,10 +1,10 @@
-# Use Phecloud from a Phorepoc phone
+# Use Cloud Companion from a Phorepoc phone
 
-Phecloud renders web pages on a server you run (a real Chromium), and the phone's browser shows the result: tiles of the page
+Cloud Companion renders web pages on a server you run (a real Chromium), and the phone's browser shows the result: tiles of the page
 come over one TLS 1.3 connection, scrolling is local, taps and typing go back to the server. The phone needs no JavaScript engine;
 modern sites, logins and cookies work because they run on the server.
 
-You need a machine that stays on and is reachable from the phone (home server, VPS), with Docker, and the Phecloud engine package
+You need a machine that stays on and is reachable from the phone (home server, VPS), with Docker, and the Cloud Companion engine package
 installed on the phone next to the Phorepoc browser.
 
 ## 1. Start the server
@@ -25,7 +25,7 @@ stream) and a one-time **pairing code** such as `ABCD-EF12` (valid for 10 minute
 server log (`docker logs phe-cloud`, line `TLS 1.3 certificate fingerprint=...`). Keep this window open.
 
 ## 3. Pair the phone
-1. Open the browser and make sure the **Phecloud** engine is the one in use (it is the default when it is the only engine installed;
+1. Open the browser and make sure the **Cloud Companion** engine is the one in use (it is the default when it is the only engine installed;
    otherwise choose it in the browser's engine list).
 2. Load any address (or `phecloud:setup`). With no server configured yet the engine shows its setup screen:
    - **Server**: the machine's address, `host` or `host:port` (the port defaults to 7400).

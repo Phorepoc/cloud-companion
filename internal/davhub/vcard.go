@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // unfold joins RFC 5545/6350 folded lines and splits into content lines.

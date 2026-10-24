@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 const (

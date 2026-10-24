@@ -1,6 +1,6 @@
 # Connections: outside accounts instead of mail hosting
 
-Phecloud does not host your mail. You connect the accounts you already have; the hub (Stalwart) is only the **local cache**:
+Cloud Companion does not host your mail. You connect the accounts you already have; the hub (Stalwart) is only the **local cache**:
 no MX record, no DKIM, no SPF. **Settings, Connections** in the web app (owner only).
 
 | Kind | What happens |
@@ -58,7 +58,7 @@ puts both original cards back. The hub copies follow with the account's next syn
 The Connections API is under `/phe/` (not `/api/`): the hub's Caddy sends `/api` to the mail server.
 
 ## Sign in with Google / Microsoft (OAuth)
-Gmail and Outlook no longer accept an ordinary password for IMAP/SMTP; they want an OAuth token. Phecloud does the sign-in with **your own app registration**
+Gmail and Outlook no longer accept an ordinary password for IMAP/SMTP; they want an OAuth token. Cloud Companion does the sign-in with **your own app registration**
 (a client id and secret you create at the provider; nothing is shared with anyone else). Set the variables, restart phecloud, and the Connections page
 offers **Sign in with Google** / **Sign in with Microsoft** (only for the providers that are configured):
 

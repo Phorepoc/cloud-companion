@@ -1,4 +1,6 @@
-# phecloud
+# Phorepoc Cloud Companion
+
+Repository: `Phorepoc/cloud-companion`. "Phecloud" was the working name: the server binary, the Docker service and image, and the `PHECLOUD_*` settings keep that name, as does the engine plug-in component (`phewebengine_phecloud`).
 
 Your own small server that does the heavy lifting for old phones and gives you one web app for your things. Self-hosted, one person per instance, Apache-2.0.
 
@@ -12,7 +14,7 @@ Status: working software that is still young. Read "Security" before you put it 
 ## Quick start
 You need Docker (with the compose plugin) and a few GB of RAM. Nothing else.
 ```
-git clone <this repository> phecloud && cd phecloud
+git clone <this repository> cloud-companion && cd cloud-companion
 docker compose up -d --build                      # builds the web app and the server; container phe-cloud
 docker exec phe-cloud phecloud paircode --admin   # prints a one-time code such as HFRE-RHAX (valid 10 minutes)
 ```

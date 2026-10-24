@@ -1,6 +1,6 @@
-# Phecloud SMS for Android
+# Cloud Companion SMS for Android
 
-An Android app that makes a phone the SMS connector of its own SIM for a Phecloud hub (hub-design.md section 2, `docs/sms.md`):
+An Android app that makes a phone the SMS connector of its own SIM for a Cloud Companion hub (hub-design.md section 2, `docs/sms.md`):
 it uploads the inbox and sent box, sends what the web app queued, and reports sent / delivered / failed back. Apache-2.0,
 Kotlin, **no libraries at run time** (platform JobScheduler, SmsManager, HttpURLConnection, org.json). Not derived from any other SMS sync
 app.
@@ -31,7 +31,7 @@ docker run --rm -v phe-android-gradle:/opt/gradle-home -v "$PWD":/work phe-andro
 `assembleRelease` signs with the key described in `android/keystore.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`;
 gitignored, like `signing/`, `*.jks`); without that file it produces an unsigned APK. A test key:
 ```
-keytool -genkeypair -keystore signing/test.jks -storepass <pw> -keypass <pw> -alias phesms-test -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Phecloud SMS test key"
+keytool -genkeypair -keystore signing/test.jks -storepass <pw> -keypass <pw> -alias phesms-test -keyalg RSA -keysize 2048 -validity 3650 -dname "CN=Cloud Companion SMS test key"
 printf 'storeFile=signing/test.jks
 storePassword=<pw>
 keyAlias=phesms-test

@@ -42,7 +42,7 @@ let last = {}
 const show = () => {
   const s = stream.state, bits = []
   if (s === 'starting') { $('info').textContent = 'Starting Android… (it was switched off to save resources)'; return }
-  if (s !== 'live') { $('info').textContent = s === 'connecting' ? 'Connecting' : (last.msg || 'Disconnected.') + ' Open this page again from Phecloud.'; return }
+  if (s !== 'live') { $('info').textContent = s === 'connecting' ? 'Connecting' : (last.msg || 'Disconnected.') + ' Open this page again from Cloud Companion.'; return }
   bits.push('connected ' + last.w + 'x' + last.h)
   if (last.fps !== undefined) bits.push(last.fps.toFixed(0) + ' fps', last.kbps.toFixed(0) + ' kbit/s')
   if (last.i2f_n) bits.push('input to next frame ' + last.i2f_ms.toFixed(0) + ' ms')

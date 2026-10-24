@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// phewebengine_phecloud.cpp -- the ECom shell of the Phecloud web-engine package. Interface 0xE7016B01
+// phewebengine_phecloud.cpp -- the ECom shell of the Cloud Companion web-engine package. Interface 0xE7016B01
 // (phewebengine_ecom.h), implementation 0xE7016B21. The engine itself is plain C (phengine_phc.c) over the phc client core.
 #include <e32std.h>
 #include <e32base.h>

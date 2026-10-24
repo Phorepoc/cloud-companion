@@ -21,8 +21,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/phorepoc/phecloud/internal/davhub"
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // GraphURL is the Graph endpoint (PHECLOUD_GRAPH_URL overrides it, for tests and national clouds).
@@ -266,7 +266,7 @@ func eventFromGraph(g gEvent, uid string) string {
 		return strings.NewReplacer("-", "", ":", "").Replace(s)
 	}
 	var b strings.Builder
-	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Phecloud//Microsoft Graph//EN\r\nBEGIN:VEVENT\r\n")
+	b.WriteString("BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Cloud Companion//Microsoft Graph//EN\r\nBEGIN:VEVENT\r\n")
 	b.WriteString("UID:" + uid + "\r\nDTSTAMP:" + time.Now().UTC().Format("20060102T150405Z") + "\r\n")
 	s, e := stamp(g.Start.DateTime), stamp(g.End.DateTime)
 	if g.IsAllDay {

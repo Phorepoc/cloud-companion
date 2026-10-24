@@ -1,6 +1,6 @@
 # SMS through your own phones
 
-Each phone that syncs SMS is the connector of its own SIM. Phecloud keeps the messages in your server's database and shows them in **Chats**;
+Each phone that syncs SMS is the connector of its own SIM. Cloud Companion keeps the messages in your server's database and shows them in **Chats**;
 a message you send there goes out through the phone you pick.
 
 ## Chats

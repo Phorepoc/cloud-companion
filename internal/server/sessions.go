@@ -9,7 +9,7 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/phorepoc/phecloud/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 // registry of the live sessions (connected devices): what the web app's "other devices" list shows, and how it reaches a tab of

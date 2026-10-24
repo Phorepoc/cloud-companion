@@ -29,7 +29,7 @@ class MainActivity : Activity() {
         prefs = Prefs(this)
         val col = LinearLayout(this).also { it.orientation = LinearLayout.VERTICAL; it.setPadding(32, 32, 32, 32) }
         setContentView(ScrollView(this).also { it.addView(col) })
-        col.addView(TextView(this).also { it.text = "Phecloud SMS"; it.textSize = 22f })
+        col.addView(TextView(this).also { it.text = "Cloud Companion SMS"; it.textSize = 22f })
         status = TextView(this); col.addView(status)
 
         val hub = edit("Hub address, e.g. https://hub.example:8443", prefs.hub)

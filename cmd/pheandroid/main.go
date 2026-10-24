@@ -8,7 +8,7 @@
 // The scrcpy server (Apache-2.0, https://github.com/Genymobile/scrcpy) is NOT part of this program or this repository: the operator provides the jar
 // (PHE_ANDROID_JAR) and its exact version (PHE_ANDROID_SCRCPY_VERSION); the adb command-line tool (Apache-2.0) must be on the PATH. The browser decodes with
 // WebCodecs (H.264 hardware or software decoder of the browser). Access: /ws needs a short-lived ticket minted from the shared secret (PHE_ANDROID_SECRET),
-// so only a signed-in Phecloud user reaches the device; the page itself carries no secret.
+// so only a signed-in Cloud Companion user reaches the device; the page itself carries no secret.
 package main
 
 import (
