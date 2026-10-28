@@ -355,3 +355,12 @@ export function passkeyBlocker() {
 
 // the Connections API (admin devices; internal/webui/connections.go)
 export const apiCall = (method, path, body) => signedJSON(method, path, body)
+
+// a signed multipart upload (the Catalogue page: installation files; internal/webui/catalogue.go)
+export async function apiUpload(path, form) {
+  const s = await signed('POST', path)
+  const r = await fetch(path, { method: 'POST', headers: s.headers, body: form })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
+  return j
+}

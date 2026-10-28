@@ -22,10 +22,12 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"github.com/phorepoc/cloud-companion/internal/browser"
+	"github.com/phorepoc/cloud-companion/internal/catalogue"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/server"
@@ -147,8 +149,14 @@ func main() {
 					go mgr.Loop(context.Background(), 15*time.Minute)
 				}
 			}
+			// self-hosted catalogues (docs/catalogue.md): the files live next to the other data; their federated sources sync in the background
+			cat := catalogue.New(st, env("PHECLOUD_CATALOGUE_DIR", filepath.Join(env("PHECLOUD_TLSDIR", "/data"), "catalogue")))
+			if v, _ := strconv.ParseInt(os.Getenv("PHECLOUD_CATALOGUE_MAX_FILE"), 10, 64); v > 0 {
+				cat.MaxFile = v
+			}
+			go cat.Loop(context.Background(), time.Minute)
 			// timeouts: a client that never finishes its request headers must not hold a connection (and a goroutine) forever; WebSockets and long uploads are not limited by these
-			hs := &http.Server{Handler: webui.Handler(srv, mgr), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
+			hs := &http.Server{Handler: webui.Handler(srv, mgr, cat), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 			go hs.Serve(hln)
 		}
 		log.Error("serve", "err", srv.Serve(ln))

@@ -74,6 +74,29 @@ var migrations = []migration{
 			`CREATE TABLE IF NOT EXISTS dev_merges(id VARCHAR(32) PRIMARY KEY, account VARCHAR(32), a_href TEXT, a_body LONGTEXT, a_etag TEXT, b_href TEXT, b_body LONGTEXT, b_etag TEXT, merged_body LONGTEXT, merged_etag TEXT, state VARCHAR(16), expires BIGINT)`,
 		},
 	}},
+	{version: 2, name: "self-hosted catalogues: catalogues, releases, federated sources, cached listings, mirrored files", stmts: map[Dialect][]string{
+		SQLite: {
+			`CREATE TABLE IF NOT EXISTS catalogues(id TEXT PRIMARY KEY, name TEXT, public INTEGER DEFAULT 0, token TEXT, priority INTEGER DEFAULT 100, sync_interval INTEGER DEFAULT 21600, created INTEGER)`,
+			`CREATE TABLE IF NOT EXISTS cat_releases(catalogue TEXT NOT NULL, app_id TEXT NOT NULL, version TEXT NOT NULL, data TEXT, created INTEGER, PRIMARY KEY(catalogue, app_id, version))`,
+			`CREATE TABLE IF NOT EXISTS cat_sources(id TEXT PRIMARY KEY, catalogue TEXT NOT NULL, name TEXT, url TEXT NOT NULL, token TEXT, priority INTEGER DEFAULT 50, enabled INTEGER DEFAULT 1, mirror INTEGER DEFAULT 0, last_sync INTEGER, last_error TEXT, created INTEGER)`,
+			`CREATE TABLE IF NOT EXISTS cat_source_items(source TEXT NOT NULL, app_id TEXT NOT NULL, data TEXT, mirror INTEGER DEFAULT -1, PRIMARY KEY(source, app_id))`,
+			`CREATE TABLE IF NOT EXISTS cat_mirror(source TEXT NOT NULL, sha256 TEXT NOT NULL, state TEXT, error TEXT, updated INTEGER, PRIMARY KEY(source, sha256))`,
+		},
+		Postgres: {
+			`CREATE TABLE IF NOT EXISTS catalogues(id TEXT PRIMARY KEY, name TEXT, public BIGINT DEFAULT 0, token TEXT, priority BIGINT DEFAULT 100, sync_interval BIGINT DEFAULT 21600, created BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS cat_releases(catalogue TEXT NOT NULL, app_id TEXT NOT NULL, version TEXT NOT NULL, data TEXT, created BIGINT, PRIMARY KEY(catalogue, app_id, version))`,
+			`CREATE TABLE IF NOT EXISTS cat_sources(id TEXT PRIMARY KEY, catalogue TEXT NOT NULL, name TEXT, url TEXT NOT NULL, token TEXT, priority BIGINT DEFAULT 50, enabled BIGINT DEFAULT 1, mirror BIGINT DEFAULT 0, last_sync BIGINT, last_error TEXT, created BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS cat_source_items(source TEXT NOT NULL, app_id TEXT NOT NULL, data TEXT, mirror BIGINT DEFAULT -1, PRIMARY KEY(source, app_id))`,
+			`CREATE TABLE IF NOT EXISTS cat_mirror(source TEXT NOT NULL, sha256 TEXT NOT NULL, state TEXT, error TEXT, updated BIGINT, PRIMARY KEY(source, sha256))`,
+		},
+		MySQL: {
+			`CREATE TABLE IF NOT EXISTS catalogues(id VARCHAR(64) PRIMARY KEY, name VARCHAR(255), public BIGINT DEFAULT 0, token VARCHAR(100), priority BIGINT DEFAULT 100, sync_interval BIGINT DEFAULT 21600, created BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS cat_releases(catalogue VARCHAR(64) NOT NULL, app_id VARCHAR(64) NOT NULL, version VARCHAR(100) NOT NULL, data LONGTEXT, created BIGINT, PRIMARY KEY(catalogue, app_id, version))`,
+			`CREATE TABLE IF NOT EXISTS cat_sources(id VARCHAR(32) PRIMARY KEY, catalogue VARCHAR(64) NOT NULL, name VARCHAR(255), url TEXT NOT NULL, token TEXT, priority BIGINT DEFAULT 50, enabled BIGINT DEFAULT 1, mirror BIGINT DEFAULT 0, last_sync BIGINT, last_error TEXT, created BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS cat_source_items(source VARCHAR(32) NOT NULL, app_id VARCHAR(64) NOT NULL, data LONGTEXT, mirror BIGINT DEFAULT -1, PRIMARY KEY(source, app_id))`,
+			`CREATE TABLE IF NOT EXISTS cat_mirror(source VARCHAR(32) NOT NULL, sha256 VARCHAR(64) NOT NULL, state VARCHAR(16), error TEXT, updated BIGINT, PRIMARY KEY(source, sha256))`,
+		},
+	}},
 }
 
 // SchemaVersion is the newest migration this build knows.

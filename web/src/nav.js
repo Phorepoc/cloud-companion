@@ -12,6 +12,7 @@ export const sections = [
   { id: 'files', label: 'Files', icon: 'sym_o_folder', path: '/files' },
   { id: 'android', label: 'Android', icon: 'sym_o_smartphone', path: '/android', admin: true },
   { id: 'connections', label: 'Connections', icon: 'sym_o_sync_alt', path: '/connections', admin: true },
+  { id: 'catalogue', label: 'Catalogue', icon: 'sym_o_storefront', path: '/catalogue', admin: true },
   { id: 'devices', label: 'Devices', icon: 'sym_o_devices', path: '/devices', admin: true },
   { id: 'settings', label: 'Settings', icon: 'sym_o_settings', path: '/settings' },
 ]

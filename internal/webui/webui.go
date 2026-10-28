@@ -15,6 +15,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/phorepoc/cloud-companion/internal/catalogue"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/server"
@@ -48,7 +49,7 @@ func (w *wsIO) Write(v any) error {
 func (w *wsIO) Close() error { return w.c.CloseNow() }
 
 // Handler serves the web app at / and the frame WebSocket at /ws.
-func Handler(s *server.Server, m *connectors.Manager) http.Handler {
+func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) http.Handler {
 	trust, err := ParseTrust(os.Getenv("PHECLOUD_TRUSTED_PROXIES"))
 	if err != nil {
 		slog.Error("PHECLOUD_TRUSTED_PROXIES ignored (nobody is trusted)", "err", err)
@@ -67,6 +68,9 @@ func Handler(s *server.Server, m *connectors.Manager) http.Handler {
 	a.routes(mux)
 	a.androidRoutes(mux)
 	(&smsAPI{a: a, st: s.Store, hub: s.Hub}).routes(mux)
+	if cat != nil {
+		(&catAPI{a: a, st: s.Store, m: cat}).routes(mux)
+	}
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)

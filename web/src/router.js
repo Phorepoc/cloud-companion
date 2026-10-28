@@ -18,6 +18,7 @@ const router = createRouter({
     section('files'),
     { path: '/android', component: () => import('./pages/AndroidPage.vue') },
     { path: '/connections', component: () => import('./pages/ConnectionsPage.vue') },
+    { path: '/catalogue', component: () => import('./pages/CataloguePage.vue') },
     { path: '/devices', component: () => import('./pages/DevicesPage.vue') },
     { path: '/settings', component: () => import('./pages/SettingsPage.vue') },
   ],

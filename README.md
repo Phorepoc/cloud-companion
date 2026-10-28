@@ -65,9 +65,23 @@ Everything is set through environment variables in `docker-compose.yml`. The one
 | `PHECLOUD_PUBLIC_URL` | the address people reach it at, needed for signing in with Google or Microsoft |
 | `PHECLOUD_OAUTH_*` | your own Google and Microsoft app registrations ([docs/connections.md](docs/connections.md)) |
 | `PHECLOUD_ANDROID_SECRET` | turns on the Android stream ([docs/android.md](docs/android.md)) |
+| `PHECLOUD_CATALOGUE_DIR`, `PHECLOUD_CATALOGUE_MAX_FILE` | where uploaded and kept installation files live (default `/data/catalogue`) and the largest file in bytes ([docs/catalogue.md](docs/catalogue.md)) |
 
 Your devices, keys and certificate live in the `phecloud-data` volume, so back it up. `phecloud snapshot` helps with
 that.
+
+## Your own software catalogue
+
+Cloud Companion can host a software list for Catalogue, the store on a Phorepoc phone. In the web app open **Catalogue**, make a catalogue (public,
+or private with a secret token in its address), and upload installation files: `.sisx`, but also `.apk`, `.exe`, `.deb`, `.AppImage`, `.zip` and
+others, with a name, version and description. It publishes them as an `index.json` in the same format as the official list, with the size and
+SHA-256 of every file. You can also add other lists as sources (the official one, a friend's Cloud Companion, any compatible `index.json`), give
+each a priority, and have the server keep copies of their files, which it only does when the SHA-256 matches the source's listing.
+
+To use it on a phone, add the catalogue's address (the web app shows it, for a private one it contains the token) as a line in
+`c:\data\pheget\indexes.txt` next to the official list; the phone app has no screen for that yet. Entries for other platforms are not listed by
+the phone. Set `PHECLOUD_PUBLIC_URL` so the addresses in the list are the ones your phone can reach, and use HTTPS beyond your own network.
+Details, the data model and the small extension to the list format: [docs/catalogue.md](docs/catalogue.md).
 
 ## The mail hub
 
