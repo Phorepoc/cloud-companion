@@ -117,27 +117,31 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { hubCall } from '../cloud.js'
-import { toast } from '../toast.js'
-import { ymd, toDate, addDays, toFields, fromFields, monthLabel, dayLabel, timeLabel, gridDays, browserZone } from '../dates.js'
+import { hubCall } from '../cloud'
+import { toast } from '../toast'
+import { ymd, toDate, addDays, toFields, fromFields, monthLabel, dayLabel, timeLabel, gridDays, browserZone, type EventFields } from '../dates'
+import type { CalendarEvent } from '../proto'
+
+/** The edit form: the event's text fields and its start and end as date and time inputs. */
+interface EventForm extends EventFields { href?: string; etag?: string; title: string; location: string; notes: string }
 import EmptyState from '../components/EmptyState.vue'
 
 const $q = useQuasar()
 const phone = computed(() => $q.screen.lt.sm)
 const now = new Date()
 const month = ref(new Date(now.getFullYear(), now.getMonth(), 1))
-const events = ref([])
+const events = ref<CalendarEvent[]>([])
 const loading = ref(false)
 const error = ref('')
-const current = ref(null)
+const current = ref<CalendarEvent | null>(null)
 const viewOpen = ref(false)
 const editOpen = ref(false)
 const saving = ref(false)
 const formError = ref('')
-const form = ref({})
+const form = ref<EventForm>({ title: '', location: '', notes: '', allday: false, startDate: '', startTime: '', endDate: '', endTime: '' })
 const zone = browserZone()
 const view = ref('month')
 const selected = ref(ymd(now))
@@ -153,17 +157,17 @@ async function load() {
     const days = gridDays(month.value)
     events.value = (await hubCall({ op: 'events.list', from: ymd(days[0]), to: ymd(addDays(days[41], 1)) })).events || []
   } catch (e) {
-    error.value = /not set up/i.test(e.message) ? 'The hub is not set up on this server, so there are no events to show. See the hub guide to set it up.' : e.message
+    error.value = /not set up/i.test((e as Error).message) ? 'The hub is not set up on this server, so there are no events to show. See the hub guide to set it up.' : (e as Error).message
   } finally {
     loading.value = false
   }
 }
-const shift = (n) => { month.value = new Date(month.value.getFullYear(), month.value.getMonth() + n, 1); selected.value = ymd(month.value); load() }
+const shift = (n: number) => { month.value = new Date(month.value.getFullYear(), month.value.getMonth() + n, 1); selected.value = ymd(month.value); load() }
 const today = () => { const d = new Date(); month.value = new Date(d.getFullYear(), d.getMonth(), 1); selected.value = ymd(d); load() }
 
-const startOf = (e) => toDate(e.start)
+const startOf = (e: CalendarEvent) => toDate(e.start)
 // the days an event covers (a multi-day or all-day event appears on each of them)
-function daysOf(e) {
+function daysOf(e: CalendarEvent) {
   const s = startOf(e)
   let last = toDate(e.end || e.start)
   if (e.allday) last = addDays(last, -1)
@@ -173,19 +177,19 @@ function daysOf(e) {
   return out.length ? out : [ymd(s)]
 }
 const byDay = computed(() => {
-  const m = {}
-  for (const e of [...events.value].sort((a, b) => startOf(a) - startOf(b))) for (const k of daysOf(e)) (m[k] = m[k] || []).push(e)
+  const m: Record<string, CalendarEvent[]> = {}
+  for (const e of [...events.value].sort((a, b) => startOf(a).getTime() - startOf(b).getTime())) for (const k of daysOf(e)) (m[k] = m[k] || []).push(e)
   return m
 })
 const weeks = computed(() => { const d = gridDays(month.value); return [0, 1, 2, 3, 4, 5].map((i) => d.slice(i * 7, i * 7 + 7)) })
-const cellLabel = (d) => `${dayLabel(d)}, ${(byDay.value[ymd(d)] || []).length} events`
+const cellLabel = (d: Date) => `${dayLabel(d)}, ${(byDay.value[ymd(d)] || []).length} events`
 
 // agenda: events of the shown month, by start day
 const groups = computed(() => {
   const m0 = month.value
   const m1 = new Date(m0.getFullYear(), m0.getMonth() + 1, 1)
   const byStart = new Map()
-  for (const e of [...events.value].sort((a, b) => startOf(a) - startOf(b))) {
+  for (const e of [...events.value].sort((a, b) => startOf(a).getTime() - startOf(b).getTime())) {
     let d = startOf(e)
     if (d < m0) d = m0
     if (d >= m1) continue
@@ -195,16 +199,16 @@ const groups = computed(() => {
   }
   return [...byStart.values()]
 })
-const whenLabel = (e) => (e.allday ? 'All day' : timeLabel(startOf(e)))
-function fullWhen(e) {
+const whenLabel = (e: CalendarEvent) => (e.allday ? 'All day' : timeLabel(startOf(e)))
+function fullWhen(e: CalendarEvent) {
   const s = startOf(e)
   if (e.allday) { const last = addDays(toDate(e.end || e.start), -1); return last > s ? `${dayLabel(s)} to ${dayLabel(last)}` : dayLabel(s) }
   const en = toDate(e.end || e.start)
   return `${dayLabel(s)}, ${timeLabel(s)} to ${ymd(en) === ymd(s) ? timeLabel(en) : dayLabel(en) + ', ' + timeLabel(en)}`
 }
 
-const openView = (e) => { current.value = e; viewOpen.value = true }
-function openNew(ev) {
+const openView = (e: CalendarEvent) => { current.value = e; viewOpen.value = true }
+function openNew(ev?: CalendarEvent) {
   viewOpen.value = false
   formError.value = ''
   if (ev) form.value = { href: ev.href, etag: ev.etag, title: ev.title, location: ev.location || '', notes: ev.notes || '', ...toFields(ev) }
@@ -230,19 +234,19 @@ async function save() {
     toast(f.href ? 'Event saved' : 'Event added')
     await load()
   } catch (e) {
-    formError.value = e.message
+    formError.value = (e as Error).message
   } finally {
     saving.value = false
   }
 }
 
-function remove(e) {
+function remove(e: CalendarEvent) {
   viewOpen.value = false
   events.value = events.value.filter((x) => x.href !== e.href)
   toast('Event deleted', {
     undo: () => { events.value = [...events.value, e] },
     onExpire: async () => {
-      try { await hubCall({ op: 'events.delete', href: e.href, etag: e.etag }) } catch (err) { error.value = err.message; await load() }
+      try { await hubCall({ op: 'events.delete', href: e.href, etag: e.etag }) } catch (err) { error.value = (err as Error).message; await load() }
     },
   })
 }

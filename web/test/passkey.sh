@@ -17,4 +17,4 @@ P1=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null)
 P2=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-cloud-pk --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8080 -e CODES="$A,$P1,$P2" -e OUT=/out \
-    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node passkey.mjs' || { echo '--- server log'; docker logs phe-cloud-pk 2>&1 | tail -12 | cut -c1-260; exit 1; }
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning passkey.ts' || { echo '--- server log'; docker logs phe-cloud-pk 2>&1 | tail -12 | cut -c1-260; exit 1; }

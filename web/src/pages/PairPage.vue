@@ -59,11 +59,11 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, pair, authStatus, passkeysSupported, passkeyRegister, passkeyLogin, recoverLogin, passkeyBlocker } from '../cloud.js'
-import { brand } from '../brand.js'
+import { state, pair, authStatus, passkeysSupported, passkeyRegister, passkeyLogin, recoverLogin, passkeyBlocker } from '../cloud'
+import { brand } from '../brand'
 import BrandLogo from '../components/BrandLogo.vue'
 
 const router = useRouter()
@@ -82,17 +82,17 @@ const shownCode = ref('')
 onMounted(async () => { try { status.value = await authStatus() } catch (e) { /* offline: the pairing form still works */ } })
 
 // plain words for what went wrong, and what to do next
-function friendly(msg) {
+function friendly(msg: string) {
   if (/invalid or expired/i.test(msg)) return 'That code did not work. It may have been used already or expired. Ask your server for a new one.'
   if (/connection/i.test(msg)) return 'Could not reach the server. Check your network and try again.'
   if (/NotAllowedError|cancel|timed out/i.test(msg)) return 'The passkey request was cancelled or timed out. Try again.'
   return msg
 }
 
-async function run(kind, fn) {
+async function run<T>(kind: string, fn: () => Promise<T>) {
   message.value = ''
   busy.value = kind
-  try { return await fn() } catch (e) { message.value = e.message || String(e); return null } finally { busy.value = '' }
+  try { return await fn() } catch (e) { message.value = (e as Error).message || String(e); return null } finally { busy.value = '' }
 }
 
 async function doPair() {
@@ -100,10 +100,10 @@ async function doPair() {
   try {
     await pair(code.value, name.value)
     router.replace('/browse')
-  } catch (e) { message.value = e.message }
+  } catch (e) { message.value = (e as Error).message }
 }
 
-function afterSignIn(rec) {
+function afterSignIn(rec: string | void | null) {
   if (rec) { shownCode.value = rec; recoveryDialog.value = true } else router.replace('/browse')
 }
 

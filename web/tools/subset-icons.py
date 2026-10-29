@@ -18,7 +18,7 @@ from fontTools.varLib import instancer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 names = set()
-srcs = glob.glob(os.path.join(ROOT, "src", "**", "*.vue"), recursive=True) + glob.glob(os.path.join(ROOT, "src", "**", "*.js"), recursive=True)
+srcs = glob.glob(os.path.join(ROOT, "src", "**", "*.vue"), recursive=True) + glob.glob(os.path.join(ROOT, "src", "**", "*.js"), recursive=True) + glob.glob(os.path.join(ROOT, "src", "**", "*.ts"), recursive=True)
 srcs.append(os.path.join(ROOT, "node_modules", "quasar", "icon-set", "material-symbols-outlined.js"))
 for f in srcs:
     if os.path.exists(f):

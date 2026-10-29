@@ -51,26 +51,33 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { apiCall } from '../cloud.js'
+import { apiCall } from '../cloud'
+import type { SmsConversation, SmsDevice, SmsMessage } from '../proto'
 
-const convs = ref([])
-const devices = ref([])
-const current = ref(null)
-const messages = ref([])
+/** The open conversation: a stored one, or a new message (empty key) still to be addressed. */
+type Current = Pick<SmsConversation, 'key' | 'number'> & Partial<SmsConversation>
+
+const convs = ref<SmsConversation[]>([])
+const devices = ref<SmsDevice[]>([])
+const current = ref<Current | null>(null)
+const messages = ref<SmsMessage[]>([])
 const loaded = ref(false)
 const error = ref('')
 const text = ref('')
 const sendVia = ref('')
 const sending = ref(false)
 const newNumber = ref('')
-let timer = null
+let timer: ReturnType<typeof setInterval> | undefined
 
-const deviceName = (id) => (devices.value.find((d) => d.device === id) || {}).name || 'phone'
+const deviceName = (id: string) => devices.value.find((d) => d.device === id)?.name || 'phone'
 const deviceOptions = computed(() => devices.value.map((d) => ({ label: d.name || d.device, value: d.device })))
-const statusText = (m) => ({ queued: 'waiting for the phone', sent: 'sent', delivered: 'delivered', failed: 'not sent' + (m.error ? ' (' + m.error + ')' : '') }[m.status] || m.status)
-const when = (t) => new Date(t * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+const statusText = (m: SmsMessage) => {
+  const text: Partial<Record<SmsMessage['status'], string>> = { queued: 'waiting for the phone', sent: 'sent', delivered: 'delivered', failed: 'not sent' + (m.error ? ' (' + m.error + ')' : '') }
+  return text[m.status] || m.status
+}
+const when = (t: number) => new Date(t * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
 async function load() {
   try {
@@ -80,12 +87,12 @@ async function load() {
     if (!sendVia.value && devices.value.length) sendVia.value = devices.value[0].device
     if (current.value && current.value.key) await loadThread()
     error.value = ''
-  } catch (e) { error.value = e.message } finally { loaded.value = true }
+  } catch (e) { error.value = (e as Error).message } finally { loaded.value = true }
 }
 async function loadThread() {
-  messages.value = (await apiCall('GET', '/sms/thread?key=' + encodeURIComponent(current.value.key))).messages
+  messages.value = (await apiCall('GET', '/sms/thread?key=' + encodeURIComponent(current.value!.key))).messages
 }
-async function open(c) {
+async function open(c: SmsConversation) {
   current.value = c
   const own = (c.devices || []).find((d) => devices.value.some((x) => x.device === d))
   if (own) sendVia.value = own // answer through a phone that carries this conversation
@@ -93,6 +100,7 @@ async function open(c) {
 }
 function startNew() { current.value = { key: '', number: '', name: '' }; messages.value = []; newNumber.value = '' }
 async function send() {
+  if (!current.value) return
   const number = current.value.key ? current.value.number : newNumber.value.trim()
   if (!number) { error.value = 'Enter the phone number to send to.'; return }
   sending.value = true; error.value = ''
@@ -104,7 +112,7 @@ async function send() {
       const c = convs.value.find((x) => x.number === number) || convs.value[0]
       if (c) await open(c)
     } else await loadThread()
-  } catch (e) { error.value = e.message } finally { sending.value = false }
+  } catch (e) { error.value = (e as Error).message } finally { sending.value = false }
 }
 
 onMounted(() => { load(); timer = setInterval(load, 5000) })

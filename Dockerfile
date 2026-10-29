@@ -7,7 +7,7 @@ RUN npm ci --no-audit --no-fund
 COPY web/ ./
 # subset the icon font to the icons the app uses (tools/subset-icons.py)
 RUN apt-get update && apt-get install -y --no-install-recommends python3-fonttools python3-brotli && rm -rf /var/lib/apt/lists/* && python3 tools/subset-icons.py
-RUN npx vite build
+RUN npm run build
 
 FROM golang:1.26-bookworm AS build
 WORKDIR /src

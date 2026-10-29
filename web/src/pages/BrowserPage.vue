@@ -46,7 +46,7 @@
       <textarea v-if="overlayRect && state.focus.kind === 'textarea'" ref="ov" v-model="ovValue" class="overlay" :style="overlayRect"
                 aria-label="Text field" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
       <input v-else-if="overlayRect" ref="ov" v-model="ovValue" :type="inputType" class="overlay" :style="overlayRect"
-             aria-label="Text field" :inputmode="state.focus.im || undefined" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
+             aria-label="Text field" :inputmode="inputMode" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
     </div>
     <div class="ph-zoom" role="group" aria-label="Zoom">
       <q-btn flat round icon="sym_o_zoom_out" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
@@ -116,30 +116,33 @@
   </q-page>
 </template>
 
-<script setup>
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { state, api, connect, creds, openInNewTab } from '../cloud.js'
+<script setup lang="ts">
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, type HTMLAttributes } from 'vue'
+import { state, api, connect, creds, openInNewTab } from '../cloud'
+import type { Region, SessionInfo, TabInfo } from '../proto'
 import EmptyState from '../components/EmptyState.vue'
-import { Renderer } from '../renderer.js'
+import { Renderer } from '../renderer'
 
-const cv = ref(null)
-const ov = ref(null)
+const cv = ref<HTMLCanvasElement | null>(null)
+const ov = ref<HTMLInputElement | null>(null)
 const urlInput = ref(state.page.url)
 const editing = ref(false)
 const ovValue = ref('')
 const dlgText = ref('')
 const dlgPass = ref('')
 const selOpen = ref(false)
-const selRegion = ref(null)
+const selRegion = ref<Region | null>(null)
 const selIndex = ref(0)
-let renderer = null
-let typeTimer = 0
+let renderer: Renderer | null = null
+// the page's keyboard hint for the focused field (text, numeric, email…)
+const inputMode = computed(() => (state.focus.im || undefined) as HTMLAttributes['inputmode'])
+let typeTimer: ReturnType<typeof setTimeout> | undefined
 
 const dlg = computed(() => state.dialogs[0] || null)
 const dlgTitle = computed(() => ({ alert: 'This page says', confirm: 'This page asks', prompt: 'This page asks', beforeunload: 'Leave this page?', auth: 'Sign in to continue', cert: 'This connection is not secure' })[dlg.value?.kind] || 'Message')
 watch(dlg, (d) => { dlgText.value = d ? d.def || '' : ''; dlgPass.value = '' })
 
-function reply(ok) {
+function reply(ok: boolean) {
   const d = dlg.value
   if (!d) return
   api.answer(d, ok, d.kind === 'prompt' || d.kind === 'auth' ? dlgText.value : '', d.kind === 'auth' ? dlgPass.value : '')
@@ -177,7 +180,7 @@ function onType() {
   clearTimeout(typeTimer)
   typeTimer = setTimeout(() => api.text(state.focus.id, ovValue.value, true), 120)
 }
-function onEnter(e) {
+function onEnter(e: KeyboardEvent) {
   if (state.focus.kind === 'textarea') return
   e.preventDefault()
   clearTimeout(typeTimer)
@@ -185,16 +188,16 @@ function onEnter(e) {
   api.key('Enter')
 }
 
-const selOptions = computed(() => (selRegion.value ? selRegion.value.opts.map((o, i) => ({ label: o.l || '(empty)', value: i })) : []))
+const selOptions = computed(() => (selRegion.value ? (selRegion.value.opts || []).map((o, i) => ({ label: o.l || '(empty)', value: i })) : []))
 function pickSelect() {
-  api.select(selRegion.value.id, selIndex.value)
+  if (selRegion.value) api.select(selRegion.value.id, selIndex.value)
 }
 
 onMounted(async () => {
-  renderer = new Renderer(cv.value)
+  renderer = new Renderer(cv.value!)
   renderer.onSelect = (r) => {
     selRegion.value = r
-    selIndex.value = Math.max(0, r.opts.findIndex((o) => o.s))
+    selIndex.value = Math.max(0, (r.opts || []).findIndex((o) => o.s))
     selOpen.value = true
   }
   renderer.attach()
@@ -202,11 +205,12 @@ onMounted(async () => {
   window.__phe = Object.assign(window.__phe || {}, {
     renderer,
     // client coordinates of a region's centre; match by label text (or name / placeholder), optionally restricted to a kind
-    regionClientPos(q, kind) {
+    regionClientPos(q: string | null, kind?: string) {
       const r = state.regions.find((g) => (!kind || g.kind === kind) && (!q || (g.label || '').includes(q) || g.name === q || g.ph === q))
-      if (!r) return null
+      if (!r || !renderer) return null
       const sr = renderer.screenRect(r)
-      const b = cv.value.getBoundingClientRect()
+      if (!sr) return null
+      const b = cv.value!.getBoundingClientRect()
       const k = b.width / 360
       return { x: b.left + (sr.x + sr.w / 2) * k, y: b.top + (sr.y + sr.h / 2) * k, scrollY: renderer.view.scrollY, zoom: renderer.view.zoom }
     },
@@ -219,16 +223,16 @@ onBeforeUnmount(() => renderer && renderer.detach())
 
 // ---- tabs on other devices ----
 const othersOpen = ref(false)
-const sendUrl = reactive({})
-let poll = 0
+const sendUrl = reactive<Record<number, string>>({})
+let poll: ReturnType<typeof setInterval> | undefined
 function openOthers() { othersOpen.value = true; api.sessions(); clearInterval(poll); poll = setInterval(() => api.sessions(), 4000) }
 function stopPoll() { clearInterval(poll) }
-function closeRemote(s, t) {
+function closeRemote(s: SessionInfo, t: TabInfo) {
   if (s.self) api.tab('close', t.v)
   else api.remote({ sid: s.sid, action: 'close', view: t.v })
   setTimeout(() => api.sessions(), 500)
 }
-function sendTo(s) {
+function sendTo(s: SessionInfo) {
   let u = (sendUrl[s.sid] || '').trim()
   if (!u) return
   if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u
@@ -236,7 +240,7 @@ function sendTo(s) {
   sendUrl[s.sid] = ''
   setTimeout(() => api.sessions(), 1500)
 }
-async function openHere(t) { othersOpen.value = false; await openInNewTab(t.url) }
+async function openHere(t: TabInfo) { othersOpen.value = false; await openInNewTab(t.url || '') }
 onBeforeUnmount(() => clearInterval(poll))
 </script>
 

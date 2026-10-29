@@ -11,7 +11,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   state: { type: String, default: 'empty' }, // empty | loading | error
   icon: { type: String, default: 'sym_o_inbox' },

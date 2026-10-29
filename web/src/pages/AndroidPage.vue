@@ -18,14 +18,14 @@
     </p>
     <q-banner v-if="problem" class="bg-negative text-white q-mb-md" rounded role="alert" data-test="android-error">{{ problem }}</q-banner>
 
-    <div v-show="configured" class="ph-toolbar2" role="toolbar" aria-label="Android controls">
-      <q-btn flat no-caps icon="sym_o_arrow_back" label="Back" data-test="android-back" @click="stream.key(4)" />
-      <q-btn flat no-caps icon="sym_o_home" label="Home" data-test="android-home" @click="stream.key(3)" />
-      <q-btn flat no-caps icon="sym_o_crop_square" label="Recent" data-test="android-recent" @click="stream.key(187)" />
-      <q-btn flat no-caps :icon="sound ? 'sym_o_volume_up' : 'sym_o_volume_off'" :label="sound ? 'Sound on' : 'Sound off'" :aria-pressed="String(sound)" data-test="android-sound" @click="toggleSound" />
-      <q-btn flat no-caps icon="sym_o_content_copy" label="Copy from phone" data-test="android-copy" @click="stream.copyFromPhone()" />
-      <q-btn flat no-caps icon="sym_o_content_paste" label="Paste to phone" data-test="android-paste" @click="stream.pasteToPhone()" />
-      <q-btn flat no-caps icon="sym_o_download" label="Install apps" data-test="android-install" @click="installOpen = true" />
+    <div v-show="configured" class="ph-toolbar2" :class="{ 'is-compact': phone }" role="toolbar" aria-label="Android controls">
+      <q-btn flat no-caps icon="sym_o_arrow_back" :label="lbl('Back')" aria-label="Back" :title="phone ? 'Back' : undefined" data-test="android-back" @click="stream.key(4)" />
+      <q-btn flat no-caps icon="sym_o_home" :label="lbl('Home')" aria-label="Home" :title="phone ? 'Home' : undefined" data-test="android-home" @click="stream.key(3)" />
+      <q-btn flat no-caps icon="sym_o_crop_square" :label="lbl('Recent')" aria-label="Recent" :title="phone ? 'Recent' : undefined" data-test="android-recent" @click="stream.key(187)" />
+      <q-btn flat no-caps :icon="sound ? 'sym_o_volume_up' : 'sym_o_volume_off'" :label="lbl(sound ? 'Sound on' : 'Sound off')" :aria-label="sound ? 'Sound on' : 'Sound off'" :aria-pressed="String(sound)" data-test="android-sound" @click="toggleSound" />
+      <q-btn flat no-caps icon="sym_o_content_copy" :label="lbl('Copy from phone')" aria-label="Copy from phone" :title="phone ? 'Copy from phone' : undefined" data-test="android-copy" @click="stream.copyFromPhone()" />
+      <q-btn flat no-caps icon="sym_o_content_paste" :label="lbl('Paste to phone')" aria-label="Paste to phone" :title="phone ? 'Paste to phone' : undefined" data-test="android-paste" @click="stream.pasteToPhone()" />
+      <q-btn flat no-caps icon="sym_o_download" :label="lbl('Install apps')" aria-label="Install apps" :title="phone ? 'Install apps' : undefined" data-test="android-install" @click="installOpen = true" />
     </div>
 
     <div v-show="configured" class="ph-stage">
@@ -47,7 +47,7 @@
           <h2 class="ph-h3">Install apps</h2>
           <p class="ph-muted">Apps run on your server and keep running when you close this page. Only apps that include x86_64 code install.</p>
           <input ref="file" type="file" accept=".apk,application/vnd.android.package-archive" hidden data-test="android-apk" @change="pickApk" />
-          <q-btn outline color="primary" no-caps icon="sym_o_upload_file" label="Install an APK file" @click="file.click()" />
+          <q-btn outline color="primary" no-caps icon="sym_o_upload_file" label="Install an APK file" @click="file?.click()" />
           <q-input v-model="pkg" outlined dense label="F-Droid package name" hint="For example org.fossify.notes" autocomplete="off" data-test="android-pkg" @keyup.enter="fdroid" />
           <q-btn unelevated color="primary" no-caps icon="sym_o_download" label="Install from F-Droid" :disable="!pkg.trim()" data-test="android-fdroid" @click="fdroid" />
           <p class="ph-small" aria-live="polite" data-test="android-install-note">{{ note }}</p>
@@ -58,16 +58,23 @@
   </q-page>
 </template>
 
-<script setup>
-import { ref, shallowRef, computed, onMounted, onBeforeUnmount } from 'vue'
+<script setup lang="ts">
+import { ref, shallowRef, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { apiCall, state } from '../cloud.js'
-import { AndroidStream } from '../android/stream.js'
+import { useQuasar } from 'quasar'
+import { apiCall, state } from '../cloud'
+import { AndroidStream, type StreamState, type StreamStats } from '../android/stream.js'
 
 const route = useRoute()
-const cv = ref(null), file = ref(null)
-const configured = ref(false), loaded = ref(false), busy = ref(false), problem = ref(''), conn = ref('idle'), connMsg = ref('')
-const w = ref(360), h = ref(640), note = ref(''), stats = ref(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
+const $q = useQuasar()
+// on a phone, and in a (phone-shaped) desktop window, the controls are one row of icons (each named for screen readers and on
+// hover), so the screen keeps the room
+const inWindow = inject('phInWindow', false)
+const phone = computed(() => inWindow || $q.screen.lt.sm)
+const lbl = (t: string) => (phone.value ? undefined : t)
+const cv = ref<HTMLCanvasElement | null>(null), file = ref<HTMLInputElement | null>(null)
+const configured = ref(false), loaded = ref(false), busy = ref(false), problem = ref(''), conn = ref<StreamState>('idle'), connMsg = ref('')
+const w = ref(360), h = ref(640), note = ref(''), stats = ref<StreamStats | null>(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
 const stream = shallowRef(new AndroidStream(document.createElement('canvas'), { base: '/android/' })) // replaced once the canvas exists
 
 const connText = computed(() => ({ idle: 'Not connected', connecting: 'Connecting', starting: 'Starting Android…', live: 'Connected', closed: connMsg.value || 'Disconnected', error: connMsg.value || 'Problem' }[conn.value]))
@@ -86,18 +93,18 @@ async function connect() {
     const j = await apiCall('GET', '/phe/android/ticket') // a fresh two-minute ticket, from this signed-in device
     configured.value = j.configured
     if (j.configured) {
-      const q = route.query
+      const q = route.query as Record<string, string | undefined> // single values: ?codec=vp8&fps=30
       stream.value.connect(j.ticket, { codec: q.codec, size: q.size, fps: q.fps, kbps: q.kbps, kind: q.kind, audio: q.audio !== '0' })
     }
-  } catch (e) { problem.value = e.message } finally { busy.value = false; loaded.value = true }
+  } catch (e) { problem.value = (e as Error).message } finally { busy.value = false; loaded.value = true }
 }
 function toggleSound() { sound.value = !sound.value; stream.value.setSound(sound.value) }
-async function pickApk(e) { const f = e.target.files[0]; if (f) await stream.value.installApk(f); e.target.value = '' }
+async function pickApk(e: Event) { const input = e.target as HTMLInputElement; const f = input.files?.[0]; if (f) await stream.value.installApk(f); input.value = '' }
 async function fdroid() { if (pkg.value.trim()) await stream.value.installFdroid(pkg.value.trim()) }
 
 onMounted(() => {
   stream.value.dispose()
-  stream.value = new AndroidStream(cv.value, {
+  stream.value = new AndroidStream(cv.value!, {
     base: '/android/',
     onState: (s, m) => { conn.value = s; connMsg.value = m; if (s === 'error') problem.value = m },
     onStats: (m) => { stats.value = m },
@@ -119,11 +126,15 @@ onBeforeUnmount(() => stream.value.dispose())
 /* the frame is the phone's shape (the stream's own aspect ratio, so it follows rotation) and as large as the content area allows */
 .ph-frame {
   --chrome: 250px;                                   /* bars, heading, toolbar, note: what is not the screen */
-  width: min(100%, calc((100dvh - var(--chrome)) * var(--ar)));
+  /* cqh is the desktop window's height inside a window, and the viewport's height elsewhere (no size container) */
+  width: min(100%, calc((100cqh - var(--chrome)) * var(--ar)));
   min-width: min(100%, 220px);
   background: #000; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-card); box-shadow: var(--ph-elev-1); overflow: hidden;
 }
-@media (max-width: 599px) { .ph-frame { --chrome: 330px; } }
+@media (max-width: 599px) { .ph-frame { --chrome: 270px; } }
+/* in a desktop window: no app bars around the page, the heading is in the window bar */
+.ph-in-window .ph-frame { --chrome: 160px; }
+.ph-toolbar2.is-compact { flex-wrap: nowrap; justify-content: space-between; gap: 0; }
 .ph-frame { position: relative; }
 .ph-starting { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ph-s2); padding: var(--ph-s4); text-align: center; color: #fff; background: rgba(0, 0, 0, 0.78); }
 .ph-frame canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }

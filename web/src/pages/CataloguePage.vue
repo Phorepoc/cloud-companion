@@ -162,38 +162,44 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { apiCall, apiUpload } from '../cloud.js'
+import { apiCall, apiUpload } from '../cloud'
+import type { CatAppReport, CatRelease, CatSourceInfo, CatSyncResult, CatalogueInfo } from '../proto'
 
-const cats = ref([])
-const cur = ref(null)
+/** The upload form: the installation file and icon, and the text fields (empty = taken from the file). */
+interface UploadForm { file: File | null; icon: File | null; app_id: string; version: string; name: string; summary: string; description: string; platform: string; arch: string; boards: string }
+type UploadText = Exclude<keyof UploadForm, 'file' | 'icon'>
+
+const cats = ref<CatalogueInfo[]>([])
+const cur = ref<CatalogueInfo | null>(null)
 const syncHours = ref(6)
-const sources = ref([])
-const apps = ref([])
-const releases = ref([])
+const sources = ref<CatSourceInfo[]>([])
+const apps = ref<CatAppReport[]>([])
+const releases = ref<CatRelease[]>([])
 const error = ref('')
 const busy = ref('')
 const creating = ref(false)
 const addingSrc = ref(false)
-const askRemove = ref(null)
-const upMsg = ref(null)
+const askRemove = ref<CatalogueInfo | null>(null)
+const upMsg = ref<{ ok: boolean; text: string } | null>(null)
 const nc = reactive({ id: '', name: '', public: false })
 const ns = reactive({ url: '', name: '', token: '', priority: 50, mirror: false })
-const blank = () => ({ file: null, app_id: '', version: '', name: '', summary: '', description: '', platform: '', arch: '', boards: '', icon: null })
+const blank = (): UploadForm => ({ file: null, app_id: '', version: '', name: '', summary: '', description: '', platform: '', arch: '', boards: '', icon: null })
 const u = reactive(blank())
 const platforms = [{ label: 'Detect from the file', value: '' }, { label: 'Symbian', value: 'symbian' }, { label: 'Android', value: 'android' }, { label: 'Windows', value: 'windows' },
   { label: 'Linux', value: 'linux' }, { label: 'macOS', value: 'macos' }, { label: 'Other', value: 'other' }]
 
-async function guard(fn) { try { error.value = ''; return await fn() } catch (e) { error.value = e.message } }
+async function guard<T>(fn: () => Promise<T>) { try { error.value = ''; return await fn() } catch (e) { error.value = (e as Error).message } }
 async function load() {
   await guard(async () => {
     cats.value = (await apiCall('GET', '/phe/catalogues')).catalogues
-    if (cur.value) cur.value = cats.value.find((c) => c.id === cur.value.id) || null
+    if (cur.value) cur.value = cats.value.find((c) => c.id === cur.value!.id) || null
     if (cur.value) await loadCur()
   })
 }
 async function loadCur() {
+  if (!cur.value) return
   const id = encodeURIComponent(cur.value.id)
   syncHours.value = Math.round(cur.value.sync_interval / 3600)
   sources.value = (await apiCall('GET', '/phe/catalogue/sources?catalogue=' + id)).sources
@@ -201,7 +207,7 @@ async function loadCur() {
   apps.value = a.apps
   releases.value = a.releases
 }
-function open(c) { cur.value = { ...c }; guard(loadCur) }
+function open(c: CatalogueInfo) { cur.value = { ...c }; guard(loadCur) }
 async function create() {
   await guard(async () => {
     const j = await apiCall('POST', '/phe/catalogues', { id: nc.id.trim(), name: nc.name.trim(), public: nc.public })
@@ -211,15 +217,18 @@ async function create() {
     open(j.catalogue)
   })
 }
-async function patchCat(body) {
-  await guard(async () => { await apiCall('POST', '/phe/catalogues/update', { id: cur.value.id, ...body }); await load() })
+async function patchCat(body: Record<string, unknown>) {
+  const id = cur.value?.id
+  if (!id) return
+  await guard(async () => { await apiCall('POST', '/phe/catalogues/update', { id, ...body }); await load() })
 }
-const setPublic = (v) => patchCat({ public: v })
+const setPublic = (v: boolean) => patchCat({ public: v })
 const rotate = () => patchCat({ rotate_token: true })
-const saveSettings = () => patchCat({ priority: cur.value.priority || 0, sync_interval: Math.max(0, Math.round((syncHours.value || 0) * 3600)) })
+const saveSettings = () => patchCat({ priority: cur.value?.priority || 0, sync_interval: Math.max(0, Math.round((syncHours.value || 0) * 3600)) })
 async function removeCat() {
   const c = askRemove.value
   askRemove.value = null
+  if (!c) return
   await guard(async () => { await apiCall('POST', '/phe/catalogues/remove', { id: c.id }); if (cur.value && cur.value.id === c.id) cur.value = null; await load() })
 }
 async function upload() {
@@ -228,45 +237,45 @@ async function upload() {
   busy.value = 'up'
   try {
     const f = new FormData()
-    f.append('catalogue', cur.value.id)
-    for (const k of ['app_id', 'version', 'name', 'summary', 'description', 'platform', 'arch', 'boards']) f.append(k, u[k] || '')
+    f.append('catalogue', cur.value!.id) // the upload form shows only with a catalogue open
+    for (const k of ['app_id', 'version', 'name', 'summary', 'description', 'platform', 'arch', 'boards'] as UploadText[]) f.append(k, u[k] || '')
     f.append('file', u.file)
     if (u.icon) f.append('icon', u.icon)
     const j = await apiUpload('/phe/catalogue/upload', f)
     upMsg.value = { ok: true, text: 'Uploaded ' + j.release.name + ' ' + j.release.version + '.' }
     Object.assign(u, blank())
     await loadCur()
-  } catch (e) { upMsg.value = { ok: false, text: e.message } } finally { busy.value = '' }
+  } catch (e) { upMsg.value = { ok: false, text: (e as Error).message } } finally { busy.value = '' }
 }
-async function removeRel(r) {
-  await guard(async () => { await apiCall('POST', '/phe/catalogue/release/remove', { catalogue: cur.value.id, app_id: r.app_id, version: r.version }); await loadCur() })
+async function removeRel(r: CatRelease) {
+  await guard(async () => { await apiCall('POST', '/phe/catalogue/release/remove', { catalogue: cur.value!.id, app_id: r.app_id, version: r.version }); await loadCur() })
 }
 async function addSource() {
   await guard(async () => {
-    await apiCall('POST', '/phe/catalogue/sources', { catalogue: cur.value.id, url: ns.url.trim(), name: ns.name.trim(), token: ns.token, priority: ns.priority || 0, mirror: ns.mirror })
+    await apiCall('POST', '/phe/catalogue/sources', { catalogue: cur.value!.id, url: ns.url.trim(), name: ns.name.trim(), token: ns.token, priority: ns.priority || 0, mirror: ns.mirror })
     addingSrc.value = false
     Object.assign(ns, { url: '', name: '', token: '', priority: 50, mirror: false })
     await loadCur()
   })
 }
-async function patchSrc(s, body) {
+async function patchSrc(s: CatSourceInfo, body: Record<string, unknown>) {
   await guard(async () => { await apiCall('POST', '/phe/catalogue/sources/update', { id: s.id, ...body }); await loadCur() })
 }
-async function removeSrc(s) {
+async function removeSrc(s: CatSourceInfo) {
   await guard(async () => { await apiCall('POST', '/phe/catalogue/sources/remove', { id: s.id }); await loadCur() })
 }
-async function runSync(body) {
+async function runSync(body: { id?: string; catalogue?: string }) {
   busy.value = 'sync'
   await guard(async () => {
     const j = await apiCall('POST', '/phe/catalogue/sources/sync', body)
-    const bad = j.results.filter((r) => !r.ok)
+    const bad = (j.results as CatSyncResult[]).filter((r) => !r.ok)
     if (bad.length) error.value = bad.map((r) => r.name + ': ' + r.detail).join('; ')
     await loadCur()
   })
   busy.value = ''
 }
-const sync = (s) => runSync({ id: s.id })
-const syncAll = () => runSync({ catalogue: cur.value.id })
+const sync = (s: CatSourceInfo) => runSync({ id: s.id })
+const syncAll = () => runSync({ catalogue: cur.value!.id })
 
 onMounted(load)
 </script>

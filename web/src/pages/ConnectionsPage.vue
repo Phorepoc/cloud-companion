@@ -151,44 +151,47 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { apiCall } from '../cloud.js'
+import { apiCall } from '../cloud'
+import type { CheckResult, ConnAccount, DevMergePreview, DupSuggestion, OAuthProvider } from '../proto'
 
-const accounts = ref([])
+const accounts = ref<ConnAccount[]>([])
 const hubOn = ref(true)
 const error = ref('')
 const syncing = ref('')
-const askRemove = ref(null)
+const askRemove = ref<ConnAccount | null>(null)
 const adding = ref(false)
 const busy = ref('')
-const testResult = ref(null)
-const dups = ref(null)
+const testResult = ref<CheckResult | null>(null)
+const dups = ref<DupSuggestion[] | null>(null)
 const dupError = ref('')
 const finding = ref(false)
-const devPreview = ref(null)
+const devPreview = ref<DevMergePreview | null>(null)
 const devSource = ref('')
-const undoable = ref(null)
-const providers = ref([])
-const oauthFor = ref(null)
+const undoable = ref<{ id: string; source: string } | null>(null)
+const providers = ref<OAuthProvider[]>([])
+const oauthFor = ref<OAuthProvider | null>(null)
 const oauthName = ref('')
 const oauthKinds = ref(['mail'])
 const oauthError = ref('')
-const oauthMsg = ref(null)
+const oauthMsg = ref<{ ok: boolean; text: string } | null>(null)
 const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
-let timer = null
+let timer: ReturnType<typeof setInterval> | undefined
 
 const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
 const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '' })
 const f = reactive(blank())
 
-const kindText = (k) => ({ imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link' }[k] || k)
-const statusText = (a) => ({ new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }[a.status] || a.status)
-const short = (n) => (n || '').split(' ')[0] || 'this one'
-function ago(t) {
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link' }
+const kindText = (k: string) => KINDS[k] || k
+const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
+const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
+const short = (n: string) => (n || '').split(' ')[0] || 'this one'
+function ago(t: number) {
   const s = Math.max(0, Math.floor(Date.now() / 1000 - t))
   if (s < 90) return 'just now'
   if (s < 5400) return Math.round(s / 60) + ' min ago'
@@ -197,7 +200,7 @@ function ago(t) {
 }
 
 async function load() {
-  try { const j = await apiCall('GET', '/phe/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = e.message }
+  try { const j = await apiCall('GET', '/phe/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = (e as Error).message }
 }
 function openAdd() { Object.assign(f, blank()); testResult.value = null; adding.value = true }
 
@@ -215,58 +218,61 @@ function payload() {
 }
 async function doTest() {
   busy.value = 'test'; testResult.value = null
-  try { testResult.value = await apiCall('POST', '/phe/connections/test', payload()) } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
+  try { testResult.value = await apiCall('POST', '/phe/connections/test', payload()) } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
 }
 async function doAdd() {
   busy.value = 'add'; testResult.value = null
-  try { await apiCall('POST', '/phe/connections', payload()); adding.value = false; await load() } catch (e) { testResult.value = { ok: false, detail: e.message } } finally { busy.value = '' }
+  try { await apiCall('POST', '/phe/connections', payload()); adding.value = false; await load() } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
 }
-async function sync(a) {
+async function sync(a: ConnAccount) {
   syncing.value = a.id; error.value = ''
-  try { const r = await apiCall('POST', '/phe/connections/sync', { id: a.id }); if (!r.ok) error.value = a.name + ': ' + r.detail } catch (e) { error.value = e.message } finally { syncing.value = ''; await load() }
+  try { const r = await apiCall('POST', '/phe/connections/sync', { id: a.id }); if (!r.ok) error.value = a.name + ': ' + r.detail } catch (e) { error.value = (e as Error).message } finally { syncing.value = ''; await load() }
 }
 async function doRemove() {
   const a = askRemove.value
   askRemove.value = null
-  try { await apiCall('POST', '/phe/connections/remove', { id: a.id }) } catch (e) { error.value = e.message }
+  if (!a) return
+  try { await apiCall('POST', '/phe/connections/remove', { id: a.id }) } catch (e) { error.value = (e as Error).message }
   await load()
 }
 async function findDups() {
   finding.value = true; dupError.value = ''
-  try { dups.value = (await apiCall('GET', '/phe/duplicates')).suggestions } catch (e) { dupError.value = e.message } finally { finding.value = false }
+  try { dups.value = (await apiCall('GET', '/phe/duplicates')).suggestions } catch (e) { dupError.value = (e as Error).message } finally { finding.value = false }
 }
-async function merge(d, keep, drop) {
+async function merge(d: DupSuggestion, keep: string, drop: string) {
   dupError.value = ''
-  try { await apiCall('POST', '/phe/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = e.message }
+  try { await apiCall('POST', '/phe/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = (e as Error).message }
 }
-function openOAuth(p) { oauthFor.value = p; oauthName.value = ''; oauthKinds.value = ['mail']; oauthError.value = '' }
+function openOAuth(p: OAuthProvider) { oauthFor.value = p; oauthName.value = ''; oauthKinds.value = ['mail']; oauthError.value = '' }
 async function startOAuth() {
   oauthError.value = ''
   try {
-    const j = await apiCall('POST', '/phe/oauth/start', { provider: oauthFor.value.id, kinds: oauthKinds.value, name: oauthName.value })
+    const j = await apiCall('POST', '/phe/oauth/start', { provider: oauthFor.value!.id, kinds: oauthKinds.value, name: oauthName.value })
     window.location.href = j.url
-  } catch (e) { oauthError.value = e.message }
+  } catch (e) { oauthError.value = (e as Error).message }
 }
-async function previewDevice(d) {
+async function previewDevice(d: DupSuggestion) {
   dupError.value = ''
-  try { devPreview.value = await apiCall('POST', '/phe/devmerge/preview', { account: d.same_source, a: d.a, b: d.b }); devSource.value = d.source_name } catch (e) { dupError.value = e.message }
+  try { devPreview.value = await apiCall('POST', '/phe/devmerge/preview', { account: d.same_source, a: d.a, b: d.b }); devSource.value = d.source_name || '' } catch (e) { dupError.value = (e as Error).message }
 }
 async function applyDevice() {
   const p = devPreview.value
   devPreview.value = null
+  if (!p) return
   try {
     await apiCall('POST', '/phe/devmerge/apply', { id: p.id })
     undoable.value = { id: p.id, source: devSource.value }
     setTimeout(() => { if (undoable.value && undoable.value.id === p.id) undoable.value = null }, 10 * 60 * 1000)
     await findDups()
-  } catch (e) { dupError.value = e.message }
+  } catch (e) { dupError.value = (e as Error).message }
 }
 async function undoDevice() {
   const u = undoable.value
-  try { await apiCall('POST', '/phe/devmerge/undo', { id: u.id }); undoable.value = null; await findDups() } catch (e) { dupError.value = e.message }
+  if (!u) return
+  try { await apiCall('POST', '/phe/devmerge/undo', { id: u.id }); undoable.value = null; await findDups() } catch (e) { dupError.value = (e as Error).message }
 }
-async function dismiss(d) {
-  try { await apiCall('POST', '/phe/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = dups.value.filter((x) => x !== d) } catch (e) { dupError.value = e.message }
+async function dismiss(d: DupSuggestion) {
+  try { await apiCall('POST', '/phe/duplicates/dismiss', { a: d.a, b: d.b }); dups.value = (dups.value || []).filter((x) => x !== d) } catch (e) { dupError.value = (e as Error).message }
 }
 
 onMounted(async () => {

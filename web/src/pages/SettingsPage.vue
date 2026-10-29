@@ -10,6 +10,13 @@
       <q-btn-toggle v-model="choice" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
                     :options="[{ label: 'Match system', value: 'system', icon: 'sym_o_contrast' }, { label: 'Light', value: 'light', icon: 'sym_o_light_mode' }, { label: 'Dark', value: 'dark', icon: 'sym_o_dark_mode' }]"
                     data-test="theme" @update:model-value="applyTheme" />
+      <template v-if="$q.screen.width >= DESKTOP_MIN_WIDTH">
+        <h3 id="set-layout">Layout</h3>
+        <p class="ph-muted">Classic shows one section at a time. Desktop opens the sections as windows side by side, as on a computer. Used on screens at least {{ DESKTOP_MIN_WIDTH }} px wide.</p>
+        <q-btn-toggle v-model="layout" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
+                      :options="[{ label: 'Classic', value: 'classic', icon: 'sym_o_web' }, { label: 'Desktop', value: 'desktop', icon: 'sym_o_desktop_windows' }]"
+                      aria-labelledby="set-layout" data-test="layout" @update:model-value="applyLayout" />
+      </template>
     </section>
 
     <section class="ph-card ph-section" aria-labelledby="set-data">
@@ -84,14 +91,22 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { state, api, forget, connect, passkeyList, passkeyRemove, passkeyAdd, recoveryRegenerate, passkeyBlocker } from '../cloud.js'
-import { theme, applyTheme } from '../theme.js'
+import { state, api, forget, connect, passkeyList, passkeyRemove, passkeyAdd, recoveryRegenerate, passkeyBlocker } from '../cloud'
+import { theme, applyTheme } from '../theme'
+import { getLayout, setLayout, DESKTOP_MIN_WIDTH, type Layout } from '../desktop/layout'
+import type { PasskeyInfo } from '../proto'
 
 const router = useRouter()
 const choice = ref(theme.value)
+const layout = ref(getLayout())
+/** Switch at once: the desktop opens with Settings in a window; the classic layout shows this page. */
+function applyLayout(v: Layout) {
+  setLayout(v)
+  router.push(v === 'desktop' ? '/desktop?open=settings' : '/settings')
+}
 const q = ref(state.settings.q)
 const gray = ref(state.settings.gray)
 const saved = ref(false)
@@ -101,24 +116,24 @@ async function apply() {
   saved.value = true
 }
 // ---- Security (admin devices) ----
-const keys = ref([])
+const keys = ref<PasskeyInfo[]>([])
 const owner = ref(false)
 const blocker = passkeyBlocker()
 const keyName = ref('This browser')
 const busy = ref('')
 const error = ref('')
-const askRemove = ref(null)
+const askRemove = ref<PasskeyInfo | null>(null)
 const recDialog = ref(false)
 const shownCode = ref('')
-const when = (t) => new Date(t * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+const when = (t: number) => new Date(t * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 async function loadKeys() {
   if (!state.admin) return
-  try { const j = await passkeyList(); keys.value = j.passkeys; owner.value = j.owner } catch (e) { error.value = e.message }
+  try { const j = await passkeyList(); keys.value = j.passkeys; owner.value = j.owner } catch (e) { error.value = (e as Error).message }
 }
-async function guard(kind, fn) {
+async function guard(kind: string, fn: () => Promise<unknown>) {
   error.value = ''
   busy.value = kind
-  try { await fn() } catch (e) { error.value = /NotAllowed|cancel|timed out/i.test(e.message) ? 'The passkey request was cancelled or timed out.' : e.message } finally { busy.value = '' }
+  try { await fn() } catch (e) { error.value = /NotAllowed|cancel|timed out/i.test((e as Error).message) ? 'The passkey request was cancelled or timed out.' : (e as Error).message } finally { busy.value = '' }
 }
 const addKey = () => guard('add', async () => {
   const rec = await passkeyAdd(keyName.value.trim() || 'Passkey')
@@ -129,6 +144,7 @@ const regen = () => guard('rec', async () => { shownCode.value = (await recovery
 async function doRemove() {
   const k = askRemove.value
   askRemove.value = null
+  if (!k) return
   await guard('rm', async () => { await passkeyRemove(k.id); await loadKeys() })
 }
 onMounted(loadKeys)

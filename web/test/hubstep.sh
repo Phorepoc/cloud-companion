@@ -4,7 +4,7 @@
 #
 # Contacts and Calendar through a running hub (Docker, from the repo root):
 #   HUB_ENV_FILE=<the hub's deploy/hub/.env.phecloud> HUB_NETWORK=phehub_default sh web/test/hubstep.sh
-# Starts the server image with the hub overlay (web/test/compose.hub.yml) and runs web/test/hub.mjs with Playwright.
+# Starts the server image with the hub overlay (web/test/compose.hub.yml) and runs web/test/hub.ts with Playwright.
 set -eu
 ROOT=$(pwd)
 OUT=$ROOT/web/test/out
@@ -18,5 +18,5 @@ CODE=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
 OWNER=$(grep "^PHECLOUD_HUB_OWNER=" "$HUB_ENV_FILE" | cut -d= -f2)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE" -e OWNER="$OWNER" -e OUT=/out \
-    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node hub.mjs' \
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning hub.ts' \
     || { echo '--- server log'; docker logs phe-cloud 2>&1 | tail -12 | cut -c1-260; exit 1; }

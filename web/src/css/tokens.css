@@ -1,39 +1,46 @@
 /* Copyright The Phorepoc Authors
  * SPDX-License-Identifier: Apache-2.0
  *
- * Design tokens (see web/STYLE.md). Everything visual is a token: components never hard-code a colour, size or duration.
- * Light is the default; dark applies under Quasar's `body.body--dark` (follows the system unless the user chose a theme).
- * Contrast ratios are recorded in STYLE.md and were computed, not guessed.
+ * Design tokens (see web/STYLE.md). The look is the Etesian design language (the N9's, carried to the web): its tokens are vendored
+ * in css/etesian/ and the app's own names below point at them, so pages keep using --ph-* and never a literal.
+ * The colour mode is set by theme.js on <html> as data-hd-mode: "hybrid" (light pages under dark chrome, the N9 default) or "dark".
+ * Custom properties resolve where they are declared, so these live on :root, the element that carries the mode.
  */
 :root {
   /* colour: surfaces and text */
-  --ph-bg: #f6f7f8;            /* the page behind everything */
-  --ph-surface: #ffffff;       /* cards, app bar, dialogs */
-  --ph-surface-2: #eceff2;     /* inputs at rest, selected rows, chips */
-  --ph-divider: #d9dde2;       /* hairlines (decorative: not required to reach 3:1) */
-  --ph-border: #7a838e;        /* control outlines (needs 3:1 against the surface) */
-  --ph-text: #1a1d21;
-  --ph-text-muted: #4a525c;
-  /* colour: accent and status */
-  --ph-accent: #0b5cad;
+  --ph-bg: var(--hd-c-bg);                    /* the page behind everything */
+  --ph-surface: var(--hd-c-surface);          /* cards, dialogs, inputs */
+  --ph-surface-2: var(--hd-c-surface-raised); /* selected rows, chips, notes */
+  --ph-divider: var(--hd-c-divider);          /* hairlines (decorative) */
+  --ph-border: var(--hd-c-fg-tertiary);       /* control outlines (3:1 against the surface) */
+  --ph-text: var(--hd-c-fg);
+  --ph-text-muted: var(--hd-c-fg-secondary);
+  /* colour: accent and status. The accent is the N9 link blue: the default Etesian blue is too light for white text (3:1). */
+  --ph-accent: #1C51AF;
   --ph-on-accent: #ffffff;
-  --ph-accent-soft: #e4effa;   /* the selected navigation item */
-  --ph-positive: #17663a;
+  --ph-accent-soft: color-mix(in srgb, var(--ph-accent) 12%, var(--hd-c-surface));
+  --ph-positive: #2E6B00;
   --ph-warning: #8a4b00;
-  --ph-negative: #b3261e;
-  --ph-focus: #0b5cad;         /* the focus ring */
+  --ph-negative: #B3191A;
+  --ph-focus: var(--hd-c-focus);
+  /* chrome: the N9 toolbar (dark gradient) used for bars, window headers and the dock */
+  --ph-chrome: var(--hd-surface-chrome);
+  --ph-chrome-fg: var(--hd-surface-chrome-fg);
+  --ph-chrome-fg-muted: var(--hd-surface-chrome-fg-secondary);
+  --ph-chrome-divider: rgba(255, 255, 255, 0.16);
 
   /* type */
-  --ph-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --ph-font: var(--hd-font-family-base);
+  --ph-font-light: var(--hd-font-family-light);
   --ph-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-  --ph-text-caption: 0.8125rem;   /* 13 px */
+  --ph-text-caption: 0.75rem;     /* 12 px */
   --ph-text-small: 0.875rem;      /* 14 px */
   --ph-text-body: 1rem;           /* 16 px: never smaller for text a person reads or types (no iOS zoom on focus) */
-  --ph-text-title-s: 1.125rem;    /* 18 */
-  --ph-text-title: 1.375rem;      /* 22 */
-  --ph-text-headline: 1.75rem;    /* 28 */
+  --ph-text-title-s: 1.1875rem;   /* 19: N9 "large" */
+  --ph-text-title: 1.5rem;        /* 24 */
+  --ph-text-headline: 2rem;       /* 32: the N9 page header, light weight */
   --ph-line: 1.5;
-  --ph-line-tight: 1.25;
+  --ph-line-tight: 1.2;
 
   /* space (4 px grid) */
   --ph-s1: 4px;
@@ -46,61 +53,43 @@
   --ph-tap: 44px;                /* minimum touch target, both dimensions */
   --ph-content-max: 960px;
 
-  /* shape and elevation */
-  --ph-r-control: 8px;
-  --ph-r-card: 12px;
-  --ph-r-sheet: 20px;
+  /* shape and elevation: N9 surfaces are flat; only overlays cast a shadow */
+  --ph-r-control: var(--hd-radius-control);
+  --ph-r-card: var(--hd-radius-card);
+  --ph-r-sheet: 16px;
   --ph-r-pill: 999px;
+  --ph-squircle: var(--hd-squircle-mask);
   --ph-elev-0: none;
-  --ph-elev-1: 0 1px 2px rgba(16, 24, 40, 0.08), 0 1px 1px rgba(16, 24, 40, 0.04);
-  --ph-elev-2: 0 4px 12px rgba(16, 24, 40, 0.12);
-  --ph-elev-3: 0 12px 32px rgba(16, 24, 40, 0.18);
+  --ph-elev-1: none;
+  --ph-elev-2: 0 4px 16px rgba(0, 0, 0, 0.18);
+  --ph-elev-3: var(--hd-shadow-overlay);
 
   /* motion */
-  --ph-dur-1: 120ms;             /* hover, press, small state changes */
-  --ph-dur-2: 200ms;             /* panels, dialogs */
-  --ph-dur-3: 300ms;             /* page-level changes */
-  --ph-ease: cubic-bezier(0.2, 0, 0, 1);
+  --ph-dur-1: var(--hd-motion-duration-fast);
+  --ph-dur-2: var(--hd-motion-duration-default);
+  --ph-dur-3: var(--hd-motion-duration-slow);
+  --ph-ease: var(--hd-motion-easing-out);
 
   /* Quasar brand variables map onto the tokens */
   --q-primary: var(--ph-accent);
-  --q-secondary: #0f766e;
+  --q-secondary: var(--hd-color-accent-conversations);
   --q-accent: var(--ph-accent);
   --q-positive: var(--ph-positive);
   --q-negative: var(--ph-negative);
   --q-info: var(--ph-accent);
   --q-warning: var(--ph-warning);
-  --q-dark: #181c22;
-  --q-dark-page: #101317;
+  --q-dark: var(--hd-c-surface);
+  --q-dark-page: var(--hd-c-bg);
 }
 
-body.body--dark {
-  --ph-bg: #101317;
-  --ph-surface: #181c22;
-  --ph-surface-2: #222831;
-  --ph-divider: #2c333c;
-  --ph-border: #6b7480;
-  --ph-text: #e8eaed;
-  --ph-text-muted: #aab1bb;
-  --ph-accent: #8ab4f8;
+:root[data-hd-mode="dark"] {
+  --ph-accent: #7FB0FF;
   --ph-on-accent: #0b1220;
-  --ph-accent-soft: #1f2d42;
-  --ph-positive: #7bd9a0;
+  --ph-accent-soft: color-mix(in srgb, var(--ph-accent) 18%, var(--hd-c-surface));
+  --ph-positive: #8FD65A;
   --ph-warning: #f2c36b;
-  --ph-negative: #f2a19b;
-  --ph-focus: #8ab4f8;
-  /* dark surfaces separate by lightness and a hairline, not by shadow */
-  --ph-elev-1: 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --ph-elev-2: 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --ph-elev-3: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 12px 32px rgba(0, 0, 0, 0.5);
-  /* custom properties resolve where they are declared, so the Quasar mapping is repeated for the dark theme */
-  --q-primary: var(--ph-accent);
-  --q-accent: var(--ph-accent);
-  --q-positive: var(--ph-positive);
-  --q-negative: var(--ph-negative);
-  --q-info: var(--ph-accent);
-  --q-warning: var(--ph-warning);
-  --q-secondary: #5eead4;
+  --ph-negative: #FF8A80;
+  --ph-elev-2: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -46,13 +46,24 @@ jobs:
           curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy"
           docker logs ci-cloud | tail -5
 
+  browser-types:
+    name: "Browser tests: TypeScript check (all of them, the Android ones included)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund && npm run check
+        working-directory: web/test
+
   browser:
     name: Browser suite (${{ matrix.script }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        script: [csp.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh]
+        script: [csp.sh, desktop.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh]
     steps:
       - uses: actions/checkout@v4
       - run: sh web/test/${{ matrix.script }}

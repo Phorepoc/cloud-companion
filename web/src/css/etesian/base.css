@@ -1,0 +1,153 @@
+/* Vendored from the Etesian Design Language (etesian-design styles/base.css, commit 790fd52), MIT licence: see ./LICENSE.
+   Do not edit here: change it in the design repo and copy it again. */
+/* Etesian base styles. Import after tokens.css. */
+:root {
+  --hd-accent: var(--hd-color-accent-default);
+  --hd-squircle-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M100.00 50.00L99.92 57.13L99.69 61.68L99.31 65.56L98.78 69.04L98.09 72.23L97.25 75.18L96.26 77.92L95.12 80.48L93.82 82.86L92.38 85.08L90.78 87.13L89.04 89.04L87.13 90.78L85.08 92.38L82.86 93.82L80.48 95.12L77.92 96.26L75.18 97.25L72.23 98.09L69.04 98.78L65.56 99.31L61.68 99.69L57.13 99.92L50.00 100.00L42.87 99.92L38.32 99.69L34.44 99.31L30.96 98.78L27.77 98.09L24.82 97.25L22.08 96.26L19.52 95.12L17.14 93.82L14.92 92.38L12.87 90.78L10.96 89.04L9.22 87.13L7.62 85.08L6.18 82.86L4.88 80.48L3.74 77.92L2.75 75.18L1.91 72.23L1.22 69.04L0.69 65.56L0.31 61.68L0.08 57.13L0.00 50.00L0.08 42.87L0.31 38.32L0.69 34.44L1.22 30.96L1.91 27.77L2.75 24.82L3.74 22.08L4.88 19.52L6.18 17.14L7.62 14.92L9.22 12.87L10.96 10.96L12.87 9.22L14.92 7.62L17.14 6.18L19.52 4.88L22.08 3.74L24.82 2.75L27.77 1.91L30.96 1.22L34.44 0.69L38.32 0.31L42.87 0.08L50.00 0.00L57.13 0.08L61.68 0.31L65.56 0.69L69.04 1.22L72.23 1.91L75.18 2.75L77.92 3.74L80.48 4.88L82.86 6.18L85.08 7.62L87.13 9.22L89.04 10.96L90.78 12.87L92.38 14.92L93.82 17.14L95.12 19.52L96.26 22.08L97.25 24.82L98.09 27.77L98.78 30.96L99.31 34.44L99.69 38.32L99.92 42.87Z'/%3E%3C/svg%3E");
+}
+.hd-root, .hd-theme-light, .hd-theme-dark, .hd-inverted {
+  font-family: var(--hd-font-family-light);
+  font-weight: var(--hd-font-weight-light);
+  font-size: var(--hd-font-size-default);
+  line-height: var(--hd-font-line-height-default);
+  color: var(--hd-c-fg);
+  -webkit-font-smoothing: antialiased;
+}
+.hd-root *, .hd-root *::before, .hd-root *::after { box-sizing: border-box; }
+
+/* Squircle utility: clip any element to the N9 superellipse. */
+.hd-squircle {
+  -webkit-mask-image: var(--hd-squircle-mask);
+  mask-image: var(--hd-squircle-mask);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+/* Squircle control (icon-only buttons, toolbar/tab selection highlight). The element itself stays
+ * rectangular (hit area); ::before draws the fill and ::after the border / focus ring, both clipped to the
+ * n = 2.8 squircle, centred, sized min(--hd-sq-size, 100% of the height). Set --hd-sq-fill / --hd-sq-ring. */
+.hd-sq {
+  --hd-sq-size: 40px; --hd-sq-fill: transparent; --hd-sq-ring: transparent; --hd-sq-ring-width: 1px; --hd-sq-ring-offset: 0px;
+  position: relative; isolation: isolate;
+  background: transparent !important; border-color: transparent !important; border-radius: 0 !important;
+}
+.hd-sq::before, .hd-sq::after {
+  content: ''; position: absolute; left: 50%; top: 50%; z-index: -1; pointer-events: none;
+  height: min(var(--hd-sq-size), 100%); aspect-ratio: 1; transform: translate(-50%, -50%);
+  -webkit-mask-image: var(--hd-squircle-mask); mask-image: var(--hd-squircle-mask);
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  transition: background var(--hd-motion-duration-instant) var(--hd-motion-easing-out);
+}
+.hd-sq::before { background: var(--hd-sq-fill); }
+.hd-sq::after {
+  height: calc(min(var(--hd-sq-size), 100%) + 2 * var(--hd-sq-ring-offset)); background: var(--hd-sq-ring);
+  -webkit-mask-image: var(--hd-squircle-mask), var(--hd-squircle-mask); mask-image: var(--hd-squircle-mask), var(--hd-squircle-mask);
+  -webkit-mask-size: 100% 100%, calc(100% - 2 * var(--hd-sq-ring-width)) calc(100% - 2 * var(--hd-sq-ring-width));
+  mask-size: 100% 100%, calc(100% - 2 * var(--hd-sq-ring-width)) calc(100% - 2 * var(--hd-sq-ring-width));
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.hd-sq.hd-focusable:focus-visible, .hd-sq:focus-visible {
+  outline: none; --hd-sq-ring: var(--hd-c-focus); --hd-sq-ring-width: var(--hd-size-focus-ring); --hd-sq-ring-offset: 3px;
+}
+
+/* Focus (extrapolated): visible only for keyboard users, 2px ring in focus colour, 2px offset. */
+.hd-focusable:focus { outline: none; }
+.hd-focusable:focus-visible {
+  outline: var(--hd-size-focus-ring) solid var(--hd-c-focus);
+  outline-offset: 2px;
+}
+.hd-visually-hidden {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.hd-page-title {
+  font-family: var(--hd-font-family-base);
+  font-weight: var(--hd-font-weight-bold);
+  text-transform: uppercase;
+  font-size: var(--hd-font-size-default);
+}
+a.hd-link, :where(.hd-root) a:where(:not([class])) { color: var(--hd-c-link); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hd-root *, .hd-theme-light *, .hd-theme-dark * {
+    animation-duration: 1ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------
+ * N9 icon lighting ("top-lit emboss"). See docs/06b-icon-lighting.md.
+ * Put .hd-icon-lit on a squircle tile; set --hd-icon-accent (one colour) and --hd-icon-size.
+ * Wrap it in .hd-icon-lit-shadow for the soft outer shadow (masks clip shadows on the tile itself).
+ * Exact gradients: set --hd-icon-top / --hd-icon-bottom (litPalette() in JS); otherwise the
+ * color-mix() fallback below is used. .hd-icon-flat (or no class) is the flat option.
+ * ---------------------------------------------------------------------------------------- */
+.hd-icon-lit {
+  --hd-icon-accent: var(--hd-accent);
+  --_top: var(--hd-icon-top, color-mix(in oklab, var(--hd-icon-accent) 80%, #fff));
+  --_bottom: var(--hd-icon-bottom, color-mix(in oklab, var(--hd-icon-accent) 84%, #000));
+  --_s: var(--hd-icon-size, 48px);
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(180deg, var(--_top) var(--hd-icon-lighting-gradient-start), var(--_bottom) var(--hd-icon-lighting-gradient-end)) !important;
+  color: var(--hd-icon-lighting-glyph-top);
+}
+.hd-icon-lit--light {
+  --_top: var(--hd-icon-light-tile-top);
+  --_bottom: var(--hd-icon-light-tile-bottom);
+  background: linear-gradient(180deg, var(--_top), var(--_bottom)) !important;
+  color: var(--hd-icon-light-tile-glyph-top);
+}
+/* top rim: squircle minus the squircle moved down by rim-size = a crescent that follows the curved top edge */
+.hd-icon-lit::before, .hd-icon-lit::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+  -webkit-mask-image: var(--hd-squircle-mask), var(--hd-squircle-mask);
+  mask-image: var(--hd-squircle-mask), var(--hd-squircle-mask);
+  -webkit-mask-size: 100% 100%; mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-composite: source-out; mask-composite: subtract;
+}
+.hd-icon-lit::before {
+  background: linear-gradient(180deg, rgba(255,255,255,var(--hd-icon-lighting-rim-opacity)), rgba(255,255,255,0) 35%);
+  -webkit-mask-position: 0 0, 0 var(--hd-icon-lighting-rim-size); mask-position: 0 0, 0 var(--hd-icon-lighting-rim-size);
+}
+/* faint reflected line along the bottom edge (EXT) */
+.hd-icon-lit::after {
+  background: linear-gradient(0deg, rgba(255,255,255,var(--hd-icon-lighting-bottom-line-opacity)), rgba(255,255,255,0) 30%);
+  -webkit-mask-position: 0 0, 0 calc(-1 * var(--hd-icon-lighting-rim-size)); mask-position: 0 0, 0 calc(-1 * var(--hd-icon-lighting-rim-size));
+}
+.hd-icon-lit--light::before { opacity: .5; }
+/* glyph cast shadow for any child that is not an HdIcon lit glyph (font icons, initials, svg): straight down */
+.hd-icon-lit > :not(img):not(.hd-icon--lit) {
+  filter: drop-shadow(0 calc(var(--_s) * 0.015) calc(var(--_s) * 0.03) rgba(0,0,0,var(--hd-icon-lighting-cast-opacity)));
+}
+.hd-icon-lit--light > :not(img):not(.hd-icon--lit) {
+  filter: drop-shadow(0 calc(var(--_s) * 0.012) calc(var(--_s) * 0.02) rgba(0,0,0,.12));
+}
+.hd-icon-lit-shadow {
+  display: inline-flex; flex: none; position: relative;
+  filter: drop-shadow(0 calc(var(--hd-icon-size, 48px) * 0.015) calc(var(--hd-icon-size, 48px) * 0.025) rgba(0,0,0,var(--hd-icon-lighting-outer-shadow-opacity)));
+}
+
+/* Button lighting (top-lit, like the icon tiles; see docs/06b-icon-lighting.md "Buttons").
+ * Set --hd-btn-base; the fill is a vertical gradient (top ~10% lighter, darker bottom), a 1px rim that is
+ * brightest along the top edge. Measured on the N9 dark buttons: #1C1C1C -> #101010 -> #080808, rim #393839. */
+.hd-button, .hd-tool-icon, .hd-quasar .q-btn, .hd-task-edit-bar__btn, .hd-tab-bar, .hd-btn-group-lit, .hd-quasar .q-btn-group {
+  --hd-btn-top: color-mix(in srgb, var(--hd-btn-base, #fff) 90%, #fff);
+  --hd-btn-bot: color-mix(in srgb, var(--hd-btn-base, #fff) 88%, #000);
+  --hd-btn-rim: color-mix(in srgb, var(--hd-btn-base, #fff) 70%, #000);
+  --hd-btn-rim-top: color-mix(in srgb, var(--hd-btn-base, #fff) 60%, #fff);
+  --hd-lit-fill: linear-gradient(var(--hd-btn-top), var(--hd-btn-base, #fff) 50%, var(--hd-btn-bot));
+  --hd-lit-shadow: inset 0 1px 0 var(--hd-btn-rim-top), inset 0 0 0 1px var(--hd-btn-rim);
+}
+
+/* Button groups read as ONE item: one shared rim and top-lit gradient on the group, square inner edges,
+ * a single 1px divider between buttons, rounded outer corners only (radius ~21% of the button height).
+ * The selected segment is the accent with the same top lighting. Used by HdTabBar (text) and QBtnGroup/QBtnToggle. */
+.hd-btn-group-lit {
+  --hd-btn-base: var(--hd-c-button-bg); display: inline-flex; overflow: hidden; border: 1px solid var(--hd-btn-rim);
+  border-radius: calc(var(--hd-size-button) * .21); background: var(--hd-lit-fill); box-shadow: inset 0 1px 0 var(--hd-btn-rim-top);
+}

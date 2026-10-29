@@ -51,7 +51,7 @@ The bridge never gets the Docker socket. `docker-compose.android.yml` runs `tecn
 and the bridge talks to that (`PHE_ANDROID_DOCKER`, `PHE_ANDROID_CONTAINER`). Without `PHE_ANDROID_DOCKER` there is no parking and the container runs all the time.
 Measured on a small x86 test server (Redroid 13, 2 cores, one run): the container held about 730 MiB while a viewer was connected and 0 once stopped (the host's overall "used" figure moved by more than that because other things were running; the
 container figure is the one to trust); it was parked 46 s after the viewer left with `PHE_ANDROID_PARK_AFTER=30s` (the check runs every 10 s and the stop takes a few seconds); the cold start, from opening the page to the first picture, took 13.8 s,
-and the page said "Starting Android…" for it. Test: `web/test/androidpark.mjs` (run by `web/test/android.sh`).
+and the page said "Starting Android…" for it. Test: `web/test/androidpark.ts` (run by `web/test/android.sh`).
 
 ## The display follows the viewing device
 The page tells the bridge the size of its window and what kind of device it is (`kind=phone` when the screen's short edge is under 600 CSS pixels, else `large`; `&kind=phone|large` in the address overrides). The bridge sets the main display with
@@ -66,7 +66,7 @@ each within a few seconds; the stream shape follows. A larger display costs more
 Right-clicking the screen opens the page's own menu (not the browser's): **Copy** and **Cut** when something is selected, **Paste** and **Select all** when a text field has focus, always **Back**, **Home**, **Recent apps**. Android's state
 comes from `dumpsys input_method` on the bridge (about 0.2 s, asked for when the menu opens): the served input connection is an `EditableInputConnection` while a text field is focused, and `mCursorSelStart` / `mCursorSelEnd` give the selection.
 Cheaper signals (scrcpy's clipboard messages) do not say whether anything is selected; uiautomator dumps are slower and do not show selections. Cut and Copy use scrcpy's copy / cut keys; Select all sends Ctrl+A.
-Long-pressing on a touch screen still works as on a phone (it is sent through as a touch). Test: `web/test/androidview.mjs` (`ONLY=view sh web/test/android.sh`).
+Long-pressing on a touch screen still works as on a phone (it is sent through as a touch). Test: `web/test/androidview.ts` (`ONLY=view sh web/test/android.sh`).
 
 ## Desktop mode (freeform windows and a taskbar)
 A **large** viewer (a tablet, laptop or desktop window; see "The display follows the viewing device") gets a desktop: [Taskbar](https://github.com/farmerbb/Taskbar) as the home app, which draws a taskbar with a start menu, a clock
@@ -79,7 +79,7 @@ across the phone / large boundary (`web/test/screenshots/android/androiddesktop-
   write its preference file `shared_prefs/com.farmerbb.taskbar_preferences.xml` as root (`launcher`, `freeform_hack`, `taskbar_active`, ...) with the app's owner; `pm enable` its `HomeActivity`; `cmd package set-home-activity` to Taskbar,
   start it, press Home. For a phone viewer: broadcast `com.farmerbb.taskbar.QUIT`, force-stop it, set the stock launcher (`com.android.launcher3/.uioverrides.QuickstepLauncher`) as home. The provisioning runs once per device start.
 - **Apps open freeform** from the Taskbar start menu; from adb use `am start --windowingMode 5 -n <activity>`. Measured on a throwaway container: Taskbar is home about 2 s after the viewer's display is set
-  (after the first-time install from F-Droid, a few more seconds), the first freeform window opens at once. Test: `web/test/androiddesktop.mjs` (`ONLY=desktop sh web/test/android.sh`).
+  (after the first-time install from F-Droid, a few more seconds), the first freeform window opens at once. Test: `web/test/androiddesktop.ts` (`ONLY=desktop sh web/test/android.sh`).
 - Redroid 14 and 15 images exist (`redroid/redroid:14.0.0-latest`, `15.0.0-latest`) but were not needed: Android 13 already provides the windowing.
 - **Limits:** the phone's own launcher state (widgets, home layout) is separate from Taskbar's; a window left open in desktop mode stays in the task list when a phone viewer connects; one viewer at a time, so two viewers of different kinds take turns.
 
@@ -104,7 +104,7 @@ embedded copy, and a Go test fails if the two differ.
 
 ## Verified, and what only a real browser can check
 **Verified by the user in a real browser:** H.264 decoding (the default codec), the ticket path from the web app (the stream played), **audible sound** through the Sound button, and a YouTube video playing smoothly in Android's browser through the stream. **Copying text from Android to the host's clipboard works** (checked by the user). The framing of the page (iframe) was rejected, hence the native page above.
-Automated (headless Chromium, `web/test/android.sh`, which runs `android.mjs` against the bridge directly and `androidapp.mjs` against phecloud + Caddy, as in the hub): scroll wheel changes the screen; rotating the device gives a
+Automated (headless Chromium, `web/test/android.sh`, which runs `android.ts` against the bridge directly and `androidapp.ts` against phecloud + Caddy, as in the hub): scroll wheel changes the screen; rotating the device gives a
 landscape canvas and back, and a tap in landscape lands correctly; browser clipboard text arrives in a focused text field on the phone (read back from the UI hierarchy) and the phone's selected text comes back to the browser;
 APK upload and F-Droid install end in `Success` and the packages are listed; a bad package name is refused; audio: Opus decoded in the browser. The app page is checked at 1280x800 and 390x844, portrait and landscape, light and dark
 (screenshots in `web/test/screenshots/android/androidapp-*.png`): the frame has the stream's aspect ratio, nothing scrolls sideways, the whole screen fits on desktop, the Home / swipe controls change the screen, the install dialog

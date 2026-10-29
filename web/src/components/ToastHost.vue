@@ -1,6 +1,6 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
-<!-- Shows the toasts from toast.js: bottom centre, above the phone's bottom bar, 4 seconds (paused while hovered or focused). -->
+<!-- Shows the toasts from toast.ts: bottom centre, above the phone's bottom bar, 4 seconds (paused while hovered or focused). -->
 <template>
   <div class="ph-toasts" role="status" aria-live="polite" data-test="toasts">
     <div v-for="t in toasts" :key="t.id" class="ph-toast" :data-test="'toast'" @mouseenter="pause(t)" @mouseleave="resume(t)" @focusin="pause(t)" @focusout="resume(t)">
@@ -11,14 +11,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { watch } from 'vue'
-import { toasts, closeToast } from '../toast.js'
+import { toasts, closeToast, type Toast } from '../toast'
 
 const timers = new Map()
-function start(t) { timers.set(t.id, setTimeout(() => closeToast(t.id), t.ms)) }
-function pause(t) { clearTimeout(timers.get(t.id)) }
-function resume(t) { if (toasts.some((x) => x.id === t.id)) start(t) }
+function start(t: Toast) { timers.set(t.id, setTimeout(() => closeToast(t.id), t.ms)) }
+function pause(t: Toast) { clearTimeout(timers.get(t.id)) }
+function resume(t: Toast) { if (toasts.some((x) => x.id === t.id)) start(t) }
 watch(() => toasts.length, () => {
   for (const t of toasts) if (!timers.has(t.id)) start(t)
 }, { flush: 'post' })

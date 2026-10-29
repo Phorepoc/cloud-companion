@@ -1,12 +1,14 @@
 /* Copyright The Phorepoc Authors
  * SPDX-License-Identifier: Apache-2.0
  *
- * Global rules built on tokens.css: base type, touch targets, focus ring, Quasar component overrides. Page-specific rules live in
- * the page's own <style scoped>.
+ * Global rules built on tokens.css: base type, touch targets, focus ring, small Quasar adjustments. The Etesian Quasar theme
+ * (css/etesian/quasar-theme.css) gives the components their look; this file only adds what the app's own rules need on top
+ * (44 px targets, the focus ring). Page-specific rules live in the page's own <style scoped>.
  */
 html { font-size: 100%; }
 body {
-  font-family: var(--ph-font);
+  font-family: var(--ph-font-light);
+  font-weight: var(--hd-font-weight-light);
   font-size: var(--ph-text-body);
   line-height: var(--ph-line);
   color: var(--ph-text);
@@ -14,10 +16,23 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 .q-layout, .q-page { background: var(--ph-bg); color: var(--ph-text); }
-h1, h2, h3 { line-height: var(--ph-line-tight); margin: 0; font-weight: 600; }
-h1 { font-size: var(--ph-text-headline); }
-h2 { font-size: var(--ph-text-title); }
-h3 { font-size: var(--ph-text-title-s); }
+/* The Etesian Quasar theme sets the brand colours on <body> (.hd-quasar); the app's accent replaces its light blue there, because
+   white text on the default Etesian blue is only 3:1. */
+.hd-quasar {
+  --q-primary: var(--ph-accent);
+  --q-accent: var(--ph-accent);
+  --q-info: var(--ph-accent);
+  --q-positive: var(--ph-positive);
+  --q-negative: var(--ph-negative);
+  --q-warning: var(--ph-warning);
+  --hd-accent: var(--ph-accent);
+}
+/* N9 type: big light headers, regular weight for small headings; bold only for emphasis */
+h1, h2, h3 { line-height: var(--ph-line-tight); margin: 0; font-family: var(--ph-font-light); }
+h1 { font-size: var(--ph-text-headline); font-weight: var(--hd-font-weight-light); }
+h2 { font-size: var(--ph-text-title); font-weight: var(--hd-font-weight-light); }
+h3 { font-size: var(--ph-text-title-s); font-weight: var(--hd-font-weight-regular); }
+b, strong { font-weight: var(--hd-font-weight-bold); }
 .ph-muted { color: var(--ph-text-muted); }
 .ph-small { font-size: var(--ph-text-small); }
 .ph-page { padding: var(--ph-s4); max-width: var(--ph-content-max); margin: 0 auto; }
@@ -26,17 +41,17 @@ h3 { font-size: var(--ph-text-title-s); }
   background: var(--ph-surface);
   border: 1px solid var(--ph-divider);
   border-radius: var(--ph-r-card);
-  box-shadow: var(--ph-elev-1);
   padding: var(--ph-s4);
 }
+/* a lit N9 squircle tile behind an icon: set --hd-icon-accent (the section colour) and --hd-icon-size */
+.ph-tile { display: inline-grid; place-items: center; flex: none; width: var(--hd-icon-size, 32px); height: var(--hd-icon-size, 32px); }
 
-/* touch targets: every control is at least 44 x 44 css px */
-.q-btn { min-height: var(--ph-tap); border-radius: var(--ph-r-control); font-weight: 600; letter-spacing: 0; text-transform: none; }
-.q-btn--round { min-width: var(--ph-tap); min-height: var(--ph-tap); border-radius: 50%; }
+/* touch targets: every control is at least 44 x 44 css px; labels in sentence case */
+.q-btn { min-height: var(--ph-tap); letter-spacing: 0; text-transform: none; }
+.q-btn--round { min-width: var(--ph-tap); min-height: var(--ph-tap); }
 .q-btn.bg-primary { color: var(--ph-on-accent) !important; }
-.q-btn:not(.q-btn--flat):not(.q-btn--outline).bg-primary { background: var(--ph-accent) !important; }
 .q-toggle__inner, .q-checkbox__inner, .q-radio__inner { min-width: var(--ph-tap); min-height: var(--ph-tap); }
-.q-field--outlined .q-field__control { min-height: var(--ph-tap); border-radius: var(--ph-r-control); }
+.q-field--outlined .q-field__control { min-height: var(--ph-tap); }
 .q-field__native, .q-field__input { font-size: var(--ph-text-body); }
 .q-field--outlined .q-field__control:before { border-color: var(--ph-border); }
 .q-item { min-height: var(--ph-tap); }
@@ -45,11 +60,8 @@ h3 { font-size: var(--ph-text-title-s); }
 :focus-visible { outline: 3px solid var(--ph-focus); outline-offset: 2px; }
 .q-btn:focus-visible, .q-item:focus-visible { outline-offset: 0; }
 
-/* dialogs and menus */
-.q-dialog__inner > .q-card, .q-menu { border-radius: var(--ph-r-card); box-shadow: var(--ph-elev-3); background: var(--ph-surface); color: var(--ph-text); }
+/* dialogs: the Etesian theme draws them; keep them to a readable width */
 .q-dialog__inner--minimized > div { max-width: 480px; }
-.q-dialog__backdrop { background: rgba(8, 12, 18, 0.55); }
-.q-banner { border-radius: var(--ph-r-control); }
 
 /* Quasar transitions follow the motion tokens */
 .q-transition--fade-enter-active, .q-transition--fade-leave-active, .q-transition--scale-enter-active, .q-transition--scale-leave-active,

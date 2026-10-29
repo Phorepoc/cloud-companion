@@ -121,7 +121,8 @@ Please report vulnerabilities privately, as described in `SECURITY.md`.
 ## Working on it
 
 `go test ./...` runs the server tests. `sh web/test/db_test.sh` repeats them against PostgreSQL and MariaDB, the
-browser tests are in `web/test/`, and `make -C client check` tests the phone-side code. GitHub Actions runs all of
+browser tests are in `web/test/` (TypeScript, run by Node directly with `--experimental-strip-types`; `npm run check` in that
+directory type-checks them), and `make -C client check` tests the phone-side code. GitHub Actions runs all of
 them except the Android tests, which need a Docker host with the `binder_linux` kernel module.
 
 The server and its admin commands are in `cmd/phecloud`. The web app is in `web/`, the phone-side code in `client/`, and

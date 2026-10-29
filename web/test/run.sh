@@ -15,7 +15,14 @@ CODE=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
 NET=$(docker inspect phe-cloud --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE" -e OUT=/out \
-    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node smoke.mjs' || { echo '--- server log'; docker logs phe-cloud 2>&1 | tail -12 | cut -c1-260; exit 1; }
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning smoke.ts' || { echo '--- server log'; docker logs phe-cloud 2>&1 | tail -12 | cut -c1-260; exit 1; }
+
+# the desktop view and the Etesian theme (a fresh admin browser at 1440 x 900)
+echo "== desktop view"
+CODE3=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
+docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
+    -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE3" -e OUT=/out \
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning desktop.ts'
 
 # HTTPS through the Caddy reverse proxy (compose profile "tls", internal CA): pair, open example.com, tap the link over wss
 if [ "${TLS_CHECK:-1}" = 1 ]; then
@@ -25,7 +32,7 @@ if [ "${TLS_CHECK:-1}" = 1 ]; then
     CODE2=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
     docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
         -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=https://caddy -e CODE="$CODE2" -e OUT=/out -e QUICK=1 -e IGNORE_TLS=1 \
-        mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node smoke.mjs'
+        mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning smoke.ts'
 fi
 
 # two devices at once: the "tabs on your devices" list (Browser section)
@@ -33,4 +40,4 @@ echo "== tabs across devices"
 CA=$(docker exec phe-cloud phecloud paircode 2>/dev/null); CB=$(docker exec phe-cloud phecloud paircode 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODES="$CA,$CB" -e OUT=/out \
-    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node multi.mjs'
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning multi.ts'

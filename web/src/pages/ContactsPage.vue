@@ -88,28 +88,32 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { hubCall } from '../cloud.js'
-import { toast } from '../toast.js'
+import { hubCall } from '../cloud'
+import type { Contact, Labeled } from '../proto'
+
+/** The edit form: a contact's fields as plain strings and editable lists. */
+interface ContactForm { href?: string; etag?: string; given: string; family: string; org: string; note: string; phones: Required<Labeled>[]; emails: Required<Labeled>[] }
+import { toast } from '../toast'
 import EmptyState from '../components/EmptyState.vue'
 
-const contacts = ref([])
+const contacts = ref<Contact[]>([])
 const loading = ref(false)
 const error = ref('')
 const filter = ref('')
-const current = ref(null)
+const current = ref<Contact | null>(null)
 const viewOpen = ref(false)
 const editOpen = ref(false)
 const saving = ref(false)
 const formError = ref('')
-const form = ref(blank())
+const form = ref<ContactForm>(blank())
 const phoneTypes = [{ label: 'Mobile', value: 'cell' }, { label: 'Home', value: 'home' }, { label: 'Work', value: 'work' }, { label: 'Other', value: 'other' }]
 const emailTypes = [{ label: 'Home', value: 'home' }, { label: 'Work', value: 'work' }, { label: 'Other', value: 'other' }]
 
 function blank() { return { href: '', etag: '', given: '', family: '', org: '', note: '', phones: [], emails: [] } }
-const initials = (c) => (c.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
-const secondary = (c) => c.org || (c.emails && c.emails[0] && c.emails[0].value) || (c.phones && c.phones[0] && c.phones[0].value) || ''
+const initials = (c: Contact) => (c.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+const secondary = (c: Contact) => c.org || (c.emails && c.emails[0] && c.emails[0].value) || (c.phones && c.phones[0] && c.phones[0].value) || ''
 const shown = computed(() => {
   const q = (filter.value || '').toLowerCase().trim()
   const list = [...contacts.value].sort((a, b) => a.name.localeCompare(b.name))
@@ -122,20 +126,20 @@ async function load() {
   try {
     contacts.value = (await hubCall({ op: 'contacts.list' })).contacts || []
   } catch (e) {
-    error.value = friendly(e.message)
+    error.value = friendly((e as Error).message)
   } finally {
     loading.value = false
   }
 }
 
-function friendly(m) {
+function friendly(m: string) {
   if (/not set up/i.test(m)) return 'The hub is not set up on this server, so there are no contacts to show. See the hub guide to set it up.'
   return m
 }
 
-const openView = (c) => { current.value = c; viewOpen.value = true }
+const openView = (c: Contact) => { current.value = c; viewOpen.value = true }
 function openNew() { form.value = blank(); formError.value = ''; editOpen.value = true }
-function openEdit(c) {
+function openEdit(c: Contact) {
   viewOpen.value = false
   form.value = { href: c.href, etag: c.etag, given: c.given || '', family: c.family || '', org: c.org || '', note: c.note || '',
     phones: (c.phones || []).map((p) => ({ type: p.type || 'cell', value: p.value })), emails: (c.emails || []).map((e) => ({ type: e.type || 'home', value: e.value })) }
@@ -158,20 +162,20 @@ async function save() {
     toast(f.href ? 'Contact saved' : 'Contact added')
     await load()
   } catch (e) {
-    formError.value = e.message
+    formError.value = (e as Error).message
   } finally {
     saving.value = false
   }
 }
 
 // deleting is deferred for the length of the toast, so "Undo" is a real undo
-function remove(c) {
+function remove(c: Contact) {
   viewOpen.value = false
   contacts.value = contacts.value.filter((x) => x.href !== c.href)
   toast('Contact deleted', {
     undo: () => { contacts.value = [...contacts.value, c] },
     onExpire: async () => {
-      try { await hubCall({ op: 'contacts.delete', href: c.href, etag: c.etag }) } catch (e) { error.value = e.message; await load() }
+      try { await hubCall({ op: 'contacts.delete', href: c.href, etag: c.etag }) } catch (e) { error.value = (e as Error).message; await load() }
     },
   })
 }

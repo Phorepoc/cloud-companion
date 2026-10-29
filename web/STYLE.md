@@ -4,8 +4,11 @@ The web app is one person's place for the things that follow them from device to
 the browser with its tabs. That is personal data, used many times a day, mostly on a phone. The interface should feel like a calm
 tool that is already on your side, not like an app that wants attention.
 
-Everything here is implemented: the tokens are in `src/css/tokens.css`, the global rules in `src/css/app.css`, the name and logo in
-`src/brand.js`, the sections in `src/nav.js`. If this document and the code disagree, fix one of them in the same change.
+The look is the **Etesian design language**: the Nokia N9's (light type, lit squircle icons, dark chrome over light pages), carried to
+the web. Its tokens, base styles and Quasar theme are vendored in `src/css/etesian/` (MIT, from the etesian-design repo, never edited
+here); the app's own tokens in `src/css/tokens.css` point at them, the global rules are in `src/css/app.css`, the name and logo in
+`src/brand.ts`, the sections in `src/nav.ts`, the desktop view in `src/desktop/`. If this document and the code disagree, fix one of them
+in the same change.
 
 ## 1. Principles
 
@@ -31,7 +34,7 @@ Everything here is implemented: the tokens are in `src/css/tokens.css`, the glob
 ## 2. Brand token
 
 The product name is undecided (candidates: Cloud Companion, Cloud Pal, Porter). **The name and the logo exist in one file,
-`src/brand.js`.** It holds `name`, `short`, `tagline`, the icon colours and `logoPath` (a 64 x 64 path drawn in `currentColor`). The build
+`src/brand.ts`.** It holds `name`, `short`, `tagline`, the icon colours and `logoPath` (a 64 x 64 path drawn in `currentColor`). The build
 reads it for the page title, the web app manifest and the app icon (`vite.config.js`); the app bar, the pairing page and the document title
 read it at run time. To rename or re-logo the product: edit that file, rebuild. Do not write the product name anywhere else, in code,
 copy or tests; refer to "the app" in prose and use `brand.name` in code. (The Go server and the phone clients have their own names:
@@ -44,65 +47,76 @@ variables (`--q-primary` and friends) are mapped onto them, so Quasar components
 
 ### 3.1 Colour
 
-One accent, a neutral ramp, four status colours. Ratios are WCAG contrast ratios, computed from the values below.
+One accent, the Etesian neutral ramp, four status colours. Surfaces, text and outlines come from the Etesian tokens (`--hd-c-*`), so they
+follow the colour mode (section 7); the accent and status colours are the app's own, because the default Etesian blue (`#4591FF`) is
+only 3:1 under white text. Each section also has its N9 application colour (`nav.ts`), used only on its icon tile, never for text.
+Ratios are WCAG contrast ratios, computed from the values below.
 
-| token | light | dark | used for |
+| token | hybrid (light) | dark | used for |
 |---|---|---|---|
-| `--ph-bg` | `#f6f7f8` | `#101317` | page background |
-| `--ph-surface` | `#ffffff` | `#181c22` | app bar, cards, dialogs, inputs |
-| `--ph-surface-2` | `#eceff2` | `#222831` | chips, selected rows, notes |
-| `--ph-divider` | `#d9dde2` | `#2c333c` | hairlines between rows (decoration only) |
-| `--ph-border` | `#7a838e` | `#6b7480` | outlines of controls |
-| `--ph-text` | `#1a1d21` | `#e8eaed` | body text |
-| `--ph-text-muted` | `#4a525c` | `#aab1bb` | secondary text, captions |
-| `--ph-accent` | `#0b5cad` | `#8ab4f8` | links, primary buttons, the selected section |
-| `--ph-on-accent` | `#ffffff` | `#0b1220` | text on an accent fill |
-| `--ph-accent-soft` | `#e4effa` | `#1f2d42` | selected navigation item, active tab |
-| `--ph-positive` | `#17663a` | `#7bd9a0` | success, "Connected" |
-| `--ph-warning` | `#8a4b00` | `#f2c36b` | caution |
-| `--ph-negative` | `#b3261e` | `#f2a19b` | errors, destructive actions |
+| `--ph-bg` | `#E0E1E2` | `#000000` | page background |
+| `--ph-surface` | `#FFFFFF` | `#161616` | cards, dialogs, inputs |
+| `--ph-surface-2` | `#F2F3F4` | `#222222` | chips, selected rows, notes |
+| `--ph-divider` | black 12 % | white 16 % | hairlines between rows (decoration only) |
+| `--ph-border` | `#6A6A6A` | `#A0A0A0` | outlines of controls |
+| `--ph-text` | `#282828` | `#FFFFFF` | body text |
+| `--ph-text-muted` | `#505050` | `#C8C8C8` | secondary text, captions |
+| `--ph-accent` | `#1C51AF` | `#7FB0FF` | links, primary buttons, the selected section (the N9 link blue) |
+| `--ph-on-accent` | `#FFFFFF` | `#0B1220` | text on an accent fill |
+| `--ph-accent-soft` | accent 12 % on surface | accent 18 % on surface | selected navigation item, active tab |
+| `--ph-positive` | `#2E6B00` | `#8FD65A` | success, "Connected" |
+| `--ph-warning` | `#8A4B00` | `#F2C36B` | caution |
+| `--ph-negative` | `#B3191A` | `#FF8A80` | errors, destructive actions |
+| `--ph-chrome` | `#3A3A3A` to `#141414` | same | the N9 toolbar: phone bottom bar, window header bars |
 
-Contrast (light / dark):
+Contrast (hybrid / dark):
 
-| pair | light | dark |
+| pair | hybrid | dark |
 |---|---|---|
-| text on page / on surface | 15.8 / 16.9 | 15.5 / 14.2 |
-| muted text on page / on surface / on surface-2 | 7.4 / 7.9 / 6.9 | 8.6 / 7.9 / 6.9 |
-| accent text on surface | 6.7 | 8.1 |
-| accent text on accent-soft | 5.7 | 6.6 |
-| on-accent text on accent | 6.7 | 8.9 |
-| positive / warning / negative text on surface | 7.0 / 6.8 / 6.5 | 10.0 / 10.4 / 8.4 |
-| control border on surface / on page | 3.8 / 3.6 | 3.6 / 3.9 |
+| text on page / on surface | 11.3 / 14.7 | 21.0 / 18.1 |
+| muted text on page / on surface / on surface-2 | 6.2 / 8.1 / 7.3 | 12.6 / 10.8 / 9.5 |
+| accent text on surface | 7.4 | 8.2 |
+| accent text on accent-soft | 6.1 | 5.9 |
+| on-accent text on accent | 7.4 | 8.5 |
+| positive / warning / negative text on surface | 6.5 / 6.8 / 6.8 | 10.3 / 11.0 / 7.9 |
+| control border on surface / on page | 5.4 / 4.1 | 6.9 / 8.0 |
+| muted chrome text (`#C8C8C8`) on the toolbar, darkest / lightest | 11.0 / 6.8 | same |
 
 Rules: dark mode is not an inversion; surfaces get lighter as they rise, and shadows give way to hairlines. Do not add a colour: if a new
-meaning is needed, use an icon and a word with an existing colour. Text over a page image or tile always sits on a surface.
+meaning is needed, use an icon and a word with an existing colour. Text over a page image or tile always sits on a surface. Section
+colours appear only as lit squircle tiles (`SectionTile.vue`), with the label beside them carrying the meaning.
 
 ### 3.2 Type
 
-System font stack (no web font to download, native feel on every platform, good for privacy and speed):
-`system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif`; monospace for ids and code:
-`ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`.
+**Nokia Pure Text** when the person has it installed (it is proprietary: referenced with `local()` only, never shipped), otherwise
+**Fira Sans** (OFL-1.1, from `@fontsource/fira-sans`, latin, weights 300/400/700, about 70 KB), which the Etesian design repo measured as
+the closest free look-alike and size-adjusts to Nokia Pure's cap height (`src/css/etesian/fonts.css`). The fonts are served by this server;
+nothing is fetched from a font service. Monospace for ids and code: `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`.
 
 | token | size | use |
 |---|---|---|
-| `--ph-text-caption` | 13 px | tab labels in the bottom bar, timestamps |
+| `--ph-text-caption` | 12 px | tab labels in the bottom bar, timestamps |
 | `--ph-text-small` | 14 px | secondary lines in lists, hints |
 | `--ph-text-body` | 16 px | all reading and typing (never smaller: phones zoom into smaller inputs) |
-| `--ph-text-title-s` | 18 px | app name, card headings |
-| `--ph-text-title` | 22 px | section headings (`h2`) |
-| `--ph-text-headline` | 28 px | the page heading (`h1`, one per page) |
+| `--ph-text-title-s` | 19 px | card headings (`h3`) |
+| `--ph-text-title` | 24 px | section headings (`h2`) |
+| `--ph-text-headline` | 32 px | the page heading (`h1`, one per page) |
 
-Line height 1.5 for text, 1.25 for headings. Weight 400 for text, 600 for headings and the selected item; no other weights. Sentence case
-everywhere. Respect the user's browser font size (sizes are in `rem`; layouts must survive 200 % zoom).
+The N9 voice: text and headings in the **light** weight (300), big light page headers; regular (400) for small headings, menus and
+buttons; bold (700) only for emphasis, the brand in the top bar and the current item in the bottom bar. Line height 1.5 for text, 1.2 for
+headings. Sentence case everywhere (the brand in the top bar is the one place in capitals). Respect the user's browser font size (sizes
+are in `rem`; layouts must survive 200 % zoom).
 
 ### 3.3 Space, shape, elevation, motion
 
 * **Space** (4 px grid): `--ph-s1` 4, `s2` 8, `s3` 12, `s4` 16, `s6` 24, `s8` 32, `s12` 48. Page padding is 16 px (12 px on a phone). Related
   things sit 8 px apart, groups 16 px, sections 24 px. `--ph-tap` is 44 px.
-* **Radii:** controls 8 px, cards and dialogs 12 px, bottom sheets 20 px at the top corners, pills and avatars fully round.
-* **Elevation:** 0 flat (bars, lists), 1 cards (a hairline and a faint shadow), 2 menus, 3 dialogs and sheets. In dark mode elevation is a
-  hairline plus a lighter surface.
-* **Motion:** 120 ms for hover and press, 200 ms for panels and dialogs, 300 ms for page-level changes; easing `cubic-bezier(0.2, 0, 0, 1)`.
+* **Radii and shapes:** controls 6 px, cards and dialogs 8 px (Etesian), bottom sheets 16 px at the top corners, pills fully round.
+  **Squircles, not rounded squares or circles,** for every thumb-sized object: section tiles, avatars, icon buttons and their pressed
+  highlight (`.hd-squircle`, `.hd-sq`, the N9 superellipse mask).
+* **Elevation:** N9 surfaces are flat: cards are a surface and a hairline, no shadow; no ripples. Only overlays cast a shadow (menus,
+  dialogs, the launcher, desktop windows). In dark mode elevation is a hairline plus a lighter surface.
+* **Motion:** 130 ms for hover and press, 200 ms for panels and dialogs, 350 ms for page-level changes; Etesian ease-out.
   Nothing loops except a progress spinner, and the spinner has text for assistive technology. Under `prefers-reduced-motion` the durations
   are 0.01 ms.
 
@@ -117,12 +131,50 @@ Content width is at most 960 px, centred; the web page itself (the cloud browser
 | 1024 px and up (desktop) | top bar + **labelled drawer** (240 px) | |
 
 The sections, in order: **Browser, Chats, Mail, Calendar** (primary: bottom bar on a phone), **Contacts, Files, Devices** (admin only),
-**Settings** (under More on a phone). They are defined once in `src/nav.js`; adding a section is one line there plus one route. A
+**Settings** (under More on a phone). They are defined once in `src/nav.ts`; adding a section is one line there plus one route. A
 section that does not exist yet shows the empty state with one sentence about what will live there and a way back; it never shows a
 disabled copy of the future UI.
 
-The top bar holds only the product mark and name and the connection status ("Connected", "Connecting", "Offline": an icon and a word).
-Page-level actions live in the page, not in the bar. Every page has exactly one `h1`.
+The top bar is the Etesian site header: the product mark and the name in bold capitals on the page colour, the connection status
+("Connected", "Connecting", "Offline": an icon and a word) and, from 1024 px, "Desktop view". Page-level actions live in the page, not in the
+bar. Every page has exactly one `h1`. On a phone the bottom bar is the N9 toolbar: the dark chrome gradient, icons with small labels,
+the current section in white and bold. In the drawer and the "More" sheet each section has its lit squircle tile.
+
+### 4.1 The desktop view
+
+From 1024 px the app can also be used as a desktop, as if the server were a computer you sit at (`src/desktop/`, route `#/desktop`).
+"Desktop view" in the top bar enters it; View > Classic view leaves it; Settings > Appearance > Layout switches either way. The choice and the window arrangement are stored on the device
+(`localStorage`: `phecloud-layout`, `phecloud-desktop`), so "/" reopens the desktop; below 1024 px the classic layout is always used.
+It follows the approved Etesian desktop design:
+
+* **Menu bar** (top, 28 px, black): the focused window's name in bold and its menus (Window: minimise, maximise, snap left / right,
+  close, the open windows; View: launcher, classic view) on the left; the connection status and the date and time on the right.
+* **Dock** (left, floating, icons only): the launcher first, a divider, then every section as its lit tile. A short bar marks an open
+  section, a longer white bar the focused one. Clicking opens a section, brings it forward, or minimises it if it is already in front.
+* **Windows** overlap; each has one 44 px header bar of N9 chrome (the section tile, its name in light type, then minimise, maximise
+  and close, separated by a hairline; close turns red on hover; inactive windows show their bar at half strength). The page inside is the
+  same page as in the classic layout, without its `h1` on screen (the bar names it; the heading stays for assistive technology).
+* **Snapping:** drag a window's bar to the left or right edge for that half, to the top edge to maximise (the zone shows while dragging);
+  double-click the bar to maximise or restore; any edge or corner resizes a floating window. Keyboard: Super or Ctrl+Alt with Left /
+  Right (snap to that half), Up (maximise), Down (float again, or minimise a floating window).
+* **Launcher:** Super alone or the dock's first button: type to filter the sections, Enter opens the first, Escape closes.
+* **Quick switcher:** hold Super (or Ctrl+Alt, where the system keeps Super for itself) and press Tab: the open windows, most recent
+  first, with the previous one selected; Tab again (Shift+Tab back) moves on, letting go switches, Escape cancels.
+* **Events** (the N9 Events screen as a panel at the right edge): click the clock, or Super+N / Ctrl+Alt+N, or View > Events. The date,
+  today's and tomorrow's calendar, unread mail and the three latest chats; each row opens its section. A service that is not set up says
+  so in one muted line. A dot on the clock marks unread mail (checked every two minutes). Escape, the clock again or a click on a window
+  closes it.
+* **Widgets** (after the Etesian Belle widgets; `src/desktop/DesktopWidgets.vue`, kinds and sizes in `widgets.ts`): on the wallpaper under
+  every window, on a 90 px grid. Big clock, analog clock (both in the menu bar's time format), unread mail, today's agenda, latest chats;
+  each is a Belle panel (dark glass, 12 px corners) headed by the section's lit squircle, and a row opens that section as a window.
+  View > Show desktop (Super+D / Ctrl+Alt+D) minimises the windows. View > Edit widgets puts the windows aside and shows the phone's
+  edit chrome (accent outline, red ✕ squircle) with the Add widgets sheet; drag to move, or focus a widget and use the arrow keys;
+  Delete removes; Done or Esc ends. No long-press and no context menu. The arrangement is kept on this device. A feeds (RSS) widget
+  waits for RSS support on the server.
+* **Android** is a phone, so its window opens tall and narrow at full height, and the screen fits the window's height (the window body is
+  a size container; the page sizes the screen with `cqh`, which is the viewport outside a window). In a window and on a phone its
+  controls are one row of icons, each named for screen readers and on hover.
+* A link from one section to another opens the other as a window instead of leaving the desktop.
 
 ## 5. Components
 
@@ -156,7 +208,7 @@ sentence that says what to do. One column. Autocomplete and `inputmode` attribut
 * Loading: a spinner and what is loading ("Loading devices"); content that already exists stays visible while it refreshes.
 * Error: say what happened and what to do ("Could not reach the server. Check your network and try again."), with the retry action.
 
-**Notices and toasts** (toasts: `src/toast.js` + `components/ToastHost.vue`; `toast(message, { undo, onExpire })`). A notice that needs action is an inline banner (`role="alert"`) at the top of the content with a "Dismiss" or a
+**Notices and toasts** (toasts: `src/toast.ts` + `components/ToastHost.vue`; `toast(message, { undo, onExpire })`). A notice that needs action is an inline banner (`role="alert"`) at the top of the content with a "Dismiss" or a
 fix. A toast is only for the result of something the person just did ("Saved"), appears at the bottom above the bar for 4 seconds, can be
 reached by keyboard, and offers "Undo" when the action can be undone. Errors are never toasts.
 
@@ -170,14 +222,16 @@ with `sym_o_`). One style only: outlined, weight 400. Sizes 20 px inline with te
 An icon is paired with a text label, or has an `aria-label`; purely decorative icons are `aria-hidden`. Used today: `language`, `chat`, `mail`,
 `calendar_month`, `contacts`, `folder`, `devices`, `settings`, `more_horiz`, `arrow_back`, `arrow_forward`, `refresh`, `add`, `close`, `zoom_in`,
 `zoom_out`, `cloud_done`, `cloud_off`, `sync`, `error`, `download`, `lock`, `check_circle`, `inbox`, `contrast`, `light_mode`, `dark_mode`, `search`, `call`,
-`location_on`, `chevron_left`, `chevron_right`. The font is subset to exactly the icons found in `src/` (and Quasar's own icon set) by
+`location_on`, `chevron_left`, `chevron_right`, and for the desktop view `desktop_windows`, `apps`, `minimize`, `crop_square`, `filter_none`, `web`, `refresh`. The font is subset to exactly the icons found in `src/` (and Quasar's own icon set) by
 `tools/subset-icons.py`, run by the Docker build: 6.5 KB instead of 3.6 MB. Add an icon by using its `sym_o_` name; the next build includes it. (The
 script freezes the variable axes to regular weight, no fill, 24 px.)
 
 ## 7. Dark mode
 
 Follows the system by default. Settings > Appearance offers **Match system, Light, Dark**; the choice is stored on the device
-(`localStorage`, key `phecloud-theme`) and applied before the first paint of the app. Both themes are tested at 390 px and 1280 px.
+(`localStorage`, key `phecloud-theme`). Light is the Etesian **hybrid** mode, the N9 look: light pages under dark chrome; dark is the
+Etesian dark mode. `theme.ts` sets `data-hd-mode` on `<html>` (the tokens follow it) and the `hd-quasar` class on `<body>` (the Quasar
+theme); before the script runs, the hybrid colours apply from `:root`. Both themes are tested at 390 px and 1280 px.
 Images and the page canvas are never recoloured; the cloud page keeps its own colours inside its frame.
 
 ## 8. Writing style for UI text
@@ -207,8 +261,15 @@ Images and the page canvas are never recoloured; the cloud page keeps its own co
 
 ## 10. Changing things
 
-* **Rename or re-logo the product:** `src/brand.js`, rebuild.
-* **Add a section:** `src/nav.js` (label, icon, path, `primary` if it belongs in the phone's bottom bar), a route in `src/router.js`, a page
+* **Code is TypeScript, strict.** `npm run check` type-checks the app (`vue-tsc`), and `npm run build` (the Docker build too)
+  refuses to build with a type error. The protocol's frames and the hub's objects are typed in `src/proto.ts`, which follows
+  `internal/proto/proto.go`: change both together. `src/android/stream.js` stays JavaScript (the Android bridge serves the same
+  file to browsers) and is described by `stream.d.ts` next to it.
+* **Rename or re-logo the product:** `src/brand.ts`, rebuild.
+* **Add a section:** `src/nav.ts` (label, icon, path, `primary` if it belongs in the phone's bottom bar), a route in `src/router.ts`, a page
   in `src/pages/`; until the page exists the `SectionPage` placeholder shows the empty state.
-* **Retune a colour:** change the token in `src/css/tokens.css` in both themes and update the contrast table here with the computed ratios.
+* **Retune a colour:** change the token in `src/css/tokens.css` in both modes and update the contrast table here with the computed ratios.
+* **Update the Etesian design files:** copy `src/styles/tokens.css`, `src/styles/base.css` and `src/quasar/etesian-quasar.css` (as
+  `quasar-theme.css`) from the etesian-design repo into `src/css/etesian/`, keeping the header that names the commit; never edit them here.
+  App-specific changes go in `src/css/tokens.css` and `src/css/app.css`.
 * **New component:** build it from tokens, give it the states above (hover, focus, disabled, loading, error), test it in both themes.

@@ -81,14 +81,15 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { state, api, connect, hubCall } from '../cloud.js'
-import { toast } from '../toast.js'
+import { state, api, connect, hubCall } from '../cloud'
+import type { AppPassword, DeviceInfo } from '../proto'
+import { toast } from '../toast'
 import EmptyState from '../components/EmptyState.vue'
 
-const fmt = (t) => new Date(t * 1000).toLocaleString()
-function confirm(d) {
+const fmt = (t: number) => new Date(t * 1000).toLocaleString()
+function confirm(d: DeviceInfo) {
   if (window.confirm('Sign out ' + (d.name || d.id) + '? It will need a new code to connect again.')) {
     api.revoke(d.id)
     setTimeout(() => api.devices(), 300)
@@ -96,7 +97,7 @@ function confirm(d) {
 }
 
 // ---- app passwords (the hub's per-device passwords) ----
-const apppws = ref([])
+const apppws = ref<AppPassword[]>([])
 const apppwLoaded = ref(false)
 const apppwError = ref('')
 const addOpen = ref(false)
@@ -105,7 +106,8 @@ const addDays = ref(0)
 const addError = ref('')
 const adding = ref(false)
 const secretOpen = ref(false)
-const created = ref({})
+// the password just made: shown once, with what a mail app needs
+const created = ref({ name: '', secret: '', owner: '', domain: '' })
 
 async function loadPw() {
   if (!state.admin) return
@@ -113,7 +115,7 @@ async function loadPw() {
   try {
     apppws.value = (await hubCall({ op: 'apppw.list' })).apppws || []
   } catch (e) {
-    apppwError.value = /not set up/i.test(e.message) ? 'The hub is not set up on this server, so there are no app passwords.' : e.message
+    apppwError.value = /not set up/i.test((e as Error).message) ? 'The hub is not set up on this server, so there are no app passwords.' : (e as Error).message
   } finally {
     apppwLoaded.value = true
   }
@@ -123,23 +125,23 @@ async function createPw() {
   addError.value = ''
   try {
     const r = await hubCall({ op: 'apppw.add', name: addName.value, days: addDays.value || undefined })
-    created.value = { name: addName.value, secret: r.secret, owner: r.owner, domain: r.domain }
+    created.value = { name: addName.value, secret: r.secret ?? '', owner: r.owner ?? '', domain: r.domain ?? '' }
     addOpen.value = false
     secretOpen.value = true
     await loadPw()
   } catch (e) {
-    addError.value = e.message
+    addError.value = (e as Error).message
   } finally {
     adding.value = false
   }
 }
-async function revokePw(p) {
+async function revokePw(p: AppPassword) {
   if (!window.confirm('Switch off the password of ' + p.name + '? That device can no longer read your mail, calendar or contacts.')) return
   try {
     await hubCall({ op: 'apppw.revoke', id2: p.id })
     toast('Password switched off')
   } catch (e) {
-    apppwError.value = e.message
+    apppwError.value = (e as Error).message
   }
   await loadPw()
 }

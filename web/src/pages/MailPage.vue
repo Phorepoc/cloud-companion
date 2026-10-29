@@ -94,39 +94,43 @@
   </q-page>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { hubCall } from '../cloud.js'
-import { toast } from '../toast.js'
+import { hubCall } from '../cloud'
+import type { MailAccount, MailBody, MailFolder, MailItem } from '../proto'
+
+/** The message being written: recipients, subject, text, the Message-ID it answers, and the account it goes out through. */
+interface Draft { rcpt: string; subject: string; body: string; replyTo: string; account: string }
+import { toast } from '../toast'
 import EmptyState from '../components/EmptyState.vue'
 
-const folders = ref([])
+const folders = ref<MailFolder[]>([])
 const folder = ref('')
-const mails = ref([])
+const mails = ref<MailItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const error = ref('')
 const open = ref(false)
 const reading = ref(false)
-const msg = ref(null)
-const current = ref(null)
+const msg = ref<MailBody | null>(null)
+const current = ref<MailItem | null>(null)
 const formatted = ref(false)
 const composeOpen = ref(false)
 const sending = ref(false)
 const sendError = ref('')
-const draft = ref({ rcpt: '', subject: '', body: '', replyTo: '', account: '' })
-const accounts = ref([]) // connected accounts that can send (Connections)
+const draft = ref<Draft>({ rcpt: '', subject: '', body: '', replyTo: '', account: '' })
+const accounts = ref<MailAccount[]>([]) // connected accounts that can send (Connections)
 const fromOptions = computed(() => [{ label: 'Hub address (stays on this server)', value: '' }, ...accounts.value.map((a) => ({ label: `${a.name} <${a.from}>`, value: a.id }))])
 
-const order = { inbox: 0, drafts: 1, sent: 2, archive: 3, junk: 4, trash: 5 }
-const folderOptions = computed(() => [...folders.value].sort((a, b) => (order[a.role] ?? 9) - (order[b.role] ?? 9) || a.name.localeCompare(b.name))
+const order: Record<string, number> = { inbox: 0, drafts: 1, sent: 2, archive: 3, junk: 4, trash: 5 }
+const folderOptions = computed(() => [...folders.value].sort((a, b) => (order[a.role || ''] ?? 9) - (order[b.role || ''] ?? 9) || a.name.localeCompare(b.name))
   .map((f) => ({ label: f.name + (f.unread ? ` (${f.unread} unread)` : ''), value: f.id })))
 const role = computed(() => (folders.value.find((f) => f.id === folder.value) || {}).role || '')
 const moveTargets = computed(() => [{ role: 'inbox', label: 'Inbox' }, { role: 'archive', label: 'Archive' }, { role: 'junk', label: 'Junk' }, { role: 'trash', label: 'Trash' }].filter((t) => t.role !== role.value && folders.value.some((f) => f.role === t.role)))
 // the formatted view: sanitised by the server, shown in a sandboxed frame whose content policy forbids every load
 const frameDoc = computed(() => `<!doctype html><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><base target="_blank"><style>body{font:15px system-ui,sans-serif;margin:8px;overflow-wrap:anywhere;color:#1a1d21;background:#fff}blockquote{margin:0 0 0 8px;padding-left:8px;border-left:3px solid #ccc}</style>${msg.value ? msg.value.safe : ''}`)
 
-function when(iso) {
+function when(iso: string) {
   const d = new Date(iso)
   return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
@@ -139,7 +143,7 @@ async function init() {
     if (!folder.value) folder.value = (folders.value.find((f) => f.role === 'inbox') || folders.value[0] || {}).id || ''
     if (folder.value) await loadList(true)
   } catch (e) {
-    error.value = /not set up/i.test(e.message) ? 'The hub is not set up on this server, so there is no mail to show. See the hub guide to set it up.' : e.message
+    error.value = /not set up/i.test((e as Error).message) ? 'The hub is not set up on this server, so there is no mail to show. See the hub guide to set it up.' : (e as Error).message
   }
 }
 async function refresh() {
@@ -147,7 +151,7 @@ async function refresh() {
   await loadList(true)
 }
 
-async function loadList(reset) {
+async function loadList(reset: boolean) {
   if (!folder.value) return
   loading.value = true
   error.value = ''
@@ -156,23 +160,23 @@ async function loadList(reset) {
     mails.value = reset ? r.mails || [] : [...mails.value, ...(r.mails || [])]
     total.value = r.total || mails.value.length
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   } finally {
     loading.value = false
   }
 }
 
-async function openMail(m) {
+async function openMail(m: MailItem) {
   current.value = m
   open.value = true
   reading.value = true
   formatted.value = false
   msg.value = null
   try {
-    msg.value = (await hubCall({ op: 'mail.read', id2: m.id })).mail
+    msg.value = (await hubCall({ op: 'mail.read', id2: m.id })).mail || null
   } catch (e) {
     open.value = false
-    error.value = e.message
+    error.value = (e as Error).message
   } finally {
     reading.value = false
   }
@@ -180,34 +184,36 @@ async function openMail(m) {
 
 async function toggleRead() {
   const m = current.value
+  if (!m) return
   const toRead = m.unread
   try {
     await hubCall({ op: 'mail.mark', id2: m.id, flag: toRead ? 'read' : 'unread' })
     m.unread = !toRead
     toast(toRead ? 'Marked as read' : 'Marked as unread')
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 }
 
 // moving and deleting wait for the length of the Undo toast before they reach the hub
-function leave(m, label, action) {
+function leave(m: MailItem | null, label: string, action: () => Promise<unknown>) {
+  if (!m) return
   open.value = false
   const i = mails.value.findIndex((x) => x.id === m.id)
   mails.value = mails.value.filter((x) => x.id !== m.id)
   toast(label, {
     undo: () => { const l = [...mails.value]; l.splice(Math.min(Math.max(i, 0), l.length), 0, m); mails.value = l },
-    onExpire: async () => { try { await action(); await refreshFolders() } catch (e) { error.value = e.message; await loadList(true) } },
+    onExpire: async () => { try { await action(); await refreshFolders() } catch (e) { error.value = (e as Error).message; await loadList(true) } },
   })
 }
 async function refreshFolders() { try { folders.value = (await hubCall({ op: 'mail.folders' })).folders || folders.value } catch (e) { /* ignore */ } }
-const remove = () => leave(current.value, role.value === 'trash' ? 'Message deleted for good' : 'Moved to Trash', () => hubCall({ op: 'mail.delete', id2: current.value.id }))
-function move(t) {
+const remove = () => leave(current.value, role.value === 'trash' ? 'Message deleted for good' : 'Moved to Trash', () => hubCall({ op: 'mail.delete', id2: current.value!.id }))
+function move(t: { label: string; role: string }) {
   const m = current.value
-  leave(m, `Moved to ${t.label}`, () => hubCall({ op: 'mail.move', id2: m.id, role: t.role }))
+  if (m) leave(m, `Moved to ${t.label}`, () => hubCall({ op: 'mail.move', id2: m.id, role: t.role }))
 }
 
-function openCompose(init) {
+function openCompose(init?: Partial<Draft>) {
   draft.value = { rcpt: '', subject: '', body: '', replyTo: '', account: accounts.value.length === 1 && !init ? '' : '', ...init }
   sendError.value = ''
   open.value = false
@@ -215,6 +221,7 @@ function openCompose(init) {
 }
 function reply() {
   const m = msg.value
+  if (!m) return
   const quoted = (m.text || '').split('\n').map((l) => '> ' + l).join('\n')
   // an answer goes out through the account the message came from (its hub folder is named "<account> / <folder>")
   const fname = (folders.value.find((f) => f.id === folder.value) || {}).name || ''
@@ -231,7 +238,7 @@ async function send() {
     toast('Message sent')
     await refresh()
   } catch (e) {
-    sendError.value = e.message
+    sendError.value = (e as Error).message
   } finally {
     sending.value = false
   }

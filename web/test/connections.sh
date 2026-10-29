@@ -21,4 +21,4 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:p
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8080 -e CODE="$A" -e OUT=/out \
     -e DAV_URL="${DAV_URL:?set DAV_URL (a Radicale collection with a fixture contact)}" -e DAV_USER="${DAV_USER:-phone}" -e DAV_PASS="${DAV_PASS:-phonepass}" \
     -e IMAP_HOST=phe-imapmem -e IMAP_PORT=1143 \
-    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node connections.mjs' || { docker logs phe-cloud-pk 2>&1 | tail -8 | cut -c1-240; exit 1; }
+    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning connections.ts' || { docker logs phe-cloud-pk 2>&1 | tail -8 | cut -c1-240; exit 1; }

@@ -1,0 +1,465 @@
+<!-- Copyright The Phorepoc Authors
+     SPDX-License-Identifier: Apache-2.0 -->
+<!-- The desktop view (1024 px and up): the app's sections as windows, as if the server were a computer you are sitting at. It follows
+     the Etesian desktop design: a global menu bar at the top (the focused window's name and its menus on the left, the connection and
+     the clock on the right), a light floating dock on the left (launcher, then the sections, a bar marking the open ones), and
+     overlapping windows that snap to halves or fill the screen (by dragging to an edge, or Super / Ctrl+Alt with the arrow keys).
+     Super alone, or the dock's first button, opens the launcher: type to find a section, Enter opens it.
+     The window arrangement and the layout choice are kept on this device (localStorage), like the theme. -->
+<template>
+  <div class="ph-desk" data-test="desktop">
+    <a href="#ph-desk-area" class="ph-skip" @click.prevent="focusTop">Skip to the windows</a>
+    <!-- global menu bar -->
+    <header class="ph-menubar">
+      <span class="ph-menubar__app" data-test="menubar-app">{{ focusedSection?.label || brand.name }}</span>
+      <q-btn flat dense no-caps label="Window" class="ph-menubar__menu" :disable="!openWins.length">
+        <q-menu class="ph-desk-menu" anchor="bottom left" self="top left">
+          <q-list dense>
+            <q-item v-close-popup clickable :disable="!focusedWin" @click="minimise(focusedWin)"><q-item-section>Minimise</q-item-section></q-item>
+            <q-item v-close-popup clickable :disable="!focusedWin" @click="toggleMax(focusedWin)">
+              <q-item-section>{{ focusedWin?.state === 'max' ? 'Restore' : 'Maximise' }}</q-item-section><q-item-section side>Super+Up</q-item-section>
+            </q-item>
+            <q-item v-close-popup clickable :disable="!focusedWin" @click="snap(focusedWin, 'left')"><q-item-section>Snap to the left half</q-item-section><q-item-section side>Super+Left</q-item-section></q-item>
+            <q-item v-close-popup clickable :disable="!focusedWin" @click="snap(focusedWin, 'right')"><q-item-section>Snap to the right half</q-item-section><q-item-section side>Super+Right</q-item-section></q-item>
+            <q-item v-close-popup clickable :disable="!focusedWin" @click="close(focusedWin)"><q-item-section>Close</q-item-section></q-item>
+            <q-separator />
+            <q-item v-for="w in openWins" :key="w.id" v-close-popup clickable @click="show(w)">
+              <q-item-section>{{ byId[w.id].label }}</q-item-section>
+              <q-item-section v-if="w.min" side>Minimised</q-item-section>
+            </q-item>
+          </q-list>
+        </q-menu>
+      </q-btn>
+      <q-btn flat dense no-caps label="View" class="ph-menubar__menu">
+        <q-menu class="ph-desk-menu" anchor="bottom left" self="top left">
+          <q-list dense>
+            <q-item v-close-popup clickable @click="launcher = true"><q-item-section>Launcher</q-item-section><q-item-section side>Super</q-item-section></q-item>
+            <q-item v-close-popup clickable @click="events = true"><q-item-section>Events</q-item-section><q-item-section side>Super+N</q-item-section></q-item>
+            <q-item v-close-popup clickable data-test="show-desktop" @click="showDesktop"><q-item-section>Show desktop</q-item-section><q-item-section side>Super+D</q-item-section></q-item>
+            <q-item v-close-popup clickable data-test="edit-widgets" @click="widgetEdit = true"><q-item-section>Edit widgets</q-item-section></q-item>
+            <q-item v-close-popup clickable data-test="classic-view" @click="leave"><q-item-section>Classic view</q-item-section></q-item>
+          </q-list>
+        </q-menu>
+      </q-btn>
+      <q-space />
+      <span class="ph-menubar__status" :class="'is-' + state.status" role="status">
+        <q-icon :name="state.status === 'online' ? 'sym_o_cloud_done' : state.status === 'connecting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="16px" aria-hidden="true" />
+        {{ statusText }}
+      </span>
+      <!-- the clock opens Events, as on the Etesian desktop; the dot says there is unread mail -->
+      <button type="button" class="ph-menubar__clock" :class="{ 'is-on': events }" :aria-expanded="events" data-test="clock"
+              :aria-label="`${dateText} ${timeText}, events${unread ? ', ' + unread + ' unread mail' : ''}`" title="Events (Super+N)" @click="events = !events">
+        <time :datetime="now.toISOString()">{{ dateText }} <b>{{ timeText }}</b></time>
+        <span v-if="unread" class="ph-menubar__dot" aria-hidden="true" />
+      </button>
+    </header>
+
+    <div id="ph-desk-area" ref="areaEl" class="ph-desk__area" tabindex="-1">
+      <!-- widgets on the wallpaper, under the windows; while they are edited the windows step aside -->
+      <DesktopWidgets :now="now" :area="area" :editing="widgetEdit" @open="(id) => open(id)" @done="widgetEdit = false" />
+      <DesktopWindow v-for="w in (widgetEdit ? [] : shownWins)" :key="w.id" :win="w" :rect="rectOf(w)" :section="byId[w.id]" :page="pages[w.id].component!"
+                     :page-props="pages[w.id].props" :focused="focusedId === w.id" :busy="busy"
+                     @focus="focus(w); events = false" @move="(p) => move(w, p)" @resize="(r) => resize(w, r)" @drag-zone="dragZone" @drop="(p) => drop(w, p)"
+                     @busy="(b) => (busy = b)" @minimise="minimise(w)" @maximise="toggleMax(w)" @close="close(w)" />
+      <!-- where a dragged window will snap -->
+      <div v-if="zone" class="ph-desk__zone" :style="zoneStyle" aria-hidden="true" />
+
+      <!-- quick switcher: hold Super (or Ctrl+Alt), Tab steps through the windows, most recent first; letting go switches -->
+      <div v-if="switcher" class="ph-switcher" role="listbox" aria-label="Windows" data-test="switcher">
+        <div v-for="(id, i) in switcher.list" :key="id" class="ph-switcher__item" :class="{ 'is-sel': i === switcher.i }"
+             role="option" :aria-selected="i === switcher.i" :data-test="'switch-' + id">
+          <SectionTile :section="byId[id]" :size="56" />
+          <span>{{ byId[id].label }}</span>
+        </div>
+      </div>
+
+      <EventsPanel v-if="events" :now="now" @open="(id) => { events = false; open(id) }" @close="events = false" @unread="(n) => (unread = n)" />
+
+      <!-- launcher -->
+      <div v-if="launcher" class="ph-launcher-scrim" @pointerdown.self="launcher = false">
+        <div class="ph-launcher" role="dialog" aria-label="Launcher" data-test="launcher">
+          <q-input ref="searchEl" v-model="query" dark borderless dense placeholder="Type to search" aria-label="Search sections"
+                   class="ph-launcher__search" @keydown.enter="openFirst" @keydown.esc="launcher = false">
+            <template #prepend><q-icon name="sym_o_search" /></template>
+          </q-input>
+          <div class="ph-launcher__grid">
+            <button v-for="s in found" :key="s.id" type="button" class="ph-launcher__app" :data-test="'launch-' + s.id" @click="open(s.id)">
+              <SectionTile :section="s" :size="56" />
+              <span>{{ s.label }}</span>
+            </button>
+            <p v-if="!found.length" class="ph-launcher__none">Nothing matches "{{ query }}".</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- dock -->
+    <nav class="ph-dock" aria-label="Sections">
+      <button type="button" class="ph-dock__item" :class="{ 'is-active': launcher }" aria-label="Launcher" title="Launcher (Super)"
+              data-test="dock-launcher" @click="launcher = !launcher">
+        <span class="ph-tile hd-squircle hd-icon-lit" style="--hd-icon-accent: #4591FF; --hd-icon-size: 40px" aria-hidden="true">
+          <q-icon name="sym_o_apps" size="24px" />
+        </span>
+      </button>
+      <span class="ph-dock__sep" aria-hidden="true" />
+      <button v-for="s in visible" :key="s.id" type="button" class="ph-dock__item"
+              :class="{ 'is-open': isOpen(s.id), 'is-active': focusedId === s.id && !winOf(s.id)?.min }"
+              :aria-label="s.label + (isOpen(s.id) ? ', open' : '')" :title="s.label" :data-test="'dock-' + s.id" @click="dockClick(s.id)">
+        <SectionTile :section="s" :size="40" />
+      </button>
+    </nav>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type Component } from 'vue'
+import type { QInput } from 'quasar'
+import type { Rect, Win, WinState } from './types'
+import { useRoute, useRouter } from 'vue-router'
+import { state, hubCall } from '../cloud'
+import { sections } from '../nav'
+import { brand } from '../brand'
+import SectionTile from '../components/SectionTile.vue'
+import DesktopWindow from './DesktopWindow.vue'
+import EventsPanel from './EventsPanel.vue'
+import DesktopWidgets from './DesktopWidgets.vue'
+import { getLayout, setLayout } from './layout'
+
+const KEY = 'phecloud-desktop'
+const GAP = 8
+const EDGE = 6 // px from the desktop's edge that counts as "dropped on the edge"
+
+const route = useRoute()
+const router = useRouter()
+const visible = computed(() => sections.filter((s) => !s.admin || state.admin))
+const byId = Object.fromEntries(sections.map((s) => [s.id, s]))
+
+// Each section's page, as the router knows it (lazy), plus the section id for the placeholder page.
+const pages: Record<string, { component: Component | undefined; props: Record<string, unknown> }> = Object.fromEntries(sections.map((s) => {
+  const rec = router.getRoutes().find((r) => r.path === s.path)
+  const c = rec?.components?.default
+  return [s.id, { component: typeof c === 'function' ? defineAsyncComponent(c as () => Promise<Component>) : c, props: rec?.meta?.id ? { sectionId: s.id } : {} }]
+}))
+
+// ---- windows ----
+/** { id, x, y, w, h, state: 'float' | 'left' | 'right' | 'max', z, min } in desktop-area coordinates; x/y/w/h is the floating size */
+const wins = reactive<Win[]>(load())
+const focusedId = ref<string | null>(null)
+const widgetEdit = ref(false) // the widgets' edit mode (View → Edit widgets)
+const busy = ref(false)
+const zone = ref<WinState | null>(null)
+const areaEl = ref<HTMLElement | null>(null)
+const area = reactive({ w: 0, h: 0, left: 0, top: 0 })
+let topZ = Math.max(0, ...wins.map((w) => w.z))
+
+const openWins = computed(() => wins)
+const shownWins = computed(() => wins.filter((w) => !w.min && byId[w.id] && pages[w.id]?.component))
+const focusedWin = computed(() => wins.find((w) => w.id === focusedId.value && !w.min) || null)
+const focusedSection = computed(() => (focusedWin.value ? byId[focusedWin.value.id] : null))
+const winOf = (id: string) => wins.find((w) => w.id === id)
+const isOpen = (id: string) => !!winOf(id)
+
+function load(): Win[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(KEY) || '[]')
+    return Array.isArray(saved) ? saved.filter((w: Win) => w && byId[w.id]) : []
+  } catch (e) { return [] }
+}
+watch(wins, () => { try { localStorage.setItem(KEY, JSON.stringify(wins)) } catch (e) { /* private mode */ } }, { deep: true })
+
+function measure() {
+  const r = areaEl.value?.getBoundingClientRect()
+  if (r) Object.assign(area, { w: r.width, h: r.height, left: r.left, top: r.top })
+}
+
+/** Where a window is drawn: its floating rectangle kept on the desktop, or the zone it is snapped to. */
+function rectOf(w: Win): Rect {
+  const half = (area.w - 3 * GAP) / 2
+  if (w.state === 'max') return { x: GAP, y: GAP, w: area.w - 2 * GAP, h: area.h - 2 * GAP }
+  if (w.state === 'left') return { x: GAP, y: GAP, w: half, h: area.h - 2 * GAP }
+  if (w.state === 'right') return { x: 2 * GAP + half, y: GAP, w: half, h: area.h - 2 * GAP }
+  const ww = Math.min(w.w, area.w - 2 * GAP)
+  const hh = Math.min(w.h, area.h - 2 * GAP)
+  // keep at least the header bar reachable
+  return { x: Math.min(Math.max(w.x, 120 - ww), area.w - 120), y: Math.min(Math.max(w.y, 0), area.h - 44), w: ww, h: hh }
+}
+
+function focus(w: Win) {
+  if (focusedId.value === w.id && w.z === topZ) return
+  w.z = ++topZ
+  focusedId.value = w.id
+}
+
+function open(id: string) {
+  launcher.value = false
+  query.value = ''
+  let w = winOf(id)
+  if (!w) {
+    const n = wins.length % 6
+    // Android is a phone: its window opens tall and narrow, the screen filling it; the other sections open as wide pages
+    const size = id === 'android' ? { w: Math.min(460, area.w - 120), h: area.h - 2 * GAP } : { w: Math.min(1040, area.w - 120), h: Math.min(720, area.h - 64) }
+    w = reactive<Win>({ id, x: 32 + n * 36, y: id === 'android' ? GAP : 16 + n * 32, ...size, state: 'float', z: 0, min: false })
+    wins.push(w)
+    w = winOf(id)! // the reactive copy in the list
+  }
+  show(w)
+}
+
+function show(w: Win) { w.min = false; focus(w) }
+
+function minimise(w: Win | null) {
+  if (!w) return
+  w.min = true
+  if (focusedId.value === w.id) focusTop()
+}
+
+function close(w: Win | null) {
+  if (!w) return
+  wins.splice(wins.indexOf(w), 1)
+  if (focusedId.value === w.id) focusTop()
+}
+
+/** Focus the topmost window still showing (after one is minimised or closed). */
+/** Minimise every window, so the widgets show (Super+D). */
+function showDesktop() {
+  launcher.value = false; events.value = false
+  for (const w of wins) w.min = true
+  focusTop()
+}
+function focusTop() {
+  const top = [...shownWins.value].sort((a, b) => b.z - a.z)[0]
+  focusedId.value = top ? top.id : null
+  nextTick(() => document.querySelector<HTMLElement>(top ? `[data-test="win-${top.id}"] .ph-win__btn` : '#ph-desk-area')?.focus())
+}
+
+function toggleMax(w: Win | null) { if (w) w.state = w.state === 'max' ? 'float' : 'max' }
+function snap(w: Win | null, s: WinState) { if (w) w.state = s }
+
+/** Where a dragged window was before the drag: dropped on an edge it snaps, and floats back there later. */
+const dragFrom = new Map<string, { x: number; y: number } | null>()
+function move(w: Win, p: { x: number; y: number }) {
+  if (!dragFrom.has(w.id)) dragFrom.set(w.id, w.state === 'float' ? { x: w.x, y: w.y } : null)
+  if (w.state !== 'float') w.state = 'float'
+  w.x = p.x; w.y = p.y
+}
+
+function resize(w: Win, r: Rect) { Object.assign(w, { x: r.x, y: r.y, w: r.w, h: r.h, state: 'float' }) }
+
+function zoneAt(px: number, py: number): WinState | null {
+  if (px <= area.left + EDGE) return 'left'
+  if (px >= area.left + area.w - EDGE) return 'right'
+  if (py <= area.top + EDGE) return 'max'
+  return null
+}
+function dragZone({ px, py }: { px: number; py: number }) { zone.value = zoneAt(px, py) }
+function drop(w: Win, { px, py }: { px: number; py: number }) {
+  const z = zoneAt(px, py)
+  const from = dragFrom.get(w.id)
+  dragFrom.delete(w.id)
+  zone.value = null
+  if (!z) return
+  if (from) { w.x = from.x; w.y = from.y }
+  w.state = z
+}
+const zoneStyle = computed(() => {
+  const r = rectOf({ id: '', x: 0, y: 0, w: 0, h: 0, z: 0, min: false, state: zone.value ?? 'max' })
+  return { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' }
+})
+
+/** Dock: open a section; if it is the focused window, minimise it; if it is minimised or behind, bring it forward. */
+function dockClick(id: string) {
+  const w = winOf(id)
+  if (w && !w.min && focusedId.value === id) minimise(w)
+  else open(id)
+}
+
+// ---- launcher ----
+const launcher = ref(false)
+const query = ref('')
+const searchEl = ref<QInput | null>(null)
+const found = computed(() => visible.value.filter((s) => s.label.toLowerCase().includes(query.value.trim().toLowerCase())))
+function openFirst() { if (found.value.length) open(found.value[0].id) }
+watch(launcher, (on) => { if (on) nextTick(() => searchEl.value?.focus()); else query.value = '' })
+
+// ---- leaving, and links between sections ----
+let leaving = false
+function leave() {
+  leaving = true
+  setLayout('classic')
+  router.push(focusedWin.value ? byId[focusedWin.value.id].path : '/browse')
+}
+/** A page that links to another section opens it as a window instead of leaving the desktop. */
+const stopGuard = router.beforeEach((to, from) => {
+  if (leaving || !from.meta.desktop || getLayout() !== 'desktop') return
+  const s = sections.find((x) => x.path === to.path)
+  if (s) { open(s.id); return false }
+})
+
+// ---- quick switcher (Super+Tab, or Ctrl+Alt+Tab where the system leaves Super to the browser) ----
+const switcher = ref<{ list: string[]; i: number } | null>(null) // the window ids, most recently used first, and the selected one
+function stepSwitcher(back: boolean) {
+  if (!switcher.value) {
+    const list = [...wins].sort((a, b) => b.z - a.z).map((w) => w.id)
+    switcher.value = { list, i: list.length > 1 ? (back ? list.length - 1 : 1) : 0 }
+  } else {
+    const n = switcher.value.list.length
+    switcher.value.i = (switcher.value.i + (back ? n - 1 : 1)) % n
+  }
+}
+function endSwitcher(commit: boolean) {
+  const sw = switcher.value
+  switcher.value = null
+  if (commit && sw) open(sw.list[sw.i])
+}
+
+// ---- keyboard: Super (or Ctrl+Alt) with the arrows snaps; Super alone opens the launcher; Escape closes it ----
+let superAlone = false
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Meta' || e.key === 'OS') { superAlone = true; return }
+  superAlone = false
+  if (e.key === 'Escape' && switcher.value) { e.preventDefault(); endSwitcher(false); return }
+  if (e.key === 'Tab' && (e.metaKey || (e.ctrlKey && e.altKey))) {
+    e.preventDefault()
+    if (wins.length) { launcher.value = false; stepSwitcher(e.shiftKey) }
+    return
+  }
+  if (e.key === 'Escape' && launcher.value) { launcher.value = false; return }
+  if (e.key === 'Escape' && events.value) { events.value = false; return }
+  if (e.key === 'Escape' && widgetEdit.value) { widgetEdit.value = false; return }
+  if ((e.key === 'd' || e.key === 'D') && (e.metaKey || (e.ctrlKey && e.altKey))) { e.preventDefault(); showDesktop(); return }
+  if ((e.key === 'n' || e.key === 'N') && (e.metaKey || (e.ctrlKey && e.altKey))) { e.preventDefault(); launcher.value = false; events.value = !events.value; return }
+  if (!(e.metaKey || (e.ctrlKey && e.altKey)) || !focusedWin.value) return
+  const w = focusedWin.value
+  // as in the Etesian desktop: Left / Right move to that zone, Up maximises, Down floats a snapped window again or minimises a floating one
+  const keys: Record<string, () => void> = { ArrowLeft: () => snap(w, 'left'), ArrowRight: () => snap(w, 'right'), ArrowUp: () => snap(w, 'max'),
+    ArrowDown: () => (w.state === 'float' ? minimise(w) : snap(w, 'float')) }
+  const act = keys[e.key]
+  if (act) { e.preventDefault(); act() }
+}
+function onKeyUp(e: KeyboardEvent) {
+  if (switcher.value && ['Meta', 'OS', 'Control', 'Alt'].includes(e.key)) { endSwitcher(true); superAlone = false; return }
+  if ((e.key === 'Meta' || e.key === 'OS') && superAlone) launcher.value = !launcher.value
+  superAlone = false
+}
+
+// ---- events: the panel, and the unread-mail dot on the clock (checked every two minutes; quiet when mail is not set up) ----
+const events = ref(false)
+const unread = ref(0)
+async function checkUnread() {
+  try { unread.value = ((await hubCall({ op: 'mail.folders' })).folders || []).find((f) => f.role === 'inbox')?.unread || 0 } catch (e) { unread.value = 0 }
+}
+watch(launcher, (on) => { if (on) events.value = false })
+
+// ---- menu bar ----
+const statusText = computed(() => ({ online: 'Connected', connecting: 'Connecting', offline: 'Offline' })[state.status] || state.status)
+const now = ref(new Date())
+const timeText = computed(() => now.value.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+const dateText = computed(() => now.value.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }))
+let clock: ReturnType<typeof setInterval> | undefined, mailTimer: ReturnType<typeof setInterval> | undefined
+
+onMounted(() => {
+  measure()
+  window.addEventListener('resize', measure)
+  window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('keyup', onKeyUp)
+  clock = setInterval(() => { now.value = new Date() }, 15000)
+  checkUnread()
+  mailTimer = setInterval(checkUnread, 120000)
+  const want = String(route.query.open || '')
+  if (byId[want]) open(want)
+  else if (!wins.length) open('browse')
+  else focusTop()
+})
+onBeforeUnmount(() => {
+  stopGuard()
+  window.removeEventListener('resize', measure)
+  window.removeEventListener('keydown', onKeyDown)
+  window.removeEventListener('keyup', onKeyUp)
+  clearInterval(clock)
+  clearInterval(mailTimer)
+})
+</script>
+
+<style scoped>
+/* the desktop: the Etesian home surface (black), with a faint glow so windows stand out */
+.ph-desk {
+  position: fixed; inset: 0; display: grid; grid-template: 28px 1fr / 72px 1fr; overflow: hidden;
+  background: radial-gradient(120% 90% at 85% 100%, #0e2238 0%, #04080d 55%, #000 100%); color: var(--hd-surface-home-fg);
+  font-family: var(--ph-font-light);
+}
+/* global menu bar */
+.ph-menubar {
+  grid-column: 1 / -1; display: flex; align-items: center; gap: var(--ph-s1); padding: 0 var(--ph-s3);
+  background: #000; color: #fff; font: 400 var(--hd-font-size-small)/1 var(--ph-font); border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.ph-menubar__app { font-weight: var(--hd-font-weight-bold); margin-right: var(--ph-s2); }
+.ph-menubar__menu { min-height: 26px !important; padding: 0 var(--ph-s2); color: #fff !important; font: inherit; }
+.ph-menubar__status { display: inline-flex; align-items: center; gap: var(--ph-s1); color: var(--ph-chrome-fg-muted); margin-right: var(--ph-s4); }
+.ph-menubar__status.is-online { color: #8FD65A; }
+.ph-menubar__clock {
+  position: relative; height: 24px; padding: 0 var(--ph-s2); border: 0; border-radius: 4px; background: none; color: inherit; font: inherit;
+  white-space: nowrap; cursor: pointer;
+}
+.ph-menubar__clock:hover, .ph-menubar__clock.is-on { background: rgba(255, 255, 255, 0.16); }
+.ph-menubar__clock b { margin-left: var(--ph-s1); }
+.ph-menubar__dot { position: absolute; top: 3px; right: 1px; width: 6px; height: 6px; border-radius: 50%; background: #7FB0FF; }
+/* windows live here */
+.ph-desk__area { position: relative; grid-column: 2; grid-row: 2; outline: none; }
+.ph-desk__zone {
+  position: absolute; z-index: 9000; pointer-events: none; border-radius: var(--ph-r-card);
+  background: color-mix(in srgb, #4591FF 22%, transparent); box-shadow: inset 0 0 0 2px #4591FF;
+}
+/* dock: a light floating strip on the left (icons only) */
+.ph-dock {
+  grid-column: 1; grid-row: 2; align-self: start; justify-self: center; margin-top: var(--ph-s3);
+  display: flex; flex-direction: column; align-items: center; gap: var(--ph-s1); padding: var(--ph-s2) 4px; width: 56px;
+  background: rgba(30, 30, 32, 0.72); border-radius: 14px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+}
+.ph-dock__sep { width: 28px; height: 1px; margin: 2px 0; background: rgba(255, 255, 255, 0.18); }
+.ph-dock__item {
+  position: relative; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; background: none; cursor: pointer;
+  transition: transform var(--ph-dur-1) var(--ph-ease);
+}
+.ph-dock__item:hover { transform: scale(1.06); }
+.ph-dock__item:focus-visible { outline: 2px solid #7FB0FF; outline-offset: 0; border-radius: 12px; }
+/* open sections: a short bar at the dock's edge; the focused one: a longer, brighter bar */
+.ph-dock__item.is-open::before {
+  content: ''; position: absolute; left: -4px; top: 50%; width: 3px; height: 8px; transform: translateY(-50%);
+  border-radius: 2px; background: rgba(255, 255, 255, 0.7);
+}
+.ph-dock__item.is-active::before { height: 20px; background: #fff; }
+/* quick switcher: a dark strip of the windows in the middle of the desktop */
+.ph-switcher {
+  position: absolute; z-index: 9600; left: 50%; top: 40%; transform: translate(-50%, -50%); display: flex; gap: var(--ph-s2);
+  padding: var(--ph-s3); max-width: 90%; overflow: hidden; border-radius: var(--ph-r-card);
+  background: var(--hd-surface-overlay); box-shadow: var(--hd-shadow-overlay), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.ph-switcher__item {
+  display: flex; flex-direction: column; align-items: center; gap: var(--ph-s2); width: 104px; padding: var(--ph-s3) var(--ph-s1);
+  border-radius: var(--ph-r-card); color: #fff; font: 400 var(--hd-font-size-small)/1.2 var(--ph-font); text-align: center;
+}
+.ph-switcher__item.is-sel { background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 2px #7FB0FF; }
+/* launcher */
+.ph-launcher-scrim { position: absolute; inset: 0; z-index: 9500; display: grid; place-items: start center; padding-top: 10vh; background: rgba(0, 0, 0, 0.45); }
+.ph-launcher {
+  width: min(640px, 90%); padding: var(--ph-s4); border-radius: var(--ph-r-card);
+  background: var(--hd-surface-overlay); color: #fff; box-shadow: var(--hd-shadow-overlay), 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.ph-launcher__search { font-size: var(--hd-font-size-xlarge); padding: 0 var(--ph-s2); border-bottom: 1px solid rgba(255, 255, 255, 0.16); }
+.ph-launcher__search :deep(.q-field__native), .ph-launcher__search :deep(.q-icon) { color: #fff; }
+.ph-launcher__search :deep(.q-field__native::placeholder) { color: var(--ph-chrome-fg-muted); opacity: 1; }
+.ph-launcher__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--ph-s2); margin-top: var(--ph-s4); }
+.ph-launcher__app {
+  display: flex; flex-direction: column; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3) var(--ph-s1);
+  border: 0; border-radius: var(--ph-r-card); background: none; color: #fff; font: 400 var(--hd-font-size-small)/1.2 var(--ph-font); cursor: pointer;
+}
+.ph-launcher__app:hover, .ph-launcher__app:focus-visible { background: rgba(255, 255, 255, 0.1); }
+.ph-launcher__none { grid-column: 1 / -1; color: var(--ph-chrome-fg-muted); }
+</style>
+<style>
+/* the menu bar's menus are teleported to <body>: dark, like the bar */
+.ph-desk-menu { background: var(--hd-surface-overlay) !important; color: #fff !important; min-width: 240px; }
+.ph-desk-menu .q-item__section--side { color: #aaa; font-size: var(--hd-font-size-xsmall); }
+.ph-desk-menu .q-separator { background: rgba(255, 255, 255, 0.16); }
+</style>

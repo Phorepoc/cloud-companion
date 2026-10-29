@@ -1,0 +1,18 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * The Etesian type: Nokia Pure Text when the person has it installed (it is proprietary and never shipped), otherwise Fira Sans
+ * (OFL-1.1, bundled from @fontsource, latin, 300/400/700), size-adjusted to Nokia Pure's cap height as the design repo measured it
+ * (font-alternatives.css there). The files are served by this server: no font is fetched from anywhere else.
+ */
+@font-face { font-family: "Nokia Pure Text"; font-weight: 300; src: local("Nokia Pure Text Light"), local("NokiaPureText-Light"); }
+@font-face { font-family: "Nokia Pure Text"; font-weight: 400; src: local("Nokia Pure Text Regular"), local("NokiaPureText-Regular"), local("Nokia Pure Text"); }
+@font-face { font-family: "Nokia Pure Text"; font-weight: 700; src: local("Nokia Pure Text Bold"), local("NokiaPureText-Bold"); }
+@font-face { font-family: "HD Fira Sans"; font-style: normal; font-weight: 300; font-display: swap; size-adjust: 102%; src: url("@fontsource/fira-sans/files/fira-sans-latin-300-normal.woff2") format("woff2"); }
+@font-face { font-family: "HD Fira Sans"; font-style: normal; font-weight: 400; font-display: swap; size-adjust: 102%; src: url("@fontsource/fira-sans/files/fira-sans-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "HD Fira Sans"; font-style: normal; font-weight: 700; font-display: swap; size-adjust: 102%; src: url("@fontsource/fira-sans/files/fira-sans-latin-700-normal.woff2") format("woff2"); }
+
+:root {
+  --hd-font-family-base: "Nokia Pure Text", "HD Fira Sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --hd-font-family-light: "Nokia Pure Text", "HD Fira Sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}

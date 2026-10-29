@@ -44,9 +44,9 @@ pairing code and HMAC authentication; the device key is kept in IndexedDB.
 - **Style guide** (`web/STYLE.md`): principles (calm, content first, phone first, 44 px targets, WCAG AA, keyboard, reduced motion), design
   tokens (`web/src/css/tokens.css`: light and dark palettes with computed contrast ratios, system font scale, 4 px spacing, radii, elevation,
   motion), the app shell (bottom bar on a phone, icon rail on a tablet, labelled drawer on a desktop; sections Browser, Chats, Mail, Calendar,
-  Contacts, Files, Devices, Settings from `web/src/nav.js`, placeholders for those not built yet), component rules, Material Symbols icons
+  Contacts, Files, Devices, Settings from `web/src/nav.ts`, placeholders for those not built yet), component rules, Material Symbols icons
   (Apache-2.0) and the writing style. Dark mode follows the system and has a toggle in Settings. The product name and logo are one replaceable
-  token (`web/src/brand.js`: it feeds the page title, the manifest and the icon). Before/after screenshots (light and dark, 390 px and
+  token (`web/src/brand.ts`: it feeds the page title, the manifest and the icon). Before/after screenshots (light and dark, 390 px and
   1280 px) are in `web/test/screenshots/before` and `.../after` (`sh web/test/shots.sh before|after`).
 - **Contacts and Calendar** (needs the hub, see `docs/hub.md`): the server talks CardDAV and CalDAV to Stalwart as the hub's single owner
   (`internal/davhub`, using `PHECLOUD_HUB_URL` and the API key from `hub-init.sh`; the credentials never reach the browser). New frames

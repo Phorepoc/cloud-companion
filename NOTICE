@@ -15,7 +15,8 @@ Third-party software built into the phecloud binary (Go modules, as reported by 
   MPL-2.0:       go-sql-driver/mysql (file-level copyleft; used unmodified as a library)
 
 Third-party software built into the web app (web/, bundled by Vite): Vue, Vue Router, Quasar and @quasar/extras (MIT); cbor-x (MIT); @noble/hashes (MIT);
-Material Symbols icon font, subset to the icons the app uses (Apache-2.0).
+Material Symbols icon font, subset to the icons the app uses (Apache-2.0); the Etesian Design Language tokens, base styles and Quasar theme (MIT, vendored in
+web/src/css/etesian/ with their licence); Fira Sans font files from @fontsource/fira-sans (SIL OFL-1.1).
 
 Third-party software in the phone client (client/): mbedTLS (Apache-2.0 OR GPL-2.0-or-later; used under Apache-2.0), libpng (libpng licence) and libjpeg-turbo (BSD-3-Clause / IJG) in the
 Symbian web-engine plug-in builds. The C client core (client/phc*.c) is ours.
