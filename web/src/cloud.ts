@@ -28,6 +28,7 @@ export interface AppState {
   sessions: SessionInfo[]
   features: string[]
   settings: { q: number; gray: boolean }
+  viewport: { w: number; h: number; phone: boolean } // the size pages are laid out at in the cloud (the window's, or the phone's 360 x 640)
 }
 
 export const state = reactive<AppState>({
@@ -49,6 +50,7 @@ export const state = reactive<AppState>({
   sessions: [],             // the connected devices and their tabs (for the "other devices" list)
   features: [],             // optional server features from the welcome frame (zoom, tabs)
   settings: { q: 70, gray: false },
+  viewport: { w: 360, h: 640, phone: true }, // the size the cloud lays pages out at: the browser window's, or the phone's 360 x 640
 })
 
 /** What the canvas view (renderer.ts) listens to while it is shown. */
@@ -222,7 +224,8 @@ export async function forget() {
 }
 
 export const api = {
-  open: (u: string) => client && client.open(u),
+  open: (u: string) => client && client.open(u, state.viewport.w, state.viewport.h),
+  viewport: (w: number, h: number) => client && client.viewport(w, h),
   navigate: (u: string) => client && client.navigate(u),
   action: (a: string) => client && client.action(a),
   tap: (l: number, x: number, y: number, sy: number) => client && client.tap(l, x, y, sy),
@@ -249,7 +252,7 @@ export const api = {
 }
 
 // test/debug hook (the Playwright smoke test reads it)
-window.__phe = Object.assign(window.__phe || {}, { state, hubCall: (m: HubRequest) => hubCall(m), apiCall: (m: string, p: string, b?: unknown) => apiCall(m, p, b) })
+window.__phe = Object.assign(window.__phe || {}, { state, api, hubCall: (m: HubRequest) => hubCall(m), apiCall: (m: string, p: string, b?: unknown) => apiCall(m, p, b) })
 
 // ---- the personal hub (contacts, calendar): one request, one answer, matched by id ----
 const hubPending = new Map<number, { resolve: (f: HubResFrame) => void; reject: (e: Error) => void }>()

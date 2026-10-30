@@ -23,7 +23,7 @@ import (
 )
 
 // Features are advertised in the welcome frame.
-var Features = []string{"zoom", "tabs"}
+var Features = []string{"zoom", "tabs", "viewport"}
 
 type Server struct {
 	Store   *store.Store

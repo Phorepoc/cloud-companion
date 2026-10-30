@@ -248,7 +248,9 @@ type cdpSession struct {
 	ns     *netState
 	box    *handlerBox
 	maxH   int
-	width  int // device width of a tile row (360)
+	width  int // device width of the viewport (360 by default)
+	height int // device height of the viewport (640 by default)
+	opened bool
 	cssW   int // layout width in css px: 360 / scale
 	pct    int // render scale in percent (0 = 100)
 	dpr    float64
@@ -269,7 +271,8 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	if width <= 0 {
 		width = 360
 	}
-	s.width, s.dpr = width, 1 // a tile row is 360 device pixels; the scale only changes the layout width and the device scale factor
+	s.width, s.dpr = width, 1 // the scale only changes the layout width and the device scale factor
+	s.opened = true
 	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
 		emulation.SetUserAgentOverride(mobileUA),
@@ -856,7 +859,14 @@ func (s *cdpSession) scalePct() int {
 // cssView is the layout viewport in css px at the current scale (360/z x 640/z).
 func (s *cdpSession) cssView() (int, int) {
 	p := s.scalePct()
-	return 360 * 100 / p, viewH * 100 / p
+	w, h := s.width, s.height
+	if w <= 0 {
+		w = 360
+	}
+	if h <= 0 {
+		h = viewH
+	}
+	return w * 100 / p, h * 100 / p
 }
 
 func (s *cdpSession) applyMetrics(ctx context.Context) error {
@@ -869,6 +879,21 @@ func (s *cdpSession) applyMetrics(ctx context.Context) error {
 // tiles stay 360 device pixels wide. pct must be one of the ladder values (100 divides 360 exactly for all of them).
 func (s *cdpSession) SetScale(ctx context.Context, pct int) error {
 	s.pct = pct
+	if err := s.applyMetrics(ctx); err != nil {
+		return err
+	}
+	return s.settle(ctx)
+}
+
+// SetViewport: the window the page is shown in has this size. Before Open it is only remembered.
+func (s *cdpSession) SetViewport(ctx context.Context, width, height int) error {
+	if width == s.width && height == s.height {
+		return nil
+	}
+	s.width, s.height = width, height
+	if !s.opened {
+		return nil
+	}
 	if err := s.applyMetrics(ctx); err != nil {
 		return err
 	}

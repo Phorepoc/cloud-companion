@@ -15,6 +15,7 @@ export class AndroidStream {
     this.cv = canvas
     this.g = canvas.getContext('2d')
     this.base = opts.base || './'
+    this.vpEl = opts.viewportEl || null
     this.cb = { onState() {}, onStats() {}, onNote() {}, onSize() {}, ...opts }
     this.ws = null; this.dec = null; this.gotKey = false; this.ts = 0
     this.W = canvas.width; this.H = canvas.height; this.rtt = 0; this.sid = ''
@@ -67,15 +68,26 @@ export class AndroidStream {
 
   // the display follows the viewing device: the usable window area and a kind (phone-shaped display, or a large landscape one for tablets / laptops / desktops)
   viewport() {
-    const w = Math.round(window.innerWidth), h = Math.round(window.innerHeight)
+    // the area the screen may use: the element the page gave (its stage), or the window
+    const el = this.vpEl
+    const r = el ? el.getBoundingClientRect() : null
+    const w = Math.round(r && r.width > 0 ? r.width : window.innerWidth), h = Math.round(r && r.height > 0 ? r.height : window.innerHeight)
     let kind = this.kindOpt
     if (kind !== 'phone' && kind !== 'large') kind = Math.min(window.screen.width, window.screen.height) >= 600 ? 'large' : 'phone'
+    // phone mode chosen by hand in a window that is wider than tall: a portrait phone-shaped display (not a landscape one the size of the window)
+    if (this.kindOpt === 'phone' && w > h) return { w: 360, h: 720, kind }
     return { w, h, kind }
   }
 
-  sendViewport() {
+  /** The user chose a mode: 'phone' or 'large' (desktop), or 'auto' to follow the window again. */
+  setKind(kind) {
+    this.kindOpt = kind
+    this.sendViewport(true)
+  }
+
+  sendViewport(force = false) {
     const v = this.viewport(), o = this.sentVp
-    if (o && o.kind === v.kind && Math.abs(v.w - o.w) < o.w * 0.05 && Math.abs(v.h - o.h) < o.h * 0.05) return
+    if (!force && o && o.kind === v.kind && Math.abs(v.w - o.w) < o.w * 0.05 && Math.abs(v.h - o.h) < o.h * 0.05) return
     this.sentVp = v
     this.send({ t: 'viewport', ...v })
   }
@@ -160,7 +172,13 @@ export class AndroidStream {
     const cv = this.cv
     const on = (t, ev, fn, o) => { t.addEventListener(ev, fn, o); this.off.push(() => t.removeEventListener(ev, fn, o)) }
     let vpTimer = 0
-    on(window, 'resize', () => { clearTimeout(vpTimer); vpTimer = setTimeout(() => this.sendViewport(), 700) }) // debounced: dragging a window edge is one change
+    const later = () => { clearTimeout(vpTimer); vpTimer = setTimeout(() => this.sendViewport(), 500) } // debounced: dragging a window edge is one change
+    on(window, 'resize', later)
+    if (this.vpEl && typeof ResizeObserver !== 'undefined') { // the stage itself: a desktop window resized, a layout change
+      const ro = new ResizeObserver(later)
+      ro.observe(this.vpEl)
+      this.off.push(() => ro.disconnect())
+    }
     this.off.push(() => clearTimeout(vpTimer))
     on(cv, 'pointerdown', (e) => { if (e.button !== 0) return; this.closeMenu(); cv.focus(); this.down = true; cv.setPointerCapture(e.pointerId); this.send({ t: 'touch', a: 0, ...this.pos(e) }); e.preventDefault() })
     on(cv, 'pointermove', (e) => { if (this.down) this.send({ t: 'touch', a: 2, ...this.pos(e) }) })

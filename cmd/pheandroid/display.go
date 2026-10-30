@@ -39,7 +39,7 @@ func displayFor(vw, vh float64, kind string) (w, h, dpi int) {
 	var short, long float64
 	if kind == "large" {
 		long = float64(maxDisplay)
-		short = long / clampf(ratio, 1.2, 1.9)
+		short = long / clampf(ratio, 0.6, 3.0)
 		dpi = 213
 	} else {
 		short = 720

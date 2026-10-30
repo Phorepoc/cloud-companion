@@ -12,6 +12,8 @@
     <header class="ph-win__bar" @pointerdown="startDrag" @dblclick="$emit('maximise')">
       <SectionTile :section="section" :size="26" />
       <h2 class="ph-win__title">{{ section.label }}</h2>
+      <!-- the page's own buttons (Browser, Android), up to the separator before minimise / maximise / close -->
+      <div ref="actions" class="ph-win__actions" data-test="title-actions" />
       <div class="ph-win__ctl">
         <button type="button" class="ph-win__btn hd-sq" aria-label="Minimise" title="Minimise" @click="$emit('minimise')">
           <q-icon name="sym_o_minimize" size="20px" aria-hidden="true" />
@@ -42,6 +44,7 @@
 
 <script setup lang="ts">
 import { computed, provide, ref, type Component } from 'vue'
+import { TITLE_ACTIONS } from '../components/titlebar'
 import type { Section } from '../nav'
 import type { Rect, Win } from './types'
 import SectionTile from '../components/SectionTile.vue'
@@ -59,6 +62,8 @@ const emit = defineEmits(['focus', 'move', 'resize', 'drag-zone', 'drop', 'minim
 
 // pages can tell they are in a window (Android uses its compact controls there)
 provide('phInWindow', true)
+const actions = ref<HTMLElement | null>(null)
+provide(TITLE_ACTIONS, actions)
 
 const HANDLES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw']
 const MIN_W = 360
@@ -138,6 +143,8 @@ function startResize(e: PointerEvent, h: string) {
 .ph-win__title { flex: 1; min-width: 0; font: var(--hd-font-weight-light) var(--hd-font-size-xlarge)/1 var(--ph-font-light); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* inactive windows: header content at half strength */
 .ph-win:not(.is-focused) .ph-win__bar > * { opacity: 0.5; }
+.ph-win__actions { flex: none; display: flex; align-items: center; gap: 2px; padding-right: var(--ph-s2); }
+.ph-win__actions:empty { display: none; }
 .ph-win__ctl { display: flex; align-items: center; padding-left: var(--ph-s1); border-left: 1px solid var(--ph-chrome-divider); }
 .ph-win__btn {
   --hd-sq-size: 34px; width: 44px; height: 44px; display: grid; place-items: center;

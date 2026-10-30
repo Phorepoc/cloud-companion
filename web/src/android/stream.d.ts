@@ -10,6 +10,7 @@ export type StreamState = 'idle' | 'connecting' | 'starting' | 'live' | 'closed'
 export interface StreamStats { fps: number; kbps: number; rtt: number; w: number; h: number; i2f_n?: number; i2f_ms: number; [k: string]: unknown }
 
 export interface StreamOptions {
+  viewportEl?: HTMLElement | null // the area the screen may use (its size is what the display on the server follows); the window when absent
   base?: string // where the bridge is: '/android/' behind phecloud, './' on its own page
   onState?: (state: StreamState, message: string) => void
   onStats?: (stats: StreamStats) => void
@@ -24,6 +25,8 @@ export class AndroidStream {
   constructor(canvas: HTMLCanvasElement, opts?: StreamOptions)
   state: StreamState
   connect(ticket: string, opts?: ConnectOptions): void
+  /** 'phone' | 'large' (desktop) | 'auto': the user's choice of Android mode; the display changes at once. */
+  setKind(kind: string): void
   close(quiet?: boolean): void
   dispose(): void
   key(code: number, meta?: number): void

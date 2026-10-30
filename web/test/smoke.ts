@@ -21,6 +21,8 @@ assert(CODE, 'CODE (a pairing code, preferably from `phecloud paircode --admin`)
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 900 }, ignoreHTTPSErrors: process.env.IGNORE_TLS === '1' })
 const page = await ctx.newPage()
+// this test measures the phone layout (360 px wide pages: page heights, the 150% render); the browser's default is the whole window (test/desktop.ts covers that)
+await page.addInitScript(() => localStorage.setItem('phecloud-browser-phone', '1'))
 const log: string[] = []
 page.on('console', (m) => log.push(m.type() + ': ' + m.text()))
 page.on('pageerror', (e) => log.push('pageerror: ' + e.message))

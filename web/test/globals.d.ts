@@ -26,10 +26,12 @@ interface PheState {
   sessions: SessionInfo[]
   features: string[]
   settings: { q: number; gray: boolean }
+  viewport: { w: number; h: number; phone: boolean }
 }
 
 interface PheHook {
   state: PheState
+  api: { open(url: string): void; viewport(w: number, h: number): void }
   forget(): Promise<void>
   // hub and API calls signed with this device's key; the answer is the server's JSON
   hubCall(msg: HubRequest): Promise<any>

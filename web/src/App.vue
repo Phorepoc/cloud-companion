@@ -12,6 +12,7 @@
         <BrandLogo :size="28" />
         <span class="ph-brand">{{ brand.name }}</span>
         <q-space />
+        <div ref="titleActions" class="ph-title-actions" data-test="title-actions" />
         <span class="ph-status" :class="'is-' + state.status" data-test="status" role="status">
           <q-icon :name="state.status === 'online' ? 'sym_o_cloud_done' : state.status === 'connecting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
           {{ statusText }}
@@ -67,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, provide, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { state, creds } from './cloud'
@@ -78,11 +79,14 @@ import ToastHost from './components/ToastHost.vue'
 import SectionTile from './components/SectionTile.vue'
 import DesktopView from './desktop/DesktopView.vue'
 import { setLayout } from './desktop/layout'
+import { TITLE_ACTIONS } from './components/titlebar'
 
 const $q = useQuasar()
 const route = useRoute()
 const router = useRouter()
 const moreOpen = ref(false)
+const titleActions = ref<HTMLElement | null>(null)
+provide(TITLE_ACTIONS, titleActions)
 const phone = computed(() => $q.screen.lt.sm)
 const tablet = computed(() => $q.screen.sm)
 const wide = computed(() => $q.screen.gt.sm)
@@ -110,6 +114,10 @@ function focusMain() {
 .ph-bar { background: var(--ph-bg); }
 .ph-brand { font-family: var(--ph-font); font-weight: var(--hd-font-weight-bold); font-size: var(--ph-text-body); text-transform: uppercase; letter-spacing: 0.02em; }
 .ph-desk-btn { color: var(--ph-text); font-weight: var(--hd-font-weight-regular); }
+.ph-title-actions { display: flex; align-items: center; gap: 2px; min-width: 0; overflow-x: auto; }
+.ph-title-actions:empty { display: none; }
+/* a page that puts buttons in the bar (Browser, Android) gets the room the brand name took */
+@media (max-width: 599px) { .ph-toolbar:has(.ph-title-actions:not(:empty)) .ph-brand { display: none; } }
 .ph-status { display: inline-flex; align-items: center; gap: var(--ph-s1); font-size: var(--ph-text-small); color: var(--ph-text-muted); }
 .ph-status.is-online { color: var(--ph-positive); }
 .ph-drawer { background: var(--ph-surface); }

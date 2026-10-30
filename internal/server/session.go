@@ -42,6 +42,7 @@ type tab struct {
 	layers []browser.Layer
 	zoom   int  // render scale in percent
 	reset  bool // the next update re-renders the same page at another scale
+	vw, vh int  // the viewport size last asked for (0 = the 360 x 640 default)
 	sent   string
 }
 
@@ -227,6 +228,13 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		if err := s.startBrowser(ctx, tb); err != nil {
 			return err
 		}
+		if o.Height > 0 { // a window that is not phone sized: lay the page out at its size
+			w, h := clampViewport(o.Width, o.Height)
+			if err := tb.br.SetViewport(ctx, w, h); err != nil {
+				return err
+			}
+			o.Width = w
+		}
 		if err := tb.br.Open(ctx, o.URL, o.Width, o.DPR); err != nil {
 			return err
 		}
@@ -258,6 +266,25 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 			return err
 		}
 		s.zoom, s.reset = pct, true
+	case proto.TViewport:
+		var vp proto.Viewport
+		if err := proto.Decode(raw, &vp); err != nil {
+			return err
+		}
+		w, h := clampViewport(vp.Width, vp.Height)
+		if w == s.vw && h == s.vh {
+			return nil
+		}
+		// every tab of this device is laid out for the window (the others are re-sent when they next update)
+		for _, t := range s.tabs {
+			if t.br == nil {
+				continue
+			}
+			if err := t.br.SetViewport(ctx, w, h); err != nil {
+				return err
+			}
+			t.vw, t.vh, t.reset = w, h, true
+		}
 	case proto.TNavigate:
 		var n proto.Navigate
 		if err := proto.Decode(raw, &n); err != nil {

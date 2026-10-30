@@ -83,6 +83,34 @@ await page.click('[data-test=android-back]'); await page.waitForTimeout(800)
 console.log('input through the page: ok')
 await page.click('[data-test=android-home]'); await page.waitForTimeout(1000)
 
+// the screen fills the window in desktop mode: no padding around it
+{
+  const st = await page.locator('[data-test=android-stage]').boundingBox()
+  const fr = await page.locator('.ph-frame').boundingBox()
+  assert(st && fr, 'stage and frame are laid out')
+  assert(fr.width >= st.width - 3 || fr.height >= st.height - 3, `the screen touches the stage on one axis (${JSON.stringify(fr)} in ${JSON.stringify(st)})`)
+  assert(fr.width * fr.height >= st.width * st.height * 0.9, `the screen uses at least 90% of the area (${JSON.stringify(fr)} in ${JSON.stringify(st)})`)
+  // the controls are in the title bar
+  const hdr = await page.locator('header.q-header').boundingBox()
+  const hb = await page.locator('[data-test=android-home]').boundingBox()
+  assert(hdr && hb && hb.y >= hdr.y - 1 && hb.y + hb.height <= hdr.y + hdr.height + 1, 'the Android buttons are in the title bar')
+  console.log('desktop mode fills the window')
+}
+
+// the mode buttons: phone mode in a desktop-sized window (a portrait display, the phone launcher), then desktop mode again
+await page.click('[data-test=android-mode-phone]')
+await shapeIs(false, 'phone mode in a wide window')
+assert.equal(await page.getAttribute('[data-test=android-mode-phone]', 'aria-pressed'), 'true')
+g = await layout('phone mode, wide window')
+assert(g.fh > g.fw, 'phone mode is portrait whatever the window')
+await shots('2a-phone-mode')
+await page.click('[data-test=android-mode-desktop]')
+await shapeIs(true, 'desktop mode again')
+assert.equal(await page.getAttribute('[data-test=android-mode-desktop]', 'aria-pressed'), 'true')
+g = await layout('desktop mode again')
+assert(g.fw > g.fh)
+console.log('the mode buttons switch between phone and desktop Android')
+
 // phone width: the display becomes phone-shaped (portrait)
 await page.setViewportSize({ width: 390, height: 844 })
 await shapeIs(false, 'phone')
@@ -98,7 +126,7 @@ await shots('3-desktop-again')
 
 // the controls: sound toggles, install dialog, APK upload through the app, reconnect
 await page.click('[data-test=android-sound]')
-assert(((await page.textContent('[data-test=android-sound]')) ?? '').includes('Sound on'))
+assert.equal(await page.getAttribute('[data-test=android-sound]', 'aria-label'), 'Sound on') // an icon button: named for assistive technology
 await page.click('[data-test=android-sound]')
 await page.click('[data-test=android-install]'); await page.waitForSelector('[data-test=android-install-dialog]')
 await page.setInputFiles('[data-test=android-apk]', '/t/markor.apk')

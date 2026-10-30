@@ -10,10 +10,9 @@
 // view would re-request tiles at the new scale; without it (today) the zoom is purely local scaling of the cached tiles.
 import { reactive } from 'vue'
 import { state, hooks, api } from './cloud'
-import { hitTest, layerScreenY, regionScreenRect, VIEW_H, type LocalScroll } from './hit'
+import { hitTest, layerScreenY, regionScreenRect, type LocalScroll } from './hit'
 import type { Region, TileFrame } from './proto'
 
-const W = 360
 export const MIN_ZOOM = 1
 export const MAX_ZOOM = 3
 
@@ -29,6 +28,8 @@ type Point = { x: number; y: number }
 
 export class Renderer {
   cv: HTMLCanvasElement
+  vw = 360 // the viewport the cloud lays the page out for, in css px: the canvas is this size
+  vh = 640
   ctx: CanvasRenderingContext2D
   dpr: number
   tiles: Tiles
@@ -48,8 +49,10 @@ export class Renderer {
     this.cv = canvas
     this.ctx = canvas.getContext('2d')!
     this.dpr = Math.max(1, Math.round(window.devicePixelRatio || 1))
-    canvas.width = W * this.dpr
-    canvas.height = VIEW_H * this.dpr
+    this.vw = state.viewport.w
+    this.vh = state.viewport.h
+    canvas.width = this.vw * this.dpr
+    canvas.height = this.vh * this.dpr
     const k = kept && kept.pid === state.page.pid ? kept : null
     kept = null
     this.tiles = k ? k.tiles : new Map() // layer id -> Map("x:y" -> ImageBitmap)
@@ -116,6 +119,17 @@ export class Renderer {
     kept = { pid: state.page.pid, tiles: this.tiles, view: { ...this.view }, lscroll: this.lscroll }
   }
 
+  /** The window changed size: the canvas follows at once (the cloud re-renders for the new size and re-sends the tiles). */
+  setSize(w: number, h: number) {
+    if (w === this.vw && h === this.vh) return
+    this.vw = w
+    this.vh = h
+    this.cv.width = w * this.dpr
+    this.cv.height = h * this.dpr
+    this.clampView()
+    this.invalidate()
+  }
+
   pointerDistance() {
     const [a, b] = [...this.pointers.values()]
     return Math.max(1, Math.hypot(a.x - b.x, a.y - b.y))
@@ -137,12 +151,12 @@ export class Renderer {
   // canvas units (360 x 640) from client coordinates
   local(clientX: number, clientY: number): Point {
     const r = this.cv.getBoundingClientRect()
-    return { x: ((clientX - r.left) * W) / r.width, y: ((clientY - r.top) * VIEW_H) / r.height }
+    return { x: ((clientX - r.left) * this.vw) / r.width, y: ((clientY - r.top) * this.vh) / r.height }
   }
 
-  viewH() { return VIEW_H / this.view.zoom }
+  viewH() { return this.vh / this.view.zoom }
   maxScroll() { return Math.max(0, state.page.h - this.viewH()) }
-  maxPan() { return Math.max(0, W - W / this.view.zoom) }
+  maxPan() { return Math.max(0, this.vw - this.vw / this.view.zoom) }
   clampView() {
     this.view.scrollY = Math.max(0, Math.min(this.maxScroll(), this.view.scrollY))
     this.view.panX = Math.max(0, Math.min(this.maxPan(), this.view.panX))
@@ -177,7 +191,7 @@ export class Renderer {
     if (target === pz) return
     const s = pz / 100
     const v = this.view
-    this.pending = { T, cssX: (v.panX + W / 2 / v.zoom) / s, cssY: (v.scrollY + VIEW_H / 2 / v.zoom) / s }
+    this.pending = { T, cssX: (v.panX + this.vw / 2 / v.zoom) / s, cssY: (v.scrollY + this.vh / 2 / v.zoom) / s }
     api.zoom(target)
   }
 
@@ -190,14 +204,14 @@ export class Renderer {
     const z = Math.max(1 / s, Math.min(3 / s, (p ? p.T : s * this.view.zoom) / s)) // what is left to scale locally
     this.view.zoom = z
     if (p) {
-      this.view.panX = p.cssX * s - W / 2 / z
-      this.view.scrollY = p.cssY * s - VIEW_H / 2 / z
+      this.view.panX = p.cssX * s - this.vw / 2 / z
+      this.view.scrollY = p.cssY * s - this.vh / 2 / z
     }
     this.clampView()
     this.invalidate()
   }
-  zoomBy(f: number) { this.zoomAt(W / 2, VIEW_H / 2, this.view.zoom * f) }
-  zoomReset() { this.zoomAt(W / 2, VIEW_H / 2, 100 / (state.page.zoom || 100)) }
+  zoomBy(f: number) { this.zoomAt(this.vw / 2, this.vh / 2, this.view.zoom * f) }
+  zoomReset() { this.zoomAt(this.vw / 2, this.vh / 2, 100 / (state.page.zoom || 100)) }
 
   // screen (canvas unit) point -> point in the scrolled page window
   windowPoint(p: Point): Point { return { x: p.x / this.view.zoom + this.view.panX, y: p.y / this.view.zoom } }
@@ -259,7 +273,7 @@ export class Renderer {
     const { zoom: z, panX, scrollY: sy } = this.view
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0)
     ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, W, VIEW_H)
+    ctx.fillRect(0, 0, this.vw, this.vh)
     // page units from here on: x is page x, y is relative to the scroll position
     ctx.setTransform(this.dpr * z, 0, 0, this.dpr * z, -panX * z * this.dpr, 0)
     ctx.imageSmoothingEnabled = true

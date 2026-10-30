@@ -42,6 +42,9 @@ type Session interface {
 	// SetScale re-lays the page out at 360/scale css px and renders at device scale factor scale (pct = 100..300); all geometry in
 	// a Snapshot is then in device pixels at that scale.
 	SetScale(ctx context.Context, pct int) error
+	// SetViewport sets the size of the window the page is shown in (device pixels at scale 100; the layout is width/scale css px wide). Before Open it only stores the size;
+	// after, the page is laid out again.
+	SetViewport(ctx context.Context, width, height int) error
 	// TapScroll taps a point (content coordinates) inside an inner scroll layer, scrolling the box there first.
 	TapScroll(ctx context.Context, layer, x, y int) error
 	Close()

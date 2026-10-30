@@ -89,7 +89,8 @@ func TestDisplayForAndIME(t *testing.T) {
 		{640, 360, "phone", 1280, 720, 320},   // a phone held sideways
 		{1280, 800, "large", 1600, 1008, 213}, // 1.6
 		{1920, 1080, "large", 1600, 896, 213}, // 1.78
-		{2560, 1080, "large", 1600, 848, 213}, // ultrawide is clamped to 1.9
+		{2560, 1080, "large", 1600, 672, 213}, // ultrawide: the window's own shape
+		{900, 900, "large", 1600, 1600, 213},  // a square window gets a square display
 		{800, 1000, "large", 1280, 1600, 213}, // a tablet upright: 1.25
 	}
 	for _, c := range cases {

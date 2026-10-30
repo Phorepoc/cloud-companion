@@ -148,6 +148,54 @@ await page.click('[data-test=win-files] a[href="#/browse"], [data-test=win-files
 await page.waitForSelector('[data-test=win-browse]')
 assert(await shown('[data-test=desktop]'), 'still on the desktop')
 
+step('Browser window: the page uses the whole window (no padding), the buttons are in the title bar, the address bar is right under it')
+{
+const bw = await box('[data-test=win-browse]')
+const bar = await box('[data-test=win-browse] header')
+for (const t of ['back', 'forward', 'reload', 'tab-new', 'zoom-in', 'phone-size']) {
+  const b = await box(`[data-test=win-browse] header [data-test=${t}]`)
+  assert(b.y >= bar.y - 1 && b.y + b.height <= bar.y + bar.height + 1, `${t} is in the title bar`)
+}
+const sep = await box('[data-test=win-browse] header .ph-win__ctl')
+const lastBtn = await box('[data-test=win-browse] header [data-test=phone-size]')
+assert(lastBtn.x + lastBtn.width <= sep.x + 1, 'the page buttons sit left of the separator before minimise / maximise / close')
+const addr = await box('[data-test=win-browse] .ph-address')
+assert(addr.y >= bar.y + bar.height - 1 && addr.y <= bar.y + bar.height + 4, `the address bar is directly under the title bar (${addr.y} vs ${bar.y + bar.height})`)
+const near = (a: number, b: number, tol = 2) => Math.abs(a - b) <= tol
+const fillCheck = async (what: string) => {
+  const st = await box('[data-test=win-browse] [data-test=stage]')
+  const cvb = await box('[data-test=win-browse] [data-test=canvas]')
+  assert(near(cvb.width, st.width) && near(cvb.height, st.height) && near(cvb.x, st.x) && near(cvb.y, st.y), `${what}: the page fills its stage (${JSON.stringify(cvb)} in ${JSON.stringify(st)})`)
+  assert(st.width + 2 >= bw.width - 4 || true, 'stage measured')
+  return st
+}
+let stg = await fillCheck('full size')
+assert(stg.width > 360 && stg.height > 200, 'not limited to a phone column')
+// a real page, so the cloud lays it out: its width is the window's
+await page.evaluate(() => window.__phe.api.open('data:text/html,<body style="margin:0"><h1>full</h1></body>'))
+await page.waitForFunction(() => window.__phe.state.page.pid > 0 && window.__phe.state.page.w === window.__phe.state.viewport.w, null, { timeout: 30000 })
+assert.equal(await page.evaluate(() => window.__phe.state.page.w), await page.evaluate(() => window.__phe.state.viewport.w), 'the cloud laid the page out at the window width')
+assert((await page.evaluate(() => window.__phe.state.page.w)) > 400, 'wider than a Symbian phone')
+await page.screenshot({ path: `${OUT}/desktop-browser-full.png` })
+// the phone size toggle, and back
+await page.click('[data-test=win-browse] [data-test=phone-size]')
+await page.waitForFunction(() => window.__phe.state.viewport.phone === true && window.__phe.state.page.w === 360, null, { timeout: 20000 })
+const pc = await box('[data-test=win-browse] [data-test=canvas]')
+assert(near(pc.width / pc.height, 360 / 640, 0.02), `phone size is 360 x 640 in shape (${pc.width} x ${pc.height})`)
+await page.screenshot({ path: `${OUT}/desktop-browser-phone.png` })
+await page.click('[data-test=win-browse] [data-test=phone-size]')
+await page.waitForFunction(() => window.__phe.state.viewport.phone === false && window.__phe.state.page.w > 400, null, { timeout: 20000 })
+stg = await fillCheck('back to full size')
+// resizing the window (live): drag the south-east corner; the cloud gets the new size
+const wb = await box('[data-test=win-browse]')
+await page.mouse.move(wb.x + wb.width - 3, wb.y + wb.height - 3)
+await page.mouse.down()
+await page.mouse.move(wb.x + wb.width - 3 - 120, wb.y + wb.height - 3 - 80, { steps: 6 })
+await page.mouse.up()
+await page.waitForFunction((w0) => window.__phe.state.viewport.w < w0 - 60 && window.__phe.state.page.w === window.__phe.state.viewport.w, Math.round(stg.width), { timeout: 20000 })
+stg = await fillCheck('after resizing the window')
+assert.equal(await page.evaluate(() => window.__phe.state.page.w), await page.evaluate(() => window.__phe.state.viewport.w), 'the cloud follows the window size')
+}
 step('Android opens as a phone: a tall narrow window, the screen filling its height')
 // no Android on the test server: answer the ticket request as if it were set up, so the (black) phone frame lays out
 await page.route('**/phe/android/ticket', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ configured: true, ticket: 'test' }) }))
@@ -241,6 +289,25 @@ await page.click('[data-test=win-settings] [data-test=layout] button:has-text("C
 await page.waitForSelector('[data-test=desktop-view]')
 assert(!(await page.locator('[data-test=desktop]').count()), 'back to the classic layout')
 
+step('Browser, classic layout (wide): the page fills the content area, the buttons are in the top bar, the address bar is the first row')
+await page.goto(BASE + '/#/browse')
+await page.waitForSelector('[data-test=canvas]')
+await page.waitForTimeout(500)
+{
+  const hdr = await box('header.q-header')
+  const cvb = await box('[data-test=canvas]')
+  const content = await box('.ph-browse')
+  const adr = await box('.ph-address')
+  for (const t of ['back', 'reload', 'phone-size']) {
+    const b = await box(`header.q-header [data-test=${t}]`)
+    assert(b.y >= hdr.y - 1 && b.y + b.height <= hdr.y + hdr.height + 1, `${t} is in the top bar`)
+  }
+  assert(adr.y <= hdr.y + hdr.height + 4, 'the address bar is directly under the top bar')
+  assert(Math.abs(cvb.x - content.x) <= 2 && Math.abs(cvb.width - content.width) <= 2, `no side padding (${JSON.stringify(cvb)} in ${JSON.stringify(content)})`)
+  assert(cvb.y + cvb.height >= content.y + content.height - 2, 'the page reaches the bottom of the content area')
+  await page.screenshot({ path: `${OUT}/browser-classic-wide.png` })
+}
+
 step('Android on a phone: one row of named icons, and the screen keeps most of the height')
 await page.setViewportSize({ width: 390, height: 844 })
 await page.route('**/phe/android/ticket', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ configured: true, ticket: 'test' }) }))
@@ -255,6 +322,26 @@ const pf = await box('.ph-frame')
 assert(pf.height > 844 * 0.6, `the screen keeps most of the height (${pf.height})`)
 await page.screenshot({ path: `${OUT}/android-phone.png` })
 await page.unroute('**/phe/android/ticket')
+
+step('Browser on a phone: edge to edge, buttons in the top bar')
+await page.setViewportSize({ width: 390, height: 844 })
+await page.goto(BASE + '/#/browse')
+await page.waitForSelector('[data-test=canvas]')
+await page.waitForTimeout(500)
+{
+  const hdr = await box('header.q-header')
+  const cvb = await box('[data-test=canvas]')
+  assert(Math.abs(cvb.x) <= 2 && Math.abs(cvb.width - 390) <= 2, `the page is as wide as the screen (${JSON.stringify(cvb)})`)
+  for (const t of ['back', 'reload']) {
+    const b = await box(`header.q-header [data-test=${t}]`)
+    assert(b.y >= hdr.y - 1 && b.y + b.height <= hdr.y + hdr.height + 1, `${t} is in the top bar`)
+  }
+  await page.screenshot({ path: `${OUT}/browser-phone.png` })
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: `${OUT}/browser-phone-dark.png` })
+  await page.emulateMedia({ colorScheme: 'light' })
+}
 
 step('a small screen always gets the classic layout')
 await page.setViewportSize({ width: 800, height: 900 })

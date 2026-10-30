@@ -55,6 +55,7 @@ const (
 	TSMSRes      = "smsres"      // S->C  its answer: how many were new, the phone's pending outbound queue
 	TTabs        = "tabs"        // S->C  the views of this connection
 	TZoom        = "zoom"        // C->S  re-render the view at a scale (percent; needs the "zoom" feature)
+	TViewport    = "viewport"    // C->S  the size of the window the page is shown in (css px; needs the "viewport" feature): the page is laid out at that size
 )
 
 type Header struct {
@@ -94,11 +95,12 @@ type Error struct {
 }
 
 type Open struct {
-	T     string  `cbor:"t"`
-	V     int     `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
-	URL   string  `cbor:"url"`
-	Width int     `cbor:"width"`
-	DPR   float64 `cbor:"dpr"`
+	T      string  `cbor:"t"`
+	V      int     `cbor:"v,omitempty"` // view (tab) id; 0 = view 1
+	URL    string  `cbor:"url"`
+	Width  int     `cbor:"width"`
+	Height int     `cbor:"height,omitempty"` // 0 = 640
+	DPR    float64 `cbor:"dpr"`
 }
 
 // Navigate: URL, or Action = back | forward | reload.
@@ -397,6 +399,15 @@ type Tabs struct {
 	T      string    `cbor:"t"`
 	Active int       `cbor:"active"`
 	List   []TabInfo `cbor:"list"`
+}
+
+// Viewport tells the server how large the window showing this view is (device pixels at render scale 100): the page is laid out at that width and
+// the screenful is that high, instead of the 360 x 640 of a small phone. Sizes are clamped to 240..2560 x 240..1600.
+type Viewport struct {
+	T      string `cbor:"t"`
+	V      int    `cbor:"v,omitempty"`
+	Width  int    `cbor:"width"`
+	Height int    `cbor:"height"`
 }
 
 type Zoom struct {

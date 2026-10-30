@@ -1,35 +1,52 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
-  <q-page class="ph-page ph-android" :style="{ '--ar': w / h }">
-    <div class="ph-head">
-      <h1>Android</h1>
-      <q-space />
-      <span class="ph-conn" :class="'is-' + conn" role="status" data-test="android-state">
-        <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' || conn === 'starting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
-        {{ connText }}
-      </span>
-      <q-btn v-if="configured" flat no-caps icon="sym_o_refresh" label="Reconnect" :loading="busy" data-test="android-reconnect" @click="connect" />
-    </div>
+  <q-page class="ph-android" :class="{ 'is-phone-mode': kind === 'phone' }">
+    <!-- the controls live in the title bar (the window's, or the app's top bar); the screen gets everything else -->
+    <Teleport v-if="titleActions && configured" :to="titleActions">
+      <div class="ph-tb" role="toolbar" aria-label="Android controls">
+        <span class="ph-conn" :class="'is-' + conn" role="status" data-test="android-state" :title="connText">
+          <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' || conn === 'starting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
+          <span class="ph-conn-text">{{ connText }}</span>
+        </span>
+        <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back" data-test="android-back" @click="stream.key(4)"><q-tooltip>Back</q-tooltip></q-btn>
+        <q-btn flat round dense icon="sym_o_home" aria-label="Home" data-test="android-home" @click="stream.key(3)"><q-tooltip>Home</q-tooltip></q-btn>
+        <q-btn flat round dense icon="sym_o_crop_square" aria-label="Recent" data-test="android-recent" @click="stream.key(187)"><q-tooltip>Recent apps</q-tooltip></q-btn>
+        <q-btn flat round dense :icon="sound ? 'sym_o_volume_up' : 'sym_o_volume_off'" :aria-label="sound ? 'Sound on' : 'Sound off'" :aria-pressed="String(sound)" data-test="android-sound" @click="toggleSound"><q-tooltip>{{ sound ? 'Sound on' : 'Sound off' }}</q-tooltip></q-btn>
+        <template v-if="!narrow">
+          <q-btn flat round dense icon="sym_o_content_copy" aria-label="Copy from phone" data-test="android-copy" @click="stream.copyFromPhone()"><q-tooltip>Copy from phone</q-tooltip></q-btn>
+          <q-btn flat round dense icon="sym_o_content_paste" aria-label="Paste to phone" data-test="android-paste" @click="stream.pasteToPhone()"><q-tooltip>Paste to phone</q-tooltip></q-btn>
+          <q-btn flat round dense icon="sym_o_download" aria-label="Install apps" data-test="android-install" @click="installOpen = true"><q-tooltip>Install apps</q-tooltip></q-btn>
+          <q-btn flat round dense icon="sym_o_refresh" aria-label="Reconnect" :loading="busy" data-test="android-reconnect" @click="connect"><q-tooltip>Reconnect</q-tooltip></q-btn>
+        </template>
+        <!-- on a phone-width screen the bar has room for the essentials; the rest is one tap away -->
+        <q-btn v-else flat round dense icon="sym_o_more_vert" aria-label="More" data-test="android-more">
+          <q-menu>
+            <q-list dense style="min-width: 190px">
+              <q-item v-close-popup clickable data-test="android-copy" @click="stream.copyFromPhone()"><q-item-section avatar><q-icon name="sym_o_content_copy" /></q-item-section><q-item-section>Copy from phone</q-item-section></q-item>
+              <q-item v-close-popup clickable data-test="android-paste" @click="stream.pasteToPhone()"><q-item-section avatar><q-icon name="sym_o_content_paste" /></q-item-section><q-item-section>Paste to phone</q-item-section></q-item>
+              <q-item v-close-popup clickable data-test="android-install" @click="installOpen = true"><q-item-section avatar><q-icon name="sym_o_download" /></q-item-section><q-item-section>Install apps</q-item-section></q-item>
+              <q-item v-close-popup clickable data-test="android-reconnect" @click="connect"><q-item-section avatar><q-icon name="sym_o_refresh" /></q-item-section><q-item-section>Reconnect</q-item-section></q-item>
+            </q-list>
+          </q-menu>
+        </q-btn>
+        <!-- Android has two modes, whatever the window: a phone (portrait, the phone launcher) and a desktop (landscape, windows and a taskbar) -->
+        <span class="ph-seg" role="group" aria-label="Android mode">
+          <q-btn flat dense no-caps icon="sym_o_smartphone" aria-label="Phone mode" :aria-pressed="String(kind === 'phone')" :class="{ 'is-on': kind === 'phone' }" data-test="android-mode-phone" @click="setMode('phone')"><q-tooltip>Phone mode</q-tooltip></q-btn>
+          <q-btn flat dense no-caps icon="sym_o_desktop_windows" aria-label="Desktop mode" :aria-pressed="String(kind === 'desktop')" :class="{ 'is-on': kind === 'desktop' }" data-test="android-mode-desktop" @click="setMode('desktop')"><q-tooltip>Desktop mode</q-tooltip></q-btn>
+        </span>
+      </div>
+    </Teleport>
 
+    <h1 class="ph-sr">Android</h1>
     <p v-if="state.admin === false" class="ph-note" role="note">Only an admin device can open Android.</p>
     <p v-if="loaded && !configured" class="ph-note" role="note" data-test="android-off">
       <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> Android is not set up on this server. See docs/android.md for the two extra containers it needs.
     </p>
-    <q-banner v-if="problem" class="bg-negative text-white q-mb-md" rounded role="alert" data-test="android-error">{{ problem }}</q-banner>
+    <q-banner v-if="problem" class="bg-negative text-white" role="alert" data-test="android-error">{{ problem }}</q-banner>
 
-    <div v-show="configured" class="ph-toolbar2" :class="{ 'is-compact': phone }" role="toolbar" aria-label="Android controls">
-      <q-btn flat no-caps icon="sym_o_arrow_back" :label="lbl('Back')" aria-label="Back" :title="phone ? 'Back' : undefined" data-test="android-back" @click="stream.key(4)" />
-      <q-btn flat no-caps icon="sym_o_home" :label="lbl('Home')" aria-label="Home" :title="phone ? 'Home' : undefined" data-test="android-home" @click="stream.key(3)" />
-      <q-btn flat no-caps icon="sym_o_crop_square" :label="lbl('Recent')" aria-label="Recent" :title="phone ? 'Recent' : undefined" data-test="android-recent" @click="stream.key(187)" />
-      <q-btn flat no-caps :icon="sound ? 'sym_o_volume_up' : 'sym_o_volume_off'" :label="lbl(sound ? 'Sound on' : 'Sound off')" :aria-label="sound ? 'Sound on' : 'Sound off'" :aria-pressed="String(sound)" data-test="android-sound" @click="toggleSound" />
-      <q-btn flat no-caps icon="sym_o_content_copy" :label="lbl('Copy from phone')" aria-label="Copy from phone" :title="phone ? 'Copy from phone' : undefined" data-test="android-copy" @click="stream.copyFromPhone()" />
-      <q-btn flat no-caps icon="sym_o_content_paste" :label="lbl('Paste to phone')" aria-label="Paste to phone" :title="phone ? 'Paste to phone' : undefined" data-test="android-paste" @click="stream.pasteToPhone()" />
-      <q-btn flat no-caps icon="sym_o_download" :label="lbl('Install apps')" aria-label="Install apps" :title="phone ? 'Install apps' : undefined" data-test="android-install" @click="installOpen = true" />
-    </div>
-
-    <div v-show="configured" class="ph-stage">
-      <div class="ph-frame" :class="{ 'is-wide': w > h }">
+    <div v-show="configured" ref="stage" class="ph-stage" data-test="android-stage">
+      <div class="ph-frame" :style="frameStyle">
         <div v-if="conn === 'starting'" class="ph-starting" role="status" data-test="android-starting">
           <q-spinner size="32px" color="white" aria-hidden="true" />
           <span>Starting Android…</span>
@@ -38,8 +55,8 @@
         <canvas ref="cv" width="360" height="640" tabindex="0" role="application" data-test="android-screen"
                 aria-label="Android screen: click or touch to tap, scroll with the wheel, type to enter text"></canvas>
       </div>
+      <p v-if="configured && (note || statsText)" class="ph-line ph-small" aria-live="polite" data-test="android-note">{{ note || statsText }}</p>
     </div>
-    <p v-if="configured" class="ph-muted ph-small ph-line" aria-live="polite" data-test="android-note">{{ note || statsText }}</p>
 
     <q-dialog v-model="installOpen">
       <q-card class="ph-dialog" data-test="android-install-dialog">
@@ -59,23 +76,44 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { apiCall, state } from '../cloud'
+import { useTitleActions } from '../components/titlebar'
 import { AndroidStream, type StreamState, type StreamStats } from '../android/stream.js'
 
 const route = useRoute()
+const titleActions = useTitleActions()
 const $q = useQuasar()
-// on a phone, and in a (phone-shaped) desktop window, the controls are one row of icons (each named for screen readers and on
-// hover), so the screen keeps the room
-const inWindow = inject('phInWindow', false)
-const phone = computed(() => inWindow || $q.screen.lt.sm)
-const lbl = (t: string) => (phone.value ? undefined : t)
-const cv = ref<HTMLCanvasElement | null>(null), file = ref<HTMLInputElement | null>(null)
+const narrow = computed(() => $q.screen.lt.sm)
+const cv = ref<HTMLCanvasElement | null>(null), file = ref<HTMLInputElement | null>(null), stage = ref<HTMLElement | null>(null)
 const configured = ref(false), loaded = ref(false), busy = ref(false), problem = ref(''), conn = ref<StreamState>('idle'), connMsg = ref('')
 const w = ref(360), h = ref(640), note = ref(''), stats = ref<StreamStats | null>(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
 const stream = shallowRef(new AndroidStream(document.createElement('canvas'), { base: '/android/' })) // replaced once the canvas exists
+
+// ---- the two Android modes ----
+// "auto" picks by the size of the window the first time; the buttons choose, and the choice is kept for this browser. The display on the server follows the choice AND the window's size.
+type Mode = 'auto' | 'phone' | 'desktop'
+const saved = ((): Mode => { try { const v = localStorage.getItem('phecloud-android-mode'); return v === 'phone' || v === 'desktop' ? v : 'auto' } catch { return 'auto' } })()
+const mode = ref<Mode>(saved)
+const stageSize = ref({ w: 0, h: 0 })
+/** What is on screen now: the mode, or (auto) what suits the window. */
+const kind = computed<'phone' | 'desktop'>(() => (mode.value !== 'auto' ? mode.value : stageSize.value.w >= 700 && stageSize.value.h >= 420 ? 'desktop' : 'phone'))
+const wire = (k: string) => (k === 'desktop' ? 'large' : 'phone')
+function setMode(m: 'phone' | 'desktop') {
+  mode.value = m
+  try { localStorage.setItem('phecloud-android-mode', m) } catch { /* private window */ }
+  stream.value.setKind(wire(m))
+}
+
+// the screen fills the window: the stream's own aspect ratio, as large as the stage allows (in desktop mode the display was made for this window, so that is all of it)
+const frameStyle = computed(() => {
+  const sw = stageSize.value.w, sh = stageSize.value.h
+  if (!sw || !sh) return {}
+  const k = Math.min(sw / w.value, sh / h.value)
+  return { width: Math.floor(w.value * k) + 'px', height: Math.floor(h.value * k) + 'px' }
+})
 
 const connText = computed(() => ({ idle: 'Not connected', connecting: 'Connecting', starting: 'Starting Android…', live: 'Connected', closed: connMsg.value || 'Disconnected', error: connMsg.value || 'Problem' }[conn.value]))
 const statsText = computed(() => {
@@ -94,7 +132,7 @@ async function connect() {
     configured.value = j.configured
     if (j.configured) {
       const q = route.query as Record<string, string | undefined> // single values: ?codec=vp8&fps=30
-      stream.value.connect(j.ticket, { codec: q.codec, size: q.size, fps: q.fps, kbps: q.kbps, kind: q.kind, audio: q.audio !== '0' })
+      stream.value.connect(j.ticket, { codec: q.codec, size: q.size, fps: q.fps, kbps: q.kbps, kind: q.kind || (mode.value === 'auto' ? undefined : wire(mode.value)), audio: q.audio !== '0' })
     }
   } catch (e) { problem.value = (e as Error).message } finally { busy.value = false; loaded.value = true }
 }
@@ -102,41 +140,44 @@ function toggleSound() { sound.value = !sound.value; stream.value.setSound(sound
 async function pickApk(e: Event) { const input = e.target as HTMLInputElement; const f = input.files?.[0]; if (f) await stream.value.installApk(f); input.value = '' }
 async function fdroid() { if (pkg.value.trim()) await stream.value.installFdroid(pkg.value.trim()) }
 
+let ro: ResizeObserver | null = null
+function measure() { const r = stage.value?.getBoundingClientRect(); if (r) stageSize.value = { w: Math.floor(r.width), h: Math.floor(r.height) } }
 onMounted(() => {
+  measure()
   stream.value.dispose()
   stream.value = new AndroidStream(cv.value!, {
     base: '/android/',
+    viewportEl: stage.value,
     onState: (s, m) => { conn.value = s; connMsg.value = m; if (s === 'error') problem.value = m },
     onStats: (m) => { stats.value = m },
     onNote: (t) => { note.value = t },
     onSize: (a, b) => { w.value = a; h.value = b },
   })
+  ro = new ResizeObserver(measure)
+  if (stage.value) ro.observe(stage.value)
   connect()
 })
-onBeforeUnmount(() => stream.value.dispose())
+onBeforeUnmount(() => { ro?.disconnect(); stream.value.dispose() })
 </script>
 
 <style scoped>
-.ph-head { display: flex; align-items: center; gap: var(--ph-s2); flex-wrap: wrap; }
-.ph-conn { display: inline-flex; align-items: center; gap: var(--ph-s1); font-size: var(--ph-text-small); color: var(--ph-text-muted); }
+/* the screen fills the content area; no padding, no heading row, the controls are in the title bar */
+.ph-android { display: flex; flex-direction: column; padding: 0; }
+.ph-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ph-note { margin: var(--ph-s3); }
+.ph-stage { flex: 1 1 auto; min-height: 0; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #000; }
+.ph-frame { position: relative; background: #000; overflow: hidden; }
+.is-phone-mode .ph-frame { border-radius: var(--ph-r-card); box-shadow: 0 0 0 1px var(--ph-divider); }
+.ph-frame canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+.ph-starting { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ph-s2); padding: var(--ph-s4); text-align: center; color: #fff; background: rgba(0, 0, 0, 0.78); }
+.ph-line { position: absolute; left: var(--ph-s2); bottom: var(--ph-s1); margin: 0; padding: 0 var(--ph-s2); border-radius: var(--ph-r-control); color: #fff; background: rgba(0, 0, 0, 0.55); pointer-events: none; }
+.ph-tb { display: flex; align-items: center; gap: 0; }
+.ph-conn { display: inline-flex; align-items: center; gap: var(--ph-s1); font-size: var(--ph-text-small); margin-right: var(--ph-s1); }
 .ph-conn.is-live { color: var(--ph-positive); }
 .ph-conn.is-closed, .ph-conn.is-error { color: var(--ph-negative); }
-.ph-toolbar2 { display: flex; flex-wrap: wrap; gap: var(--ph-s1); margin: var(--ph-s2) 0; }
-.ph-stage { display: flex; justify-content: center; }
-/* the frame is the phone's shape (the stream's own aspect ratio, so it follows rotation) and as large as the content area allows */
-.ph-frame {
-  --chrome: 250px;                                   /* bars, heading, toolbar, note: what is not the screen */
-  /* cqh is the desktop window's height inside a window, and the viewport's height elsewhere (no size container) */
-  width: min(100%, calc((100cqh - var(--chrome)) * var(--ar)));
-  min-width: min(100%, 220px);
-  background: #000; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-card); box-shadow: var(--ph-elev-1); overflow: hidden;
-}
-@media (max-width: 599px) { .ph-frame { --chrome: 270px; } }
-/* in a desktop window: no app bars around the page, the heading is in the window bar */
-.ph-in-window .ph-frame { --chrome: 160px; }
-.ph-toolbar2.is-compact { flex-wrap: nowrap; justify-content: space-between; gap: 0; }
-.ph-frame { position: relative; }
-.ph-starting { position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--ph-s2); padding: var(--ph-s4); text-align: center; color: #fff; background: rgba(0, 0, 0, 0.78); }
-.ph-frame canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: pointer; }
-.ph-line { text-align: center; min-height: 1.5em; margin: var(--ph-s2) 0 0; }
+/* the top bar already says Connected: this chip is its icon (the text stays for assistive technology) */
+.ph-conn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ph-seg { display: inline-flex; margin-left: var(--ph-s1); border: 1px solid currentColor; border-radius: var(--ph-r-control); overflow: hidden; }
+.ph-seg .q-btn { border-radius: 0; min-height: 32px; padding: 0 6px; }
+.ph-seg .q-btn.is-on { background: var(--ph-accent); color: var(--ph-on-accent); }
 </style>

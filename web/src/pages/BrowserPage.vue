@@ -1,8 +1,33 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
-  <q-page class="ph-browse">
-    <div class="ph-tabs" data-test="tab-strip" role="tablist" aria-label="Open tabs">
+  <q-page class="ph-browse" :class="{ 'is-phone': phoneSize }">
+    <!-- the buttons live in the title bar (the window's, or the app's top bar): the page keeps its room for the page -->
+    <Teleport v-if="titleActions" :to="titleActions">
+      <div class="ph-tb" role="toolbar" aria-label="Browser controls">
+        <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back" :disable="!state.page.back" data-test="back" @click="api.action('back')"><q-tooltip>Back</q-tooltip></q-btn>
+        <q-btn flat round dense icon="sym_o_arrow_forward" aria-label="Forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')"><q-tooltip>Forward</q-tooltip></q-btn>
+        <q-btn flat round dense icon="sym_o_refresh" aria-label="Reload" data-test="reload" @click="api.action('reload')"><q-tooltip>Reload</q-tooltip></q-btn>
+        <q-btn flat round dense icon="sym_o_add" aria-label="New tab" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')"><q-tooltip>New tab (up to 3)</q-tooltip></q-btn>
+        <q-btn flat round dense icon="sym_o_devices" aria-label="Tabs on your other devices" data-test="other-devices" @click="openOthers"><q-tooltip>Tabs on your other devices</q-tooltip></q-btn>
+        <q-btn v-if="!narrow" flat round dense icon="sym_o_zoom_out" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
+        <span v-if="!narrow" class="ph-tb-zoom ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
+        <q-btn v-if="!narrow" flat round dense icon="sym_o_zoom_in" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+        <q-btn v-if="canFull && !narrow" flat round dense :icon="phoneSize ? 'sym_o_open_in_full' : 'sym_o_smartphone'" :aria-pressed="String(phoneSize)"
+               :aria-label="phoneSize ? 'Use the whole window' : 'Phone size'" data-test="phone-size" @click="togglePhone">
+          <q-tooltip>{{ phoneSize ? 'Use the whole window' : 'Phone size (360 x 640)' }}</q-tooltip>
+        </q-btn>
+      </div>
+    </Teleport>
+
+    <div class="ph-address" role="search">
+      <q-input v-model="urlInput" outlined dense square class="col ph-url" placeholder="Search or enter a web address" aria-label="Address" inputmode="url"
+               autocomplete="off" data-test="url" @keyup.enter="go" @focus="editing = true" @blur="editing = false">
+        <template #append><q-spinner v-if="state.loading" size="20px" color="primary" aria-label="Loading" data-test="spinner" /></template>
+      </q-input>
+    </div>
+    <!-- the tabs: only when there is more than one (the new-tab button is in the title bar) -->
+    <div v-if="state.tabs.length > 1" class="ph-tabs" data-test="tab-strip" role="tablist" aria-label="Open tabs">
       <div v-for="t in state.tabs" :key="t.v" class="ph-tab" :class="{ 'is-active': t.v === state.activeView }" role="presentation">
         <button type="button" class="ph-tab-main" role="tab" :aria-selected="t.v === state.activeView" :data-test="'tab-' + t.v" @click="api.tab('switch', t.v)">
           {{ t.title || t.url || 'New tab' }}
@@ -11,24 +36,8 @@
           <q-icon name="sym_o_close" size="20px" aria-hidden="true" />
         </button>
       </div>
-      <q-btn flat round icon="sym_o_add" aria-label="New tab" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')">
-        <q-tooltip>New tab (up to 3)</q-tooltip>
-      </q-btn>
-      <q-btn flat round icon="sym_o_devices" aria-label="Tabs on your other devices" data-test="other-devices" @click="openOthers">
-        <q-tooltip>Tabs on your other devices</q-tooltip>
-      </q-btn>
     </div>
-
-    <div class="ph-address" role="search">
-      <q-btn flat round icon="sym_o_arrow_back" aria-label="Back" :disable="!state.page.back" data-test="back" @click="api.action('back')" />
-      <q-btn flat round icon="sym_o_arrow_forward" aria-label="Forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')" />
-      <q-btn flat round icon="sym_o_refresh" aria-label="Reload" data-test="reload" @click="api.action('reload')" />
-      <q-input v-model="urlInput" outlined class="col ph-url" placeholder="Search or enter a web address" aria-label="Address" inputmode="url"
-               autocomplete="off" data-test="url" @keyup.enter="go" @focus="editing = true" @blur="editing = false">
-        <template #append><q-spinner v-if="state.loading" size="20px" color="primary" aria-label="Loading" data-test="spinner" /></template>
-      </q-input>
-    </div>
-    <div class="ph-page-title ph-small ph-muted" data-test="title">{{ state.page.title }}</div>
+    <span class="ph-sr" data-test="title">{{ state.page.title }}</span>
 
     <q-banner v-if="state.error" class="ph-note is-error" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
@@ -41,17 +50,14 @@
       <template #action><q-btn flat label="OK" @click="state.downloadNote = ''" /></template>
     </q-banner>
 
-    <div class="viewport">
-      <canvas ref="cv" data-test="canvas" class="ph-canvas" aria-label="Web page" />
-      <textarea v-if="overlayRect && state.focus.kind === 'textarea'" ref="ov" v-model="ovValue" class="overlay" :style="overlayRect"
-                aria-label="Text field" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
-      <input v-else-if="overlayRect" ref="ov" v-model="ovValue" :type="inputType" class="overlay" :style="overlayRect"
-             aria-label="Text field" :inputmode="inputMode" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
-    </div>
-    <div class="ph-zoom" role="group" aria-label="Zoom">
-      <q-btn flat round icon="sym_o_zoom_out" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
-      <span class="ph-small ph-muted" aria-live="polite">{{ state.page.zoom || 100 }}%</span>
-      <q-btn flat round icon="sym_o_zoom_in" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+    <div ref="stage" class="ph-stage" data-test="stage">
+      <div class="viewport" :style="vpStyle">
+        <canvas ref="cv" data-test="canvas" class="ph-canvas" aria-label="Web page" />
+        <textarea v-if="overlayRect && state.focus.kind === 'textarea'" ref="ov" v-model="ovValue" class="overlay" :style="overlayRect"
+                  aria-label="Text field" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
+        <input v-else-if="overlayRect" ref="ov" v-model="ovValue" :type="inputType" class="overlay" :style="overlayRect"
+               aria-label="Text field" :inputmode="inputMode" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
+      </div>
     </div>
     <div v-if="state.page.trunc" class="ph-small ph-muted">The rest of this page is not shown. Open it on a larger screen to read on.</div>
 
@@ -122,7 +128,14 @@ import { state, api, connect, creds, openInNewTab } from '../cloud'
 import type { Region, SessionInfo, TabInfo } from '../proto'
 import EmptyState from '../components/EmptyState.vue'
 import { Renderer } from '../renderer'
+import { useTitleActions } from '../components/titlebar'
+import { useQuasar } from 'quasar'
 
+const titleActions = useTitleActions()
+// on a phone-width screen the bar has room for the essentials only (pinch zooms, and the page already is phone sized)
+const $q = useQuasar()
+const narrow = computed(() => $q.screen.lt.sm)
+const stage = ref<HTMLElement | null>(null)
 const cv = ref<HTMLCanvasElement | null>(null)
 const ov = ref<HTMLInputElement | null>(null)
 const urlInput = ref(state.page.url)
@@ -134,6 +147,38 @@ const selOpen = ref(false)
 const selRegion = ref<Region | null>(null)
 const selIndex = ref(0)
 let renderer: Renderer | null = null
+
+// ---- the size of the remote window ----
+// By default the cloud lays the page out at the size of this window (no phone-sized column, no padding); "Phone size" goes back to 360 x 640 and back again.
+// A resize reaches the cloud (debounced), which lays the page out again and sends tiles for the new size.
+const wantPhone = ref(localStorage.getItem('phecloud-browser-phone') === '1')
+const canFull = computed(() => state.features.includes('viewport'))
+const phoneSize = computed(() => wantPhone.value || !canFull.value)
+const vpStyle = computed(() => (phoneSize.value
+  ? { width: '360px', height: '640px', maxWidth: '100%', maxHeight: '100%', position: 'relative' as const }
+  : { width: state.viewport.w + 'px', height: state.viewport.h + 'px', position: 'absolute' as const, left: '0', top: '0' }))
+let resizeObs: ResizeObserver | null = null
+let vpTimer: ReturnType<typeof setTimeout> | undefined
+function applySize(now = false) {
+  if (!stage.value) return
+  const r = stage.value.getBoundingClientRect()
+  const w = phoneSize.value ? 360 : Math.max(240, Math.floor(r.width))
+  const h = phoneSize.value ? 640 : Math.max(240, Math.floor(r.height))
+  const same = state.viewport.w === w && state.viewport.h === h && state.viewport.phone === phoneSize.value
+  state.viewport = { w, h, phone: phoneSize.value }
+  renderer?.setSize(w, h)
+  if (same) return
+  clearTimeout(vpTimer)
+  const send = () => { if (canFull.value && state.page.pid !== 0) api.viewport(w, h) }
+  if (now) send()
+  else vpTimer = setTimeout(send, 250)
+}
+function togglePhone() {
+  wantPhone.value = !wantPhone.value
+  localStorage.setItem('phecloud-browser-phone', wantPhone.value ? '1' : '0')
+  nextTick(() => applySize(true))
+}
+watch(canFull, () => nextTick(() => applySize(true)))
 // the page's keyboard hint for the focused field (text, numeric, email…)
 const inputMode = computed(() => (state.focus.im || undefined) as HTMLAttributes['inputmode'])
 let typeTimer: ReturnType<typeof setTimeout> | undefined
@@ -194,6 +239,11 @@ function pickSelect() {
 }
 
 onMounted(async () => {
+  // measure first: the canvas is made at the size the cloud will lay the page out at
+  if (stage.value) {
+    const r = stage.value.getBoundingClientRect()
+    state.viewport = phoneSize.value ? { w: 360, h: 640, phone: true } : { w: Math.max(240, Math.floor(r.width)), h: Math.max(240, Math.floor(r.height)), phone: false }
+  }
   renderer = new Renderer(cv.value!)
   renderer.onSelect = (r) => {
     selRegion.value = r
@@ -201,6 +251,9 @@ onMounted(async () => {
     selOpen.value = true
   }
   renderer.attach()
+  applySize(true)
+  resizeObs = new ResizeObserver(() => applySize())
+  if (stage.value) resizeObs.observe(stage.value)
   // test/debug hook: screen position (client coordinates) of a region by label
   window.__phe = Object.assign(window.__phe || {}, {
     renderer,
@@ -211,7 +264,7 @@ onMounted(async () => {
       const sr = renderer.screenRect(r)
       if (!sr) return null
       const b = cv.value!.getBoundingClientRect()
-      const k = b.width / 360
+      const k = b.width / renderer.vw
       return { x: b.left + (sr.x + sr.w / 2) * k, y: b.top + (sr.y + sr.h / 2) * k, scrollY: renderer.view.scrollY, zoom: renderer.view.zoom }
     },
   })
@@ -219,7 +272,7 @@ onMounted(async () => {
     try { await connect() } catch (e) { /* shown by the status banner */ }
   }
 })
-onBeforeUnmount(() => renderer && renderer.detach())
+onBeforeUnmount(() => { resizeObs?.disconnect(); clearTimeout(vpTimer); if (renderer) renderer.detach() })
 
 // ---- tabs on other devices ----
 const othersOpen = ref(false)
@@ -245,23 +298,26 @@ onBeforeUnmount(() => clearInterval(poll))
 </script>
 
 <style scoped>
-.ph-browse { display: flex; flex-direction: column; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3); }
-.ph-tabs, .ph-address { width: 100%; max-width: 720px; display: flex; align-items: center; gap: var(--ph-s1); }
-.ph-address { gap: var(--ph-s1); }
+/* the page fills the whole content area: the buttons are in the title bar, the address bar is the first row, the web page gets everything else */
+.ph-browse { display: flex; flex-direction: column; padding: 0; gap: 0; }
+.ph-address { display: flex; align-items: center; flex: none; padding: 0; }
 .ph-url { flex: 1 1 0; min-width: 0; }
-.ph-tabs { overflow-x: auto; }
-.ph-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; height: var(--ph-tap); border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); background: var(--ph-surface); }
-.ph-tab.is-active { border-color: var(--ph-accent); background: var(--ph-accent-soft); }
-.ph-tab-main { flex: 1; min-width: 0; height: 100%; padding: 0 var(--ph-s2) 0 var(--ph-s3); background: none; border: 0; text-align: left; color: var(--ph-text); font: inherit; font-size: var(--ph-text-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.ph-url :deep(.q-field__control) { border-radius: 0; }
+.ph-tabs { flex: none; display: flex; align-items: center; gap: 0; overflow-x: auto; }
+.ph-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; height: 36px; border: 0; border-bottom: 2px solid transparent; background: var(--ph-surface); }
+.ph-tab.is-active { border-bottom-color: var(--ph-accent); background: var(--ph-accent-soft); }
+.ph-tab-main { flex: 1; min-width: 0; height: 100%; padding: 0 var(--ph-s2) 0 var(--ph-s3); background: none; border: 0; text-align: left; color: var(--ph-text); font: inherit; font-size: var(--ph-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .ph-tab.is-active .ph-tab-main { font-weight: 600; }
-.ph-tab-close { flex: none; width: var(--ph-tap); height: var(--ph-tap); display: grid; place-items: center; background: none; border: 0; color: var(--ph-text-muted); cursor: pointer; border-radius: var(--ph-r-control); }
-.ph-page-title { max-width: 720px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-height: 1.5em; }
-.ph-note { width: 100%; max-width: 720px; background: var(--ph-surface-2); color: var(--ph-text); border: 1px solid var(--ph-divider); }
+.ph-tab-close { flex: none; width: 36px; height: 36px; display: grid; place-items: center; background: none; border: 0; color: var(--ph-text-muted); cursor: pointer; }
+.ph-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ph-note { flex: none; border-radius: 0; background: var(--ph-surface-2); color: var(--ph-text); border-bottom: 1px solid var(--ph-divider); }
 .ph-note.is-error { border-color: var(--ph-negative); }
 .ph-note.is-error :deep(.q-icon) { color: var(--ph-negative); }
-.viewport { position: relative; width: 360px; height: 640px; max-width: 100%; }
-.ph-canvas { width: 360px; height: 640px; display: block; touch-action: none; background: #fff; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); box-shadow: var(--ph-elev-1); }
-.ph-zoom { display: flex; align-items: center; gap: var(--ph-s2); }
+.ph-stage { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--ph-bg); }
+.ph-canvas { width: 100%; height: 100%; display: block; touch-action: none; background: #fff; }
+.is-phone .ph-canvas { border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); box-shadow: var(--ph-elev-1); }
+.ph-tb { display: flex; align-items: center; gap: 0; }
+.ph-tb-zoom { min-width: 3.2em; text-align: center; }
 .overlay { position: absolute; box-sizing: border-box; font: inherit; font-size: var(--ph-text-body); color: #1a1d21; border: 2px solid var(--ph-focus); border-radius: var(--ph-r-control); padding: 2px 8px; background: #fff; }
 .ph-dialog { width: min(92vw, 420px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); }

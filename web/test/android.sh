@@ -76,12 +76,14 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:p
 }
 if [ "${ONLY:-}" = view ]; then run_view; exit $?; fi
 if [ "${ONLY:-}" = desktop ]; then run_desktop; exit $?; fi
+if [ "${ONLY:-}" != app ]; then
 EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-android-t --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8090 -e TICKET="$EXP.$SIG" -e QUERY="${QUERY:-}" -e OUT=/out \
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning android.ts' || { docker logs phe-android-t 2>&1 | tail -8; exit 1; }
 docker stats --no-stream --format 'redroid {{.CPUPerc}} {{.MemUsage}}' phe-redroid-t
+fi
 [ "${ONLY:-}" = android ] && exit 0
 # the web app's own page: phecloud (with the web app) + Caddy in front, as in the hub; the standalone run above has finished, so the single viewer slot is free
 docker build -q -t phe-cloud-t:dev . >/dev/null
@@ -102,6 +104,7 @@ docker run -d --name phe-caddy-t --network phepa --cpus 0.5 --memory 128m -v "$O
 sleep 8
 CODE=$(docker exec phe-cloud-t phecloud paircode --admin 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-caddy-t --ipc=host     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8080 -e CODE="$CODE" -e OUT=/out     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning androidapp.ts' || { docker logs phe-android-t 2>&1 | tail -5; docker logs phe-cloud-t 2>&1 | tail -5; exit 1; }
+[ "${ONLY:-}" = app ] && exit 0   # ONLY=app: just the web app's own Android page
 # parking: the standalone page against the bridge again (the app run above has finished); parking after $PARK_AFTER (default 30s here, 15m in production)
 EXP=$(( $(date +%s) + 3000 ))
 SIG=$(printf "android.$EXP" | openssl dgst -sha256 -hmac testsecret -hex | sed 's/.*= //')
