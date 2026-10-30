@@ -122,6 +122,88 @@ await shots('6-remove-confirm')
 await page.click('[data-test=remove-confirm]')
 await page.waitForFunction(() => document.querySelectorAll('[data-test=passkey-row]').length === 1)
 step('a passkey is removed after confirmation')
+
+// 5b. Settings, "Pair a new device": codes made in the app, as the CLI makes them
+await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
+await page.locator('[data-test=pair-device]').scrollIntoViewIfNeeded()
+assert.equal(await page.locator('[data-test=pair-result]').count(), 0, 'no code is shown before one is asked for')
+await page.click('[data-test=pair-generate]')
+await page.waitForSelector('[data-test=pair-code]')
+const codeNew = ((await page.textContent('[data-test=pair-code]')) ?? '').trim()
+assert.match(codeNew, /^[A-Z0-9]{4}-[A-Z0-9]{4}$/)
+const fpShown = ((await page.textContent('[data-test=pair-fingerprint]')) ?? '').replace(/\s+/g, '')
+assert.match(fpShown, /^[0-9a-f]{64}$/, 'the server certificate fingerprint is shown')
+assert.match((await page.textContent('[data-test=pair-countdown]')) ?? '', /Expires in (9:[3-5]\d|10:00).*normal device/)
+await shots('7-pair-code')
+// the countdown is live
+const c1 = (await page.textContent('[data-test=pair-countdown]')) ?? ''
+await page.waitForFunction((was) => document.querySelector('[data-test=pair-countdown]')?.textContent !== was, c1, { timeout: 5000 })
+// copy buttons
+await page.click('[data-test=pair-copy]')
+await page.waitForSelector('[data-test=pair-copied]')
+assert.equal(await page.evaluate(() => navigator.clipboard.readText()), codeNew, 'the code was copied')
+await page.click('[data-test=pair-copy-fp]')
+assert.equal((await page.evaluate(() => navigator.clipboard.readText())).replace(/\s+/g, ''), fpShown, 'the fingerprint was copied')
+step('Settings: a normal pairing code, large, with a live countdown, the fingerprint and copy buttons')
+
+// the code pairs a NORMAL device once, and only once
+const ctx2 = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1000 } })
+const p2 = await ctx2.newPage()
+await p2.goto(BASE)
+await p2.fill('[data-test=code]', codeNew)
+await p2.click('[data-test=pair]')
+await p2.waitForFunction(() => window.__phe && window.__phe.state.status === 'online', null, { timeout: 20000 })
+assert.equal(await p2.evaluate(() => window.__phe.state.admin), false, 'a normal code makes a normal device')
+await p2.goto(BASE + '/#/settings')
+await p2.waitForSelector('[data-test=pair-denied]')
+assert.equal(await p2.locator('[data-test=pair-generate]').count(), 0, 'a normal device cannot make codes')
+assert.equal(
+  await p2.evaluate(async () => (await window.__phe.apiCall('POST', '/phe/pair/code', { admin: false }).then(() => 200, () => 403))),
+  403, 'the server refuses a normal device too')
+await shots('8-pair-denied-non-admin')
+const ctx3 = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1000 } })
+const p3 = await ctx3.newPage()
+await p3.goto(BASE)
+await p3.fill('[data-test=code]', codeNew)
+await p3.click('[data-test=pair]')
+await p3.waitForSelector('[data-test=pair-error]')
+assert.match((await p3.textContent('[data-test=pair-error]')) ?? '', /code|invalid|expired/i)
+await ctx3.close()
+step('the code works once; a normal device sees the reason instead of the action and the server refuses it')
+
+// generate another, as an admin device
+await page.click('[data-test=pair-kind] >> text=Admin device')
+await page.waitForSelector('[data-test=pair-admin-note]')
+await page.click('[data-test=pair-another]')
+await page.waitForFunction((old) => document.querySelector('[data-test=pair-code]')?.textContent?.trim() !== old, codeNew)
+const codeAdm = ((await page.textContent('[data-test=pair-code]')) ?? '').trim()
+assert.match((await page.textContent('[data-test=pair-countdown]')) ?? '', /admin device/)
+const ctx4 = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 1000 } })
+const p4 = await ctx4.newPage()
+await p4.goto(BASE)
+await p4.fill('[data-test=code]', codeAdm)
+await p4.click('[data-test=pair]')
+await p4.waitForFunction(() => window.__phe && window.__phe.state.status === 'online', null, { timeout: 20000 })
+assert.equal(await p4.evaluate(() => window.__phe.state.admin), true, 'an admin code makes an admin device')
+await p4.goto(BASE + '/#/settings')
+await p4.waitForSelector('[data-test=pair-generate]')
+await ctx4.close()
+step('"Generate another" with the admin choice: a different code that makes an admin device')
+
+// the expiry state: shorten the lifetime the page is told about (the real code stays valid on the server)
+await page.route('**/phe/pair/code', async (route) => {
+  const res = await route.fetch()
+  const j = await res.json()
+  j.expires = Math.floor(Date.now() / 1000) + 2
+  await route.fulfill({ response: res, json: j })
+})
+await page.click('[data-test=pair-another]')
+await page.waitForFunction(() => /expired/i.test(document.querySelector('[data-test=pair-countdown]')?.textContent ?? ''), null, { timeout: 8000 })
+assert.equal(await page.locator('[data-test=pair-copy]').isDisabled(), true, 'an expired code cannot be copied')
+await shots('9-pair-expired')
+await page.unroute('**/phe/pair/code')
+await ctx2.close()
+step('an expired code is marked, cannot be copied, and "Generate another" offers a fresh one')
 // the recovery code that exists now is recNew (rec1 was replaced): keep it for step 5
 rec1 = recNew
 // a browser that is not signed in cannot use these endpoints

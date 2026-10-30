@@ -117,6 +117,9 @@ export interface SmsMessage {
   status: 'received' | 'queued' | 'sent' | 'delivered' | 'failed'
   error?: string
 }
+/** POST /phe/pair/code: a single-use pairing code (internal/webui/pair.go). `expires` is unix seconds. */
+export interface PairCodeInfo { code: string; expires: number; ttl: number; admin: boolean; fingerprint: string }
+
 /** GET /passkey/list: one of the owner's passkeys (internal/store/passkey.go). */
 export interface PasskeyInfo { id: string; name: string; created: number; last_used: number }
 

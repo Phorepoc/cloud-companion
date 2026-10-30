@@ -67,6 +67,7 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	a := newAuth(s.Store)
 	a.routes(mux)
 	a.androidRoutes(mux)
+	a.pairRoutes(mux)
 	(&smsAPI{a: a, st: s.Store, hub: s.Hub}).routes(mux)
 	if cat != nil {
 		(&catAPI{a: a, st: s.Store, m: cat}).routes(mux)

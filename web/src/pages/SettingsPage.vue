@@ -31,6 +31,8 @@
       </div>
     </section>
 
+    <PairNewDevice />
+
     <section v-if="state.admin" class="ph-card ph-section" aria-labelledby="set-security" data-test="security">
       <h2 id="set-security">Security</h2>
       <p v-if="blocker" class="ph-note" role="note" data-test="passkey-blocker"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> {{ blocker }}</p>
@@ -98,6 +100,7 @@ import { state, api, forget, connect, passkeyList, passkeyRemove, passkeyAdd, re
 import { theme, applyTheme } from '../theme'
 import { getLayout, setLayout, DESKTOP_MIN_WIDTH, type Layout } from '../desktop/layout'
 import type { PasskeyInfo } from '../proto'
+import PairNewDevice from '../components/PairNewDevice.vue'
 
 const router = useRouter()
 const choice = ref(theme.value)

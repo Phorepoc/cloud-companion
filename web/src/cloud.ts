@@ -7,7 +7,7 @@ import { reactive, shallowRef } from 'vue'
 import { PheClient, type Creds } from './pheclient'
 import { idbGet, idbSet, idbDel } from './idb'
 import { brand } from './brand'
-import type { DeviceInfo, Dialog, Focus, HubRequest, HubResFrame, Layer, PageInfo, Region, ServerFrame, SessionInfo, TabInfo, TileFrame, WelcomeFrame } from './proto'
+import type { DeviceInfo, Dialog, Focus, HubRequest, HubResFrame, Layer, PageInfo, PairCodeInfo, Region, ServerFrame, SessionInfo, TabInfo, TileFrame, WelcomeFrame } from './proto'
 
 export interface AppState {
   status: 'offline' | 'connecting' | 'online'
@@ -362,6 +362,8 @@ async function signedJSON(method: string, path: string, body?: unknown): Promise
   return j
 }
 
+/** Settings, Pair a new device: a single-use code (admin devices only). */
+export const pairCodeNew = (admin: boolean): Promise<PairCodeInfo> => signedJSON('POST', '/phe/pair/code', { admin })
 export const passkeyList = () => signedJSON('GET', '/passkey/list')
 export const passkeyRemove = (id: string) => signedJSON('POST', '/passkey/remove', { id })
 export const recoveryRegenerate = () => signedJSON('POST', '/passkey/recovery', {})
