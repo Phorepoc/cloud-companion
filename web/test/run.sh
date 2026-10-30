@@ -17,12 +17,8 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ip
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE" -e OUT=/out \
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning smoke.ts' || { echo '--- server log'; docker logs phe-cloud 2>&1 | tail -12 | cut -c1-260; exit 1; }
 
-# the desktop view and the Etesian theme (a fresh admin browser at 1440 x 900)
-echo "== desktop view"
-CODE3=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
-docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
-    -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODE="$CODE3" -e OUT=/out \
-    mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning desktop.ts'
+# (the desktop view and the Etesian theme: web/test/desktop.sh. It needs a secure origin (localhost) for the Android window, so it
+# has its own run, as in CI.)
 
 # HTTPS through the Caddy reverse proxy (compose profile "tls", internal CA): pair, open example.com, tap the link over wss
 if [ "${TLS_CHECK:-1}" = 1 ]; then
