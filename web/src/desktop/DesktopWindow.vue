@@ -57,7 +57,8 @@ const props = withDefaults(defineProps<{
   pageProps?: Record<string, unknown>
   focused?: boolean
   busy?: boolean      // some window is being moved or resized
-}>(), { pageProps: () => ({}) })
+  card?: { x: number; y: number; s: number; z: number; side: boolean } | null // in the Windows view: the window itself, scaled into its card
+}>(), { pageProps: () => ({}), card: null })
 const emit = defineEmits(['focus', 'move', 'resize', 'drag-zone', 'drop', 'minimise', 'maximise', 'close', 'busy'])
 
 // pages can tell they are in a window (Android uses its compact controls there)
@@ -70,9 +71,12 @@ const MIN_W = 360
 const MIN_H = 240
 const dragging = ref(false)
 
-const style = computed(() => ({
-  left: props.rect.x + 'px', top: props.rect.y + 'px', width: props.rect.w + 'px', height: props.rect.h + 'px', zIndex: props.win.z,
-}))
+const style = computed(() => {
+  const c = props.card
+  if (c) return { left: c.x + 'px', top: c.y + 'px', width: props.rect.w + 'px', height: props.rect.h + 'px', zIndex: c.z,
+    transform: `scale(${c.s})`, transformOrigin: '0 0', opacity: c.side ? 0.5 : 1, transition: 'left .18s, top .18s, transform .18s, opacity .18s' }
+  return { left: props.rect.x + 'px', top: props.rect.y + 'px', width: props.rect.w + 'px', height: props.rect.h + 'px', zIndex: props.win.z }
+})
 
 /** Moves with the pointer; leaving a snapped state restores the floating size under the pointer. */
 function startDrag(e: PointerEvent) {

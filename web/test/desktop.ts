@@ -149,6 +149,33 @@ await page.keyboard.press('Tab')
 await page.keyboard.press('Escape')
 await page.keyboard.up('Alt'); await page.keyboard.up('Control')
 assert.equal((await text('[data-test=menubar-app]')).trim(), 'Settings', 'Escape cancels the switch')
+// the Windows view (2026-10-31, as the Etesian desktop and Plasma): the windows themselves are the cards, the neighbours at half strength;
+// Ctrl + wheel zooms to a grid and keeps the view open, arrows move, Enter opens
+await page.keyboard.down('Control'); await page.keyboard.down('Alt')
+await page.keyboard.press('Tab')
+await page.waitForSelector('[data-test=switcher]')
+const op = async (id: string) => Number(await page.locator(`[data-test=win-${id}]`).evaluate((el) => getComputedStyle(el).opacity))
+const scale = async (id: string) => await page.locator(`[data-test=win-${id}]`).evaluate((el) => getComputedStyle(el).transform)
+await page.waitForTimeout(300)
+const selId = (await page.getAttribute('[data-test=switcher] [aria-selected=true]', 'data-test'))!.replace('switch-', '')
+const other = (await page.getAttribute('[data-test=switcher] [aria-selected=false]', 'data-test'))!.replace('switch-', '')
+assert.match(await scale(selId), /^matrix\(0\.\d+/, 'the selected window itself is scaled into its card')
+assert.equal(await op(selId), 1); assert.equal(await op(other), 0.5, 'its neighbour shows at half strength')
+await page.locator('.ph-wins').dispatchEvent('wheel', { deltaY: 100, ctrlKey: true }) // Ctrl + wheel (a pinch arrives the same way): zoom out
+await page.waitForSelector('[data-test=wins-zoom-2][aria-checked=true]')
+await page.keyboard.up('Alt'); await page.keyboard.up('Control')
+assert(await shown('[data-test=switcher]'), 'zoomed out, the view stays open when the keys are let go')
+await page.waitForTimeout(500)
+await page.screenshot({ path: `${OUT}/desktop-windows-view.png` })
+for (const id of ['mail', 'settings', 'calendar']) {
+  const b = await box(`[data-test=switch-${id}]`)
+  assert(b.y >= 0 && b.y + b.height <= 900, `every card is on screen (${id}: ${JSON.stringify(b)})`)
+}
+await page.keyboard.press('Enter')
+await page.waitForSelector('[data-test=switcher]', { state: 'detached' })
+assert.equal((await text('[data-test=menubar-app]')).trim().toLowerCase(), selId, 'Enter opens the selected window')
+assert.equal(await scale(selId), 'none', 'the windows are back at their own size')
+
 
 step('Events: the clock opens the panel (calendar, mail, chats), Escape closes it, Ctrl+Alt+N toggles it, a window click dismisses it')
 await page.click('[data-test=clock]')

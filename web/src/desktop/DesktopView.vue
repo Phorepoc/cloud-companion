@@ -60,21 +60,32 @@
     <div id="ph-desk-area" ref="areaEl" class="ph-desk__area" tabindex="-1">
       <!-- widgets on the wallpaper, under the windows; while they are edited the windows step aside -->
       <DesktopWidgets :now="now" :area="area" :editing="widgetEdit" @open="(id) => open(id)" @done="widgetEdit = false" />
-      <DesktopWindow v-for="w in (widgetEdit ? [] : shownWins)" :key="w.id" :win="w" :rect="rectOf(w)" :section="byId[w.id]" :page="pages[w.id].component!"
-                     :page-props="pages[w.id].props" :focused="focusedId === w.id" :busy="busy"
+      <DesktopWindow v-for="w in (widgetEdit ? [] : switcher ? viewWins : shownWins)" :key="w.id" :win="w" :rect="rectOf(w)" :section="byId[w.id]" :page="pages[w.id].component!"
+                     :page-props="pages[w.id].props" :focused="focusedId === w.id" :busy="busy || !!switcher" :card="switcher ? cardOf(w.id) : null"
                      @focus="focus(w); events = false" @move="(p) => move(w, p)" @resize="(r) => resize(w, r)" @drag-zone="dragZone" @drop="(p) => drop(w, p)"
                      @busy="(b) => (busy = b)" @minimise="minimise(w)" @maximise="toggleMax(w)" @close="close(w)" />
       <!-- where a dragged window will snap -->
       <div v-if="zone || pickHot" class="ph-desk__zone" :style="zoneStyle" aria-hidden="true" />
       <LayoutPicker v-if="picker" :layout="picker.layout" :hot="pickHot" :drag="picker.drag" @pick="(l, z) => snapZone(focusedWin, l, z)" />
 
-      <!-- quick switcher: hold Super (or Ctrl+Alt), Tab steps through the windows, most recent first; letting go switches -->
-      <div v-if="switcher" class="ph-switcher" role="listbox" aria-label="Windows" data-test="switcher">
-        <div v-for="(id, i) in switcher.list" :key="id" class="ph-switcher__item" :class="{ 'is-sel': i === switcher.i }"
-             role="option" :aria-selected="i === switcher.i" :data-test="'switch-' + id">
-          <SectionTile :section="byId[id]" :size="56" />
-          <span>{{ byId[id].label }}</span>
-        </div>
+      <!-- the Windows view (Etesian desktop, Plasma's etesian_windows; the phone's Open apps): hold Super (or Ctrl+Alt) and tap Tab, the
+           windows themselves become cards, one large at a time with its neighbours at half strength; letting go switches. Super / Ctrl +
+           wheel zooms to 2, 3 or 4 per row and keeps the view open (Tab, arrows, Enter, a click, Esc). -->
+      <div v-if="switcher" class="ph-wins" role="listbox" aria-label="Windows" data-test="switcher" @wheel="onViewWheel" @pointerdown.self="endSwitcher(false)">
+        <header class="ph-wins__head">
+          <h2>Windows</h2><span>{{ switcher.list.length }} open · {{ LEVEL_LABEL[switcher.level] }}</span>
+          <span class="ph-wins__zoom" role="radiogroup" aria-label="Zoom (Super + wheel)">
+            <button v-for="l in [1, 2, 3, 4]" :key="l" type="button" role="radio" class="hd-sq" :class="{ 'is-on': l === switcher.level }" :aria-checked="l === switcher.level"
+                    :aria-label="LEVEL_LABEL[l]" :data-test="'wins-zoom-' + l" @click="setLevel(l)">
+              <svg width="20" height="14" viewBox="0 0 20 14" aria-hidden="true"><rect v-for="k in l" :key="k" :x="l === 1 ? 4 : (k - 1) * (20 / l) + 0.5" :y="l === 1 ? 1 : 3" :width="l === 1 ? 12 : 20 / l - 1.5" :height="l === 1 ? 12 : 8" rx="1.5" fill="currentColor" /></svg>
+            </button>
+          </span>
+        </header>
+        <!-- one button over each card: picks it (the page under it does not take the pointer) -->
+        <button v-for="(id, i) in switcher.list" :key="id" type="button" class="ph-wins__hit" role="option" :aria-selected="i === switcher.i" :aria-label="byId[id].label"
+                :class="{ 'is-sel': i === switcher.i }" :data-test="'switch-' + id" :style="hitStyle(id)" @click="switcher.i = i; endSwitcher(true)">
+          <span class="ph-wins__label"><SectionTile :section="byId[id]" :size="22" />{{ byId[id].label }}</span>
+        </button>
       </div>
 
       <EventsPanel v-if="events" :now="now" @open="(id) => { events = false; open(id) }" @close="events = false" @unread="(n) => (unread = n)" />
@@ -360,11 +371,51 @@ const stopGuard = router.beforeEach((to, from) => {
 })
 
 // ---- quick switcher (Super+Tab, or Ctrl+Alt+Tab where the system leaves Super to the browser) ----
-const switcher = ref<{ list: string[]; i: number } | null>(null) // the window ids, most recently used first, and the selected one
+/** the Windows view: the window ids, most recently used first, the selected one, the zoom level, and whether it stays open */
+const switcher = ref<{ list: string[]; i: number; level: number; held: boolean } | null>(null)
+const LEVEL_LABEL: Record<number, string> = { 1: 'One at a time', 2: '2 per row', 3: '3 per row', 4: '4 per row' }
+const viewWins = computed(() => (switcher.value ? switcher.value.list.map((id) => winOf(id)!).filter(Boolean) : []))
+/** The cards (etesian-design desktop2/XWindows.vue): level 1 = one large card centred, the others in a row beside it at half strength;
+ *  2–4 = a grid. Each card keeps its window's shape. */
+const cards = computed(() => {
+  const sw = switcher.value
+  const out: Record<string, { x: number; y: number; w: number; h: number; s: number; z: number; side: boolean }> = {}
+  if (!sw) return out
+  const TOP = 64, TITLE = 34, PAD = 40, n = sw.level, avail = area.w - 2 * PAD
+  const fit = (w: Win, bw: number, bh: number) => { const r = rectOf(w), s = Math.min(bw / r.w, bh / r.h); return { w: r.w * s, h: r.h * s, s } }
+  const ws = viewWins.value
+  if (n === 1) {
+    const ch = area.h - TOP - TITLE - 40, cw = Math.min(ch * 1.5, avail - 260), G = 48
+    const fs = ws.map((w) => fit(w, cw, ch)), xs: number[] = []
+    const sel = Math.min(sw.i, fs.length - 1)
+    xs[sel] = PAD + avail / 2 - fs[sel].w / 2
+    for (let i = sel + 1; i < fs.length; i++) xs[i] = xs[i - 1] + fs[i - 1].w + G
+    for (let i = sel - 1; i >= 0; i--) xs[i] = xs[i + 1] - G - fs[i].w
+    ws.forEach((w, i) => { out[w.id] = { x: xs[i], y: TOP + (ch - fs[i].h) / 2, ...fs[i], z: 9210 + i, side: i !== sel } })
+    return out
+  }
+  const gap = n === 2 ? 40 : n === 3 ? 32 : 26, rows = Math.ceil(ws.length / n)
+  const cw = (avail - gap * (n - 1)) / n, ch = Math.min(cw * 0.62, (area.h - TOP - 16 - rows * (TITLE + gap)) / rows) // every row on screen
+  ws.forEach((w, i) => {
+    const c = i % n, r = Math.floor(i / n), f = fit(w, cw, ch)
+    out[w.id] = { x: PAD + c * (cw + gap) + (cw - f.w) / 2, y: TOP + r * (ch + TITLE + gap) + (ch - f.h), ...f, z: 9210 + i, side: false }
+  })
+  return out
+})
+const cardOf = (id: string) => cards.value[id] || null
+const hitStyle = (id: string) => { const c = cards.value[id]; return c ? { left: c.x + 'px', top: c.y + 'px', width: c.w + 'px', height: c.h + TITLE_H + 'px' } : {} }
+const TITLE_H = 30
+function setLevel(l: number) { if (switcher.value) { switcher.value.level = l; switcher.value.held = l === 1 && switcher.value.held } }
+function onViewWheel(e: WheelEvent) {
+  const sw = switcher.value
+  if (!sw) return
+  if (e.metaKey || e.ctrlKey) { e.preventDefault(); sw.level = Math.min(4, Math.max(1, sw.level + (e.deltaY > 0 ? 1 : -1))); sw.held = false }
+  else if (sw.level === 1 && e.deltaY) sw.i = Math.min(sw.list.length - 1, Math.max(0, sw.i + (e.deltaY > 0 ? 1 : -1)))
+}
 function stepSwitcher(back: boolean) {
   if (!switcher.value) {
     const list = [...wins].sort((a, b) => b.z - a.z).map((w) => w.id)
-    switcher.value = { list, i: list.length > 1 ? (back ? list.length - 1 : 1) : 0 }
+    switcher.value = { list, i: list.length > 1 ? (back ? list.length - 1 : 1) : 0, level: 1, held: true }
   } else {
     const n = switcher.value.list.length
     switcher.value.i = (switcher.value.i + (back ? n - 1 : 1)) % n
@@ -382,6 +433,13 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Meta' || e.key === 'OS') { superAlone = true; return }
   superAlone = false
   if (e.key === 'Escape' && switcher.value) { e.preventDefault(); endSwitcher(false); return }
+  if (switcher.value && !switcher.value.held) {
+    // zoomed out, the view stays open as a task viewer: arrows / Tab move, Enter opens
+    const sw = switcher.value, n = sw.list.length, per = sw.level
+    const step: Record<string, number> = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: per, ArrowUp: -per, Tab: e.shiftKey ? -1 : 1 }
+    if (e.key === 'Enter') { e.preventDefault(); endSwitcher(true); return }
+    if (step[e.key] !== undefined) { e.preventDefault(); sw.i = Math.min(n - 1, Math.max(0, sw.i + step[e.key])); return }
+  }
   if (picker.value && !picker.value.drag) {
     // Super+Z: a digit picks the layout, the next one its zone
     if (e.key === 'Escape') { e.preventDefault(); picker.value = null; return }
@@ -417,7 +475,7 @@ function onKeyDown(e: KeyboardEvent) {
   if (act) { e.preventDefault(); act() }
 }
 function onKeyUp(e: KeyboardEvent) {
-  if (switcher.value && ['Meta', 'OS', 'Control', 'Alt'].includes(e.key)) { endSwitcher(true); superAlone = false; return }
+  if (switcher.value?.held && ['Meta', 'OS', 'Control', 'Alt'].includes(e.key)) { endSwitcher(true); superAlone = false; return }
   if ((e.key === 'Meta' || e.key === 'OS') && superAlone) overview.value = !overview.value
   superAlone = false
 }
@@ -514,16 +572,16 @@ onBeforeUnmount(() => {
 }
 .ph-dock__item.is-open.is-active::before { width: 5px; height: 5px; background: var(--hd-accent, #4591FF); }
 /* quick switcher: a dark strip of the windows in the middle of the desktop */
-.ph-switcher {
-  position: absolute; z-index: 9600; left: 50%; top: 40%; transform: translate(-50%, -50%); display: flex; gap: var(--ph-s2);
-  padding: var(--ph-s3); max-width: 90%; overflow: hidden; border-radius: var(--ph-r-card);
-  background: var(--hd-surface-overlay); box-shadow: var(--hd-shadow-overlay), 0 0 0 1px rgba(255, 255, 255, 0.1);
-}
-.ph-switcher__item {
-  display: flex; flex-direction: column; align-items: center; gap: var(--ph-s2); width: 104px; padding: var(--ph-s3) var(--ph-s1);
-  border-radius: var(--ph-r-card); color: #fff; font: 400 var(--hd-font-size-small)/1.2 var(--ph-font); text-align: center;
-}
-.ph-switcher__item.is-sel { background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 2px #7FB0FF; }
+.ph-wins { position: absolute; inset: 0; z-index: 9200; background: rgba(0, 0, 0, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.ph-wins__head { position: absolute; left: 40px; right: 40px; top: 14px; display: flex; align-items: center; gap: 14px; color: #fff; font-family: var(--ph-font); }
+.ph-wins__head h2 { margin: 0; font: 300 28px/1 var(--ph-font-light); }
+.ph-wins__head > span { color: var(--ph-chrome-fg-muted); font-size: var(--hd-font-size-small); }
+.ph-wins__zoom { margin-left: auto; display: flex; gap: 4px; }
+.ph-wins__zoom button { display: grid; place-items: center; width: 34px; height: 30px; border: 0; background: rgba(255, 255, 255, 0.1); color: #C8C8C8; cursor: pointer; }
+.ph-wins__zoom button.is-on { background: #4591FF; color: #fff; }
+.ph-wins__hit { position: absolute; z-index: 9300; padding: 0; border: 0; border-radius: var(--ph-r-card); background: transparent; cursor: pointer; }
+.ph-wins__hit.is-sel { box-shadow: 0 0 0 3px #7FB0FF; }
+.ph-wins__label { position: absolute; left: 0; right: 0; bottom: 0; height: 30px; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; font: 400 15px/1 var(--ph-font); }
 /* the Overview: full screen over the desktop, slightly see-through and blurred */
 .ph-ov {
   position: absolute; inset: 0; z-index: 9500; display: grid; grid-template-columns: 380px 1fr 480px;
