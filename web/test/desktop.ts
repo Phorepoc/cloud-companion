@@ -5,7 +5,7 @@
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types desktop.ts
 //
 // Pairs at 1440 x 900, checks the Etesian colour modes, enters the desktop from the top bar, opens sections from the dock, moves
-// focus, snaps by dragging to an edge and with Ctrl+Alt+arrows, uses the launcher, the quick switcher and Events, opens Android as a
+// focus, snaps by dragging to an edge and with Ctrl+Alt+arrows, uses the Overview and the spotlight, the quick switcher and Events, opens Android as a
 // phone-shaped window (and checks its phone layout), minimises and restores,
 // follows a link between sections into a window, shows the desktop and edits its widgets (add, move, remove, kept on reload), goes back to the classic view (menu and Settings > Layout), checks that the choice is remembered and that
 // a small screen always gets the classic layout.
@@ -84,9 +84,23 @@ await page.keyboard.press('Control+Alt+ArrowUp')
 r = await box('[data-test=win-mail]')
 assert(r.width > 1300, 'Mail is maximised')
 
-step('the launcher: type to find a section, Enter opens it')
+step('the Overview (dock button / Super): Events, the open windows and the sections; typing searches; Enter opens')
 await page.click('[data-test=dock-launcher]')
+await page.waitForSelector('[data-test=overview]')
+assert(!(await shown('[data-test=launcher]')), 'the dock button opens the Overview, not the spotlight')
+assert(await shown('[data-test=overview] [data-test=events]'), 'the Overview shows Events')
+assert(await shown('[data-test=ov-win-mail]'), 'the Overview shows the open Mail window')
+await page.keyboard.type('cal')
+assert(await shown('[data-test=ov-launch-calendar]'))
+assert(!(await shown('[data-test=ov-launch-mail]')), 'the Overview search filters by name')
+await page.screenshot({ path: `${OUT}/desktop-overview.png` })
+await page.keyboard.press('Escape')
+assert(!(await shown('[data-test=overview]')), 'Esc closes the Overview')
+
+step('the spotlight (Ctrl+Alt+Space; Super+Space): type to find a section, Enter opens it')
+await page.keyboard.press('Control+Alt+Space')
 await page.waitForSelector('[data-test=launcher]')
+assert(!(await shown('[data-test=overview]')), 'the spotlight is not the Overview')
 await page.keyboard.type('cal')
 assert(await shown('[data-test=launch-calendar]'))
 assert(!(await shown('[data-test=launch-mail]')), 'the launcher filters by name')
@@ -215,6 +229,12 @@ await page.goto(BASE + '/#/')
 await page.waitForSelector('[data-test=desktop]')
 await page.waitForSelector('[data-test=win-mail]')
 
+step('dock: a floating strip centred on the left edge, as in the design (regression 2026-10-30: it sat at the top)')
+{
+  const d = await box('.ph-dock'), a = await box('.ph-desk__area')
+  assert(Math.abs((d.y + d.height / 2) - (a.y + a.height / 2)) <= 2, `the dock is centred vertically (${d.y + d.height / 2} vs ${a.y + a.height / 2})`)
+  assert(d.height < a.height - 40, 'and only as long as its icons')
+}
 step('widgets: the default ones sit under the windows; Ctrl+Alt+D shows the desktop')
 for (const k of ['clock-digital', 'mail', 'agenda']) await page.waitForSelector(`[data-test=widget-${k}]`)
 // the same time as the menu bar, in the same (locale) format
@@ -259,11 +279,31 @@ assert.equal((await box('[data-test=widget-clock-analog]')).x, after.x, 'and so 
 // has no hub, so they say so: not "Could not load: unknown or revoked device" from a request sent before the connection was signed in)
 await page.waitForFunction(() => /not set up/.test(document.querySelector('[data-test=widget-mail]')?.textContent || ''), null, { timeout: 10000 })
 assert.doesNotMatch(await text('[data-test=widget-mail]'), /Could not load/)
+// More Belle widgets (2026-10-30): notes, a month, the latest mail one at a time, the clock in words
 await page.click('.ph-menubar__menu:has-text("View")')
 await page.click('[data-test=edit-widgets]')
 await page.waitForSelector('[data-test=widget-sheet]')
+for (const k of ['notes', 'month', 'mail-stack', 'clock-word']) await page.click(`[data-test=widget-add-${k}]`)
+for (const k of ['notes', 'month', 'mail-stack', 'clock-word']) await page.waitForSelector(`[data-test=widget-${k}]`)
 await page.keyboard.press('Escape')
 await page.waitForSelector('[data-test=widget-sheet]', { state: 'hidden' })
+await page.keyboard.press('Control+Alt+d')
+step('widgets: notes are kept, the month marks today, the time reads in words, lists scroll')
+await page.fill('[data-test=widget-note]', 'Buy rye bread')
+await page.click('[data-test=widget-note-add]')
+assert.equal(await page.inputValue('[data-test=widget-note]'), '', '+ starts a new, empty note')
+await page.fill('[data-test=widget-note]', 'Call Mikko')
+assert.equal(await page.locator('[data-test=widget-month] .ph-wg__day').count(), 42, 'the month shows six weeks')
+assert.equal(await page.locator('[data-test=widget-month] .ph-wg__day.is-today').count(), 1, 'and lights today')
+assert.match(await text('[data-test=widget-clock-word]'), /(past|to|o'clock)/, 'the clock in words')
+// regression 2026-10-30: the mail, agenda and chats widgets showed a fixed 3 or 4 rows; they hold up to 20 and scroll
+assert.equal(await page.evaluate(() => { const host = document.querySelector('.ph-wg')!, d = document.createElement('div'); d.className = 'ph-wg__list'
+  for (const a of host.getAttributeNames()) if (a.startsWith('data-v-')) d.setAttribute(a, '') // the component's scoped styles
+  host.appendChild(d)
+  const o = getComputedStyle(d).overflowY; d.remove(); return o }), 'auto', 'the widget lists scroll')
+await page.reload()
+await page.waitForSelector('[data-test=widget-note]')
+assert.equal(await page.inputValue('[data-test=widget-note]'), 'Buy rye bread', 'notes are kept after a reload')
 await page.keyboard.press('Control+Alt+d')
 await page.screenshot({ path: `${OUT}/desktop-widgets.png` })
 

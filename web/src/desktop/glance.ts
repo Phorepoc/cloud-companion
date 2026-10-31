@@ -6,7 +6,7 @@
 
 import { apiCall, hubCall } from '../cloud'
 import { addDays, toDate, ymd } from '../dates'
-import type { CalendarEvent, MailItem, SmsConversation } from '../proto'
+import type { CalendarEvent, Contact, MailItem, SmsConversation } from '../proto'
 
 const NOT_SET_UP = /not set up|not configured/i
 export const quiet = (e: Error, what: string) => (NOT_SET_UP.test(e.message) ? `${what} is not set up on this server.` : `Could not load: ${e.message}`)
@@ -31,6 +31,19 @@ export async function loadUnread(n = 3): Promise<{ unread: number; items: MailIt
   const unread = inbox?.unread || 0
   const items = inbox && unread ? ((await hubCall({ op: 'mail.list', folder: inbox.id, pos: 0 })).mails || []).filter((m) => m.unread).slice(0, n) : []
   return { unread, items }
+}
+
+/** The inbox's unread count and its newest messages, read or not (up to `n`, as the Belle Mail widget lists them). */
+export async function loadMail(n = 20): Promise<{ unread: number; items: MailItem[] }> {
+  const folders = (await hubCall({ op: 'mail.folders' })).folders || []
+  const inbox = folders.find((f) => f.role === 'inbox')
+  const items = inbox ? ((await hubCall({ op: 'mail.list', folder: inbox.id, pos: 0 })).mails || []).slice(0, n) : []
+  return { unread: inbox?.unread || 0, items }
+}
+
+/** Contacts, by name (people first: entries without a name are left out). */
+export async function loadContacts(): Promise<Contact[]> {
+  return ((await hubCall({ op: 'contacts.list' })).contacts || []).filter((c) => c.name).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 /** The `n` most recent conversations. */

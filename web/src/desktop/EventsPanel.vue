@@ -4,7 +4,7 @@
      calendar, unread mail and the latest chats, in one dark panel at the right edge under the menu bar. Each row opens its section
      as a window. Everything is read when the panel opens; a part whose service is not set up says so in one muted line. -->
 <template>
-  <aside class="ph-events" role="dialog" aria-label="Events" data-test="events" @keydown.esc="$emit('close')">
+  <aside class="ph-events" :class="{ 'is-embedded': embedded }" :role="embedded ? 'region' : 'dialog'" aria-label="Events" data-test="events" @keydown.esc="$emit('close')">
     <header class="ph-events__head">
       <p class="ph-events__day">{{ dayText }}</p>
       <q-btn flat round dense color="white" icon="sym_o_refresh" aria-label="Refresh" title="Refresh" :loading="loading" @click="load" />
@@ -59,7 +59,7 @@ import { addDays, toDate, timeLabel, dayLabel } from '../dates'
 import { quiet, loadEvents, eventsOn, loadUnread, loadChats, ago as agoAt } from './glance'
 import SectionTile from '../components/SectionTile.vue'
 
-const props = defineProps({ now: { type: Date, required: true } })
+const props = defineProps({ now: { type: Date, required: true }, /** inside the Overview: fills its column, no shadow */ embedded: { type: Boolean, default: false } })
 const emit = defineEmits(['open', 'close', 'unread'])
 const byId = Object.fromEntries(sections.map((s) => [s.id, s]))
 
@@ -90,6 +90,7 @@ onMounted(load)
 
 <style scoped>
 /* the N9 Events screen as a desktop panel: dark overlay surface, light big date, rows with lit tiles */
+.ph-events.is-embedded { inset: 0; width: auto; z-index: auto; background: none; box-shadow: none; }
 .ph-events {
   position: absolute; z-index: 9400; top: 0; right: 0; bottom: 0; width: 380px; overflow-y: auto; padding: var(--ph-s4);
   background: #141414; color: #fff; box-shadow: var(--hd-shadow-overlay), -1px 0 0 rgba(255, 255, 255, 0.1);

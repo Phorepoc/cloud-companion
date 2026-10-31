@@ -4,7 +4,9 @@
      the Etesian desktop design: a global menu bar at the top (the focused window's name and its menus on the left, the connection and
      the clock on the right), a light floating dock on the left (launcher, then the sections, a bar marking the open ones), and
      overlapping windows that snap to halves or fill the screen (by dragging to an edge, or Super / Ctrl+Alt with the arrow keys).
-     Super alone, or the dock's first button, opens the launcher: type to find a section, Enter opens it.
+     Super alone, or the dock's first button, opens the Overview, the main menu (Etesian Desktop v1, kept by v2): Events on the left,
+     the open windows in the middle, the sections on the right; just type to search. Super+Space (or Ctrl+Alt+Space) opens the
+     spotlight, a compact search added by Desktop v2: type to find a section, Enter opens it.
      The window arrangement and the layout choice are kept on this device (localStorage), like the theme. -->
 <template>
   <div class="ph-desk" data-test="desktop">
@@ -33,7 +35,8 @@
       <q-btn flat dense no-caps label="View" class="ph-menubar__menu">
         <q-menu class="ph-desk-menu" anchor="bottom left" self="top left">
           <q-list dense>
-            <q-item v-close-popup clickable @click="launcher = true"><q-item-section>Launcher</q-item-section><q-item-section side>Super</q-item-section></q-item>
+            <q-item v-close-popup clickable data-test="menu-overview" @click="overview = true"><q-item-section>Overview</q-item-section><q-item-section side>Super</q-item-section></q-item>
+            <q-item v-close-popup clickable @click="launcher = true"><q-item-section>Search</q-item-section><q-item-section side>Super+Space</q-item-section></q-item>
             <q-item v-close-popup clickable @click="events = true"><q-item-section>Events</q-item-section><q-item-section side>Super+N</q-item-section></q-item>
             <q-item v-close-popup clickable data-test="show-desktop" @click="showDesktop"><q-item-section>Show desktop</q-item-section><q-item-section side>Super+D</q-item-section></q-item>
             <q-item v-close-popup clickable data-test="edit-widgets" @click="widgetEdit = true"><q-item-section>Edit widgets</q-item-section></q-item>
@@ -75,9 +78,39 @@
 
       <EventsPanel v-if="events" :now="now" @open="(id) => { events = false; open(id) }" @close="events = false" @unread="(n) => (unread = n)" />
 
-      <!-- launcher -->
+      <!-- the Overview (Super): the main menu, Events | windows | sections -->
+      <div v-if="overview" class="ph-ov" role="dialog" aria-label="Overview" data-test="overview" @pointerdown.self="overview = false">
+        <div class="ph-ov__events"><EventsPanel :now="now" embedded @open="(id) => open(id)" @close="overview = false" @unread="(n) => (unread = n)" /></div>
+        <section class="ph-ov__wins" aria-label="Open windows" @pointerdown.self="overview = false">
+          <div v-for="w in [...wins].sort((a, b) => b.z - a.z)" :key="w.id" class="ph-ov__win" :data-test="'ov-win-' + w.id">
+            <button type="button" class="ph-ov__card" :aria-label="'Show ' + byId[w.id].label" @click="open(w.id)">
+              <SectionTile :section="byId[w.id]" :size="56" />
+            </button>
+            <span class="ph-ov__name"><SectionTile :section="byId[w.id]" :size="18" />{{ byId[w.id].label }}</span>
+            <button type="button" class="ph-ov__close hd-squircle" :aria-label="'Close ' + byId[w.id].label" :data-test="'ov-close-' + w.id" @click="close(w)">
+              <q-icon name="sym_o_close" size="14px" />
+            </button>
+          </div>
+          <p v-if="!wins.length" class="ph-ov__none">No open windows</p>
+        </section>
+        <section class="ph-ov__apps" aria-label="Sections">
+          <q-input ref="ovSearchEl" v-model="query" dark borderless dense placeholder="Type to search" aria-label="Search sections"
+                   class="ph-launcher__search" @keydown.enter="openFirst" @keydown.esc="overview = false">
+            <template #prepend><q-icon name="sym_o_search" /></template>
+          </q-input>
+          <p class="ph-ov__hint">{{ query ? `Matching “${query}”` : 'Just start typing' }}</p>
+          <div class="ph-ov__grid">
+            <button v-for="s in found" :key="s.id" type="button" class="ph-launcher__app" :data-test="'ov-launch-' + s.id" @click="open(s.id)">
+              <SectionTile :section="s" :size="54" />
+              <span>{{ s.label }}</span>
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- spotlight (Super+Space): a compact search, added by Desktop v2 next to the Overview -->
       <div v-if="launcher" class="ph-launcher-scrim" @pointerdown.self="launcher = false">
-        <div class="ph-launcher" role="dialog" aria-label="Launcher" data-test="launcher">
+        <div class="ph-launcher" role="dialog" aria-label="Search" data-test="launcher">
           <q-input ref="searchEl" v-model="query" dark borderless dense placeholder="Type to search" aria-label="Search sections"
                    class="ph-launcher__search" @keydown.enter="openFirst" @keydown.esc="launcher = false">
             <template #prepend><q-icon name="sym_o_search" /></template>
@@ -94,12 +127,10 @@
     </div>
 
     <!-- dock -->
-    <nav class="ph-dock" aria-label="Sections">
-      <button type="button" class="ph-dock__item" :class="{ 'is-active': launcher }" aria-label="Launcher" title="Launcher (Super)"
-              data-test="dock-launcher" @click="launcher = !launcher">
-        <span class="ph-tile hd-squircle hd-icon-lit" style="--hd-icon-accent: #4591FF; --hd-icon-size: 40px" aria-hidden="true">
-          <q-icon name="sym_o_apps" size="24px" />
-        </span>
+    <nav class="ph-dock hd-on-home" aria-label="Sections">
+      <button type="button" class="ph-dock__item" :class="{ 'is-active': overview }" aria-label="Overview" title="Overview (Super)"
+              data-test="dock-launcher" @click="overview = !overview">
+        <span class="ph-dock__launcher hd-squircle" aria-hidden="true"><q-icon name="sym_o_apps" size="22px" /></span>
       </button>
       <span class="ph-dock__sep" aria-hidden="true" />
       <button v-for="s in visible" :key="s.id" type="button" class="ph-dock__item"
@@ -192,6 +223,7 @@ function focus(w: Win) {
 
 function open(id: string) {
   launcher.value = false
+  overview.value = false
   query.value = ''
   let w = winOf(id)
   if (!w) {
@@ -222,7 +254,7 @@ function close(w: Win | null) {
 /** Focus the topmost window still showing (after one is minimised or closed). */
 /** Minimise every window, so the widgets show (Super+D). */
 function showDesktop() {
-  launcher.value = false; events.value = false
+  launcher.value = false; overview.value = false; events.value = false
   for (const w of wins) w.min = true
   focusTop()
 }
@@ -273,13 +305,16 @@ function dockClick(id: string) {
   else open(id)
 }
 
-// ---- launcher ----
+// ---- the Overview (Super) and the spotlight (Super+Space) share the search ----
 const launcher = ref(false)
+const overview = ref(false)
 const query = ref('')
 const searchEl = ref<QInput | null>(null)
+const ovSearchEl = ref<QInput | null>(null)
 const found = computed(() => visible.value.filter((s) => s.label.toLowerCase().includes(query.value.trim().toLowerCase())))
 function openFirst() { if (found.value.length) open(found.value[0].id) }
-watch(launcher, (on) => { if (on) nextTick(() => searchEl.value?.focus()); else query.value = '' })
+watch(launcher, (on) => { if (on) { overview.value = false; nextTick(() => searchEl.value?.focus()) } else query.value = '' })
+watch(overview, (on) => { if (on) { launcher.value = false; events.value = false; nextTick(() => ovSearchEl.value?.focus()) } else query.value = '' })
 
 // ---- leaving, and links between sections ----
 let leaving = false
@@ -312,7 +347,7 @@ function endSwitcher(commit: boolean) {
   if (commit && sw) open(sw.list[sw.i])
 }
 
-// ---- keyboard: Super (or Ctrl+Alt) with the arrows snaps; Super alone opens the launcher; Escape closes it ----
+// ---- keyboard: Super (or Ctrl+Alt) with the arrows snaps; Super alone opens the Overview, Super+Space the spotlight; Escape closes ----
 let superAlone = false
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Meta' || e.key === 'OS') { superAlone = true; return }
@@ -320,14 +355,16 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Escape' && switcher.value) { e.preventDefault(); endSwitcher(false); return }
   if (e.key === 'Tab' && (e.metaKey || (e.ctrlKey && e.altKey))) {
     e.preventDefault()
-    if (wins.length) { launcher.value = false; stepSwitcher(e.shiftKey) }
+    if (wins.length) { launcher.value = false; overview.value = false; stepSwitcher(e.shiftKey) }
     return
   }
+  if (e.key === ' ' && (e.metaKey || (e.ctrlKey && e.altKey))) { e.preventDefault(); launcher.value = !launcher.value; return }
   if (e.key === 'Escape' && launcher.value) { launcher.value = false; return }
+  if (e.key === 'Escape' && overview.value) { overview.value = false; return }
   if (e.key === 'Escape' && events.value) { events.value = false; return }
   if (e.key === 'Escape' && widgetEdit.value) { widgetEdit.value = false; return }
   if ((e.key === 'd' || e.key === 'D') && (e.metaKey || (e.ctrlKey && e.altKey))) { e.preventDefault(); showDesktop(); return }
-  if ((e.key === 'n' || e.key === 'N') && (e.metaKey || (e.ctrlKey && e.altKey))) { e.preventDefault(); launcher.value = false; events.value = !events.value; return }
+  if ((e.key === 'n' || e.key === 'N') && (e.metaKey || (e.ctrlKey && e.altKey))) { e.preventDefault(); launcher.value = false; overview.value = false; events.value = !events.value; return }
   if (!(e.metaKey || (e.ctrlKey && e.altKey)) || !focusedWin.value) return
   const w = focusedWin.value
   // as in the Etesian desktop: Left / Right move to that zone, Up maximises, Down floats a snapped window again or minimises a floating one
@@ -338,7 +375,7 @@ function onKeyDown(e: KeyboardEvent) {
 }
 function onKeyUp(e: KeyboardEvent) {
   if (switcher.value && ['Meta', 'OS', 'Control', 'Alt'].includes(e.key)) { endSwitcher(true); superAlone = false; return }
-  if ((e.key === 'Meta' || e.key === 'OS') && superAlone) launcher.value = !launcher.value
+  if ((e.key === 'Meta' || e.key === 'OS') && superAlone) overview.value = !overview.value
   superAlone = false
 }
 
@@ -409,26 +446,30 @@ onBeforeUnmount(() => {
   position: absolute; z-index: 9000; pointer-events: none; border-radius: var(--ph-r-card);
   background: color-mix(in srgb, #4591FF 22%, transparent); box-shadow: inset 0 0 0 2px #4591FF;
 }
-/* dock: a light floating strip on the left (icons only) */
+/* dock (as the design's XDock): a floating strip centred on the left edge, only as long as its icons; translucent and blurred */
 .ph-dock {
-  grid-column: 1; grid-row: 2; align-self: start; justify-self: center; margin-top: var(--ph-s3);
-  display: flex; flex-direction: column; align-items: center; gap: var(--ph-s1); padding: var(--ph-s2) 4px; width: 56px;
-  background: rgba(30, 30, 32, 0.72); border-radius: 14px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(12px);
+  grid-column: 1; grid-row: 2; align-self: center; justify-self: center; z-index: 40;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border-radius: 14px;
+  background: color-mix(in srgb, var(--hd-surface-overlay) 90%, transparent); color: var(--hd-c-fg);
+  box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
 }
-.ph-dock__sep { width: 28px; height: 1px; margin: 2px 0; background: rgba(255, 255, 255, 0.18); }
-.ph-dock__item {
-  position: relative; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; background: none; cursor: pointer;
-  transition: transform var(--ph-dur-1) var(--ph-ease);
-}
-.ph-dock__item:hover { transform: scale(1.06); }
-.ph-dock__item:focus-visible { outline: 2px solid #7FB0FF; outline-offset: 0; border-radius: 12px; }
-/* open sections: a short bar at the dock's edge; the focused one: a longer, brighter bar */
+.ph-dock__sep { flex: none; width: 70%; height: 1px; margin: 4px 0; background: var(--hd-c-divider); }
+.ph-dock__item { position: relative; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; background: none; cursor: pointer; }
+/* hover and the focused window: a pressed squircle behind the icon (no scaling) */
+.ph-dock__item::after { content: ''; position: absolute; inset: 0; z-index: -1; background: transparent; -webkit-mask: var(--ph-squircle) center / contain no-repeat; mask: var(--ph-squircle) center / contain no-repeat; }
+.ph-dock__item:hover::after, .ph-dock__item.is-active::after { background: var(--hd-c-pressed); }
+.ph-dock__item { isolation: isolate; }
+.ph-dock__item:focus-visible { outline: 2px solid #7FB0FF; outline-offset: 0; }
+/* the Overview button: a flat accent squircle */
+.ph-dock__launcher { display: grid; place-items: center; width: 40px; height: 40px; background: var(--hd-accent, #4591FF); color: #fff; }
+.ph-dock__item:hover .ph-dock__launcher, .ph-dock__item.is-active .ph-dock__launcher { background: color-mix(in srgb, var(--hd-accent, #4591FF) 75%, #fff); }
+.ph-dock__item:has(.ph-dock__launcher)::after { display: none; }
+/* running: a small dot on the screen-edge side; the focused one larger, in the accent */
 .ph-dock__item.is-open::before {
-  content: ''; position: absolute; left: -4px; top: 50%; width: 3px; height: 8px; transform: translateY(-50%);
-  border-radius: 2px; background: rgba(255, 255, 255, 0.7);
+  content: ''; position: absolute; left: -6px; top: 50%; width: 4px; height: 4px; transform: translateY(-50%);
+  border-radius: 50%; background: var(--hd-c-fg-secondary);
 }
-.ph-dock__item.is-active::before { height: 20px; background: #fff; }
+.ph-dock__item.is-open.is-active::before { width: 5px; height: 5px; background: var(--hd-accent, #4591FF); }
 /* quick switcher: a dark strip of the windows in the middle of the desktop */
 .ph-switcher {
   position: absolute; z-index: 9600; left: 50%; top: 40%; transform: translate(-50%, -50%); display: flex; gap: var(--ph-s2);
@@ -440,7 +481,30 @@ onBeforeUnmount(() => {
   border-radius: var(--ph-r-card); color: #fff; font: 400 var(--hd-font-size-small)/1.2 var(--ph-font); text-align: center;
 }
 .ph-switcher__item.is-sel { background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 2px #7FB0FF; }
-/* launcher */
+/* the Overview: full screen over the desktop, slightly see-through and blurred */
+.ph-ov {
+  position: absolute; inset: 0; z-index: 9500; display: grid; grid-template-columns: 380px 1fr 480px;
+  background: rgba(20, 20, 20, 0.92); color: #fff; backdrop-filter: blur(18px); font-family: var(--ph-font);
+}
+.ph-ov__events { position: relative; overflow: hidden; border-right: 1px solid rgba(255, 255, 255, 0.12); }
+.ph-ov__wins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--ph-s4); padding: var(--ph-s5, 32px) var(--ph-s5, 32px); overflow-y: auto; }
+.ph-ov__win { position: relative; display: flex; flex-direction: column; gap: var(--ph-s2); }
+.ph-ov__card {
+  display: grid; place-items: center; aspect-ratio: 16 / 10; border: 0; border-radius: var(--ph-r-card); cursor: pointer;
+  background: rgba(255, 255, 255, 0.08); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.ph-ov__card:hover, .ph-ov__card:focus-visible { box-shadow: 0 0 0 2px #4591FF; outline: none; }
+.ph-ov__name { display: flex; align-items: center; justify-content: center; gap: var(--ph-s2); font: 400 var(--hd-font-size-small)/1.2 var(--ph-font); }
+.ph-ov__close {
+  position: absolute; top: -8px; right: -8px; display: none; place-items: center; width: 24px; height: 24px; padding: 0; border: 0;
+  background: #E5484D; color: #fff; cursor: pointer;
+}
+.ph-ov__win:hover .ph-ov__close, .ph-ov__close:focus-visible { display: grid; }
+.ph-ov__none { grid-column: 1 / -1; align-self: center; text-align: center; color: var(--ph-chrome-fg-muted); }
+.ph-ov__apps { padding: var(--ph-s4); border-left: 1px solid rgba(255, 255, 255, 0.12); overflow-y: auto; }
+.ph-ov__hint { margin: var(--ph-s2) 4px 0; color: var(--ph-chrome-fg-muted); font-size: var(--hd-font-size-small); }
+.ph-ov__grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--ph-s1); margin-top: var(--ph-s3); }
+/* spotlight */
 .ph-launcher-scrim { position: absolute; inset: 0; z-index: 9500; display: grid; place-items: start center; padding-top: 10vh; background: rgba(0, 0, 0, 0.45); }
 .ph-launcher {
   width: min(640px, 90%); padding: var(--ph-s4); border-radius: var(--ph-r-card);
