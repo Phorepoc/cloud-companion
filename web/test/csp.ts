@@ -24,7 +24,7 @@ assert.equal(h['referrer-policy'], 'no-referrer')
 await page.fill('[data-test=code]', CODE)
 await page.click('[data-test=pair]')
 await page.waitForSelector('[data-test=nav-settings]', { timeout: 30000 })
-for (const sec of ['browse', 'chats', 'mail', 'calendar', 'contacts', 'files', 'android', 'connections', 'catalogue', 'devices', 'settings']) {
+for (const sec of ['browse', 'chats', 'mail', 'calendar', 'contacts', 'files', 'music', 'android', 'connections', 'catalogue', 'devices', 'settings']) {
   await page.goto(BASE + '/#/' + sec)
   await page.waitForTimeout(700)
   console.log('section', sec, 'ok')

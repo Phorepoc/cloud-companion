@@ -66,6 +66,7 @@ Everything is set through environment variables in `docker-compose.yml`. The one
 | `PHECLOUD_OAUTH_*` | your own Google and Microsoft app registrations ([docs/connections.md](docs/connections.md)) |
 | `PHECLOUD_ANDROID_SECRET` | turns on the Android stream ([docs/android.md](docs/android.md)) |
 | `PHECLOUD_CATALOGUE_DIR`, `PHECLOUD_CATALOGUE_MAX_FILE` | where uploaded and kept installation files live (default `/data/catalogue`) and the largest file in bytes ([docs/catalogue.md](docs/catalogue.md)) |
+| `PHECLOUD_FILES_DIR` | the Files section and the Music library: the owner's files, shared by every paired device (default `/data/files`); public share links are served at `/s/<token>` |
 
 Your devices, keys and certificate live in the `phecloud-data` volume, so back it up. `phecloud snapshot` helps with
 that.

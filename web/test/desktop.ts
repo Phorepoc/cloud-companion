@@ -234,9 +234,11 @@ await page.click('[data-test=win-calendar] [data-test=win-close]')
 assert(!(await page.locator('[data-test=win-calendar]').count()), 'closed')
 
 step('a link to another section opens a window instead of leaving the desktop')
-await page.click('[data-test=dock-files]')
+await page.click('[data-test=dock-music]')
+await page.waitForSelector('[data-test=win-music] [data-test=music-empty]')
+await page.click('[data-test=win-music] .q-btn:has-text("Open Files")')
 await page.waitForSelector('[data-test=win-files]')
-await page.click('[data-test=win-files] a[href="#/browse"], [data-test=win-files] .q-btn:has-text("Back to the browser")')
+await page.click('[data-test=dock-browse]')
 await page.waitForSelector('[data-test=win-browse]')
 assert(await shown('[data-test=desktop]'), 'still on the desktop')
 

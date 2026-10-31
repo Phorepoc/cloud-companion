@@ -25,7 +25,7 @@
     <ul v-if="shown.length" class="ph-list ph-card" data-test="contact-list">
       <li v-for="(c, i) in shown" :key="c.href">
         <button type="button" class="ph-row" :data-test="'contact-row-' + i" @click="openView(c)">
-          <span class="ph-avatar" aria-hidden="true">{{ initials(c) }}</span>
+          <span class="ph-avatar hd-squircle" aria-hidden="true">{{ initials(c) }}</span>
           <span class="ph-row-main">
             <span class="ph-row-title">{{ c.name }}</span>
             <span class="ph-small ph-muted">{{ secondary(c) }}</span>
@@ -192,7 +192,7 @@ onMounted(load)
 .ph-row:hover { background: var(--ph-surface-2); }
 .ph-row-main { display: flex; flex-direction: column; min-width: 0; }
 .ph-row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--ph-accent-soft); color: var(--ph-accent); font-weight: 600; }
+.ph-avatar { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: var(--ph-accent-soft); color: var(--ph-accent); font-weight: 600; }
 .ph-dialog { width: min(94vw, 480px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); overflow-wrap: anywhere; }
 .ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }

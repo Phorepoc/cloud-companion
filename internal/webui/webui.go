@@ -11,15 +11,16 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/coder/websocket"
 
 	"github.com/phorepoc/cloud-companion/internal/catalogue"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/feeds"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/server"
-	"github.com/phorepoc/cloud-companion/internal/feeds"
 	"github.com/phorepoc/cloud-companion/internal/weather"
 )
 
@@ -80,6 +81,11 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	}
 	(&weatherAPI{a: a, st: s.Store, v: vault, w: weather.New()}).routes(mux)
 	(&feedsAPI{a: a, st: s.Store, f: feeds.New()}).routes(mux)
+	filesDir := os.Getenv("PHECLOUD_FILES_DIR")
+	if filesDir == "" {
+		filesDir = filepath.Join(envOr("PHECLOUD_TLSDIR", "/data"), "files")
+	}
+	newFilesAPI(a, s.Store, filesDir).routes(mux)
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)
@@ -110,4 +116,11 @@ func securityHeaders(h http.Handler) http.Handler {
 		hd.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
 		h.ServeHTTP(w, r)
 	})
+}
+
+func envOr(k, def string) string {
+	if v := os.Getenv(k); v != "" {
+		return v
+	}
+	return def
 }

@@ -21,6 +21,7 @@ export const sections: Section[] = [
   { id: 'calendar', label: 'Calendar', icon: 'sym_o_calendar_month', color: '#EF5500', path: '/calendar', primary: true },
   { id: 'contacts', label: 'Contacts', icon: 'sym_o_contacts', color: '#007DC9', path: '/contacts' },
   { id: 'files', label: 'Files', icon: 'sym_o_folder', color: '#EA650A', path: '/files' },
+  { id: 'music', label: 'Music', icon: 'sym_o_music_note', color: '#E6007E', path: '/music' },
   { id: 'android', label: 'Android', icon: 'sym_o_smartphone', color: '#62B700', path: '/android', admin: true },
   { id: 'connections', label: 'Connections', icon: 'sym_o_sync_alt', color: '#347708', path: '/connections', admin: true },
   { id: 'catalogue', label: 'Catalogue', icon: 'sym_o_storefront', color: '#1C51AF', path: '/catalogue', admin: true },
@@ -34,5 +35,4 @@ export const placeholders: Record<string, { title: string; icon: string; text: s
   mail: { title: 'Mail', icon: 'sym_o_mail', text: 'Your mailboxes will appear here, with one inbox across all your accounts.' },
   calendar: { title: 'Calendar', icon: 'sym_o_calendar_month', text: 'Your events from every calendar will appear here.' },
   contacts: { title: 'Contacts', icon: 'sym_o_contacts', text: 'Your contacts will appear here, merged from all your accounts and devices.' },
-  files: { title: 'Files', icon: 'sym_o_folder', text: 'Your files will appear here, available on every device.' },
 }

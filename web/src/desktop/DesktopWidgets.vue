@@ -231,6 +231,30 @@
         </div>
       </div>
 
+      <!-- music (Belle small, belle-music-widget-small.jpg): a dark glossy panel, the square art (as is) rising above its top edge, the song
+           over previous / play / next in a recessed groove; nothing playing: the blue tile, "Go to Music library" -->
+      <div v-else-if="w.kind === 'music'" class="ph-wg__music">
+        <div class="ph-wg__mpanel" />
+        <button type="button" class="ph-wg__mart" :disabled="editing" aria-label="Open Music" @click="emit('open', 'music')">
+          <AlbumCover v-if="song" :album="song.album" :cover="song.cover" :size="124" /><span v-else class="ph-wg__mempty"><svg viewBox="0 0 24 24" :width="40" :height="40" aria-hidden="true"><path d="M9 17.5V5.5l11-2.5v12" fill="none" stroke="#050508" stroke-width="2" /><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4" fill="#050508" /><ellipse cx="17.5" cy="15" rx="3" ry="2.4" fill="#050508" /></svg></span></button>
+        <div class="ph-wg__mside"><span class="ph-wg__mtitle" data-test="widget-music-title">{{ song ? song.title + ' · ' + song.artist : 'Go to Music library' }}</span>
+          <div class="ph-wg__mctl">
+            <button v-for="(b, i) in musicButtons" :key="i" type="button" class="ph-wg__mbtn hd-squircle" :class="{ 'is-big': i === 1, 'is-dim': !song }" :aria-label="b.label"
+                    :disabled="editing" :data-test="'widget-music-' + b.id" @click="b.do()"><svg viewBox="0 0 24 24" :width="i === 1 ? 22 : 15" :height="i === 1 ? 22 : 15"><path :d="b.d" fill="currentColor" /></svg></button>
+          </div></div>
+      </div>
+      <!-- music, large (belle-music-widget-large.jpg): the square art stands up out of a glossy black tray that holds the buttons -->
+      <div v-else-if="w.kind === 'music-large'" class="ph-wg__mlarge">
+        <div class="ph-wg__mtray" />
+        <button type="button" class="ph-wg__mlart" :disabled="editing" aria-label="Open Music" @click="emit('open', 'music')">
+          <AlbumCover v-if="song" :album="song.album" :cover="song.cover" :size="150" /><span v-else class="ph-wg__mempty is-large"><svg viewBox="0 0 24 24" :width="64" :height="64" aria-hidden="true"><path d="M9 17.5V5.5l11-2.5v12" fill="none" stroke="#050508" stroke-width="2" /><ellipse cx="6.5" cy="17.5" rx="3" ry="2.4" fill="#050508" /><ellipse cx="17.5" cy="15" rx="3" ry="2.4" fill="#050508" /></svg><span>Go to Music library</span></span></button>
+        <div v-if="song" class="ph-wg__mlt"><b>{{ song.title }}</b><u>{{ song.artist }}</u></div>
+        <div class="ph-wg__mlctl">
+          <button v-for="(b, i) in musicButtons" :key="i" type="button" class="ph-wg__mbtn hd-squircle is-l" :class="{ 'is-big': i === 1, 'is-dim': !song }" :aria-label="b.label"
+                  :disabled="editing" @click="b.do()"><svg viewBox="0 0 24 24" :width="i === 1 ? 28 : 18" :height="i === 1 ? 28 : 18"><path :d="b.d" fill="currentColor" /></svg></button>
+        </div>
+      </div>
+
       <!-- devices: the paired devices, connected ones first (only the owner sees them) -->
       <div v-else-if="w.kind === 'devices'" class="ph-wg__panel" data-test="widget-devices">
         <header class="ph-wg__head"><SectionTile :section="byId.devices" :size="32" /><b>Devices</b></header>
@@ -291,6 +315,8 @@
 </template>
 
 <script setup lang="ts">
+import AlbumCover from '../components/AlbumCover.vue'
+import { current as currentSong, next as musicNext, player, prev as musicPrev, toggle as musicToggle } from '../music'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { state, api } from '../cloud'
 import { feedList, posts, feedsError, loadFeeds, openPost, postTs } from './feeds'
@@ -520,6 +546,14 @@ let timer: ReturnType<typeof setInterval> | undefined
 watch(() => state.status, (s, old) => { if (s === 'online' && old !== 'online') refresh() })
 onMounted(() => { refresh(); timer = setInterval(refresh, 120000) })
 onBeforeUnmount(() => { clearInterval(timer); clearInterval(ticking) })
+
+// the music widgets follow the app's one player
+const song = computed(() => currentSong())
+const musicButtons = computed(() => [
+  { id: 'prev', label: 'Previous', d: 'M6 6h2v12H6zm3.5 6 8.5 6V6z', do: musicPrev },
+  { id: 'toggle', label: player.playing ? 'Pause' : 'Play', d: player.playing ? 'M6 5h4v14H6zm8 0h4v14h-4z' : 'M8 5v14l11-7z', do: () => (song.value ? musicToggle() : emit('open', 'music')) },
+  { id: 'next', label: 'Next', d: 'M16 6h2v12h-2zM6 18l8.5-6L6 6z', do: musicNext },
+])
 </script>
 
 <style scoped>
@@ -683,4 +717,30 @@ onBeforeUnmount(() => { clearInterval(timer); clearInterval(ticking) })
 .ph-wg__wxday { flex: 0.75; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; }
 .ph-wg__wxicon { position: absolute; top: 0; left: 56px; color: #fff; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)); }
 .ph-wg__word b { font-size: 40px; font-weight: 300; line-height: 1.05; } .ph-wg__word span { font-size: 40px; font-weight: 600; line-height: 1.05; }
+/* music (Belle small and large) */
+.ph-wg__music { position: relative; height: 100%; display: flex; align-items: flex-end; gap: 12px; padding: 0 10px 10px; color: #fff; }
+.ph-wg__mpanel { position: absolute; left: 0; right: 0; bottom: 0; top: 44px; border-radius: 12px; border: 1px solid #000;
+  background: linear-gradient(#3C3C40, #18181A 22%, #0B0B0C 70%, #1A1A1C); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.ph-wg__mart, .ph-wg__mlart { position: relative; flex: none; padding: 0; border: 0; background: none; cursor: pointer; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6); }
+.ph-wg__mart { width: 124px; height: 124px; }
+.ph-wg__mempty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; width: 124px; height: 124px;
+  background: radial-gradient(circle at 50% 40%, #2F5FD0, #0D2A82 70%, #061650); color: #fff; font-size: 15px; }
+.ph-wg__mempty svg { filter: drop-shadow(0 1px 1px rgba(255, 255, 255, 0.5)); }
+.ph-wg__mempty.is-large { width: 150px; height: 150px; }
+.ph-wg__mside { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ph-wg__mtitle { max-width: 100%; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-wg__mctl { display: flex; align-items: center; justify-content: space-around; width: 100%; height: 46px; padding: 0 6px; border-radius: 12px;
+  background: linear-gradient(#050506, #141416); box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.9), 0 1px 0 rgba(255, 255, 255, 0.12); }
+.ph-wg__mbtn { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 0; color: #fff; cursor: pointer;
+  background: linear-gradient(#4A4A4F, #1E1E21 50%, #0C0C0D); }
+.ph-wg__mbtn.is-big { width: 38px; height: 38px; }
+.ph-wg__mbtn.is-l { width: 38px; height: 38px; } .ph-wg__mbtn.is-l.is-big { width: 50px; height: 50px; }
+.ph-wg__mbtn.is-dim { opacity: 0.55; }
+.ph-wg__mlarge { position: relative; height: 100%; display: flex; flex-direction: column; align-items: center; color: #fff; }
+.ph-wg__mtray { position: absolute; left: 0; right: 0; bottom: 0; height: 52%; border-radius: 14px; border: 1px solid #000;
+  background: linear-gradient(#3C3C40, #18181A 18%, #0B0B0C 60%, #1A1A1C); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.ph-wg__mlart { width: 150px; height: 150px; margin-top: 4px; }
+.ph-wg__mlt { position: relative; display: flex; gap: 10px; align-items: baseline; max-width: 100%; margin-top: 4px; font-size: 14px; white-space: nowrap; overflow: hidden; }
+.ph-wg__mlt u { color: #4A9BFF; font-size: 13px; text-decoration: none; }
+.ph-wg__mlctl { position: relative; margin-top: auto; margin-bottom: 10px; display: flex; align-items: center; gap: 18px; }
 </style>

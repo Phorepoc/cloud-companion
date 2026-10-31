@@ -68,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, provide, ref } from 'vue'
+import { computed, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { state, creds } from './cloud'
@@ -80,6 +80,8 @@ import SectionTile from './components/SectionTile.vue'
 import DesktopView from './desktop/DesktopView.vue'
 import { setLayout } from './desktop/layout'
 import { TITLE_ACTIONS } from './components/titlebar'
+import { listenForRemote } from './music'
+import { loadTracks } from './files'
 
 const $q = useQuasar()
 const route = useRoute()
@@ -105,6 +107,9 @@ function openDesktop() {
 function focusMain() {
   document.getElementById('main')?.focus()
 }
+
+// music sent from another device ("Play on") starts here
+watch(() => !!creds.value, (on) => { if (on) listenForRemote(loadTracks) }, { immediate: true })
 </script>
 
 <style scoped>

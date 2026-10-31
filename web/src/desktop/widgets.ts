@@ -5,7 +5,7 @@
 // The arrangement is kept on this device (localStorage), like the windows.
 
 export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'clock-gear' | 'clock-lcd' | 'weather' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'today'
-  | 'chats' | 'contacts' | 'contact' | 'notes' | 'shortcuts' | 'feeds' | 'web' | 'devices'
+  | 'chats' | 'contacts' | 'contact' | 'notes' | 'shortcuts' | 'feeds' | 'web' | 'devices' | 'music' | 'music-large'
 
 /** A placed widget: its kind and its top-left grid cell. */
 /** `opt` is the widget's own setting: the contact's name for a contact, the page for a web page widget. */
@@ -37,6 +37,8 @@ export const KINDS: Record<WidgetKind, WidgetInfo> = {
   web: { label: 'Web page', group: 'Shortcuts', w: 2, h: 2 },
   feeds: { label: 'Feeds', group: 'Feeds', w: 4, h: 3 },
   devices: { label: 'Devices', group: 'Devices', w: 4, h: 2 },
+  music: { label: 'Music', group: 'Music', w: 4, h: 2 },
+  'music-large': { label: 'Music, large', group: 'Music', w: 4, h: 3 },
 }
 
 const KEY = 'phecloud-desktop-widgets'
