@@ -9,7 +9,7 @@
      spotlight, a compact search added by Desktop v2: type to find a section, Enter opens it.
      The window arrangement and the layout choice are kept on this device (localStorage), like the theme. -->
 <template>
-  <div class="ph-desk" data-test="desktop">
+  <div class="ph-desk" :class="['ph-desk--' + dock.pos, { 'is-autohide': dock.hide, 'is-dockshown': dockPeek }]" :style="{ '--ph-dock-icon': dock.size + 'px' }" data-test="desktop">
     <a href="#ph-desk-area" class="ph-skip" @click.prevent="focusTop">Skip to the windows</a>
     <!-- global menu bar -->
     <header class="ph-menubar">
@@ -139,7 +139,8 @@
     </div>
 
     <!-- dock -->
-    <nav class="ph-dock hd-on-home" aria-label="Sections">
+    <i v-if="dock.hide" class="ph-dock__edge" aria-hidden="true" @pointerenter="dockPeek = true" />
+    <nav class="ph-dock hd-on-home" aria-label="Sections" data-test="dock" @contextmenu.prevent="dockEdit = true" @pointerleave="dockPeek = false" @pointerenter="dockPeek = true">
       <button type="button" class="ph-dock__item" :class="{ 'is-active': overview }" aria-label="Overview" title="Overview (Super)"
               data-test="dock-launcher" @click="overview = !overview">
         <span class="ph-dock__launcher hd-squircle" aria-hidden="true"><q-icon name="sym_o_apps" size="22px" /></span>
@@ -148,9 +149,25 @@
       <button v-for="s in visible" :key="s.id" type="button" class="ph-dock__item"
               :class="{ 'is-open': isOpen(s.id), 'is-active': focusedId === s.id && !winOf(s.id)?.min }"
               :aria-label="s.label + (isOpen(s.id) ? ', open' : '')" :title="s.label" :data-test="'dock-' + s.id" @click="dockClick(s.id)">
-        <SectionTile :section="s" :size="40" />
+        <SectionTile :section="s" :size="dock.size" />
       </button>
     </nav>
+    <!-- dock settings (right-click the dock; etesian-design desktop2/XDockSettings.vue, Plasma's dock edit mode) -->
+    <q-dialog v-model="dockEdit">
+      <q-card class="ph-dset" data-test="dock-edit">
+        <q-card-section>
+          <h2 class="ph-dset__h">Dock</h2>
+          <h3 class="ph-dset__sh">Position</h3>
+          <q-btn-toggle v-model="dock.pos" no-caps unelevated spread toggle-color="primary" color="surface-2" text-color="ph" data-test="dock-pos"
+                        :options="[{ label: 'Left', value: 'left' }, { label: 'Bottom', value: 'bottom' }, { label: 'Right', value: 'right' }]" />
+          <h3 class="ph-dset__sh">Size · {{ dock.size }} px icons</h3>
+          <q-slider v-model="dock.size" :min="32" :max="64" :step="4" label aria-label="Icon size" data-test="dock-size" />
+          <h3 class="ph-dset__sh">Visibility</h3>
+          <q-toggle v-model="dock.hide" label="Auto-hide (shows at the screen edge)" data-test="dock-autohide" />
+        </q-card-section>
+        <q-card-actions align="right"><q-btn unelevated no-caps color="primary" label="Done" data-test="dock-done" v-close-popup /></q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -186,6 +203,15 @@ const pages: Record<string, { component: Component | undefined; props: Record<st
   const c = rec?.components?.default
   return [s.id, { component: typeof c === 'function' ? defineAsyncComponent(c as () => Promise<Component>) : c, props: rec?.meta?.id ? { sectionId: s.id } : {} }]
 }))
+
+// ---- dock: its edge, icon size and auto-hide (right-click it), kept on this device ----
+const DOCK_KEY = 'phecloud-dock'
+const dock = reactive<{ pos: 'left' | 'bottom' | 'right'; size: number; hide: boolean }>((() => {
+  try { const d = JSON.parse(localStorage.getItem(DOCK_KEY) || '{}'); return { pos: ['left', 'bottom', 'right'].includes(d.pos) ? d.pos : 'left', size: Math.min(64, Math.max(32, Number(d.size) || 40)), hide: !!d.hide } }
+  catch { return { pos: 'left', size: 40, hide: false } }
+})())
+const dockEdit = ref(false), dockPeek = ref(false)
+watch(dock, () => { try { localStorage.setItem(DOCK_KEY, JSON.stringify(dock)) } catch { /* private mode */ } nextTick(measure) }, { deep: true })
 
 // ---- windows ----
 /** { id, x, y, w, h, state: 'float' | 'left' | 'right' | 'max', z, min } in desktop-area coordinates; x/y/w/h is the floating size */
@@ -521,7 +547,8 @@ onBeforeUnmount(() => {
 <style scoped>
 /* the desktop: the Etesian home surface (black), with a faint glow so windows stand out */
 .ph-desk {
-  position: fixed; inset: 0; display: grid; grid-template: 28px 1fr / 72px 1fr; overflow: hidden;
+  --ph-dock-t: calc(var(--ph-dock-icon, 40px) + 32px);
+  position: fixed; inset: 0; display: grid; grid-template: 28px 1fr / var(--ph-dock-t) 1fr; overflow: hidden;
   background: radial-gradient(120% 90% at 85% 100%, #0e2238 0%, #04080d 55%, #000 100%); color: var(--hd-surface-home-fg);
   font-family: var(--ph-font-light);
 }
@@ -541,6 +568,31 @@ onBeforeUnmount(() => {
 .ph-menubar__clock:hover, .ph-menubar__clock.is-on { background: rgba(255, 255, 255, 0.16); }
 .ph-menubar__clock b { margin-left: var(--ph-s1); }
 .ph-menubar__dot { position: absolute; top: 3px; right: 1px; width: 6px; height: 6px; border-radius: 50%; background: #7FB0FF; }
+/* the dock on another edge, or auto-hidden (the windows get the whole width, the dock slides in over them at the edge) */
+.ph-desk--right { grid-template: 28px 1fr / 1fr var(--ph-dock-t); }
+.ph-desk--right .ph-desk__area { grid-column: 1; }
+.ph-desk--right .ph-dock { grid-column: 2; }
+.ph-desk--bottom { grid-template: 28px 1fr var(--ph-dock-t) / 1fr; }
+.ph-desk--bottom .ph-desk__area { grid-column: 1; grid-row: 2; }
+.ph-desk--bottom .ph-dock { grid-column: 1; grid-row: 3; flex-direction: row; }
+.ph-desk--bottom .ph-dock__sep { width: 1px; height: 70%; margin: 0 4px; }
+.ph-desk--bottom .ph-dock__item.is-open::before { left: 50%; top: auto; bottom: -6px; transform: translateX(-50%); }
+.ph-desk--right .ph-dock__item.is-open::before { left: auto; right: -6px; }
+.ph-desk.is-autohide { grid-template: 28px 1fr / 1fr; }
+.ph-desk.is-autohide .ph-desk__area { grid-column: 1; grid-row: 2; }
+.ph-desk.is-autohide .ph-dock { position: absolute; z-index: 9500; transition: transform 0.2s; }
+.ph-desk--left.is-autohide .ph-dock { left: 8px; top: 50%; transform: translate(calc(-100% - 12px), -50%); }
+.ph-desk--right.is-autohide .ph-dock { right: 8px; top: 50%; transform: translate(calc(100% + 12px), -50%); }
+.ph-desk--bottom.is-autohide .ph-dock { bottom: 8px; left: 50%; transform: translate(-50%, calc(100% + 12px)); }
+.ph-desk--left.is-autohide.is-dockshown .ph-dock, .ph-desk--right.is-autohide.is-dockshown .ph-dock { transform: translate(0, -50%); }
+.ph-desk--bottom.is-autohide.is-dockshown .ph-dock { transform: translate(-50%, 0); }
+.ph-dock__edge { position: absolute; z-index: 9499; }
+.ph-desk--left .ph-dock__edge { left: 0; top: 28px; bottom: 0; width: 4px; }
+.ph-desk--right .ph-dock__edge { right: 0; top: 28px; bottom: 0; width: 4px; }
+.ph-desk--bottom .ph-dock__edge { left: 0; right: 0; bottom: 0; height: 4px; }
+.ph-dset { min-width: 360px; }
+.ph-dset__h { margin: 0 0 8px; font: 300 24px/1 var(--ph-font-light); }
+.ph-dset__sh { margin: 16px 0 6px; font: 700 var(--hd-font-size-small)/1 var(--ph-font); color: var(--ph-text-muted, inherit); }
 /* windows live here */
 .ph-desk__area { position: relative; grid-column: 2; grid-row: 2; outline: none; }
 .ph-desk__zone {
@@ -555,14 +607,14 @@ onBeforeUnmount(() => {
   box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
 }
 .ph-dock__sep { flex: none; width: 70%; height: 1px; margin: 4px 0; background: var(--hd-c-divider); }
-.ph-dock__item { position: relative; display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 0; background: none; cursor: pointer; }
+.ph-dock__item { position: relative; display: grid; place-items: center; width: calc(var(--ph-dock-icon, 40px) + 8px); height: calc(var(--ph-dock-icon, 40px) + 8px); padding: 0; border: 0; background: none; cursor: pointer; }
 /* hover and the focused window: a pressed squircle behind the icon (no scaling) */
 .ph-dock__item::after { content: ''; position: absolute; inset: 0; z-index: -1; background: transparent; -webkit-mask: var(--ph-squircle) center / contain no-repeat; mask: var(--ph-squircle) center / contain no-repeat; }
 .ph-dock__item:hover::after, .ph-dock__item.is-active::after { background: var(--hd-c-pressed); }
 .ph-dock__item { isolation: isolate; }
 .ph-dock__item:focus-visible { outline: 2px solid #7FB0FF; outline-offset: 0; }
 /* the Overview button: a flat accent squircle */
-.ph-dock__launcher { display: grid; place-items: center; width: 40px; height: 40px; background: var(--hd-accent, #4591FF); color: #fff; }
+.ph-dock__launcher { display: grid; place-items: center; width: var(--ph-dock-icon, 40px); height: var(--ph-dock-icon, 40px); background: var(--hd-accent, #4591FF); color: #fff; }
 .ph-dock__item:hover .ph-dock__launcher, .ph-dock__item.is-active .ph-dock__launcher { background: color-mix(in srgb, var(--hd-accent, #4591FF) 75%, #fff); }
 .ph-dock__item:has(.ph-dock__launcher)::after { display: none; }
 /* running: a small dot on the screen-edge side; the focused one larger, in the accent */
