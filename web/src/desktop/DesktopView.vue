@@ -148,10 +148,23 @@
       <span class="ph-dock__sep" aria-hidden="true" />
       <button v-for="s in visible" :key="s.id" type="button" class="ph-dock__item"
               :class="{ 'is-open': isOpen(s.id), 'is-active': focusedId === s.id && !winOf(s.id)?.min }"
-              :aria-label="s.label + (isOpen(s.id) ? ', open' : '')" :title="s.label" :data-test="'dock-' + s.id" @click="dockClick(s.id)">
+              :aria-label="s.label + (isOpen(s.id) ? ', open' : '')" :title="isOpen(s.id) ? undefined : s.label" :data-test="'dock-' + s.id" @click="dockClick(s.id)"
+              @pointerenter="hoverDock(s.id, $event)" @pointerleave="leaveDock">
         <SectionTile :section="s" :size="dock.size" />
       </button>
     </nav>
+    <!-- hover card of an open section (Plasma's task tooltip, without a live preview): its state, what it is doing, minimise / close -->
+    <div v-if="hover" class="ph-hcard hd-on-overlay" :style="hover.style" role="tooltip" data-test="dock-hover" @pointerenter="keepHover" @pointerleave="leaveDock">
+      <header><SectionTile :section="byId[hover.id]" :size="28" /><b>{{ byId[hover.id].label }}</b></header>
+      <p class="ph-hcard__state" data-test="dock-hover-state">{{ hoverState }}</p>
+      <p v-if="hover.id === 'music' && song" class="ph-hcard__line">{{ player.playing ? 'Playing' : 'Paused' }}: {{ song.title }} · {{ song.artist }}</p>
+      <p v-if="hover.id === 'mail' && unread" class="ph-hcard__line">{{ unread }} unread</p>
+      <footer>
+        <q-btn v-if="hover.id === 'music' && song" flat dense no-caps :icon="player.playing ? 'sym_o_pause' : 'sym_o_play_arrow'" :label="player.playing ? 'Pause' : 'Play'" @click="musicToggle()" />
+        <q-btn flat dense no-caps :label="winOf(hover.id)?.min ? 'Show' : 'Minimise'" data-test="dock-hover-min" @click="hoverMin" />
+        <q-btn flat dense no-caps color="negative" label="Close" data-test="dock-hover-close" @click="close(winOf(hover.id) ?? null); hover = null" />
+      </footer>
+    </div>
     <!-- dock settings (right-click the dock; etesian-design desktop2/XDockSettings.vue, Plasma's dock edit mode) -->
     <q-dialog v-model="dockEdit">
       <q-card class="ph-dset" data-test="dock-edit">
@@ -176,6 +189,7 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import type { QInput } from 'quasar'
 import type { Rect, Win, WinState } from './types'
 import LayoutPicker from './LayoutPicker.vue'
+import { current as currentSong, player, toggle as musicToggle } from '../music'
 import { LAYOUTS, zoneRect } from './snaplayouts'
 import { useRoute, useRouter } from 'vue-router'
 import { state } from '../cloud'
@@ -212,6 +226,28 @@ const dock = reactive<{ pos: 'left' | 'bottom' | 'right'; size: number; hide: bo
 })())
 const dockEdit = ref(false), dockPeek = ref(false)
 watch(dock, () => { try { localStorage.setItem(DOCK_KEY, JSON.stringify(dock)) } catch { /* private mode */ } nextTick(measure) }, { deep: true })
+
+// ---- dock hover cards ----
+const hover = ref<{ id: string; style: Record<string, string> } | null>(null)
+let hoverT = 0
+const song = computed(() => currentSong())
+function hoverDock(id: string, e: PointerEvent) {
+  clearTimeout(hoverT)
+  if (!isOpen(id)) { hover.value = null; return }
+  const it = (e.currentTarget as HTMLElement).getBoundingClientRect(), bar = (e.currentTarget as HTMLElement).closest('nav')!.getBoundingClientRect()
+  // next to the dock (not the icon), level with the icon
+  const r = { left: dock.pos === 'bottom' ? it.left : bar.left, right: bar.right, top: dock.pos === 'bottom' ? bar.top : it.top, width: it.width }
+  hoverT = window.setTimeout(() => {
+    const style: Record<string, string> = dock.pos === 'bottom' ? { left: Math.max(8, r.left + r.width / 2 - 130) + 'px', bottom: window.innerHeight - r.top + 10 + 'px' }
+      : dock.pos === 'right' ? { right: window.innerWidth - r.left + 10 + 'px', top: r.top + 'px' } : { left: r.right + 10 + 'px', top: r.top + 'px' }
+    hover.value = { id, style }
+  }, hover.value ? 0 : 450)
+}
+function keepHover() { clearTimeout(hoverT) }
+function leaveDock() { clearTimeout(hoverT); hoverT = window.setTimeout(() => { hover.value = null }, 250) }
+const STATE_TEXT: Record<string, string> = { float: 'Open', left: 'Left half', right: 'Right half', max: 'Maximised', zone: 'In a snap layout' }
+const hoverState = computed(() => { const w = hover.value && winOf(hover.value.id); return !w ? '' : w.min ? 'Minimised' : (focusedId.value === w.id ? 'In front · ' : '') + STATE_TEXT[w.state] })
+function hoverMin() { const w = hover.value && winOf(hover.value.id); if (!w) return; if (w.min) open(w.id); else minimise(w) }
 
 // ---- windows ----
 /** { id, x, y, w, h, state: 'float' | 'left' | 'right' | 'max', z, min } in desktop-area coordinates; x/y/w/h is the floating size */
@@ -591,6 +627,12 @@ onBeforeUnmount(() => {
 .ph-desk--right .ph-dock__edge { right: 0; top: 28px; bottom: 0; width: 4px; }
 .ph-desk--bottom .ph-dock__edge { left: 0; right: 0; bottom: 0; height: 4px; }
 .ph-dset { min-width: 360px; }
+.ph-hcard { position: fixed; z-index: 9600; width: 260px; padding: 12px 12px 6px; border-radius: var(--ph-r-card); background: color-mix(in srgb, var(--hd-surface-overlay) 96%, transparent);
+  color: var(--hd-c-fg); box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); font-family: var(--ph-font); }
+.ph-hcard header { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+.ph-hcard p { margin: 6px 0 0; font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+.ph-hcard .ph-hcard__line { color: var(--hd-c-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-hcard footer { display: flex; justify-content: flex-end; gap: 2px; margin-top: 6px; }
 .ph-dset__h { margin: 0 0 8px; font: 300 24px/1 var(--ph-font-light); }
 .ph-dset__sh { margin: 16px 0 6px; font: 700 var(--hd-font-size-small)/1 var(--ph-font); color: var(--ph-text-muted, inherit); }
 /* windows live here */
