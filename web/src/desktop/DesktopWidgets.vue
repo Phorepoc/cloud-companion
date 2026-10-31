@@ -160,6 +160,87 @@
         <q-icon class="ph-wg__wxicon" :name="weatherIcon(forecast?.code ?? 3, forecast?.day ?? true)" size="76px" :aria-label="forecast?.description || 'Weather'" />
       </div>
 
+      <!-- gear clock (Belle, belle-ref11): a round dial in a lighter metal rim with twelve ticks, toothed metal gears turning behind the
+           hands, a thin white second hand, the day low on the left and the date at 3 o'clock in dark round bubbles -->
+      <div v-else-if="w.kind === 'clock-gear'" class="ph-wg__gear" role="img" :aria-label="'Clock, ' + clock.text">
+        <svg viewBox="0 0 126 126" aria-hidden="true">
+          <defs>
+            <radialGradient id="ph-wg-gface" cx=".5" cy=".4" r=".6"><stop offset="0" stop-color="#3A3B3F" /><stop offset="1" stop-color="#121214" /></radialGradient>
+            <linearGradient id="ph-wg-grim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6A6B70" /><stop offset=".5" stop-color="#3A3B3F" /><stop offset="1" stop-color="#202124" /></linearGradient>
+            <linearGradient id="ph-wg-gmetal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55565B" /><stop offset="1" stop-color="#2A2B2F" /></linearGradient>
+          </defs>
+          <circle cx="63" cy="63" r="62" fill="url(#ph-wg-grim)" stroke="#050506" />
+          <circle cx="63" cy="63" r="53" fill="url(#ph-wg-gface)" stroke="#050506" stroke-width=".8" />
+          <g v-for="(g, i) in GEARS" :key="i" :transform="`rotate(${(i % 2 ? -1 : 1) * secDeg * (20 / g.r)} ${g.x} ${g.y})`" class="ph-wg__cog">
+            <path :d="g.d" fill="url(#ph-wg-gmetal)" stroke="#0E0E10" stroke-width=".5" />
+            <circle :cx="g.x" :cy="g.y" :r="g.r * 0.55" fill="#1A1B1E" />
+            <circle :cx="g.x" :cy="g.y" :r="g.r * 0.18" fill="#4A4B50" />
+          </g>
+          <line v-for="a in 12" :key="a" x1="63" y1="3.5" x2="63" :y2="a % 3 ? 7.5 : 9" stroke="#C8C9CD" stroke-width="1.4" stroke-linecap="round" :transform="`rotate(${a * 30} 63 63)`" />
+          <g class="ph-wg__hands">
+            <path d="M60.5 68 L60.6 25.5 Q63 24.2 65.4 25.5 L65.5 68 Z" fill="#fff" :transform="`rotate(${hourDeg} 63 63)`" />
+            <path d="M61.7 68 L61.75 12 Q63 11.2 64.25 12 L64.3 68 Z" fill="#fff" :transform="`rotate(${minDeg} 63 63)`" />
+          </g>
+          <line class="ph-wg__hand--s" x1="63" y1="76" x2="63" y2="12" stroke="#E6E6E8" stroke-width=".8" :transform="`rotate(${secDeg} 63 63)`" />
+          <circle cx="63" cy="63" r="5.5" fill="url(#ph-wg-grim)" stroke="#0E0E10" stroke-width=".6" /><circle cx="63" cy="63" r="1.6" fill="#D0D1D5" />
+        </svg>
+        <span class="ph-wg__gday">{{ tick.toLocaleDateString(undefined, { weekday: 'short' }) }}</span><span class="ph-wg__gdate">{{ tick.getDate() }}</span>
+      </div>
+
+      <!-- LCD clock (Belle, belle-ref10): green segment digits on black glass in a dark metal frame, the date beside -->
+      <div v-else-if="w.kind === 'clock-lcd'" class="ph-wg__lcd" role="img" :aria-label="'Clock, ' + clock.text">
+        <div class="ph-wg__lcdglass"><span class="ph-wg__lcdt">{{ clock.hour }}</span><span class="ph-wg__lcdc">:</span><span class="ph-wg__lcdt">{{ clock.minute }}</span>
+          <span class="ph-wg__lcdd">{{ now.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' }) }}</span></div>
+      </div>
+
+      <!-- Today (Belle calendar card): white paper on rings, the next entry of the day; tap opens Calendar -->
+      <button v-else-if="w.kind === 'today'" type="button" class="ph-wg__paperwrap" :disabled="editing" data-test="widget-today" @click="emit('open', 'calendar')">
+        <i class="ph-wg__ring" style="left: 18%" /><i class="ph-wg__ring" style="right: 18%" />
+        <span class="ph-wg__todaypaper">
+          <span class="ph-wg__todayday">Today</span>
+          <span v-if="cal.error" class="ph-wg__todayev">{{ cal.error }}</span>
+          <span v-else-if="!nextToday" class="ph-wg__todayev">Nothing planned</span>
+          <span v-else class="ph-wg__todayev"><b>{{ nextToday.allday ? 'All day' : timeLabel(toDate(nextToday.start)) }}</b><i class="ph-wg__cyan" /><span>{{ nextToday.title || '(no title)' }}</span></span>
+        </span>
+      </button>
+
+      <!-- one contact (Belle contact shortcut): the photo, or squircle initials, with the name on a dark strip; tap opens Contacts -->
+      <button v-else-if="w.kind === 'contact'" type="button" class="ph-wg__photo" :disabled="editing" data-test="widget-contact" @click="emit('open', 'contacts')">
+        <span class="ph-wg__pinit hd-squircle" :style="{ background: tint(w.opt || '?') }">{{ initials(w.opt || '?') }}</span>
+        <span class="ph-wg__strip">{{ w.opt || 'Pick a contact' }}</span>
+      </button>
+
+      <!-- web page (Belle web shortcut): the site's name on the strip; tap opens it in a new tab -->
+      <button v-else-if="w.kind === 'web'" type="button" class="ph-wg__photo ph-wg__webtile" :disabled="editing" data-test="widget-web" @click="openPage(w.opt)">
+        <img v-if="w.opt && !noIcon[w.opt]" :src="iconOf(w.opt)" alt="" class="ph-wg__favicon" @error="noIcon[w.opt] = true" />
+        <q-icon v-else name="sym_o_language" size="56px" class="ph-wg__favicon" aria-hidden="true" />
+        <span class="ph-wg__strip">{{ w.opt ? hostOf(w.opt) : 'Pick a page' }}</span>
+      </button>
+
+      <!-- feeds (Belle RSS widget): orange header with the feed count, the newest posts below; tap opens the post -->
+      <div v-else-if="w.kind === 'feeds'" class="ph-wg__rss" data-test="widget-feeds">
+        <header class="ph-wg__rsshead"><span><b>Feeds</b><small>{{ feedList.length === 1 ? feedList[0].title : feedList.length + ' feeds' }}</small></span>
+          <button type="button" class="ph-wg__arrow" aria-label="Refresh" :disabled="editing" @click="loadFeeds"><q-icon name="sym_o_refresh" size="24px" /></button></header>
+        <div class="ph-wg__rssbody">
+          <p v-if="feedsError" class="ph-wg__rssnone">Could not load: {{ feedsError }}</p>
+          <p v-else-if="!posts.length" class="ph-wg__rssnone">{{ feedList.length ? 'No posts yet.' : 'No feeds yet. Add them under Feeds in Events.' }}</p>
+          <button v-for="p in posts.slice(0, 20)" :key="p.link + p.title" type="button" class="ph-wg__rssrow" :disabled="editing" data-test="widget-feed" @click="openPost(p)">
+            <i class="ph-wg__rssdot" /><span class="ph-wg__rsst">{{ p.title || '(no title)' }}<small>{{ p.feed }}{{ postTs(p) ? ' · ' + ago(now, postTs(p)) : '' }}</small></span></button>
+        </div>
+      </div>
+
+      <!-- devices: the paired devices, connected ones first (only the owner sees them) -->
+      <div v-else-if="w.kind === 'devices'" class="ph-wg__panel" data-test="widget-devices">
+        <header class="ph-wg__head"><SectionTile :section="byId.devices" :size="32" /><b>Devices</b></header>
+        <p v-if="!state.admin" class="ph-wg__none">Only the owner sees the devices.</p>
+        <p v-else-if="!devices.length" class="ph-wg__none">No devices yet.</p>
+        <div v-else class="ph-wg__list">
+          <button v-for="d in devices" :key="d.id" type="button" class="ph-wg__dev" :disabled="editing" @click="emit('open', 'devices')">
+            <i class="ph-wg__devdot" :class="{ 'is-on': d.online }" /><span class="ph-wg__title">{{ d.name }}</span>
+            <span class="ph-wg__sec">{{ d.online ? 'Connected' : d.seen ? 'Seen ' + ago(now, d.seen) : 'Never seen' }}</span></button>
+        </div>
+      </div>
+
       <template v-if="editing">
         <i class="ph-wg__outline" aria-hidden="true" />
         <button type="button" class="ph-wg__x" :aria-label="'Remove ' + KINDS[w.kind].label" title="Remove" :data-test="'widget-remove-' + w.kind"
@@ -182,12 +263,31 @@
       <q-btn unelevated no-caps color="primary" label="Done" class="full-width q-mt-md" data-test="widgets-done" @click="emit('done')" />
     </aside>
     <WeatherPlaceDialog v-model="pickingPlace" />
+    <!-- the setting of a contact or web page widget, asked when it is added -->
+    <q-dialog :model-value="!!setting" @update:model-value="(v) => { if (!v) setting = null }">
+      <q-card class="ph-wg__setcard" data-test="widget-setting">
+        <q-card-section><b>{{ setting?.kind === 'web' ? 'Which page?' : 'Which contact?' }}</b></q-card-section>
+        <q-card-section v-if="setting?.kind === 'web'">
+          <q-input v-model="settingText" dense outlined autofocus label="Address" placeholder="https://example.org" data-test="widget-setting-url" @keyup.enter="saveSetting" />
+        </q-card-section>
+        <q-list v-else dense class="ph-wg__setlist">
+          <q-item v-for="c in people.items" :key="c.href || c.name" clickable data-test="widget-setting-contact" @click="settingText = c.name; saveSetting()">
+            <q-item-section>{{ c.name }}</q-item-section></q-item>
+          <q-item v-if="!people.items.length"><q-item-section class="ph-muted">{{ people.error || 'No contacts yet.' }}</q-item-section></q-item>
+        </q-list>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" @click="setting = null" />
+          <q-btn v-if="setting?.kind === 'web'" unelevated no-caps color="primary" label="Save" data-test="widget-setting-save" @click="saveSetting" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
-import { state } from '../cloud'
+import { state, api } from '../cloud'
+import { feedList, posts, feedsError, loadFeeds, openPost, postTs } from './feeds'
 import { sections } from '../nav'
 import { timeLabel, toDate, dayLabel } from '../dates'
 import type { CalendarEvent, Contact, MailItem, SmsConversation } from '../proto'
@@ -252,6 +352,10 @@ function add(kind: WidgetKind) {
   const at = freeSpot(kind, list, grid.value.cols, grid.value.rows)
   full.value = !at
   if (at) list.push({ id: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind, ...at })
+  if (at && (kind === 'contact' || kind === 'web')) {
+    setting.value = list[list.length - 1]; settingText.value = ''
+    if (kind === 'contact') loadContacts().then((c) => { people.items = c; people.error = '' }, (e) => { people.error = quiet(e, 'Contacts') })
+  }
   if (at && kind === 'weather') loadWeather()
 }
 function remove(w: Widget) {
@@ -276,7 +380,7 @@ const dateText = computed(() => dayLabel(props.now))
 // the analog clock keeps its own second (the desktop's `now` moves every 15 s)
 const tick = ref(new Date())
 let ticking: ReturnType<typeof setInterval> | undefined
-watch(() => list.some((w) => w.kind === 'clock-analog'), (on) => {
+watch(() => list.some((w) => w.kind === 'clock-analog' || w.kind === 'clock-gear'), (on) => {
   clearInterval(ticking); ticking = undefined
   if (on) { tick.value = new Date(); ticking = setInterval(() => { tick.value = new Date() }, 1000) }
 }, { immediate: true })
@@ -292,6 +396,17 @@ function squircleRect(w: number, h: number, n: number, x = 0, y = 0): string {
   }
   return 'M' + pts.join('L') + 'Z'
 }
+/** A toothed gear at (x, y), radius r (the phone's gear dial draws the same). */
+function gearPath(x: number, y: number, r: number, teeth: number): string {
+  const pts: string[] = []
+  for (let i = 0; i < teeth * 4; i++) { // each tooth: two points out, two in
+    const a = (Math.PI * 2 * i) / (teeth * 4), rr = i % 4 < 2 ? r : r * 0.86
+    pts.push(`${(x + rr * Math.cos(a)).toFixed(2)} ${(y + rr * Math.sin(a)).toFixed(2)}`)
+  }
+  return 'M' + pts.join('L') + 'Z'
+}
+/** the gear clock's gears (a 126 grid, as on the phone): x, y, radius and teeth */
+const GEARS = [[83, 39, 26, 18], [39, 83, 24, 16], [63, 63, 22, 16], [87, 82, 14, 11]].map(([x, y, r, t]) => ({ x, y, r, d: gearPath(x, y, r, t) }))
 /** the 701's dial: n 2.9 face and bezel, the date window at 3 o'clock */
 const DIAL = { outer: squircleRect(126, 126, 2.9), inner: squircleRect(118, 118, 2.9, 4, 4), win: squircleRect(26, 26, 2.8, 79, 50) }
 
@@ -307,6 +422,9 @@ function refresh() {
   if (has('mail', 'mail-stack')) loadMail(20).then((m) => { mail.unread = m.unread; mail.items = m.items; mail.error = '' }, (e) => { mail.error = quiet(e, 'Mail') })
   if (has('agenda', 'month')) loadEvents(monthStart.value, 42).then((ev) => { cal.items = ev; cal.error = '' }, (e) => { cal.error = quiet(e, 'The calendar') })
   if (has('chats')) loadChats(20).then((c) => { chats.items = c; chats.error = '' }, (e) => { chats.error = quiet(e, 'Chats') })
+  if (has('today') && !has('agenda', 'month')) loadEvents(props.now, 1).then((ev) => { cal.items = ev; cal.error = '' }, (e) => { cal.error = quiet(e, 'The calendar') })
+  if (has('feeds')) loadFeeds()
+  if (has('devices') && state.admin) api.devices()
   if (has('contacts')) loadContacts().then((c) => { people.items = c; people.error = '' }, (e) => { people.error = quiet(e, 'Contacts') })
 }
 /** a mail's time: the time today, else the day and month */
@@ -315,6 +433,27 @@ function mailTime(date: string) {
   if (isNaN(d.getTime())) return ''
   return ymd(d) === ymd(props.now) ? timeLabel(d) : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
+
+// today: the next entry still to come (or the last of the day)
+const nextToday = computed(() => today.value.find((e) => e.allday || toDate(e.end || e.start) >= props.now) || null)
+
+// contact and web page widgets: their setting
+const setting = ref<Widget | null>(null), settingText = ref('')
+function saveSetting() {
+  const w = setting.value, t = settingText.value.trim()
+  if (!w || !t) return
+  w.opt = w.kind === 'web' && !/^https?:\/\//i.test(t) ? 'https://' + t : t
+  setting.value = null
+}
+const noIcon = reactive<Record<string, boolean>>({}) // sites whose icon did not load show the globe
+const hostOf = (u: string) => { try { return new URL(u).host.replace(/^www\./, '') } catch { return u } }
+const iconOf = (u: string) => { try { return new URL('/favicon.ico', u).href } catch { return '' } }
+function openPage(u?: string) { if (u && /^https?:\/\//i.test(u)) window.open(u, '_blank', 'noopener') }
+
+// devices: connected ones (seen in the last two minutes) first, then by when they were last seen
+const devices = computed(() => (state.deviceList || []).filter((d) => !d.revoked)
+  .map((d) => ({ ...d, online: !!d.seen && Date.now() / 1000 - d.seen < 120 }))
+  .sort((a, b) => Number(b.online) - Number(a.online) || b.seen - a.seen))
 
 // latest mail, one at a time
 const stackAt = ref(0)
@@ -408,6 +547,54 @@ onBeforeUnmount(() => { clearInterval(timer); clearInterval(ticking) })
 .ph-wg__analog svg { width: 100%; height: 100%; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)); }
 .ph-wg__hands { filter: drop-shadow(0 1.2px 0.9px rgba(0, 0, 0, 0.55)); }
 .ph-wg__dialdate { font-family: var(--ph-font); }
+/* gear clock */
+.ph-wg__gear { position: relative; height: 100%; aspect-ratio: 1; margin: auto; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)); }
+.ph-wg__gear svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ph-wg__gday, .ph-wg__gdate { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%;
+  background: radial-gradient(#1A1B1E, #0B0B0C); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); color: #D0D1D5; font-size: 13px; }
+.ph-wg__gday { left: 31%; top: 70%; width: 20%; height: 20%; }
+.ph-wg__gdate { left: 83%; top: 50%; width: 13%; height: 13%; }
+/* LCD clock */
+.ph-wg__lcd { width: fit-content; margin: auto; padding: 8px; border-radius: 14px; border: 1px solid #000; background: linear-gradient(#5A5B60, #2A2B2E 50%, #0E0E10); }
+.ph-wg__lcdglass { display: flex; align-items: center; padding: 10px 10px 10px 14px; border-radius: 8px; border: 1px solid #46474B; background: linear-gradient(#2A2B2E, #050506); color: #23B14D; font-family: ui-monospace, monospace; }
+.ph-wg__lcdt { display: grid; place-items: center; padding: 0 8px; border-radius: 6px; border: 1px solid #050506; background: linear-gradient(#1E1F22, #111214 50%, #1A1B1D); font-size: 56px; line-height: 1.15; text-shadow: 0 0 6px rgba(35, 177, 77, 0.5); }
+.ph-wg__lcdc { padding: 0 3px; font-size: 30px; }
+.ph-wg__lcdd { align-self: flex-end; margin-left: 10px; padding: 2px 5px; border-radius: 3px; border: 1px solid #1E3A24; background: #0B140D; font-size: 14px; }
+/* Today card */
+.ph-wg__paperwrap { position: relative; display: block; width: 100%; height: 100%; padding: 5px 0 0; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; }
+.ph-wg__ring { position: absolute; top: 0; z-index: 1; width: 8px; height: 14px; border-radius: 4px; border: 1px solid #6A6B70; background: linear-gradient(90deg, #8E8F94, #F4F4F6, #8E8F94); }
+.ph-wg__todaypaper { display: flex; flex-direction: column; height: 100%; border-radius: 12px; border: 1px solid #BDBDC0; background: linear-gradient(#fff, #E6E6E8); color: #1A1A1A; box-shadow: 0 6px 0 -1px rgba(18, 18, 18, 0.94); }
+.ph-wg__todayday { padding: 3px 0 2px; text-align: center; font-size: 15px; border-bottom: 1px solid #C9C9CC; }
+.ph-wg__todayev { flex: 1; display: flex; align-items: center; gap: 8px; padding: 0 14px; font-size: 16px; overflow: hidden; white-space: nowrap; }
+.ph-wg__todayev span { overflow: hidden; text-overflow: ellipsis; }
+.ph-wg__cyan { width: 4px; align-self: stretch; margin: 8px 0; background: #09A7CC; }
+/* contact and web page shortcuts: the picture as is, the name on a dark strip */
+.ph-wg__photo { position: relative; display: grid; place-items: center; width: 100%; height: 100%; padding: 0; overflow: hidden; border: 0; border-radius: 6px; background: #3A3A3C; color: #fff; font: inherit; cursor: pointer; }
+.ph-wg__webtile { background: linear-gradient(#fff, #DFE6EE); color: #2A6FB5; }
+.ph-wg__favicon { width: 48px; height: 48px; margin-bottom: 30px; }
+.ph-wg__pinit { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 30px; font-size: 24px; font-weight: 700; }
+.ph-wg__strip { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 10px 7px; background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 16px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* feeds (Belle RSS) */
+.ph-wg__rss { display: flex; flex-direction: column; height: 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+.ph-wg__rsshead { display: flex; align-items: center; height: 52px; padding: 0 8px 0 14px; border-radius: 10px 10px 0 0; background: linear-gradient(#F7A13A, #E5620F); }
+.ph-wg__rsshead > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ph-wg__rsshead b { font-size: 18px; text-shadow: 0 1px 1px rgba(0, 0, 0, 0.4); }
+.ph-wg__rsshead small { font-size: 13px; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-wg__rssbody { flex: 1; min-height: 0; overflow-y: auto; border-radius: 0 0 10px 10px; background: linear-gradient(#fff, #E9E9EB); color: #1A1A1A; }
+.ph-wg__rssnone { margin: 12px 14px; font-size: 14px; color: #555; }
+.ph-wg__rssrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 14px; border: 0; border-bottom: 1px solid #DCDCDE; background: none; color: inherit; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.ph-wg__rssrow:hover { background: rgba(229, 98, 15, 0.08); }
+.ph-wg__rssdot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #E5620F; }
+.ph-wg__rsst { display: flex; flex-direction: column; min-width: 0; }
+.ph-wg__rsst small { font-size: 12px; color: #666; }
+/* devices */
+.ph-wg__dev { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 4px; border: 0; border-bottom: 1px solid rgba(255, 255, 255, 0.1); background: none; color: #fff; font: inherit; text-align: left; cursor: pointer; }
+.ph-wg__dev:hover { background: rgba(255, 255, 255, 0.08); }
+.ph-wg__dev .ph-wg__title { flex: 1; }
+.ph-wg__devdot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); }
+.ph-wg__devdot.is-on { background: #8FD65A; }
+.ph-wg__setcard { min-width: 340px; }
+.ph-wg__setlist { max-height: 50vh; overflow-y: auto; }
 /* edit chrome, as on the phone: accent outline and a red ✕ squircle at the top right */
 .ph-wg__outline { position: absolute; inset: -4px; border: 2px solid #4591FF; border-radius: 14px; pointer-events: none; }
 .ph-wg__x { position: absolute; top: -14px; right: -14px; padding: 0; border: 0; background: none; cursor: pointer; }

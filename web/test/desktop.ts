@@ -11,6 +11,7 @@
 // a small screen always gets the classic layout.
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
+import http from 'node:http'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const CODE = process.env.CODE
@@ -314,6 +315,50 @@ await page.waitForSelector('[data-test=widget-note]')
 assert.equal(await page.inputValue('[data-test=widget-note]'), 'Buy rye bread', 'notes are kept after a reload')
 await page.keyboard.press('Control+Alt+d')
 await page.screenshot({ path: `${OUT}/desktop-widgets.png` })
+
+step('Events and the new Belle widgets (2026-10-31): the month unfolds, the weather line, feeds, gear and LCD clocks, Today, web page, devices')
+// a feed for the server to read: this process shares the server's network, so the server reaches it on localhost
+const feedSrv = http.createServer((_q, r) => { r.setHeader('Content-Type', 'application/rss+xml')
+  r.end('<rss version="2.0"><channel><title>Harbour News</title><item><title>Tram line opens to the harbour</title><link>https://example.org/tram</link>' +
+    '<pubDate>' + new Date(Date.now() - 3600e3).toUTCString() + '</pubDate></item></channel></rss>') })
+await new Promise<void>((ok) => feedSrv.listen(8799, ok))
+await page.keyboard.press('Control+Alt+n')
+await page.waitForSelector('[data-test=events]')
+assert(await shown('[data-test=events-weather]'), 'Events shows the time with the weather')
+await page.click('[data-test=events-day]')
+assert.equal(await page.locator('[data-test=events-mday]').count(), 42, 'the date unfolds the month (six weeks)')
+assert(await shown('[data-test=events] h2:has-text("Feeds")'), 'Feeds in Events')
+await page.fill('[data-test=events-feed-url]', 'http://localhost:8799/feed.xml')
+await page.click('[data-test=events-feed-add]')
+await page.waitForSelector('[data-test=events-feed]:has-text("Tram line opens")', { timeout: 15000 })
+assert.match(await text('[data-test=events-feed]'), /Harbour News/, 'a post names its feed')
+await page.screenshot({ path: `${OUT}/desktop-events-feeds.png` })
+await page.keyboard.press('Escape')
+await page.waitForSelector('[data-test=events]', { state: 'detached' })
+await page.evaluate(() => localStorage.setItem('phecloud-desktop-widgets', '[]'))
+await page.reload()
+await page.click('.ph-menubar__menu:has-text("View")')
+await page.click('[data-test=edit-widgets]')
+await page.waitForSelector('[data-test=widget-sheet]')
+for (const k of ['feeds', 'clock-gear', 'clock-lcd', 'today', 'devices']) await page.click(`[data-test=widget-add-${k}]`)
+await page.click('[data-test=widget-add-web]')
+await page.fill('[data-test=widget-setting-url]', 'example.org')
+await page.click('[data-test=widget-setting-save]')
+await page.click('[data-test=widgets-done]')
+await page.waitForSelector('[data-test=widget-sheet]', { state: 'hidden' })
+await page.keyboard.press('Control+Alt+d')
+await page.waitForSelector('[data-test=widget-feed]:has-text("Tram line opens")', { timeout: 15000 })
+assert.match(await text('[data-test=widget-web]'), /example\.org/, 'the web page widget names its site')
+assert.match(await text('[data-test=widget-today]'), /Today/, 'the Today card')
+assert.match(await text('[data-test=widget-clock-lcd]'), /\d\d\s*:\s*\d\d/, 'the LCD clock shows the time')
+await page.waitForSelector('[data-test=widget-devices] .ph-wg__dev', { timeout: 10000 })
+assert.match(await text('[data-test=widget-devices]'), /Connected/, 'this device is listed as connected')
+const cog = () => page.locator('[data-test=widget-clock-gear] .ph-wg__cog').first().getAttribute('transform')
+const c0 = await cog(); await page.waitForTimeout(2100)
+assert.notEqual(await cog(), c0, 'the gears turn with the seconds')
+assert.equal(await page.locator('[data-test=widget-clock-gear] .ph-wg__hand--s').getAttribute('stroke'), '#E6E6E8', 'the gear clock\'s second hand is thin and white (belle-ref11)')
+await page.screenshot({ path: `${OUT}/desktop-widgets-new.png` })
+feedSrv.close()
 
 step('dark: the desktop follows the colour mode')
 await page.emulateMedia({ colorScheme: 'dark' })

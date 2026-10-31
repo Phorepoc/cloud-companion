@@ -19,6 +19,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/server"
+	"github.com/phorepoc/cloud-companion/internal/feeds"
 	"github.com/phorepoc/cloud-companion/internal/weather"
 )
 
@@ -78,6 +79,7 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 		vault = m.V
 	}
 	(&weatherAPI{a: a, st: s.Store, v: vault, w: weather.New()}).routes(mux)
+	(&feedsAPI{a: a, st: s.Store, f: feeds.New()}).routes(mux)
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)

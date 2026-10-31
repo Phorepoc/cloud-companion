@@ -4,10 +4,12 @@
 // Desktop widgets (after the Etesian Belle widgets): what kinds there are, their size on the 90 px grid, and where they are.
 // The arrangement is kept on this device (localStorage), like the windows.
 
-export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'weather' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'chats' | 'contacts' | 'notes' | 'shortcuts'
+export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'clock-gear' | 'clock-lcd' | 'weather' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'today'
+  | 'chats' | 'contacts' | 'contact' | 'notes' | 'shortcuts' | 'feeds' | 'web' | 'devices'
 
 /** A placed widget: its kind and its top-left grid cell. */
-export interface Widget { id: string; kind: WidgetKind; x: number; y: number }
+/** `opt` is the widget's own setting: the contact's name for a contact, the page for a web page widget. */
+export interface Widget { id: string; kind: WidgetKind; x: number; y: number; opt?: string }
 
 export const CELL = 90 // px per grid cell
 export const MARGIN = 24 // px from the top-left of the desktop area to cell 0,0
@@ -19,15 +21,22 @@ export const KINDS: Record<WidgetKind, WidgetInfo> = {
   'clock-analog': { label: 'Analog clock', group: 'Clocks', w: 2, h: 2 },
   'clock-flip': { label: 'Flip clock', group: 'Clocks', w: 4, h: 2 },
   'clock-word': { label: 'Clock in words', group: 'Clocks', w: 4, h: 2 },
+  'clock-gear': { label: 'Gear clock', group: 'Clocks', w: 3, h: 3 },
+  'clock-lcd': { label: 'LCD clock', group: 'Clocks', w: 4, h: 2 },
   weather: { label: 'Weather', group: 'Weather', w: 4, h: 2 },
   mail: { label: 'Mail', group: 'Mail', w: 4, h: 3 },
   'mail-stack': { label: 'Latest mail, one at a time', group: 'Mail', w: 4, h: 2 },
   agenda: { label: 'Agenda', group: 'Calendar', w: 4, h: 3 },
   month: { label: 'Month', group: 'Calendar', w: 3, h: 3 },
+  today: { label: 'Today', group: 'Calendar', w: 4, h: 1 },
   chats: { label: 'Latest chats', group: 'Chats', w: 4, h: 2 },
   contacts: { label: 'Contacts', group: 'Contacts', w: 4, h: 1 },
+  contact: { label: 'One contact', group: 'Contacts', w: 2, h: 2 },
   notes: { label: 'Notes', group: 'Notes', w: 4, h: 3 },
   shortcuts: { label: 'Shortcuts', group: 'Shortcuts', w: 4, h: 1 },
+  web: { label: 'Web page', group: 'Shortcuts', w: 2, h: 2 },
+  feeds: { label: 'Feeds', group: 'Feeds', w: 4, h: 3 },
+  devices: { label: 'Devices', group: 'Devices', w: 4, h: 2 },
 }
 
 const KEY = 'phecloud-desktop-widgets'
