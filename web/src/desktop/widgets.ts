@@ -4,7 +4,7 @@
 // Desktop widgets (after the Etesian Belle widgets): what kinds there are, their size on the 90 px grid, and where they are.
 // The arrangement is kept on this device (localStorage), like the windows.
 
-export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'chats' | 'contacts' | 'notes' | 'shortcuts'
+export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'weather' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'chats' | 'contacts' | 'notes' | 'shortcuts'
 
 /** A placed widget: its kind and its top-left grid cell. */
 export interface Widget { id: string; kind: WidgetKind; x: number; y: number }
@@ -19,6 +19,7 @@ export const KINDS: Record<WidgetKind, WidgetInfo> = {
   'clock-analog': { label: 'Analog clock', group: 'Clocks', w: 2, h: 2 },
   'clock-flip': { label: 'Flip clock', group: 'Clocks', w: 4, h: 2 },
   'clock-word': { label: 'Clock in words', group: 'Clocks', w: 4, h: 2 },
+  weather: { label: 'Weather', group: 'Weather', w: 4, h: 2 },
   mail: { label: 'Mail', group: 'Mail', w: 4, h: 3 },
   'mail-stack': { label: 'Latest mail, one at a time', group: 'Mail', w: 4, h: 2 },
   agenda: { label: 'Agenda', group: 'Calendar', w: 4, h: 3 },

@@ -130,6 +130,21 @@
         <b>{{ words[0] }}</b><span>{{ words[1] }}</span><small class="ph-wg__sec">{{ dateText }}</small>
       </div>
 
+      <!-- weather (Belle Weather): now, today's high / low, the place (picks another), the next two days -->
+      <div v-else-if="w.kind === 'weather'" class="ph-wg__weather">
+        <div class="ph-wg__panel ph-wg__wxbody">
+          <div class="ph-wg__wxnow">
+            <div class="ph-wg__wxt"><span data-test="weather-temp">{{ forecast ? forecast.temperature + '°' : '--°' }}</span>
+              <small v-if="forecast?.days[0]">{{ forecast.days[0].high }}° / {{ forecast.days[0].low }}°</small></div>
+            <button type="button" class="ph-wg__wxplace" :disabled="editing" data-test="weather-place-open" @click="pickingPlace = true">{{ placeText }}</button>
+          </div>
+          <div v-for="d in (forecast?.days || []).slice(1, 3)" :key="d.date" class="ph-wg__wxday">
+            <q-icon :name="weatherIcon(d.code)" size="34px" aria-hidden="true" /><span>{{ d.high }}° / {{ d.low }}°</span><span class="ph-wg__sec">{{ weekday(d.date) }}</span>
+          </div>
+        </div>
+        <q-icon class="ph-wg__wxicon" :name="weatherIcon(forecast?.code ?? 3, forecast?.day ?? true)" size="76px" :aria-label="forecast?.description || 'Weather'" />
+      </div>
+
       <template v-if="editing">
         <i class="ph-wg__outline" aria-hidden="true" />
         <button type="button" class="ph-wg__x" :aria-label="'Remove ' + KINDS[w.kind].label" title="Remove" :data-test="'widget-remove-' + w.kind"
@@ -151,6 +166,7 @@
       <p v-if="full" class="ph-wg__none" role="status">There is no room left. Remove or move a widget first.</p>
       <q-btn unelevated no-caps color="primary" label="Done" class="full-width q-mt-md" data-test="widgets-done" @click="emit('done')" />
     </aside>
+    <WeatherPlaceDialog v-model="pickingPlace" />
   </div>
 </template>
 
@@ -163,6 +179,8 @@ import type { CalendarEvent, Contact, MailItem, SmsConversation } from '../proto
 import SectionTile from '../components/SectionTile.vue'
 import { quiet, loadEvents, eventsOn, loadMail, loadChats, loadContacts, ago } from './glance'
 import { ymd } from '../dates'
+import WeatherPlaceDialog from './WeatherPlaceDialog.vue'
+import { forecast, noPlace, weatherError, loadWeather, weatherIcon } from './weather'
 import { CELL, MARGIN, KINDS, loadWidgets, saveWidgets, gridSize, fits, freeSpot, type Widget, type WidgetKind } from './widgets'
 
 const props = defineProps<{ now: Date; area: { w: number; h: number }; editing: boolean }>()
@@ -219,12 +237,18 @@ function add(kind: WidgetKind) {
   const at = freeSpot(kind, list, grid.value.cols, grid.value.rows)
   full.value = !at
   if (at) list.push({ id: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind, ...at })
+  if (at && kind === 'weather') loadWeather()
 }
 function remove(w: Widget) {
   const i = list.findIndex((x) => x.id === w.id)
   if (i >= 0) list.splice(i, 1)
   full.value = false
 }
+
+// ---- weather ----
+const pickingPlace = ref(false)
+const placeText = computed(() => forecast.value?.place.name || (noPlace.value ? 'Pick a place' : weatherError.value ? 'No weather' : 'Updating…'))
+const weekday = (d: string) => new Date(d + 'T12:00:00').toLocaleDateString([], { weekday: 'short' })
 
 // ---- clocks ----
 // the time as the menu bar shows it (the browser's locale: 24 h, or 12 h with AM / PM)
@@ -245,6 +269,7 @@ const people = reactive({ items: [] as Contact[], error: '' })
 const today = computed(() => eventsOn(cal.items, props.now))
 const has = (...k: WidgetKind[]) => list.some((w) => k.includes(w.kind))
 function refresh() {
+  if (has('weather')) loadWeather()
   if (has('mail', 'mail-stack')) loadMail(20).then((m) => { mail.unread = m.unread; mail.items = m.items; mail.error = '' }, (e) => { mail.error = quiet(e, 'Mail') })
   if (has('agenda', 'month')) loadEvents(monthStart.value, 42).then((ev) => { cal.items = ev; cal.error = '' }, (e) => { cal.error = quiet(e, 'The calendar') })
   if (has('chats')) loadChats(20).then((c) => { chats.items = c; chats.error = '' }, (e) => { chats.error = quiet(e, 'Chats') })
@@ -411,5 +436,14 @@ onBeforeUnmount(() => clearInterval(timer))
 .ph-wg__flipdate { grid-column: span 2; text-align: center; }
 /* clock in words */
 .ph-wg__word { height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 8px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
+.ph-wg__weather { position: relative; height: 100%; }
+.ph-wg__wxbody { position: absolute; inset: 26px 0 0; display: flex; flex-direction: row; height: auto; padding: 0; }
+.ph-wg__wxnow { flex: 1.25; display: flex; flex-direction: column; min-width: 0; }
+.ph-wg__wxt { flex: 1; display: flex; align-items: flex-end; gap: 10px; padding-left: 12px; }
+.ph-wg__wxt span { font-size: 44px; font-weight: 300; line-height: 1; } .ph-wg__wxt small { margin-bottom: 4px; font-size: 15px; opacity: 0.75; }
+.ph-wg__wxplace { height: 32px; margin: 6px; border-radius: 4px; border: 1px solid rgba(255, 255, 255, 0.25); color: inherit; font: inherit; font-size: 15px;
+  background: linear-gradient(rgba(64, 65, 68, 0.88), rgba(21, 21, 23, 0.88)); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-wg__wxday { flex: 0.75; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; }
+.ph-wg__wxicon { position: absolute; top: 0; left: 56px; color: #fff; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)); }
 .ph-wg__word b { font-size: 40px; font-weight: 300; line-height: 1.05; } .ph-wg__word span { font-size: 40px; font-weight: 600; line-height: 1.05; }
 </style>

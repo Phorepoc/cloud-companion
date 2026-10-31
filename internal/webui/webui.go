@@ -19,6 +19,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/server"
+	"github.com/phorepoc/cloud-companion/internal/weather"
 )
 
 //go:embed all:dist
@@ -72,6 +73,11 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	if cat != nil {
 		(&catAPI{a: a, st: s.Store, m: cat}).routes(mux)
 	}
+	var vault *connectors.Vault
+	if m != nil {
+		vault = m.V
+	}
+	(&weatherAPI{a: a, st: s.Store, v: vault, w: weather.New()}).routes(mux)
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)

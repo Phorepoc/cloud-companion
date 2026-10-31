@@ -97,6 +97,11 @@ var migrations = []migration{
 			`CREATE TABLE IF NOT EXISTS cat_mirror(source VARCHAR(32) NOT NULL, sha256 VARCHAR(64) NOT NULL, state VARCHAR(16), error TEXT, updated BIGINT, PRIMARY KEY(source, sha256))`,
 		},
 	}},
+	{version: 3, name: "server settings: one value per name (weather source, units, default place)", stmts: map[Dialect][]string{
+		SQLite:   {`CREATE TABLE IF NOT EXISTS server_settings(name TEXT PRIMARY KEY, value TEXT)`},
+		Postgres: {`CREATE TABLE IF NOT EXISTS server_settings(name TEXT PRIMARY KEY, value TEXT)`},
+		MySQL:    {`CREATE TABLE IF NOT EXISTS server_settings(name VARCHAR(100) PRIMARY KEY, value LONGTEXT)`},
+	}},
 }
 
 // SchemaVersion is the newest migration this build knows.
