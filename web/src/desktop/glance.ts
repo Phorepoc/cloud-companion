@@ -7,6 +7,7 @@
 import { apiCall, hubCall } from '../cloud'
 import { addDays, toDate, ymd } from '../dates'
 import type { CalendarEvent, Contact, MailItem, SmsConversation } from '../proto'
+import { pickInboxes, mergeNewest } from './inboxes'
 
 const NOT_SET_UP = /not set up|not configured/i
 export const quiet = (e: Error, what: string) => (NOT_SET_UP.test(e.message) ? `${what} is not set up on this server.` : `Could not load: ${e.message}`)
@@ -24,21 +25,24 @@ export function eventsOn(events: CalendarEvent[], day: Date): CalendarEvent[] {
     .sort((a, b) => (a.allday ? -1 : b.allday ? 1 : toDate(a.start).getTime() - toDate(b.start).getTime()))
 }
 
-/** The inbox's unread count and its newest unread messages (up to `n`). */
-export async function loadUnread(n = 3): Promise<{ unread: number; items: MailItem[] }> {
-  const folders = (await hubCall({ op: 'mail.folders' })).folders || []
-  const inbox = folders.find((f) => f.role === 'inbox')
-  const unread = inbox?.unread || 0
-  const items = inbox && unread ? ((await hubCall({ op: 'mail.list', folder: inbox.id, pos: 0 })).mails || []).filter((m) => m.unread).slice(0, n) : []
-  return { unread, items }
+const inboxes = async () => pickInboxes((await hubCall({ op: 'mail.folders' })).folders || [])
+
+/** The accounts with an inbox, for the mail widgets' setting. */
+export const mailAccounts = async () => (await inboxes()).map((i) => i.account)
+
+/** The unread count and the newest messages, read or not (up to `n`, as the Belle Mail widget lists them), of one account's inbox,
+ *  or of every inbox merged newest first when `account` is ''. */
+export async function loadMail(n = 20, account = ''): Promise<{ unread: number; items: MailItem[] }> {
+  const boxes = (await inboxes()).filter((i) => !account || i.account === account)
+  const lists = await Promise.all(boxes.map(async (b) => ((await hubCall({ op: 'mail.list', folder: b.id, pos: 0 })).mails || []).slice(0, n)))
+  const items = mergeNewest(lists, n)
+  return { unread: boxes.reduce((t, b) => t + b.unread, 0), items }
 }
 
-/** The inbox's unread count and its newest messages, read or not (up to `n`, as the Belle Mail widget lists them). */
-export async function loadMail(n = 20): Promise<{ unread: number; items: MailItem[] }> {
-  const folders = (await hubCall({ op: 'mail.folders' })).folders || []
-  const inbox = folders.find((f) => f.role === 'inbox')
-  const items = inbox ? ((await hubCall({ op: 'mail.list', folder: inbox.id, pos: 0 })).mails || []).slice(0, n) : []
-  return { unread: inbox?.unread || 0, items }
+/** Every inbox's unread count and the newest unread messages (up to `n`), for Events and the menu bar. */
+export async function loadUnread(n = 3): Promise<{ unread: number; items: MailItem[] }> {
+  const all = await loadMail(40)
+  return { unread: all.unread, items: all.items.filter((m) => m.unread).slice(0, n) }
 }
 
 /** Contacts, by name (people first: entries without a name are left out). */

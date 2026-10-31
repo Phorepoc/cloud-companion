@@ -147,7 +147,8 @@ import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, r
 import type { QInput } from 'quasar'
 import type { Rect, Win, WinState } from './types'
 import { useRoute, useRouter } from 'vue-router'
-import { state, hubCall } from '../cloud'
+import { state } from '../cloud'
+import { loadUnread } from './glance'
 import { sections } from '../nav'
 import { brand } from '../brand'
 import SectionTile from '../components/SectionTile.vue'
@@ -383,7 +384,7 @@ function onKeyUp(e: KeyboardEvent) {
 const events = ref(false)
 const unread = ref(0)
 async function checkUnread() {
-  try { unread.value = ((await hubCall({ op: 'mail.folders' })).folders || []).find((f) => f.role === 'inbox')?.unread || 0 } catch (e) { unread.value = 0 }
+  try { unread.value = (await loadUnread(0)).unread } catch (e) { unread.value = 0 }
 }
 watch(launcher, (on) => { if (on) events.value = false })
 

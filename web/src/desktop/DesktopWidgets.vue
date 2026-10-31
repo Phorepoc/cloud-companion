@@ -41,13 +41,14 @@
 
       <!-- mail -->
       <div v-else-if="w.kind === 'mail'" class="ph-wg__panel">
-        <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b>Mail</b>
-          <span v-if="mail.unread" class="ph-wg__count" data-test="widget-mail-count">{{ mail.unread }} unread</span></header>
-        <p v-if="mail.error" class="ph-wg__none">{{ mail.error }}</p>
-        <p v-else-if="!mail.items.length" class="ph-wg__none">No mail.</p>
+        <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b class="ph-wg__acct">{{ w.opt || 'Mail' }}</b>
+          <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the account" title="Pick the account" data-test="widget-mail-account" @pointerdown.stop @click="pickAccount(w)"><q-icon name="sym_o_settings" size="20px" /></button>
+          <span v-if="mailOf(w).unread" class="ph-wg__count" data-test="widget-mail-count">{{ mailOf(w).unread }} unread</span></header>
+        <p v-if="mailOf(w).error" class="ph-wg__none">{{ mailOf(w).error }}</p>
+        <p v-else-if="!mailOf(w).items.length" class="ph-wg__none">No mail.</p>
         <!-- the newest 20, read or not (unread marked), scrolling: as the Belle Mail widget -->
         <div v-else class="ph-wg__list" data-test="widget-mail-list">
-          <button v-for="m in mail.items" :key="m.id" type="button" class="ph-wg__row" :class="{ 'is-unread': m.unread }" :disabled="editing" @click="emit('open', 'mail')">
+          <button v-for="m in mailOf(w).items" :key="m.id" type="button" class="ph-wg__row" :class="{ 'is-unread': m.unread }" :disabled="editing" @click="emit('open', 'mail')">
             <span class="ph-wg__title">{{ m.from || '(no sender)' }}<span class="ph-wg__sec ph-wg__when">{{ mailTime(m.date) }}</span></span>
             <span class="ph-wg__sec ph-wg__line">{{ m.subject || '(no subject)' }}</span>
           </button>
@@ -82,17 +83,18 @@
 
       <!-- latest mail, one at a time (Belle "Latest mail"): ▲ ▼ step through, disabled at the ends -->
       <div v-else-if="w.kind === 'mail-stack'" class="ph-wg__panel ph-wg__stack">
-        <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b>Latest mail</b>
+        <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b class="ph-wg__acct">{{ w.opt || 'Latest mail' }}</b>
+          <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the account" title="Pick the account" @pointerdown.stop @click="pickAccount(w)"><q-icon name="sym_o_settings" size="20px" /></button>
           <span class="ph-wg__nav">
-            <button type="button" class="ph-wg__arrow" aria-label="Newer mail" :disabled="editing || stackAt === 0" @click="stackAt--"><q-icon name="sym_o_keyboard_arrow_up" size="22px" /></button>
-            <button type="button" class="ph-wg__arrow" aria-label="Older mail" data-test="widget-stack-older" :disabled="editing || stackAt >= mail.items.length - 1" @click="stackAt++"><q-icon name="sym_o_keyboard_arrow_down" size="22px" /></button>
+            <button type="button" class="ph-wg__arrow" aria-label="Newer mail" :disabled="editing || (stackAt[w.id] || 0) === 0" @click="stackAt[w.id] = (stackAt[w.id] || 0) - 1"><q-icon name="sym_o_keyboard_arrow_up" size="22px" /></button>
+            <button type="button" class="ph-wg__arrow" aria-label="Older mail" data-test="widget-stack-older" :disabled="editing || (stackAt[w.id] || 0) >= mailOf(w).items.length - 1" @click="stackAt[w.id] = (stackAt[w.id] || 0) + 1"><q-icon name="sym_o_keyboard_arrow_down" size="22px" /></button>
           </span></header>
-        <p v-if="mail.error" class="ph-wg__none">{{ mail.error }}</p>
-        <p v-else-if="!mail.items.length" class="ph-wg__none">No mail.</p>
+        <p v-if="mailOf(w).error" class="ph-wg__none">{{ mailOf(w).error }}</p>
+        <p v-else-if="!mailOf(w).items.length" class="ph-wg__none">No mail.</p>
         <button v-else type="button" class="ph-wg__row ph-wg__one" :disabled="editing" data-test="widget-stack-mail" @click="emit('open', 'mail')">
-          <span class="ph-wg__title">{{ stackMail?.from || '(no sender)' }}<span class="ph-wg__sec ph-wg__when">{{ stackAt + 1 }} / {{ mail.items.length }}</span></span>
-          <span class="ph-wg__line">{{ stackMail?.subject || '(no subject)' }}</span>
-          <span class="ph-wg__sec ph-wg__clamp">{{ stackMail?.preview }}</span>
+          <span class="ph-wg__title">{{ stackOf(w)?.from || '(no sender)' }}<span class="ph-wg__sec ph-wg__when">{{ (stackAt[w.id] || 0) + 1 }} / {{ mailOf(w).items.length }}</span></span>
+          <span class="ph-wg__line">{{ stackOf(w)?.subject || '(no subject)' }}</span>
+          <span class="ph-wg__sec ph-wg__clamp">{{ stackOf(w)?.preview }}</span>
         </button>
       </div>
 
@@ -266,10 +268,14 @@
     <!-- the setting of a contact or web page widget, asked when it is added -->
     <q-dialog :model-value="!!setting" @update:model-value="(v) => { if (!v) setting = null }">
       <q-card class="ph-wg__setcard" data-test="widget-setting">
-        <q-card-section><b>{{ setting?.kind === 'web' ? 'Which page?' : 'Which contact?' }}</b></q-card-section>
+        <q-card-section><b>{{ setting?.kind === 'web' ? 'Which page?' : setting?.kind === 'contact' ? 'Which contact?' : 'Which account?' }}</b></q-card-section>
         <q-card-section v-if="setting?.kind === 'web'">
           <q-input v-model="settingText" dense outlined autofocus label="Address" placeholder="https://example.org" data-test="widget-setting-url" @keyup.enter="saveSetting" />
         </q-card-section>
+        <q-list v-else-if="setting?.kind !== 'contact'" dense class="ph-wg__setlist">
+          <q-item v-for="a in ['', ...accounts]" :key="a" clickable data-test="widget-setting-account" :active="(setting?.opt || '') === a" @click="setting!.opt = a || undefined; setting = null; refresh()">
+            <q-item-section>{{ a || 'Every inbox' }}</q-item-section></q-item>
+        </q-list>
         <q-list v-else dense class="ph-wg__setlist">
           <q-item v-for="c in people.items" :key="c.href || c.name" clickable data-test="widget-setting-contact" @click="settingText = c.name; saveSetting()">
             <q-item-section>{{ c.name }}</q-item-section></q-item>
@@ -292,7 +298,7 @@ import { sections } from '../nav'
 import { timeLabel, toDate, dayLabel } from '../dates'
 import type { CalendarEvent, Contact, MailItem, SmsConversation } from '../proto'
 import SectionTile from '../components/SectionTile.vue'
-import { quiet, loadEvents, eventsOn, loadMail, loadChats, loadContacts, ago } from './glance'
+import { quiet, loadEvents, eventsOn, loadMail, mailAccounts, loadChats, loadContacts, ago } from './glance'
 import { ymd } from '../dates'
 import WeatherPlaceDialog from './WeatherPlaceDialog.vue'
 import { forecast, noPlace, weatherError, loadWeather, weatherIcon } from './weather'
@@ -411,7 +417,9 @@ const GEARS = [[83, 39, 26, 18], [39, 83, 24, 16], [63, 63, 22, 16], [87, 82, 14
 const DIAL = { outer: squircleRect(126, 126, 2.9), inner: squircleRect(118, 118, 2.9, 4, 4), win: squircleRect(26, 26, 2.8, 79, 50) }
 
 // ---- data: loaded for the kinds on the desktop, refreshed every two minutes ----
-const mail = reactive({ items: [] as MailItem[], unread: 0, error: '' })
+/** mail per account ('' = every inbox), for the mail widgets showing it */
+const mailBy = reactive<Record<string, { items: MailItem[]; unread: number; error: string }>>({})
+const mailOf = (w: Widget) => mailBy[w.opt || ''] || (mailBy[w.opt || ''] = { items: [], unread: 0, error: '' })
 const cal = reactive({ items: [] as CalendarEvent[], error: '' })
 const chats = reactive({ items: [] as SmsConversation[], error: '' })
 const people = reactive({ items: [] as Contact[], error: '' })
@@ -419,7 +427,10 @@ const today = computed(() => eventsOn(cal.items, props.now))
 const has = (...k: WidgetKind[]) => list.some((w) => k.includes(w.kind))
 function refresh() {
   if (has('weather')) loadWeather()
-  if (has('mail', 'mail-stack')) loadMail(20).then((m) => { mail.unread = m.unread; mail.items = m.items; mail.error = '' }, (e) => { mail.error = quiet(e, 'Mail') })
+  for (const acct of new Set(list.filter((w) => w.kind === 'mail' || w.kind === 'mail-stack').map((w) => w.opt || ''))) {
+    const m = mailBy[acct] || (mailBy[acct] = { items: [], unread: 0, error: '' })
+    loadMail(20, acct).then((r) => { m.unread = r.unread; m.items = r.items; m.error = '' }, (e) => { m.error = quiet(e, 'Mail') })
+  }
   if (has('agenda', 'month')) loadEvents(monthStart.value, 42).then((ev) => { cal.items = ev; cal.error = '' }, (e) => { cal.error = quiet(e, 'The calendar') })
   if (has('chats')) loadChats(20).then((c) => { chats.items = c; chats.error = '' }, (e) => { chats.error = quiet(e, 'Chats') })
   if (has('today') && !has('agenda', 'month')) loadEvents(props.now, 1).then((ev) => { cal.items = ev; cal.error = '' }, (e) => { cal.error = quiet(e, 'The calendar') })
@@ -436,6 +447,13 @@ function mailTime(date: string) {
 
 // today: the next entry still to come (or the last of the day)
 const nextToday = computed(() => today.value.find((e) => e.allday || toDate(e.end || e.start) >= props.now) || null)
+
+// mail widgets: one account's inbox, or every inbox (Plasma's Mail widget settings)
+const accounts = ref<string[]>([])
+async function pickAccount(w: Widget) {
+  setting.value = w
+  try { accounts.value = await mailAccounts() } catch { accounts.value = [] }
+}
 
 // contact and web page widgets: their setting
 const setting = ref<Widget | null>(null), settingText = ref('')
@@ -456,9 +474,8 @@ const devices = computed(() => (state.deviceList || []).filter((d) => !d.revoked
   .sort((a, b) => Number(b.online) - Number(a.online) || b.seen - a.seen))
 
 // latest mail, one at a time
-const stackAt = ref(0)
-const stackMail = computed(() => mail.items[Math.min(stackAt.value, mail.items.length - 1)])
-watch(() => mail.items.length, (n) => { if (stackAt.value >= n) stackAt.value = Math.max(0, n - 1) })
+const stackAt = reactive<Record<string, number>>({})
+const stackOf = (w: Widget) => { const items = mailOf(w).items; return items[Math.min(stackAt[w.id] || 0, items.length - 1)] }
 
 // month: six weeks from the Monday on or before the 1st
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
@@ -594,6 +611,7 @@ onBeforeUnmount(() => { clearInterval(timer); clearInterval(ticking) })
 .ph-wg__devdot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); }
 .ph-wg__devdot.is-on { background: #8FD65A; }
 .ph-wg__setcard { min-width: 340px; }
+.ph-wg__acct { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ph-wg__setlist { max-height: 50vh; overflow-y: auto; }
 /* edit chrome, as on the phone: accent outline and a red ✕ squircle at the top right */
 .ph-wg__outline { position: absolute; inset: -4px; border: 2px solid #4591FF; border-radius: 14px; pointer-events: none; }
