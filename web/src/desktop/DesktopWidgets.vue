@@ -15,12 +15,27 @@
         <span class="ph-wg__sec">{{ dateText }}</span>
       </div>
       <div v-else-if="w.kind === 'clock-analog'" class="ph-wg__analog" role="img" :aria-label="'Clock, ' + clock.text">
-        <svg viewBox="0 0 100 100" aria-hidden="true">
-          <circle cx="50" cy="50" r="46" class="ph-wg__face" />
-          <line v-for="i in 12" :key="i" x1="50" y1="9" x2="50" :y2="i % 3 ? 13 : 16" class="ph-wg__tick" :transform="`rotate(${i * 30} 50 50)`" />
-          <line x1="50" y1="50" x2="50" y2="28" class="ph-wg__hand ph-wg__hand--h" :transform="`rotate(${hourDeg} 50 50)`" />
-          <line x1="50" y1="50" x2="50" y2="17" class="ph-wg__hand" :transform="`rotate(${minDeg} 50 50)`" />
-          <circle cx="50" cy="50" r="3" fill="#4591FF" />
+        <!-- the Belle analog dial, as Nokia drew it (a 126 grid): a squircle face in warm charcoal, white hands, the blue second hand -->
+        <svg viewBox="0 0 126 126" aria-hidden="true">
+          <defs>
+            <linearGradient id="ph-wg-bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A5A55" /><stop offset=".5" stop-color="#3E3E39" /><stop offset="1" stop-color="#34342F" /></linearGradient>
+            <linearGradient id="ph-wg-face" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#41413C" /><stop offset=".22" stop-color="#373732" /><stop offset=".59" stop-color="#32322D" /><stop offset="1" stop-color="#282823" /></linearGradient>
+            <linearGradient id="ph-wg-win" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2A2A26" /><stop offset="1" stop-color="#3C3C37" /></linearGradient>
+          </defs>
+          <path :d="DIAL.outer" fill="url(#ph-wg-bezel)" stroke="#1C1C19" stroke-width="1" />
+          <path :d="DIAL.inner" fill="url(#ph-wg-face)" />
+          <path :d="DIAL.inner" fill="none" stroke="#fff" stroke-opacity=".13" stroke-width=".8" />
+          <line v-for="a in [0, 90, 180, 270]" :key="a" x1="63" y1="10.5" x2="63" y2="15.3" stroke="#fff" stroke-width="2.7" stroke-linecap="round" :transform="`rotate(${a} 63 63)`" />
+          <line v-for="a in [30, 60, 120, 150, 210, 240, 300, 330]" :key="a" x1="63" y1="11.5" x2="63" y2="15.5" stroke="#D6D6D6" stroke-opacity=".4" stroke-width="1.6" stroke-linecap="round" :transform="`rotate(${a} 63 63)`" />
+          <path :d="DIAL.win" fill="url(#ph-wg-win)" stroke="#000" stroke-opacity=".35" stroke-width=".8" />
+          <text x="92" y="67.6" text-anchor="middle" font-size="12.5" fill="#D6D6D6" class="ph-wg__dialdate">{{ tick.getDate() }}</text>
+          <g class="ph-wg__hands">
+            <path class="ph-wg__hand--h" d="M60.5 68 L60.6 25.5 Q63 24.2 65.4 25.5 L65.5 68 Z" fill="#fff" :transform="`rotate(${hourDeg} 63 63)`" />
+            <path class="ph-wg__hand--m" d="M61.7 68 L61.75 9.4 Q63 8.6 64.25 9.4 L64.3 68 Z" fill="#fff" :transform="`rotate(${minDeg} 63 63)`" />
+            <circle cx="63" cy="63" r="5" fill="#fff" />
+          </g>
+          <line class="ph-wg__hand--s" x1="63" y1="84" x2="63" y2="9" stroke="#4791DC" stroke-width="1.1" :transform="`rotate(${secDeg} 63 63)`" />
+          <circle cx="63" cy="63" r="2.2" fill="#4791DC" /><circle cx="63" cy="63" r="1" fill="#fff" />
         </svg>
       </div>
 
@@ -258,8 +273,27 @@ const clock = computed(() => {
   return { hour: part('hour'), minute: part('minute'), period: part('dayPeriod'), text: parts.map((p) => p.value).join('') }
 })
 const dateText = computed(() => dayLabel(props.now))
-const minDeg = computed(() => props.now.getMinutes() * 6)
-const hourDeg = computed(() => (props.now.getHours() % 12) * 30 + props.now.getMinutes() / 2)
+// the analog clock keeps its own second (the desktop's `now` moves every 15 s)
+const tick = ref(new Date())
+let ticking: ReturnType<typeof setInterval> | undefined
+watch(() => list.some((w) => w.kind === 'clock-analog'), (on) => {
+  clearInterval(ticking); ticking = undefined
+  if (on) { tick.value = new Date(); ticking = setInterval(() => { tick.value = new Date() }, 1000) }
+}, { immediate: true })
+const secDeg = computed(() => tick.value.getSeconds() * 6)
+const minDeg = computed(() => tick.value.getMinutes() * 6 + tick.value.getSeconds() / 10)
+const hourDeg = computed(() => (tick.value.getHours() % 12) * 30 + tick.value.getMinutes() / 2 + tick.value.getSeconds() / 120)
+/** A squircle |x|^n + |y|^n = 1 stretched to a w × h box at (x, y) (etesian-design squircleRectPath). */
+function squircleRect(w: number, h: number, n: number, x = 0, y = 0): string {
+  const pts: string[] = []
+  for (let i = 0; i < 96; i++) {
+    const t = (i / 96) * Math.PI * 2, c = Math.cos(t), s = Math.sin(t)
+    pts.push(`${(x + w / 2 + (w / 2) * Math.sign(c) * Math.abs(c) ** (2 / n)).toFixed(2)} ${(y + h / 2 + (h / 2) * Math.sign(s) * Math.abs(s) ** (2 / n)).toFixed(2)}`)
+  }
+  return 'M' + pts.join('L') + 'Z'
+}
+/** the 701's dial: n 2.9 face and bezel, the date window at 3 o'clock */
+const DIAL = { outer: squircleRect(126, 126, 2.9), inner: squircleRect(118, 118, 2.9, 4, 4), win: squircleRect(26, 26, 2.8, 79, 50) }
 
 // ---- data: loaded for the kinds on the desktop, refreshed every two minutes ----
 const mail = reactive({ items: [] as MailItem[], unread: 0, error: '' })
@@ -329,7 +363,7 @@ let timer: ReturnType<typeof setInterval> | undefined
 // after a dropped connection comes back, catch up
 watch(() => state.status, (s, old) => { if (s === 'online' && old !== 'online') refresh() })
 onMounted(() => { refresh(); timer = setInterval(refresh, 120000) })
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => { clearInterval(timer); clearInterval(ticking) })
 </script>
 
 <style scoped>
@@ -372,10 +406,8 @@ onBeforeUnmount(() => clearInterval(timer))
 /* analog: the Belle dial on its own */
 .ph-wg__analog { height: 100%; display: grid; place-items: center; }
 .ph-wg__analog svg { width: 100%; height: 100%; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)); }
-.ph-wg__face { fill: #1E1E21; stroke: rgba(255, 255, 255, 0.25); stroke-width: 1.5; }
-.ph-wg__tick { stroke: rgba(255, 255, 255, 0.8); stroke-width: 2; stroke-linecap: round; }
-.ph-wg__hand { stroke: #fff; stroke-width: 3; stroke-linecap: round; }
-.ph-wg__hand--h { stroke-width: 4.5; }
+.ph-wg__hands { filter: drop-shadow(0 1.2px 0.9px rgba(0, 0, 0, 0.55)); }
+.ph-wg__dialdate { font-family: var(--ph-font); }
 /* edit chrome, as on the phone: accent outline and a red ✕ squircle at the top right */
 .ph-wg__outline { position: absolute; inset: -4px; border: 2px solid #4591FF; border-radius: 14px; pointer-events: none; }
 .ph-wg__x { position: absolute; top: -14px; right: -14px; padding: 0; border: 0; background: none; cursor: pointer; }
