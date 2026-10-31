@@ -85,6 +85,30 @@ await page.keyboard.press('Control+Alt+ArrowUp')
 r = await box('[data-test=win-mail]')
 assert(r.width > 1300, 'Mail is maximised')
 
+step('snap layouts (as the Etesian desktop and Plasma): Ctrl+Alt+Z, a layout number, a zone number; or drag to the top edge and drop on a zone')
+await page.keyboard.press('Control+Alt+z')
+await page.waitForSelector('[data-test=layout-picker]')
+assert.equal(await page.locator('.ph-lpick__item').count(), 6, 'six layouts')
+await page.keyboard.press('2') // three columns
+await page.keyboard.press('3') // the right one
+await page.waitForSelector('[data-test=layout-picker]', { state: 'detached' })
+r = await box('[data-test=win-mail]')
+const third = (1440 - 72) / 3 // the desktop area is right of the dock
+assert(Math.abs(r.width - third) < 30 && r.x > 2 * third - 10, `Mail fills the right third (${JSON.stringify(r)})`)
+const bar2 = await box('[data-test=win-mail] header')
+await page.mouse.move(bar2.x + 60, bar2.y + 20)
+await page.mouse.down()
+await page.mouse.move(720, 34, { steps: 12 })
+await page.waitForSelector('[data-test=layout-picker]')
+const lz = await box('[data-test=layout-5-1]') // main + stack: the main half
+await page.mouse.move(lz.x + lz.width / 2, lz.y + lz.height / 2, { steps: 8 })
+assert(await shown('.ph-desk__zone'), 'the zone under the pointer is shown on the desktop')
+await page.screenshot({ path: `${OUT}/desktop-snap-picker.png` })
+await page.mouse.up()
+r = await box('[data-test=win-mail]')
+assert(r.x < 120 && Math.abs(r.width - (1440 - 72) / 2) < 30 && r.height > 780, `Mail fills the main half (${JSON.stringify(r)})`)
+await page.keyboard.press('Control+Alt+ArrowUp')
+
 step('the Overview (dock button / Super): Events, the open windows and the sections; typing searches; Enter opens')
 await page.click('[data-test=dock-launcher]')
 await page.waitForSelector('[data-test=overview]')

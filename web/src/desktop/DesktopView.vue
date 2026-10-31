@@ -65,7 +65,8 @@
                      @focus="focus(w); events = false" @move="(p) => move(w, p)" @resize="(r) => resize(w, r)" @drag-zone="dragZone" @drop="(p) => drop(w, p)"
                      @busy="(b) => (busy = b)" @minimise="minimise(w)" @maximise="toggleMax(w)" @close="close(w)" />
       <!-- where a dragged window will snap -->
-      <div v-if="zone" class="ph-desk__zone" :style="zoneStyle" aria-hidden="true" />
+      <div v-if="zone || pickHot" class="ph-desk__zone" :style="zoneStyle" aria-hidden="true" />
+      <LayoutPicker v-if="picker" :layout="picker.layout" :hot="pickHot" :drag="picker.drag" @pick="(l, z) => snapZone(focusedWin, l, z)" />
 
       <!-- quick switcher: hold Super (or Ctrl+Alt), Tab steps through the windows, most recent first; letting go switches -->
       <div v-if="switcher" class="ph-switcher" role="listbox" aria-label="Windows" data-test="switcher">
@@ -146,6 +147,8 @@
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type Component } from 'vue'
 import type { QInput } from 'quasar'
 import type { Rect, Win, WinState } from './types'
+import LayoutPicker from './LayoutPicker.vue'
+import { LAYOUTS, zoneRect } from './snaplayouts'
 import { useRoute, useRouter } from 'vue-router'
 import { state } from '../cloud'
 import { loadUnread } from './glance'
@@ -207,6 +210,7 @@ function measure() {
 /** Where a window is drawn: its floating rectangle kept on the desktop, or the zone it is snapped to. */
 function rectOf(w: Win): Rect {
   const half = (area.w - 3 * GAP) / 2
+  if (w.state === 'zone') { const r = zoneRect(w.lay ?? 0, w.zi ?? 0, area.w, area.h, GAP); if (r) return r }
   if (w.state === 'max') return { x: GAP, y: GAP, w: area.w - 2 * GAP, h: area.h - 2 * GAP }
   if (w.state === 'left') return { x: GAP, y: GAP, w: half, h: area.h - 2 * GAP }
   if (w.state === 'right') return { x: 2 * GAP + half, y: GAP, w: half, h: area.h - 2 * GAP }
@@ -267,6 +271,15 @@ function focusTop() {
 
 function toggleMax(w: Win | null) { if (w) w.state = w.state === 'max' ? 'float' : 'max' }
 function snap(w: Win | null, s: WinState) { if (w) w.state = s }
+/** Snap layouts: the picker (dragged to the top edge, or Super+Z / Ctrl+Alt+Z) and the zone under the pointer while dragging. */
+const picker = ref<{ layout: number; drag: boolean } | null>(null)
+const pickHot = ref<[number, number] | null>(null)
+function snapZone(w: Win | null, layout: number, zi: number) {
+  picker.value = null; pickHot.value = null
+  if (!w) return
+  w.state = 'zone'; w.lay = layout; w.zi = zi
+  focus(w)
+}
 
 /** Where a dragged window was before the drag: dropped on an edge it snaps, and floats back there later. */
 const dragFrom = new Map<string, { x: number; y: number } | null>()
@@ -284,8 +297,22 @@ function zoneAt(px: number, py: number): WinState | null {
   if (py <= area.top + EDGE) return 'max'
   return null
 }
-function dragZone({ px, py }: { px: number; py: number }) { zone.value = zoneAt(px, py) }
+// dragging a window to the top edge drops the snap-layout picker; it stays while the pointer is over it, and releasing over a zone snaps
+const PICK_EDGE = 40
+function dragZone({ px, py }: { px: number; py: number }) {
+  if (py <= area.top + PICK_EDGE && !picker.value) picker.value = { layout: -1, drag: true }
+  if (picker.value?.drag) {
+    const el = document.elementFromPoint(px, py)?.closest<HTMLElement>('[data-lz]')
+    const over = !!document.elementFromPoint(px, py)?.closest('[data-test=layout-picker]')
+    pickHot.value = el ? (el.dataset.lz!.split(':').map(Number) as [number, number]) : null
+    if (!over && py > area.top + PICK_EDGE) picker.value = null // dragged down off the picker: keep floating
+  }
+  zone.value = pickHot.value ? null : zoneAt(px, py)
+}
 function drop(w: Win, { px, py }: { px: number; py: number }) {
+  const hot = pickHot.value
+  picker.value = null; pickHot.value = null
+  if (hot) { dragFrom.delete(w.id); zone.value = null; snapZone(w, hot[0], hot[1]); return }
   const z = zoneAt(px, py)
   const from = dragFrom.get(w.id)
   dragFrom.delete(w.id)
@@ -295,7 +322,8 @@ function drop(w: Win, { px, py }: { px: number; py: number }) {
   w.state = z
 }
 const zoneStyle = computed(() => {
-  const r = rectOf({ id: '', x: 0, y: 0, w: 0, h: 0, z: 0, min: false, state: zone.value ?? 'max' })
+  const h = pickHot.value
+  const r = rectOf({ id: '', x: 0, y: 0, w: 0, h: 0, z: 0, min: false, state: h ? 'zone' : zone.value ?? 'max', lay: h?.[0], zi: h?.[1] })
   return { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' }
 })
 
@@ -354,6 +382,20 @@ function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Meta' || e.key === 'OS') { superAlone = true; return }
   superAlone = false
   if (e.key === 'Escape' && switcher.value) { e.preventDefault(); endSwitcher(false); return }
+  if (picker.value && !picker.value.drag) {
+    // Super+Z: a digit picks the layout, the next one its zone
+    if (e.key === 'Escape') { e.preventDefault(); picker.value = null; return }
+    const n = Number(e.key) - 1
+    if (Number.isInteger(n) && n >= 0) {
+      e.preventDefault()
+      if (picker.value.layout < 0) { if (n < LAYOUTS.length) picker.value.layout = n }
+      else if (n < LAYOUTS[picker.value.layout].zones.length) snapZone(focusedWin.value, picker.value.layout, n)
+      return
+    }
+  }
+  if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || (e.ctrlKey && e.altKey)) && focusedWin.value) {
+    e.preventDefault(); picker.value = picker.value ? null : { layout: -1, drag: false }; return
+  }
   if (e.key === 'Tab' && (e.metaKey || (e.ctrlKey && e.altKey))) {
     e.preventDefault()
     if (wins.length) { launcher.value = false; overview.value = false; stepSwitcher(e.shiftKey) }
