@@ -4,9 +4,9 @@
      the Etesian desktop design: a global menu bar at the top (the focused window's name and its menus on the left, the connection and
      the clock on the right), a light floating dock on the left (launcher, then the sections, a bar marking the open ones), and
      overlapping windows that snap to halves or fill the screen (by dragging to an edge, or Super / Ctrl+Alt with the arrow keys).
-     Super alone, or the dock's first button, opens the Overview, the main menu (Etesian Desktop v1, kept by v2): Events on the left,
-     the open windows in the middle, the sections on the right; just type to search. Super+Space (or Ctrl+Alt+Space) opens the
-     spotlight, a compact search added by Desktop v2: type to find a section, Enter opens it.
+     Super alone, or the dock's first button, opens the Overview, the main menu: Events on the left,
+     the open windows in the middle, the sections on the right; just type to search. Super+Space (or Ctrl+Alt+Space) opens
+     Search, a compact search: type to find a section, Enter opens it.
      The window arrangement and the layout choice are kept on this device (localStorage), like the theme. -->
 <template>
   <div class="ph-desk" :class="['ph-desk--' + dock.pos, { 'is-autohide': dock.hide, 'is-dockshown': dockPeek }]" :style="{ '--ph-dock-icon': dock.size + 'px' }" data-test="desktop">
@@ -120,7 +120,7 @@
         </section>
       </div>
 
-      <!-- spotlight (Super+Space): a compact search, added by Desktop v2 next to the Overview -->
+      <!-- Search (Super+Space): a compact search next to the Overview -->
       <div v-if="launcher" class="ph-launcher-scrim" @pointerdown.self="launcher = false">
         <div class="ph-launcher" role="dialog" aria-label="Search" data-test="launcher">
           <q-input ref="searchEl" v-model="query" dark borderless dense placeholder="Type to search" aria-label="Search sections"
@@ -407,7 +407,7 @@ function dockClick(id: string) {
   else open(id)
 }
 
-// ---- the Overview (Super) and the spotlight (Super+Space) share the search ----
+// ---- the Overview (Super) and Search (Super+Space) share the search ----
 const launcher = ref(false)
 const overview = ref(false)
 const query = ref('')
@@ -489,7 +489,7 @@ function endSwitcher(commit: boolean) {
   if (commit && sw) open(sw.list[sw.i])
 }
 
-// ---- keyboard: Super (or Ctrl+Alt) with the arrows snaps; Super alone opens the Overview, Super+Space the spotlight; Escape closes ----
+// ---- keyboard: Super (or Ctrl+Alt) with the arrows snaps; Super alone opens the Overview, Super+Space Search; Escape closes ----
 let superAlone = false
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === 'Meta' || e.key === 'OS') { superAlone = true; return }
@@ -699,7 +699,7 @@ onBeforeUnmount(() => {
 .ph-ov__apps { padding: var(--ph-s4); border-left: 1px solid rgba(255, 255, 255, 0.12); overflow-y: auto; }
 .ph-ov__hint { margin: var(--ph-s2) 4px 0; color: var(--ph-chrome-fg-muted); font-size: var(--hd-font-size-small); }
 .ph-ov__grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--ph-s1); margin-top: var(--ph-s3); }
-/* spotlight */
+/* Search */
 .ph-launcher-scrim { position: absolute; inset: 0; z-index: 9500; display: grid; place-items: start center; padding-top: 10vh; background: rgba(0, 0, 0, 0.45); }
 .ph-launcher {
   width: min(640px, 90%); padding: var(--ph-s4); border-radius: var(--ph-r-card);
