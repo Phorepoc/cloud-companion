@@ -1,4 +1,4 @@
-/* Vendored from the Etesian Design Language (etesian-design quasar/etesian-quasar.css, commit 790fd52), MIT licence: see ./LICENSE.
+/* Vendored from the Etesian Design Language (etesian-design quasar/etesian-quasar.css, commit 790fd52; the text field and button shapes from 9ee8dee, v0.3.2), MIT licence: see ./LICENSE.
    Do not edit here: change it in the design repo and copy it again. */
 /*
  * Etesian Design Language theme for Quasar 2 (all built-in components).
@@ -156,6 +156,22 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 /* coloured buttons: same top-lit gradient over the bg-* colour */
 .hd-quasar .q-btn--standard[class*="bg-"], .hd-quasar .q-btn--unelevated[class*="bg-"], .hd-quasar .q-btn--push[class*="bg-"] { background-image: linear-gradient(rgba(255,255,255,.12), transparent 50%, rgba(0,0,0,.12)) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.35), inset 0 0 0 1px rgba(0,0,0,.18); }
 .hd-quasar .q-btn:not(.q-btn--round):not(.q-btn--rounded):not(.q-btn--fab):not(.q-btn--fab-mini) { border-radius: calc(var(--hd-size-button) * .21); }
+/* N9: a button's ends are a squircle as tall as the button, cut in half and pulled apart (blanco button background, n = 2.8).
+   The button itself is the 1px edge (its colour, darkened), ::before the lit face inset by 1px; both masked to that shape. */
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq) {
+  --h: var(--hd-sqf-h, var(--hd-size-button)); border: 0 !important; border-radius: 0 !important; box-shadow: none !important; isolation: isolate;
+  -webkit-mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat; mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat;
+}
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):not([class*="bg-"]) { background: var(--hd-btn-rim); }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)[class*="bg-"] { background-image: linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)) !important; }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)::before {
+  content: ''; position: absolute; inset: 1px; z-index: -1; border: 0 !important; border-radius: 0; box-shadow: none !important; --h: calc(var(--hd-sqf-h, var(--hd-size-button)) - 2px);
+  -webkit-mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat; mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat;
+  background-color: inherit; background-image: var(--hd-lit-fill);
+}
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)[class*="bg-"]::before { background-image: linear-gradient(rgba(255,255,255,.12), transparent 50%, rgba(0,0,0,.12)); }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):not([class*="bg-"]):active:not(.disabled)::before { background-image: linear-gradient(var(--hd-btn-bot), var(--hd-btn-base)); }
+.hd-quasar .q-btn--dense { --hd-sqf-h: 32px; }
 .hd-quasar .q-btn--push { border-bottom-width: 1px; }
 .hd-quasar .q-btn--push::before { border-bottom: 0 !important; }
 .hd-quasar .q-btn:hover:not(.disabled) { filter: brightness(.96); }
@@ -329,19 +345,30 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-field__marginal { color: var(--hd-c-fg-secondary); height: var(--hd-size-field); }
 .hd-quasar .q-field__bottom { color: var(--hd-c-fg-secondary); font-size: var(--hd-font-size-xsmall); padding-top: 4px; }
 .hd-quasar .q-field--error .q-field__bottom, .hd-quasar .q-field--error .q-field__label { color: var(--hd-color-palette-warning); }
+/* outlined and filled fields take the N9 text field's shape: squircle-half ends (.hd-sqf in base.css, repeated here
+   because Quasar owns these elements' ::before (edge) and ::after (focus edge)) */
 .hd-quasar .q-field--outlined .q-field__control, .hd-quasar .q-field--filled .q-field__control {
-  background: var(--hd-c-surface); border-radius: var(--hd-radius-control); min-height: var(--hd-size-field); padding: 0 var(--hd-space-double);
-  box-shadow: inset 0 1px 2px rgba(0,0,0,.12);
+  --hd-sqf-h: 56px; --hd-sqf-edge: var(--hd-c-button-border); /* Quasar's field height (40 dense) */ --hd-sqf-edge-w: 1px;
+  background: none; border-radius: 0; min-height: var(--hd-size-field); padding: 0 calc(var(--hd-size-field) / 3); isolation: isolate;
 }
-.hd-quasar .q-field--outlined .q-field__control::before, .hd-quasar .q-field--filled .q-field__control::before { border: 1px solid var(--hd-c-button-border); border-radius: var(--hd-radius-control); background: transparent; opacity: 1; }
-.hd-quasar .q-field--outlined:hover .q-field__control::before { border-color: var(--hd-c-fg-secondary); }
-.hd-quasar .q-field--outlined .q-field__control::after, .hd-quasar .q-field--filled .q-field__control::after { border-radius: var(--hd-radius-control); border-width: 1px; height: auto; background: none; }
-.hd-quasar .q-field--outlined.q-field--focused .q-field__control::after, .hd-quasar .q-field--filled.q-field--focused .q-field__control::after { border: 2px solid var(--hd-c-focus); transform: none; }
-.hd-quasar .q-field--error.q-field--outlined .q-field__control::after { border-color: var(--hd-color-palette-warning); }
+.hd-quasar .q-field--outlined .q-field__control::before, .hd-quasar .q-field--filled .q-field__control::before, .hd-quasar .q-field--outlined .q-field__control::after, .hd-quasar .q-field--filled .q-field__control::after { --h: var(--hd-sqf-h);
+  -webkit-mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat,
+    var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat,
+    linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat;
+  mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat,
+    var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat,
+    linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat;
+  border: 0; border-radius: 0; opacity: 1; transform: none; transition: background var(--hd-motion-duration-instant); }
+.hd-quasar .q-field--outlined .q-field__control::before, .hd-quasar .q-field--filled .q-field__control::before { position: absolute; inset: 0; z-index: -1; background: var(--hd-sqf-edge); }
+.hd-quasar .q-field--outlined .q-field__control::after, .hd-quasar .q-field--filled .q-field__control::after { position: absolute; inset: var(--hd-sqf-edge-w); height: auto; z-index: -1; --h: calc(var(--hd-sqf-h) - 2 * var(--hd-sqf-edge-w));
+  background: linear-gradient(rgba(0,0,0,.06), transparent 4px), var(--hd-c-surface); }
+.hd-quasar .q-field--outlined:hover .q-field__control { --hd-sqf-edge: var(--hd-c-fg-secondary); }
+.hd-quasar .q-field--outlined.q-field--focused .q-field__control, .hd-quasar .q-field--filled.q-field--focused .q-field__control { --hd-sqf-edge: var(--hd-c-focus); --hd-sqf-edge-w: 2px; }
+.hd-quasar .q-field--error.q-field--outlined .q-field__control { --hd-sqf-edge: var(--hd-color-palette-warning); }
+.hd-quasar .q-field--dense .q-field__control { --hd-sqf-h: 40px; }
 .hd-quasar .q-field--standard .q-field__control::before { border-bottom-color: var(--hd-c-button-border); }
 .hd-quasar .q-field--standard .q-field__control::after { background: var(--hd-c-focus); height: 2px; }
 .hd-quasar .q-field--borderless .q-field__control { background: transparent; box-shadow: none; }
-.hd-quasar .q-field--rounded .q-field__control, .hd-quasar .q-field--rounded .q-field__control::before { border-radius: var(--hd-radius-pill); }
 .hd-quasar .q-field--dense .q-field__control, .hd-quasar .q-field--dense .q-field__marginal { min-height: 32px; height: auto; }
 .hd-quasar .q-field__native::selection { background: var(--hd-color-palette-select); color: #000; }
 .hd-quasar .q-field--disabled { opacity: var(--hd-opacity-disabled); }
