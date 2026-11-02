@@ -164,6 +164,7 @@ async function forgetIt() {
 <style scoped>
 .ph-section { margin-top: var(--ph-s4); display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-section p { margin: 0; }
+.ph-section h3 { margin-top: var(--ph-s3); }
 .ph-h3 { font-size: var(--ph-text-h3, 1.1rem); margin: var(--ph-s2) 0 0; }
 .ph-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
 .ph-keys li { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); padding: var(--ph-s3); border: 1px solid var(--ph-border); border-radius: var(--ph-r-control); }

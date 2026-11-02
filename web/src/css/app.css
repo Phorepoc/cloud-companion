@@ -50,6 +50,8 @@ b, strong { font-weight: var(--hd-font-weight-bold); }
 .q-btn { min-height: var(--ph-tap); letter-spacing: 0; text-transform: none; }
 .q-btn--round { min-width: var(--ph-tap); min-height: var(--ph-tap); }
 .q-btn.bg-primary { color: var(--ph-on-accent) !important; }
+/* the dark colour mode's negative is a light salmon: white text on it fails contrast, so banners use the dark ink there */
+:root[data-hd-mode="dark"] .q-banner.bg-negative.text-white { color: var(--ph-on-accent) !important; }
 .q-toggle__inner, .q-checkbox__inner, .q-radio__inner { min-width: var(--ph-tap); min-height: var(--ph-tap); }
 .q-field--outlined .q-field__control { min-height: var(--ph-tap); }
 .q-field__native, .q-field__input { font-size: var(--ph-text-body); }
