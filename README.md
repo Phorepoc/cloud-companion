@@ -31,7 +31,7 @@ The last command prints a one-time code like `HFRE-RHAX`, which is good for 10 m
 can add a passkey and get a recovery code.
 
 To add a phone, run `docker exec phe-cloud phecloud paircode` without `--admin` and enter the code on the phone. For a
-Phorepoc phone, [docs/phorepoc-phone.md](docs/phorepoc-phone.md) explains the steps. `phecloud devices` lists what's
+Phorepoc OS phone, [docs/phorepoc-phone.md](docs/phorepoc-phone.md) explains the steps. `phecloud devices` lists what's
 paired and `phecloud revoke <id>` signs one out.
 
 ## Reaching it from other machines
@@ -73,7 +73,7 @@ that.
 
 ## Your own software catalogue
 
-Cloud Companion can host a software list for Catalogue, the store on a Phorepoc phone. In the web app open **Catalogue**, make a catalogue (public,
+Cloud Companion can host a software list for Catalogue, the store on a Phorepoc OS phone. In the web app open **Catalogue**, make a catalogue (public,
 or private with a secret token in its address), and upload installation files: `.sisx`, but also `.apk`, `.exe`, `.deb`, `.AppImage`, `.zip` and
 others, with a name, version and description. It publishes them as an `index.json` in the same format as the official list, with the size and
 SHA-256 of every file. You can also add other lists as sources (the official one, a friend's Cloud Companion, any compatible `index.json`), give
