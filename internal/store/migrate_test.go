@@ -6,6 +6,7 @@ package store
 import (
 	"database/sql"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -69,5 +70,43 @@ func TestRewrite(t *testing.T) {
 	}
 	if got := rewrite(Postgres, `SELECT GROUP_CONCAT(DISTINCT device) FROM sms`); got != `SELECT string_agg(DISTINCT device, ',') FROM sms` {
 		t.Fatal(got)
+	}
+}
+
+// A database at schema version 3 with hosted releases opens, and the releases are in the library, published, untouched in the old table.
+func TestMigration4MovesReleases(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "v3.db")
+	old, err := sql.Open("sqlite", "file:"+p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	stmts := []string{
+		`CREATE TABLE schema_migrations(version INTEGER PRIMARY KEY, name VARCHAR(255), applied BIGINT)`,
+		`INSERT INTO schema_migrations VALUES(1,'a',1),(2,'b',1),(3,'c',1)`,
+		`CREATE TABLE catalogues(id TEXT PRIMARY KEY, name TEXT, public INTEGER DEFAULT 0, token TEXT, priority INTEGER DEFAULT 100, sync_interval INTEGER DEFAULT 21600, created INTEGER)`,
+		`CREATE TABLE cat_releases(catalogue TEXT NOT NULL, app_id TEXT NOT NULL, version TEXT NOT NULL, data TEXT, created INTEGER, PRIMARY KEY(catalogue, app_id, version))`,
+		`INSERT INTO catalogues VALUES('c1','C one',1,'',100,0,1)`,
+		`INSERT INTO cat_releases VALUES('c1','app','1.0','{"file":{"sha256":"` + strings.Repeat("a", 64) + `","size":3},"icon":{"sha256":"` + strings.Repeat("b", 64) + `"}}',42)`,
+	}
+	for _, q := range stmts {
+		if _, err := old.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	old.Close()
+	st, err := Open(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+	fs := st.CatFiles()
+	if len(fs) != 1 || fs[0].Kind != "stored" || fs[0].SHA256 != strings.Repeat("a", 64) || fs[0].IconSHA != strings.Repeat("b", 64) || fs[0].Size != 3 {
+		t.Fatalf("%+v", fs)
+	}
+	if pub := st.CatPublished("c1"); pub[fs[0].ID] != 42 {
+		t.Fatalf("%v", pub)
+	}
+	if n := len(st.CatReleases("c1")); n != 1 {
+		t.Fatalf("the old rows must stay: %d", n)
 	}
 }

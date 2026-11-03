@@ -202,3 +202,40 @@ func migrateReleases(tx *Tx) error {
 	}
 	return nil
 }
+
+// TestRunMigration4 inserts legacy cat_releases rows (catalogue|app|version -> JSON) and runs the data move of migration 4 again; for tests of the
+// migration (the real one runs once, at open).
+func (s *Store) TestRunMigration4(rows map[string]string) error {
+	for k, data := range rows {
+		p := splitKey(k)
+		if _, err := s.db.Exec(`INSERT INTO cat_releases(catalogue,app_id,version,data,created) VALUES(?,?,?,?,?)`, p[0], p[1], p[2], data, 5); err != nil {
+			return err
+		}
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	if err := migrateReleases(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
+}
+
+func splitKey(k string) [3]string {
+	var out [3]string
+	n := 0
+	cur := ""
+	for _, r := range k {
+		if r == '|' && n < 2 {
+			out[n] = cur
+			cur = ""
+			n++
+			continue
+		}
+		cur += string(r)
+	}
+	out[n] = cur
+	return out
+}

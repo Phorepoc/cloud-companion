@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/cloud-companion/internal/catalogue"
+	"github.com/phorepoc/cloud-companion/internal/pkginfo"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
@@ -507,4 +508,53 @@ func TestCatalogueDumpIndex(t *testing.T) {
 	e.upload("open", map[string]string{"app_id": "droid", "version": "2", "name": "Droid"}, "d.apk", []byte("y"))
 	_, b, _ := e.get("/catalogue/open/index.json", "")
 	os.WriteFile(out, b, 0o644)
+}
+
+// The library flow over HTTP: a file dropped in the folder, a rescan, publish by id, the index; the file goes, the app is unpublished with a warning.
+func TestCatalogueLibraryFlow(t *testing.T) {
+	e := newCatEnv(t)
+	e.create("lib", true)
+	p := filepath.Join(e.m.Library, "drop.apk")
+	if err := os.WriteFile(p, pkginfo.ExampleAPK(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, r := e.admin.call(t, "POST", "/phe/catalogue/library/scan", map[string]any{})
+	if code != 200 || len(r["result"].(map[string]any)["added"].([]any)) != 1 {
+		t.Fatalf("%d %v", code, r)
+	}
+	_, r = e.admin.call(t, "GET", "/phe/catalogue/library?catalogue=lib", nil)
+	ent := r["entries"].([]any)[0].(map[string]any)
+	if ent["name"] != "Test App" || ent["app_id"] != "com.example.app" || ent["published"] != false || ent["icon_data"] == nil || ent["status"] != "ok" {
+		t.Fatalf("%v", ent)
+	}
+	id := ent["id"].(string)
+	if code, r = e.admin.call(t, "POST", "/phe/catalogue/library/publish", map[string]any{"catalogue": "lib", "ids": []string{id}, "publish": true}); code != 200 || r["changed"].(float64) != 1 {
+		t.Fatalf("%d %v", code, r)
+	}
+	it := e.index("/catalogue/lib/index.json", "")["items"].([]any)
+	if len(it) != 1 || it[0].(map[string]any)["platform"] != "android" || it[0].(map[string]any)["icon_url"] == nil {
+		t.Fatalf("%v", it)
+	}
+	if code, r = e.admin.call(t, "POST", "/phe/catalogue/library/edit", map[string]any{"id": id, "edits": map[string]any{"name": "Nicer Name", "description": "Hi"}}); code != 200 {
+		t.Fatalf("%d %v", code, r)
+	}
+	if it = e.index("/catalogue/lib/index.json", "")["items"].([]any); it[0].(map[string]any)["name"] != "Nicer Name" {
+		t.Fatalf("%v", it)
+	}
+	os.Remove(p)
+	_, r = e.admin.call(t, "POST", "/phe/catalogue/library/scan", map[string]any{})
+	if len(r["result"].(map[string]any)["removed"].([]any)) != 1 {
+		t.Fatalf("%v", r)
+	}
+	if it = e.index("/catalogue/lib/index.json", "")["items"].([]any); len(it) != 0 {
+		t.Fatalf("%v", it)
+	}
+	_, r = e.admin.call(t, "GET", "/phe/catalogue/library?catalogue=lib", nil)
+	ent = r["entries"].([]any)[0].(map[string]any)
+	if ent["status"] != "missing" || ent["published"] != false || ent["error"] == "" {
+		t.Fatalf("%v", ent)
+	}
+	if code, _ = e.admin.call(t, "POST", "/phe/catalogue/library/remove", map[string]any{"id": id}); code != 200 {
+		t.Fatal(code)
+	}
 }
