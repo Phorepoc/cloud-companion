@@ -352,10 +352,10 @@ await page.click('[data-test=widget-add-clock-analog]')
 await page.click('[data-test=widget-add-chats]')
 await page.waitForSelector('[data-test=widget-clock-analog]')
 await page.waitForSelector('[data-test=widget-chats]')
-// The analog clock is the Etesian dial and keeps time to the second (regression 2026-10-31: a black circle, no second hand)
+// The analog clock is the 701's Belle dial and keeps time to the second (regression 2026-10-31: a black circle, no second hand)
 const dial = page.locator('[data-test=widget-clock-analog] svg')
 assert.equal(await dial.locator('circle[r="46"]').count(), 0, 'the analog face is a squircle, not a circle')
-assert.equal(await dial.locator('.ph-wg__hand--s').getAttribute('stroke'), '#4791DC', 'the second hand is Etesian blue')
+assert.equal(await dial.locator('.ph-wg__hand--s').getAttribute('stroke'), '#4791DC', 'the second hand is Belle blue')
 const sec = async () => Number(/rotate\(([\d.]+)/.exec((await dial.locator('.ph-wg__hand--s').getAttribute('transform')) || '')?.[1])
 const s0 = await sec(); await page.waitForTimeout(2100)
 assert.notEqual(await sec(), s0, 'the second hand moves')
@@ -389,7 +389,7 @@ assert.equal((await box('[data-test=widget-clock-analog]')).x, after.x, 'and so 
 // has no hub, so they say so: not "Could not load: unknown or revoked device" from a request sent before the connection was signed in)
 await page.waitForFunction(() => /not set up/.test(document.querySelector('[data-test=widget-mail]')?.textContent || ''), null, { timeout: 10000 })
 assert.doesNotMatch(await text('[data-test=widget-mail]'), /Could not load/)
-// More Etesian widgets (2026-10-30): notes, a month, the latest mail one at a time, the clock in words
+// More Belle widgets (2026-10-30): notes, a month, the latest mail one at a time, the clock in words
 await page.click('.ph-menubar__menu:has-text("View")')
 await page.click('[data-test=edit-widgets]')
 await page.waitForSelector('[data-test=widget-sheet]')
@@ -417,7 +417,7 @@ assert.equal(await page.inputValue('[data-test=widget-note]'), 'Buy rye bread', 
 await page.keyboard.press('Control+Alt+d')
 await page.screenshot({ path: `${OUT}/desktop-widgets.png` })
 
-step('Events and the new Etesian widgets (2026-10-31): the month unfolds, the weather line, feeds, gear and LCD clocks, Today, web page, devices')
+step('Events and the new Belle widgets (2026-10-31): the month unfolds, the weather line, feeds, gear and LCD clocks, Today, web page, devices')
 // a feed for the server to read: this process shares the server's network, so the server reaches it on localhost
 const feedSrv = http.createServer((_q, r) => { r.setHeader('Content-Type', 'application/rss+xml')
   r.end('<rss version="2.0"><channel><title>Harbour News</title><item><title>Tram line opens to the harbour</title><link>https://example.org/tram</link>' +
@@ -457,7 +457,7 @@ assert.match(await text('[data-test=widget-devices]'), /Connected/, 'this device
 const cog = () => page.locator('[data-test=widget-clock-gear] .ph-wg__cog').first().getAttribute('transform')
 const c0 = await cog(); await page.waitForTimeout(2100)
 assert.notEqual(await cog(), c0, 'the gears turn with the seconds')
-assert.equal(await page.locator('[data-test=widget-clock-gear] .ph-wg__hand--s').getAttribute('stroke'), '#E6E6E8', 'the gear clock\'s second hand is thin and white (reference 11)')
+assert.equal(await page.locator('[data-test=widget-clock-gear] .ph-wg__hand--s').getAttribute('stroke'), '#E6E6E8', 'the gear clock\'s second hand is thin and white (belle-ref11)')
 await page.screenshot({ path: `${OUT}/desktop-widgets-new.png` })
 feedSrv.close()
 

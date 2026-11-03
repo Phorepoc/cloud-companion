@@ -164,9 +164,9 @@ It follows the approved Etesian desktop design:
   today's and tomorrow's calendar, unread mail and the three latest chats; each row opens its section. A service that is not set up says
   so in one muted line. A dot on the clock marks unread mail (checked every two minutes). Escape, the clock again or a click on a window
   closes it.
-* **Widgets** (after the Etesian widgets; `src/desktop/DesktopWidgets.vue`, kinds and sizes in `widgets.ts`): on the wallpaper under
+* **Widgets** (after the Etesian Belle widgets; `src/desktop/DesktopWidgets.vue`, kinds and sizes in `widgets.ts`): on the wallpaper under
   every window, on a 90 px grid. Big clock, analog clock (both in the menu bar's time format), unread mail, today's agenda, latest chats;
-  each is an Etesian panel (dark glass, 12 px corners) headed by the section's lit squircle, and a row opens that section as a window.
+  each is a Belle panel (dark glass, 12 px corners) headed by the section's lit squircle, and a row opens that section as a window.
   View > Show desktop (Super+D / Ctrl+Alt+D) minimises the windows. View > Edit widgets puts the windows aside and shows the phone's
   edit chrome (accent outline, red ✕ squircle) with the Add widgets sheet; drag to move, or focus a widget and use the arrow keys;
   Delete removes; Done or Esc ends. No long-press and no context menu. The arrangement is kept on this device. A feeds (RSS) widget

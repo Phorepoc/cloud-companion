@@ -1,6 +1,6 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
-<!-- The desktop's widgets (after the Etesian widgets): clocks, unread mail, the agenda and the latest chats, on the wallpaper
+<!-- The desktop's widgets (after the Etesian Belle widgets): clocks, unread mail, the agenda and the latest chats, on the wallpaper
      under every window. A row opens its section as a window. View → Edit widgets turns on the phone's edit chrome: an accent
      outline, a red ✕ squircle to remove, a faint 90 px grid to snap to, and the Add widgets sheet. In edit mode a widget moves by
      dragging or, focused, with the arrow keys; Delete removes it; Done or Esc ends editing. No long-press, no context menu. -->
@@ -15,7 +15,7 @@
         <span class="ph-wg__sec">{{ dateText }}</span>
       </div>
       <div v-else-if="w.kind === 'clock-analog'" class="ph-wg__analog" role="img" :aria-label="'Clock, ' + clock.text">
-        <!-- the Etesian analog dial, as Nokia drew it (a 126 grid): a squircle face in warm charcoal, white hands, the blue second hand -->
+        <!-- the Belle analog dial, as Nokia drew it (a 126 grid): a squircle face in warm charcoal, white hands, the blue second hand -->
         <svg viewBox="0 0 126 126" aria-hidden="true">
           <defs>
             <linearGradient id="ph-wg-bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A5A55" /><stop offset=".5" stop-color="#3E3E39" /><stop offset="1" stop-color="#34342F" /></linearGradient>
@@ -46,7 +46,7 @@
           <span v-if="mailOf(w).unread" class="ph-wg__count" data-test="widget-mail-count">{{ mailOf(w).unread }} unread</span></header>
         <p v-if="mailOf(w).error" class="ph-wg__none">{{ mailOf(w).error }}</p>
         <p v-else-if="!mailOf(w).items.length" class="ph-wg__none">No mail.</p>
-        <!-- the newest 20, read or not (unread marked), scrolling: as the Etesian Mail widget -->
+        <!-- the newest 20, read or not (unread marked), scrolling: as the Belle Mail widget -->
         <div v-else class="ph-wg__list" data-test="widget-mail-list">
           <button v-for="m in mailOf(w).items" :key="m.id" type="button" class="ph-wg__row" :class="{ 'is-unread': m.unread }" :disabled="editing" @click="emit('open', 'mail')">
             <span class="ph-wg__title">{{ m.from || '(no sender)' }}<span class="ph-wg__sec ph-wg__when">{{ mailTime(m.date) }}</span></span>
@@ -81,7 +81,7 @@
         </div>
       </div>
 
-      <!-- latest mail, one at a time (Etesian "Latest mail"): ▲ ▼ step through, disabled at the ends -->
+      <!-- latest mail, one at a time (Belle "Latest mail"): ▲ ▼ step through, disabled at the ends -->
       <div v-else-if="w.kind === 'mail-stack'" class="ph-wg__panel ph-wg__stack">
         <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b class="ph-wg__acct">{{ w.opt || 'Latest mail' }}</b>
           <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the account" title="Pick the account" @pointerdown.stop @click="pickAccount(w)"><q-icon name="sym_o_settings" size="20px" /></button>
@@ -98,7 +98,7 @@
         </button>
       </div>
 
-      <!-- month (Etesian calendar): today lit, a dot under days with events; tap opens Calendar -->
+      <!-- month (Belle calendar): today lit, a dot under days with events; tap opens Calendar -->
       <button v-else-if="w.kind === 'month'" type="button" class="ph-wg__panel ph-wg__month" :disabled="editing" @click="emit('open', 'calendar')">
         <b class="ph-wg__mtitle">{{ monthTitle }}</b>
         <span class="ph-wg__mgrid">
@@ -107,7 +107,7 @@
         </span>
       </button>
 
-      <!-- contacts (Etesian "Contacts, group"): squircle initials; tap opens Contacts -->
+      <!-- contacts (Belle "Contacts, group"): squircle initials; tap opens Contacts -->
       <div v-else-if="w.kind === 'contacts'" class="ph-wg__panel ph-wg__people">
         <p v-if="people.error" class="ph-wg__none">{{ people.error }}</p>
         <p v-else-if="!people.items.length" class="ph-wg__none">No contacts yet.</p>
@@ -118,7 +118,7 @@
         </div>
       </div>
 
-      <!-- notes (Etesian Notes): yellow paper; ▲ ▼ browse, + writes a new one, the bin deletes the one shown. Kept in this browser. -->
+      <!-- notes (Belle Notes): yellow paper; ▲ ▼ browse, + writes a new one, the bin deletes the one shown. Kept in this browser. -->
       <div v-else-if="w.kind === 'notes'" class="ph-wg__notes">
         <textarea v-model="notes.list[notes.at]" class="ph-wg__paper" :readonly="editing" aria-label="Note" placeholder="Tap + to write a note." data-test="widget-note" @input="saveNotes" />
         <span class="ph-wg__notebar">
@@ -129,7 +129,7 @@
         </span>
       </div>
 
-      <!-- shortcuts (Etesian shortcuts): four sections on their lit squircles -->
+      <!-- shortcuts (Belle shortcuts): four sections on their lit squircles -->
       <div v-else-if="w.kind === 'shortcuts'" class="ph-wg__panel ph-wg__shorts">
         <button v-for="sec in shortcutSections" :key="sec.id" type="button" class="ph-wg__short" :disabled="editing" @click="emit('open', sec.id)">
           <SectionTile :section="sec" :size="40" /><small>{{ sec.label }}</small>
@@ -142,12 +142,12 @@
         <span class="ph-wg__sec ph-wg__flipdate">{{ dateText }}</span>
       </div>
 
-      <!-- the time in words (Etesian text clock) -->
+      <!-- the time in words (Belle text clock) -->
       <div v-else-if="w.kind === 'clock-word'" class="ph-wg__word" role="img" :aria-label="'Clock, ' + clock.text">
         <b>{{ words[0] }}</b><span>{{ words[1] }}</span><small class="ph-wg__sec">{{ dateText }}</small>
       </div>
 
-      <!-- weather (Etesian Weather): now, today's high / low, the place (picks another), the next two days -->
+      <!-- weather (Belle Weather): now, today's high / low, the place (picks another), the next two days -->
       <div v-else-if="w.kind === 'weather'" class="ph-wg__weather">
         <div class="ph-wg__panel ph-wg__wxbody">
           <div class="ph-wg__wxnow">
@@ -162,7 +162,7 @@
         <q-icon class="ph-wg__wxicon" :name="weatherIcon(forecast?.code ?? 3, forecast?.day ?? true)" size="76px" :aria-label="forecast?.description || 'Weather'" />
       </div>
 
-      <!-- gear clock (reference 11): a round dial in a lighter metal rim with twelve ticks, toothed metal gears turning behind the
+      <!-- gear clock (Belle, belle-ref11): a round dial in a lighter metal rim with twelve ticks, toothed metal gears turning behind the
            hands, a thin white second hand, the day low on the left and the date at 3 o'clock in dark round bubbles -->
       <div v-else-if="w.kind === 'clock-gear'" class="ph-wg__gear" role="img" :aria-label="'Clock, ' + clock.text">
         <svg viewBox="0 0 126 126" aria-hidden="true">
@@ -189,13 +189,13 @@
         <span class="ph-wg__gday">{{ tick.toLocaleDateString(undefined, { weekday: 'short' }) }}</span><span class="ph-wg__gdate">{{ tick.getDate() }}</span>
       </div>
 
-      <!-- LCD clock (reference 10): green segment digits on black glass in a dark metal frame, the date beside -->
+      <!-- LCD clock (Belle, belle-ref10): green segment digits on black glass in a dark metal frame, the date beside -->
       <div v-else-if="w.kind === 'clock-lcd'" class="ph-wg__lcd" role="img" :aria-label="'Clock, ' + clock.text">
         <div class="ph-wg__lcdglass"><span class="ph-wg__lcdt">{{ clock.hour }}</span><span class="ph-wg__lcdc">:</span><span class="ph-wg__lcdt">{{ clock.minute }}</span>
           <span class="ph-wg__lcdd">{{ now.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' }) }}</span></div>
       </div>
 
-      <!-- Today (Etesian calendar card): white paper on rings, the next entry of the day; tap opens Calendar -->
+      <!-- Today (Belle calendar card): white paper on rings, the next entry of the day; tap opens Calendar -->
       <button v-else-if="w.kind === 'today'" type="button" class="ph-wg__paperwrap" :disabled="editing" data-test="widget-today" @click="emit('open', 'calendar')">
         <i class="ph-wg__ring" style="left: 18%" /><i class="ph-wg__ring" style="right: 18%" />
         <span class="ph-wg__todaypaper">
@@ -206,20 +206,20 @@
         </span>
       </button>
 
-      <!-- one contact (Etesian contact shortcut): the photo, or squircle initials, with the name on a dark strip; tap opens Contacts -->
+      <!-- one contact (Belle contact shortcut): the photo, or squircle initials, with the name on a dark strip; tap opens Contacts -->
       <button v-else-if="w.kind === 'contact'" type="button" class="ph-wg__photo" :disabled="editing" data-test="widget-contact" @click="emit('open', 'contacts')">
         <span class="ph-wg__pinit hd-squircle" :style="{ background: tint(w.opt || '?') }">{{ initials(w.opt || '?') }}</span>
         <span class="ph-wg__strip">{{ w.opt || 'Pick a contact' }}</span>
       </button>
 
-      <!-- web page (Etesian web shortcut): the site's name on the strip; tap opens it in a new tab -->
+      <!-- web page (Belle web shortcut): the site's name on the strip; tap opens it in a new tab -->
       <button v-else-if="w.kind === 'web'" type="button" class="ph-wg__photo ph-wg__webtile" :disabled="editing" data-test="widget-web" @click="openPage(w.opt)">
         <img v-if="w.opt && !noIcon[w.opt]" :src="iconOf(w.opt)" alt="" class="ph-wg__favicon" @error="noIcon[w.opt] = true" />
         <q-icon v-else name="sym_o_language" size="56px" class="ph-wg__favicon" aria-hidden="true" />
         <span class="ph-wg__strip">{{ w.opt ? hostOf(w.opt) : 'Pick a page' }}</span>
       </button>
 
-      <!-- feeds (Etesian RSS widget): orange header with the feed count, the newest posts below; tap opens the post -->
+      <!-- feeds (Belle RSS widget): orange header with the feed count, the newest posts below; tap opens the post -->
       <div v-else-if="w.kind === 'feeds'" class="ph-wg__rss" data-test="widget-feeds">
         <header class="ph-wg__rsshead"><span><b>Feeds</b><small>{{ feedList.length === 1 ? feedList[0].title : feedList.length + ' feeds' }}</small></span>
           <button type="button" class="ph-wg__arrow" aria-label="Refresh" :disabled="editing" @click="loadFeeds"><q-icon name="sym_o_refresh" size="24px" /></button></header>
@@ -231,7 +231,7 @@
         </div>
       </div>
 
-      <!-- music (small): a dark glossy panel, the square art (as is) rising above its top edge, the song
+      <!-- music (Belle small, belle-music-widget-small.jpg): a dark glossy panel, the square art (as is) rising above its top edge, the song
            over previous / play / next in a recessed groove; nothing playing: the blue tile, "Go to Music library" -->
       <div v-else-if="w.kind === 'music'" class="ph-wg__music">
         <div class="ph-wg__mpanel" />
@@ -243,7 +243,7 @@
                     :disabled="editing" :data-test="'widget-music-' + b.id" @click="b.do()"><svg viewBox="0 0 24 24" :width="i === 1 ? 22 : 15" :height="i === 1 ? 22 : 15"><path :d="b.d" fill="currentColor" /></svg></button>
           </div></div>
       </div>
-      <!-- music, large (large): the square art stands up out of a glossy black tray that holds the buttons -->
+      <!-- music, large (belle-music-widget-large.jpg): the square art stands up out of a glossy black tray that holds the buttons -->
       <div v-else-if="w.kind === 'music-large'" class="ph-wg__mlarge">
         <div class="ph-wg__mtray" />
         <button type="button" class="ph-wg__mlart" :disabled="editing" aria-label="Open Music" @click="emit('open', 'music')">
@@ -439,7 +439,7 @@ function gearPath(x: number, y: number, r: number, teeth: number): string {
 }
 /** the gear clock's gears (a 126 grid, as on the phone): x, y, radius and teeth */
 const GEARS = [[83, 39, 26, 18], [39, 83, 24, 16], [63, 63, 22, 16], [87, 82, 14, 11]].map(([x, y, r, t]) => ({ x, y, r, d: gearPath(x, y, r, t) }))
-/** the phone's dial: n 2.9 face and bezel, the date window at 3 o'clock */
+/** the 701's dial: n 2.9 face and bezel, the date window at 3 o'clock */
 const DIAL = { outer: squircleRect(126, 126, 2.9), inner: squircleRect(118, 118, 2.9, 4, 4), win: squircleRect(26, 26, 2.8, 79, 50) }
 
 // ---- data: loaded for the kinds on the desktop, refreshed every two minutes ----
@@ -567,7 +567,7 @@ const musicButtons = computed(() => [
 .ph-wg.is-editing .ph-wg__w { cursor: grab; touch-action: none; }
 .ph-wg__w.is-dragging { z-index: 1; cursor: grabbing; opacity: 0.9; }
 .ph-wg__w:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
-/* the Etesian panel: dark glass with a light top edge */
+/* the Belle panel: dark glass with a light top edge */
 .ph-wg__panel {
   height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; overflow: hidden;
   border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15);
@@ -593,7 +593,7 @@ const musicButtons = computed(() => [
 .ph-wg__colon { opacity: 0.6; margin: 0 2px; }
 .ph-wg__period { margin-left: 8px; font-size: 22px; opacity: 0.7; }
 .ph-wg__digital b { font-weight: 300; }
-/* analog: the Etesian dial on its own */
+/* analog: the Belle dial on its own */
 .ph-wg__analog { height: 100%; display: grid; place-items: center; }
 .ph-wg__analog svg { width: 100%; height: 100%; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)); }
 .ph-wg__hands { filter: drop-shadow(0 1.2px 0.9px rgba(0, 0, 0, 0.55)); }
@@ -625,7 +625,7 @@ const musicButtons = computed(() => [
 .ph-wg__favicon { width: 48px; height: 48px; margin-bottom: 30px; }
 .ph-wg__pinit { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 30px; font-size: 24px; font-weight: 700; }
 .ph-wg__strip { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 10px 7px; background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 16px; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* feeds (Etesian RSS) */
+/* feeds (Belle RSS) */
 .ph-wg__rss { display: flex; flex-direction: column; height: 100%; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
 .ph-wg__rsshead { display: flex; align-items: center; height: 52px; padding: 0 8px 0 14px; border-radius: 10px 10px 0 0; background: linear-gradient(#F7A13A, #E5620F); }
 .ph-wg__rsshead > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -717,7 +717,7 @@ const musicButtons = computed(() => [
 .ph-wg__wxday { flex: 0.75; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 14px; }
 .ph-wg__wxicon { position: absolute; top: 0; left: 56px; color: #fff; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.5)); }
 .ph-wg__word b { font-size: 40px; font-weight: 300; line-height: 1.05; } .ph-wg__word span { font-size: 40px; font-weight: 600; line-height: 1.05; }
-/* music (Etesian small and large) */
+/* music (Belle small and large) */
 .ph-wg__music { position: relative; height: 100%; display: flex; align-items: flex-end; gap: 12px; padding: 0 10px 10px; color: #fff; }
 .ph-wg__mpanel { position: absolute; left: 0; right: 0; bottom: 0; top: 44px; border-radius: 12px; border: 1px solid #000;
   background: linear-gradient(#3C3C40, #18181A 22%, #0B0B0C 70%, #1A1A1C); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25); }
