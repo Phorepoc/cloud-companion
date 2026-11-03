@@ -19,6 +19,8 @@ type migration struct {
 	stmts   map[Dialect][]string
 	// tolerate lists SQLite statements whose failure is fine (ALTER TABLE ADD COLUMN on a database that has the column)
 	tolerate bool
+	// after runs in the same transaction once the statements have run (data moves SQL alone cannot do)
+	after func(*Tx) error
 }
 
 var migrations = []migration{
@@ -102,6 +104,20 @@ var migrations = []migration{
 		Postgres: {`CREATE TABLE IF NOT EXISTS server_settings(name TEXT PRIMARY KEY, value TEXT)`},
 		MySQL:    {`CREATE TABLE IF NOT EXISTS server_settings(name VARCHAR(100) PRIMARY KEY, value LONGTEXT)`},
 	}},
+	{version: 4, name: "catalogue library: scanned package files and per-catalogue publishing; hosted releases move into it", after: migrateReleases, stmts: map[Dialect][]string{
+		SQLite: {
+			`CREATE TABLE IF NOT EXISTS cat_library(id TEXT PRIMARY KEY, path TEXT NOT NULL, kind TEXT NOT NULL, sha256 TEXT, size INTEGER, mtime INTEGER, status TEXT, error TEXT, meta TEXT, edits TEXT, legacy TEXT, icon_sha TEXT, added INTEGER, scanned INTEGER, changed INTEGER)`,
+			`CREATE TABLE IF NOT EXISTS cat_publish(catalogue TEXT NOT NULL, file_id TEXT NOT NULL, created INTEGER, PRIMARY KEY(catalogue, file_id))`,
+		},
+		Postgres: {
+			`CREATE TABLE IF NOT EXISTS cat_library(id TEXT PRIMARY KEY, path TEXT NOT NULL, kind TEXT NOT NULL, sha256 TEXT, size BIGINT, mtime BIGINT, status TEXT, error TEXT, meta TEXT, edits TEXT, legacy TEXT, icon_sha TEXT, added BIGINT, scanned BIGINT, changed BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS cat_publish(catalogue TEXT NOT NULL, file_id TEXT NOT NULL, created BIGINT, PRIMARY KEY(catalogue, file_id))`,
+		},
+		MySQL: {
+			`CREATE TABLE IF NOT EXISTS cat_library(id VARCHAR(32) PRIMARY KEY, path VARCHAR(1024) NOT NULL, kind VARCHAR(16) NOT NULL, sha256 VARCHAR(64), size BIGINT, mtime BIGINT, status VARCHAR(16), error TEXT, meta LONGTEXT, edits LONGTEXT, legacy LONGTEXT, icon_sha VARCHAR(64), added BIGINT, scanned BIGINT, changed BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS cat_publish(catalogue VARCHAR(64) NOT NULL, file_id VARCHAR(32) NOT NULL, created BIGINT, PRIMARY KEY(catalogue, file_id))`,
+		},
+	}},
 }
 
 // SchemaVersion is the newest migration this build knows.
@@ -129,6 +145,12 @@ func (s *Store) migrate() error {
 				if s.d == SQLite && m.tolerate && strings.HasPrefix(q, "ALTER TABLE") {
 					continue // the column is already there (a database from before migrations)
 				}
+				tx.Rollback()
+				return fmt.Errorf("migration %d (%s): %w", m.version, m.name, err)
+			}
+		}
+		if m.after != nil {
+			if err := m.after(tx); err != nil {
 				tx.Rollback()
 				return fmt.Errorf("migration %d (%s): %w", m.version, m.name, err)
 			}

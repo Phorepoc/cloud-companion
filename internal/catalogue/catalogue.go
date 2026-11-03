@@ -32,10 +32,16 @@ type Manager struct {
 	Dir     string       // PHECLOUD_CATALOGUE_DIR: blobs/ holds every file, named by its SHA-256
 	Client  *http.Client // fetches sources (tests replace it)
 	MaxFile int64        // the largest file accepted (upload, mirror); 0 = 2 GiB
+	Library string       // PHECLOUD_CATALOGUE_LIBRARY: the folder of package files every catalogue publishes from
 
-	mu      sync.Mutex
-	syncing map[string]bool
-	vok     sync.Map // sha256 -> "size/mtime" of the last full verification
+	mu        sync.Mutex
+	syncing   map[string]bool
+	scanMu    sync.Mutex
+	lastMu    sync.Mutex
+	last      ScanResult
+	lastAt    int64
+	ScanEvery time.Duration // periodic scan interval (0 = only at start and on request)
+	vok       sync.Map      // sha256 -> "size/mtime" of the last full verification
 }
 
 func New(st *store.Store, dir string) *Manager {
@@ -101,6 +107,13 @@ func (m *Manager) OpenBlob(sha string) (*os.File, os.FileInfo, error) {
 		return nil, nil, os.ErrNotExist
 	}
 	f, err := os.Open(m.blobPath(sha))
+	if os.IsNotExist(err) { // not a stored blob: a file of the library folder
+		if lf, ok := m.St.CatFileBySHA(sha); ok {
+			if p, perr := m.libPath(lf.Path); perr == nil {
+				f, err = os.Open(p)
+			}
+		}
+	}
 	if err != nil {
 		return nil, nil, err
 	}
@@ -404,14 +417,7 @@ func newest(item map[string]any) (tag, pub string) {
 func (m *Manager) Build(c store.Catalogue, prefix string) (items []any, report []AppReport, files map[string]string) {
 	files = map[string]string{}
 	cands := map[string][]Cand{}
-	byApp := map[string][]Release{}
-	for _, row := range m.St.CatReleases(c.ID) {
-		var r Release
-		if json.Unmarshal([]byte(row.Data), &r) == nil && m.blobOK(r.File.SHA256) {
-			r.Published = row.Created
-			byApp[row.AppID] = append(byApp[row.AppID], r)
-		}
-	}
+	byApp := m.hosted(c.ID)
 	for id, rels := range byApp {
 		sort.SliceStable(rels, func(i, j int) bool { return rels[i].Published < rels[j].Published })
 		it := m.hostedItem(c, prefix, rels, map[string]string{}) // a throw-away files map: only the winner's files are served
@@ -488,15 +494,7 @@ func (m *Manager) Build(c store.Catalogue, prefix string) (items []any, report [
 		item := jsonCopy(w.item)
 		if w.SourceID == "local" {
 			// serve the hosted files of the winner
-			var rels []Release
-			for _, row := range m.St.CatReleases(c.ID) {
-				var r Release
-				if row.AppID == id && json.Unmarshal([]byte(row.Data), &r) == nil && m.blobOK(r.File.SHA256) {
-					r.Published = row.Created
-					rels = append(rels, r)
-				}
-			}
-			sort.SliceStable(rels, func(i, j int) bool { return rels[i].Published < rels[j].Published })
+			rels := byApp[id]
 			item = m.hostedItem(c, prefix, rels, files)
 		} else if w.mirror == 1 {
 			mir := m.St.CatMirrors(w.SourceID)

@@ -35,6 +35,7 @@ type catEnv struct {
 func newCatEnv(t *testing.T) *catEnv {
 	st := store.OpenTest(t)
 	m := catalogue.New(st, t.TempDir())
+	m.Library = t.TempDir()
 	a := newAuth(st)
 	mux := http.NewServeMux()
 	(&catAPI{a: a, st: st, m: m}).routes(mux)
@@ -232,11 +233,11 @@ func TestCatalogueHostedPublicAndPrivate(t *testing.T) {
 	if hi["name"] != "Hello Again" || len(hi["resolved"].([]any)) != 2 || len(hi["releases"].([]any)) != 2 {
 		t.Fatalf("two releases: %v", hi)
 	}
-	// removing a release removes its file once nothing else needs it
+	// removing a release removes its file from the library
 	if code, _ = e.admin.call(t, "POST", "/phe/catalogue/release/remove", map[string]any{"catalogue": "open", "app_id": "hello", "version": "1.1"}); code != 200 {
 		t.Fatalf("remove: %d", code)
 	}
-	if _, err := os.Stat(filepath.Join(e.m.Dir, "blobs", sum([]byte("SIS-v2"))[:2], sum([]byte("SIS-v2")))); err == nil {
+	if _, err := os.Stat(filepath.Join(e.m.Library, "uploads", "Hello_1.1.sisx")); err == nil {
 		t.Fatal("the removed release's file is still on disk")
 	}
 }
@@ -251,7 +252,7 @@ func TestCatalogueTamperedFileNotServed(t *testing.T) {
 	if code, _, _ := e.get(url, ""); code != 200 {
 		t.Fatalf("before: %d", code)
 	}
-	p := filepath.Join(e.m.Dir, "blobs", sum(data)[:2], sum(data))
+	p := filepath.Join(e.m.Library, "uploads", "a.sis")
 	time.Sleep(20 * time.Millisecond)
 	if err := os.WriteFile(p, []byte("evil bytes"), 0o644); err != nil {
 		t.Fatal(err)

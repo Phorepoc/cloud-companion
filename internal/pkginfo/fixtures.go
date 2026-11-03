@@ -3,7 +3,7 @@
 
 package pkginfo
 
-// Small real-format packages built in the tests: a SISX like emitter/sis.py writes (deflated controller and data), an MBM, an APK with a binary
+// Small real-format packages for tests: a SISX like emitter/sis.py writes (deflated controller and data), an MBM, an APK with a binary
 // manifest and a resource table. The builders are the inverse of the readers, written from the format descriptions, not from the readers' code.
 
 import (
@@ -266,3 +266,13 @@ func buildAPK() []byte {
 	zw.Close()
 	return buf.Bytes()
 }
+
+// Exported for the tests of other packages (the catalogue scanner): small real-format packages.
+
+// ExampleSIS is a SISX with one file; the same uid with another version is "the same app, changed".
+func ExampleSIS(uid uint32, name, vendor string, version [3]int32, payload string) []byte {
+	return buildSIS(uid, []string{name}, []string{vendor}, []uint16{1}, version, 0x20022E6D, []sisTestFile{{`!:\sys\bin\x.exe`, []byte(payload)}})
+}
+
+// ExampleAPK is an APK for com.Example.App 1.2.3 labelled "Test App", with a 16x16 icon.
+func ExampleAPK() []byte { return buildAPK() }

@@ -237,54 +237,13 @@ func (c *catAPI) routes(mux *http.ServeMux) {
 		if !c.admin(w, r) || !readJSON(w, r, &in) {
 			return
 		}
-		var shas []string
-		for _, rel := range c.st.CatReleases(in.ID) {
-			var x catalogue.Release
-			if json.Unmarshal([]byte(rel.Data), &x) == nil {
-				shas = append(shas, x.File.SHA256)
-			}
-		}
 		if err := c.st.CatalogueRemove(in.ID); err != nil {
 			bad(w, 500, "could not remove")
 			return
 		}
-		for _, s := range shas {
-			c.m.Prune(s)
-		}
 		reply(w, 200, map[string]any{"ok": true})
 	})
-	mux.HandleFunc("/phe/catalogue/upload", c.upload)
-	mux.HandleFunc("/phe/catalogue/release/remove", func(w http.ResponseWriter, r *http.Request) {
-		var in struct {
-			Catalogue string
-			AppID     string `json:"app_id"`
-			Version   string
-		}
-		if !c.admin(w, r) || !readJSON(w, r, &in) {
-			return
-		}
-		var shas []string
-		for _, rel := range c.st.CatReleases(in.Catalogue) {
-			var x catalogue.Release
-			if rel.AppID == in.AppID && rel.Version == in.Version && json.Unmarshal([]byte(rel.Data), &x) == nil {
-				shas = append(shas, x.File.SHA256)
-				if x.Icon != nil {
-					shas = append(shas, x.Icon.SHA256)
-				}
-				for _, s := range x.Screenshots {
-					shas = append(shas, s.SHA256)
-				}
-			}
-		}
-		if ok, err := c.st.CatReleaseDelete(in.Catalogue, in.AppID, in.Version); err != nil || !ok {
-			bad(w, 404, "no such release")
-			return
-		}
-		for _, s := range shas {
-			c.m.Prune(s)
-		}
-		reply(w, 200, map[string]any{"ok": true})
-	})
+	c.libraryRoutes(mux)
 	mux.HandleFunc("/phe/catalogue/apps", func(w http.ResponseWriter, r *http.Request) {
 		if !c.admin(w, r) {
 			return
@@ -296,12 +255,8 @@ func (c *catAPI) routes(mux *http.ServeMux) {
 		}
 		_, rep, _ := c.m.Build(cat, prefix(publicBase(r), cat))
 		rels := []catalogue.Release{}
-		for _, row := range c.st.CatReleases(cat.ID) {
-			var x catalogue.Release
-			if json.Unmarshal([]byte(row.Data), &x) == nil {
-				x.Published = row.Created
-				rels = append(rels, x)
-			}
+		for _, rs := range c.m.Hosted(cat.ID) {
+			rels = append(rels, rs...)
 		}
 		if rep == nil {
 			rep = []catalogue.AppReport{}
@@ -469,8 +424,8 @@ func (c *catAPI) routes(mux *http.ServeMux) {
 func (c *catAPI) describe(cat store.Catalogue, base string) map[string]any {
 	idx := prefix(base, cat) + "/index.json"
 	apps := map[string]bool{}
-	for _, r := range c.st.CatReleases(cat.ID) {
-		apps[r.AppID] = true
+	for id := range c.m.Hosted(cat.ID) {
+		apps[id] = true
 	}
 	d := map[string]any{"id": cat.ID, "name": cat.Name, "public": cat.Public, "priority": cat.Priority, "sync_interval": cat.SyncInterval,
 		"created": cat.Created, "index_url": idx, "hosted_apps": len(apps), "sources": len(c.st.CatSources(cat.ID))}
@@ -527,96 +482,3 @@ func splitList(s string) []string {
 	return out
 }
 
-// upload stores one release: the installation file, optional icon and screenshots, and the metadata.
-func (c *catAPI) upload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost || !c.admin(w, r) {
-		return
-	}
-	limit := c.m.MaxFile
-	if limit <= 0 {
-		limit = 2 << 30
-	}
-	r.Body = http.MaxBytesReader(w, r.Body, limit+64<<20)
-	if err := r.ParseMultipartForm(16 << 20); err != nil {
-		bad(w, 400, "bad upload: "+err.Error())
-		return
-	}
-	defer r.MultipartForm.RemoveAll()
-	cat, ok := c.st.Catalogue(r.FormValue("catalogue"))
-	if !ok {
-		bad(w, 404, "unknown catalogue")
-		return
-	}
-	hdrs := r.MultipartForm.File["file"]
-	if len(hdrs) != 1 {
-		bad(w, 400, "one installation file is needed (field \"file\")")
-		return
-	}
-	rel := catalogue.Release{
-		AppID: r.FormValue("app_id"), Version: r.FormValue("version"), Name: r.FormValue("name"), Summary: r.FormValue("summary"),
-		Description: r.FormValue("description"), Category: r.FormValue("category"), License: r.FormValue("license"), Homepage: r.FormValue("homepage"),
-		Platform: r.FormValue("platform"), Package: r.FormValue("package"), Arch: splitList(r.FormValue("arch")), Boards: splitList(r.FormValue("boards")),
-		MinCore: r.FormValue("min_core"), Legacy: formBool(r.FormValue("legacy")), NeedsPlatsec: formBool(r.FormValue("needs_platsec_hack")),
-	}
-	for _, a := range strings.Split(r.FormValue("authors"), ",") {
-		if a = strings.TrimSpace(a); a != "" {
-			rel.Authors = append(rel.Authors, a)
-		}
-	}
-	rel.File.Name = hdrs[0].Filename
-	if err := rel.Normalize(); err != nil {
-		bad(w, 400, err.Error())
-		return
-	}
-	saveFiles := func(field string, max int64) ([]catalogue.Blob, bool) {
-		var out []catalogue.Blob
-		for _, fh := range r.MultipartForm.File[field] {
-			f, err := fh.Open()
-			if err != nil {
-				bad(w, 400, "bad upload")
-				return nil, false
-			}
-			sha, size, err := c.m.PutBlob(f, max, "")
-			f.Close()
-			if err != nil {
-				bad(w, 413, err.Error())
-				return nil, false
-			}
-			name := catalogue.SafeName(fh.Filename)
-			if name == "" {
-				name = sha[:12]
-			}
-			out = append(out, catalogue.Blob{Name: name, SHA256: sha, Size: size})
-		}
-		return out, true
-	}
-	file, ok := saveFiles("file", limit)
-	if !ok {
-		return
-	}
-	rel.File = file[0]
-	if icon, ok := saveFiles("icon", 4<<20); !ok {
-		return
-	} else if len(icon) > 0 {
-		rel.Icon = &icon[0]
-	}
-	shots, ok := saveFiles("screenshot", 8<<20)
-	if !ok {
-		return
-	}
-	if len(shots) > 12 {
-		bad(w, 400, "at most 12 screenshots")
-		return
-	}
-	rel.Screenshots = shots
-	if err := rel.Normalize(); err != nil { // the real file name is known now
-		bad(w, 400, err.Error())
-		return
-	}
-	data, _ := json.Marshal(rel)
-	if err := c.st.CatReleasePut(store.CatRelease{Catalogue: cat.ID, AppID: rel.AppID, Version: rel.Version, Data: string(data)}); err != nil {
-		bad(w, 500, "could not save")
-		return
-	}
-	reply(w, 200, map[string]any{"release": rel, "url": prefix(publicBase(r), cat) + "/files/" + rel.File.SHA256 + "/" + rel.File.Name})
-}

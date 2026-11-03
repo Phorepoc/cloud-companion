@@ -137,7 +137,7 @@ func (s *Store) CatalogueRemove(id string) error {
 			return err
 		}
 	}
-	if _, err := s.db.Exec(`DELETE FROM cat_releases WHERE catalogue=?`, id); err != nil {
+	if _, err := s.db.Exec(`DELETE FROM cat_publish WHERE catalogue=?`, id); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(`DELETE FROM catalogues WHERE id=?`, id)
@@ -320,7 +320,7 @@ func (s *Store) CatMirrors(source string) map[string]CatMirror {
 // CatBlobReferenced says whether any hosted release or cached mirror still uses the file with this SHA-256 (hosted data names it in its JSON).
 func (s *Store) CatBlobReferenced(sha string) bool {
 	var n int
-	if s.db.QueryRow(`SELECT COUNT(*) FROM cat_releases WHERE data LIKE ?`, "%"+sha+"%").Scan(&n) == nil && n > 0 {
+	if s.db.QueryRow(`SELECT COUNT(*) FROM cat_library WHERE sha256=? OR icon_sha=? OR edits LIKE ? OR legacy LIKE ?`, sha, sha, "%"+sha+"%", "%"+sha+"%").Scan(&n) == nil && n > 0 {
 		return true
 	}
 	return s.db.QueryRow(`SELECT COUNT(*) FROM cat_mirror WHERE sha256=? AND state='ok'`, sha).Scan(&n) == nil && n > 0
