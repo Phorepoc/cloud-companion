@@ -6,13 +6,12 @@ Catalogue is the software store on a Phorepoc phone. By default it reads the off
 files, it publishes an `index.json` with each file's size and SHA-256, and it can merge in other lists (the official one, a friend's
 Cloud Companion, any compatible `index.json`) and keep copies of their files, so a phone downloads everything from one place.
 
-Code: `internal/catalogue` (merge, files, sync), `internal/webui/catalogue.go` (HTTP), `internal/store/catalogue.go` (tables, migration 2),
+Code: `internal/pkginfo` (SIS / APK / MBM readers), `internal/catalogue` (library scan, merge, files, sync), `internal/webui/catalogue.go` (HTTP), `internal/store/catalogue.go` (tables, migrations 2 and 4),
 the **Catalogue** page of the web app (`web/src/pages/CataloguePage.vue`). Tests: `internal/webui/catalogue_test.go`.
 
 ## Using it
 1. Open **Catalogue** in the web app (owner only) and make a catalogue. Choose **public** (no token) or **private** (a secret token is part of the address).
-2. **Upload an app**: the file, an id (`my-app`), a version and a name; summary, description, platform, processors, target boards and an icon are optional.
-   Uploading the same id with a new version adds a release; the newest upload gives the name and description.
+2. **Add apps**: put the files in the library folder and press **Rescan** (or **Upload a file**); the name, version, vendor and icon are read from the file. Select entries and press **Publish**. Edit the description or anything else with the pencil. See "The library" below.
 3. Copy the **address for Catalogue** shown under the catalogue (`https://you.example.org/catalogue/<id>/index.json`, private ones
    `.../catalogue/<id>/<token>/index.json`). The address is built from `PHECLOUD_PUBLIC_URL`, else from the host your browser used (behind a
    reverse proxy: set `PHECLOUD_TRUSTED_PROXIES`, see reverse-proxy.md). Phones need a plain `http://` or `https://` address they can reach.
@@ -27,11 +26,61 @@ screen for adding a list; the file is the way. The app merges the lists by `id` 
 first, so an app id that is also in the official list shows the official entry on the phone; use your own ids. (Giving the official list to
 your catalogue as a source is still useful for keeping copies of its files on your server and for other clients.)
 
+## The library
+Packages live in **one library folder** for the whole server, and each catalogue **publishes entries from it** (a file can be in several catalogues,
+a catalogue can offer files from any subfolder). One folder with per-catalogue publishing was chosen over a folder per catalogue because the same file
+is often offered in more than one list, moving a file between catalogues should not be a file operation, and a scan reads each file once.
+
+`PHECLOUD_CATALOGUE_LIBRARY` is the folder (default `<catalogue dir>/library`; the compose file mounts a volume, or a host folder given by
+`PHECLOUD_CATALOGUE_LIBRARY_DIR`, at `/library`). Put `.sis`, `.sisx`, `.apk` (and `.exe`, `.msi`, `.deb`, `.rpm`, `.zip` ... , which carry no
+metadata we read) in it, in any subfolders. Dot-files and dot-folders are ignored.
+
+### Scanning
+A scan runs **at start, every `PHECLOUD_CATALOGUE_SCAN_INTERVAL` seconds (default 900, 0 = never), and on request** (the **Rescan** button, `POST /phe/catalogue/library/scan`).
+- **Added**: a new file becomes an entry (unpublished) with the metadata read from it.
+- **Changed**: a file whose size or modification time moved is hashed; a different SHA-256 means the file changed and its metadata is read again.
+  A published entry stays published and serves the new file. A package that stops being readable is unpublished and flagged.
+- **Moved / renamed**: the same SHA-256 under a new path is the same entry (publication and edits kept).
+- **Removed**: the entry is **unpublished at once in every catalogue** and flagged **File missing** with the time it was noticed. The owner either
+  deletes the entry or puts the file back and rescans: the entry returns to normal but is **not published again on its own**.
+- **Unreadable**: the file is not a valid package of its type (or is too large to read, over 512 MiB for a SIS). It is listed with the reason and can be published
+  only after its details are filled in by hand.
+- **Upload** in the page (or `POST /phe/catalogue/upload`, same fields as before) stores the file in `uploads/` of the library and scans it; an upload
+  with the same name and other content gets the hash in its name. The upload API publishes at once into the named catalogue (`publish=0` to not); a
+  same-id-same-version upload replaces the earlier one.
+
+### What the scanner reads
+| Package | Read |
+|---|---|
+| SIS / SISX (Symbian 9) | English (else first) package name, vendor, version, package UID (app id `uid-xxxxxxxx`), languages, target devices (UID names such as S60 5th Edition, Symbian^3, Belle, and the names in the file), the number of installed files, the **processor from the first executable's E32 header** (`arm`, or `x32` for images built for this system), zlib-compressed blocks. **Icon**: the `_reg.rsc` / `_loc.rsc` resources are searched for the icon file name (8-bit and UTF-16 text; the resource structure is not parsed), else a picture file named like an icon; an **MBM** is decoded (all colour depths, run-length coded, with its mask as alpha) to PNG. |
+| APK | binary `AndroidManifest.xml` and `resources.arsc`: package name (app id, lower case), `versionName` (else `versionCode`), the application label (strings and string resources, no-locale entry first, then English), `minSdkVersion`, the processors from `lib/<abi>/`. **Icon**: the densest PNG of the icon resource; an adaptive icon whose layers are PNGs or colours is composed. Vector and WebP icons are not drawn and the entry says so. |
+| other | name from the file name, platform and package type from the extension; the version must be entered. |
+
+The description is **never** read (packages do not carry one): it is yours to enter. Nothing from the package is executed or installed.
+
+### Edits and the rule for keeping them
+Name, app id, version, summary, description, homepage, category, license, authors, platform, processors, boards and the icon can be edited per
+entry; an edit overrides what the file says, an empty field means "as read". The edits are kept separately from what was read, so a rescan never loses
+them. **When the file changes**: the new metadata replaces what was read; edits stay if it is the same app (same app id read from the file) except the
+**version**, which is always read again; if the app id read from the file is different, all edits are dropped, since it is another app.
+
+### Publishing
+**Publish** / **Unpublish** act on the selected entries for the open catalogue. An entry can only be published when it is not missing and its release
+is complete (app id, version, name). Two published entries with the same app id and version in one catalogue are refused (unpublish the other first).
+Deleting an entry removes it and its publications; with "also delete the file" it removes the file from the folder as well (otherwise the next scan
+finds it again).
+
+### Upgrading
+Migration 4 moves every release of the earlier model (`cat_releases`) into the library as a published **stored** entry in its catalogue, with its file
+still in `blobs/`; nothing is lost and the served `index.json` is unchanged. The old table is left in place, no longer read.
+
 ## Data model (tables from migration 2)
 | Table | What it holds |
 |---|---|
 | `catalogues` | `id` (the address segment), `name`, `public`, `token` (private only), `priority` (of the hosted entries, default 100), `sync_interval` (seconds, default 21600, 0 = only by hand) |
-| `cat_releases` | one row per (catalogue, app id, version): the metadata and file description as JSON (`catalogue.Release`) |
+| `cat_library` (migration 4) | one row per package file: path in the library, SHA-256, size, status (`ok` / `missing` / `unreadable`), what was read (`meta`), the owner's `edits`, the icon, or a `stored` entry from an earlier version |
+| `cat_publish` (migration 4) | which catalogue publishes which library entry, and since when |
+| `cat_releases` | the earlier model, one row per (catalogue, app id, version); migration 4 moved it into the library; no longer read |
 | `cat_sources` | a federated source: `url`, optional bearer `token`, `priority` (default 50), `enabled`, `mirror`, last sync time and error |
 | `cat_source_items` | the source's last fetched listing, one JSON item per app id, with the per-app `mirror` override (-1 follow the source, 0 never, 1 always) |
 | `cat_mirror` | per source and SHA-256: `ok`, `failed` or `mismatch` (and the reason) for the cached file |
@@ -119,5 +168,5 @@ a source are not copied; they keep the source's address.
 ## Not done
 - A settings screen in the phone's Catalogue for adding lists and tokens (today: `indexes.txt`).
 - A command line (`phecloud catalogue ...`); the owner API and web page cover everything.
-- Browser tests for the Catalogue page (the Go tests cover the API and the rules above).
+- Browser tests for the Catalogue page (the Go tests cover the API and the rules above). Not read: MIF / SVG-T icons (see the next step), WebP and vector Android icons, AIF icons of old S60 apps, embedded SIS files.
 - Per-release approval, signatures of listings (the SHA-256 is the integrity check), garbage collection of files left by a crash during upload (`tmp/`).

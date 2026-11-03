@@ -162,3 +162,14 @@ export interface CatRelease {
 }
 /** POST /phe/catalogue/sync: one source's result. */
 export interface CatSyncResult { id: string; name: string; ok: boolean; summary?: unknown; detail?: string }
+
+/** GET /phe/catalogue/library: one package file of the library with what was read from it (internal/webui/library.go libEntry). */
+export interface CatLibEntry {
+  id: string; path: string; kind: 'library' | 'stored'; sha256: string; size: number; status: 'ok' | 'missing' | 'unreadable'; error: string
+  name: string; app_id: string; version: string; platform: string; package: string; arch?: string[]; summary: string; description: string
+  problem?: string; published: boolean; published_in: string[]; icon_data?: string; icon_note?: string; added: number; changed: number
+  meta: { vendor?: string; uid?: string; targets?: string[]; languages?: string[]; read: boolean }
+  edits: { app_id?: string; version?: string; name?: string; summary?: string; description?: string; category?: string; license?: string; homepage?: string }
+}
+export interface CatScanResult { total: number; added: string[]; changed: string[]; removed: string[]; restored: string[]; renamed: string[]; unreadable: string[]; seconds: number }
+export interface CatLibraryInfo { path: string; scan_interval: number; last_scan: number; last_result: CatScanResult }

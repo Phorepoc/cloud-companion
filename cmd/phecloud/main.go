@@ -155,6 +155,14 @@ func main() {
 				cat.MaxFile = v
 			}
 			go cat.Loop(context.Background(), time.Minute)
+			// the library: the folder the package files are read from (mount it into the container); scanned at start, then every PHECLOUD_CATALOGUE_SCAN_INTERVAL seconds (0 = on request only)
+			cat.Library = env("PHECLOUD_CATALOGUE_LIBRARY", filepath.Join(cat.Dir, "library"))
+			scanSecs := 900
+			if v, err := strconv.Atoi(os.Getenv("PHECLOUD_CATALOGUE_SCAN_INTERVAL")); err == nil && v >= 0 {
+				scanSecs = v
+			}
+			cat.ScanEvery = time.Duration(scanSecs) * time.Second
+			go cat.ScanLoop(context.Background(), cat.ScanEvery, func(msg string, kv ...any) { log.Info(msg, kv...) })
 			// timeouts: a client that never finishes its request headers must not hold a connection (and a goroutine) forever; WebSockets and long uploads are not limited by these
 			hs := &http.Server{Handler: webui.Handler(srv, mgr, cat), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 			go hs.Serve(hln)

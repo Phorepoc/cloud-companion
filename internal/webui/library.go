@@ -154,16 +154,36 @@ func (c *catAPI) libraryRoutes(mux *http.ServeMux) {
 		reply(w, 200, map[string]any{"ok": true})
 	})
 	mux.HandleFunc("/phe/catalogue/library/icon", func(w http.ResponseWriter, r *http.Request) {
-		// a new icon for an entry: the PNG as the request body
+		// a new icon for an entry: multipart with id and icon (a PNG)
 		if !c.admin(w, r) || r.Method != http.MethodPost {
 			return
 		}
-		f, ok := c.st.CatFile(r.URL.Query().Get("id"))
-		if !ok {
-			bad(w, 404, "unknown entry")
+		r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
+		if err := r.ParseMultipartForm(8 << 20); err != nil {
+			bad(w, 400, "bad upload")
 			return
 		}
-		sha, size, err := c.m.PutBlob(http.MaxBytesReader(w, r.Body, 4<<20), 4<<20, "")
+		defer r.MultipartForm.RemoveAll()
+		f, ok := c.st.CatFile(r.FormValue("id"))
+		hdrs := r.MultipartForm.File["icon"]
+		if !ok || len(hdrs) != 1 {
+			bad(w, 404, "unknown entry or no icon")
+			return
+		}
+		src, err := hdrs[0].Open()
+		if err != nil {
+			bad(w, 400, "bad upload")
+			return
+		}
+		defer src.Close()
+		head := make([]byte, 8)
+		src.Read(head)
+		src.Seek(0, 0)
+		if string(head[1:4]) != "PNG" {
+			bad(w, 400, "the icon must be a PNG picture")
+			return
+		}
+		sha, size, err := c.m.PutBlob(src, 4<<20, "")
 		if err != nil {
 			bad(w, 413, err.Error())
 			return

@@ -16,6 +16,8 @@ services:
       - "${PHECLOUD_WEB_BIND:-127.0.0.1}:8080:8080"
     volumes:
       - phecloud-data:/data
+      # the catalogue library (docs/catalogue.md): drop .sisx / .apk files here (set PHECLOUD_CATALOGUE_LIBRARY_DIR to a host folder, e.g. /srv/apps); uploads land in its uploads/ folder
+      - ${PHECLOUD_CATALOGUE_LIBRARY_DIR:-phecloud-library}:/library
     env_file:
       - path: deploy/hub/.env.phecloud   # written by deploy/hub/hub-init.sh; optional
         required: false
@@ -32,6 +34,8 @@ services:
       PHECLOUD_OAUTH_MS_SECRET: ${PHECLOUD_OAUTH_MS_SECRET:-}
       PHECLOUD_OAUTH_MS_TENANT: ${PHECLOUD_OAUTH_MS_TENANT:-common}
       PHECLOUD_PUBLIC_URL: ${PHECLOUD_PUBLIC_URL:-}
+      PHECLOUD_CATALOGUE_LIBRARY: /library
+      PHECLOUD_CATALOGUE_SCAN_INTERVAL: ${PHECLOUD_CATALOGUE_SCAN_INTERVAL:-900}   # seconds between automatic rescans; 0 = only when you press Rescan
     restart: unless-stopped
     # environment:
     #   PHECLOUD_PLAIN_LISTEN: ":7401"   # development only: plain TCP for client/test/run.sh
@@ -55,3 +59,4 @@ services:
 volumes:
   caddy-data:
   phecloud-data:
+  phecloud-library:

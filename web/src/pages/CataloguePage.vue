@@ -44,26 +44,48 @@
         <q-btn outline color="primary" no-caps label="Save" data-test="cat-save" @click="saveSettings" />
       </section>
 
-      <section class="ph-card ph-section" aria-labelledby="up-h">
-        <h2 id="up-h">Upload an app</h2>
-        <div class="ph-form">
-          <q-file v-model="u.file" outlined dense label="Installation file (.sisx, .apk, .exe, .deb, .zip ...)" data-test="up-file" />
-          <div class="ph-two">
-            <q-input v-model="u.app_id" outlined dense label="App id" hint="lower case, for example my-app" data-test="up-id" />
-            <q-input v-model="u.version" outlined dense label="Version" data-test="up-version" />
-          </div>
-          <q-input v-model="u.name" outlined dense label="Name" data-test="up-name" />
-          <q-input v-model="u.summary" outlined dense label="One-line summary" data-test="up-summary" />
-          <q-input v-model="u.description" outlined dense type="textarea" label="Description (optional)" data-test="up-desc" />
-          <div class="ph-two">
-            <q-select v-model="u.platform" :options="platforms" emit-value map-options outlined dense label="Platform" data-test="up-platform" />
-            <q-input v-model="u.arch" outlined dense label="Processors" hint="arm, x32 | aarch64, x86_64 ... (empty = default)" data-test="up-arch" />
-          </div>
-          <q-input v-model="u.boards" outlined dense label="Only these devices (optional)" hint="board names, comma separated" data-test="up-boards" />
-          <q-file v-model="u.icon" outlined dense label="Icon (optional, PNG)" data-test="up-icon" />
-          <q-btn unelevated color="primary" icon="sym_o_upload" label="Upload" :loading="busy === 'up'" data-test="up-go" @click="upload" />
-          <p v-if="upMsg" :class="upMsg.ok ? 'ph-ok' : 'ph-error'" role="status" data-test="up-result">{{ upMsg.text }}</p>
+      <section class="ph-card ph-section" aria-labelledby="lib-h">
+        <div class="ph-row">
+          <h2 id="lib-h">Library</h2>
+          <q-btn outline color="primary" no-caps icon="sym_o_refresh" label="Rescan" :loading="busy === 'scan'" data-test="lib-scan" @click="rescan" />
+          <q-btn unelevated color="primary" no-caps icon="sym_o_upload" label="Upload a file" data-test="lib-upload" @click="uploading = true" />
         </div>
+        <p class="ph-muted ph-small" data-test="lib-info">
+          Files in <code>{{ libInfo?.path }}</code> are read automatically: name, version, vendor and icon come from the file itself.
+          {{ libInfo && libInfo.scan_interval ? 'Rescanned every ' + Math.round(libInfo.scan_interval / 60) + ' minutes' : 'Rescanned only when you press Rescan' }}<span v-if="libInfo && libInfo.last_scan">; last scan {{ new Date(libInfo.last_scan * 1000).toLocaleString() }}</span>.
+        </p>
+        <p v-if="scanMsg" class="ph-ok ph-small" role="status" data-test="scan-result">{{ scanMsg }}</p>
+        <div v-for="e in missing" :key="e.id" class="ph-error ph-small" role="alert" data-test="missing-warning">
+          <q-icon name="sym_o_warning" size="18px" aria-hidden="true" /> {{ e.name }}: the file <code>{{ e.path }}</code> is missing, so it was unpublished. Put the file back and rescan, or delete the entry.
+        </div>
+        <div class="ph-row">
+          <q-input v-model="filter" outlined dense clearable label="Search" class="ph-grow" data-test="lib-filter" />
+          <q-checkbox :model-value="allSelected" label="Select all shown" data-test="lib-all" @update:model-value="toggleAll" />
+        </div>
+        <div class="ph-row">
+          <q-btn unelevated color="primary" no-caps icon="sym_o_publish" :label="'Publish (' + selected.length + ')'" :disable="!selected.length" data-test="lib-publish" @click="publish(true)" />
+          <q-btn outline color="primary" no-caps icon="sym_o_unpublished" label="Unpublish" :disable="!selected.length" data-test="lib-unpublish" @click="publish(false)" />
+        </div>
+        <p v-if="!entries.length" class="ph-muted" data-test="no-lib">The library is empty. Put .sisx or .apk files in the folder and press Rescan, or upload one.</p>
+        <ul v-else class="ph-list" aria-label="Library">
+          <li v-for="e in shown" :key="e.id" data-test="lib-row">
+            <q-checkbox v-model="selected" :val="e.id" :aria-label="'Select ' + e.name" :disable="e.status === 'missing' && !e.published" />
+            <img v-if="e.icon_data" :src="e.icon_data" alt="" width="48" height="48" class="ph-icon" data-test="lib-icon" />
+            <div v-else class="ph-icon ph-muted ph-small" :title="e.icon_note || 'No icon in the file'">{{ e.icon_note ? 'No icon shown' : '' }}</div>
+            <div class="ph-grow">
+              <strong>{{ e.name }}</strong> <span class="ph-small ph-muted">{{ e.version }}</span>
+              <span class="ph-chip" data-test="lib-status">{{ statusText(e) }}</span>
+              <div class="ph-small ph-muted">{{ e.platform }} / {{ e.package }}<span v-if="e.arch && e.arch.length"> / {{ e.arch.join(', ') }}</span> · {{ fmtSize(e.size) }} · {{ e.path }}</div>
+              <div v-if="e.meta.vendor" class="ph-small ph-muted">{{ e.meta.vendor }}<span v-if="e.meta.targets && e.meta.targets.length"> · for {{ e.meta.targets.join(', ') }}</span></div>
+              <div v-if="e.status !== 'ok'" class="ph-error ph-small" role="alert">{{ e.error }}</div>
+              <div v-else-if="e.problem" class="ph-small ph-muted">Cannot be published yet: {{ e.problem }}</div>
+              <div v-if="e.icon_note && !e.icon_data" class="ph-small ph-muted">{{ e.icon_note }}</div>
+            </div>
+            <q-btn flat round icon="sym_o_edit" :aria-label="'Edit ' + e.name" data-test="lib-edit" @click="edit(e)" />
+            <q-btn flat round color="negative" icon="sym_o_delete" :aria-label="'Delete ' + e.name" data-test="lib-delete" @click="askDelete = e" />
+          </li>
+        </ul>
+        <p v-if="libError" class="ph-error" role="alert" data-test="lib-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ libError }}</p>
       </section>
 
       <section class="ph-card ph-section" aria-labelledby="src-h">
@@ -107,16 +129,61 @@
             </div>
           </li>
         </ul>
-        <h3 class="ph-h3">Your uploads</h3>
-        <ul class="ph-list" aria-label="Uploaded releases">
-          <li v-for="r in releases" :key="r.app_id + r.version" data-test="rel-row">
-            <div class="ph-grow">{{ r.name }} {{ r.version }} <span class="ph-chip">{{ r.platform }} / {{ r.package }}</span>
-              <div class="ph-small ph-muted">{{ r.file.name }}, {{ r.file.size }} bytes, sha256 {{ r.file.sha256.slice(0, 16) }}...</div></div>
-            <q-btn flat round color="negative" icon="sym_o_delete" :aria-label="'Remove ' + r.name + ' ' + r.version" data-test="rel-remove" @click="removeRel(r)" />
-          </li>
-        </ul>
       </section>
     </template>
+
+    <q-dialog v-model="uploading">
+      <q-card class="ph-dialog" data-test="up-dialog">
+        <q-card-section class="ph-form">
+          <h2 class="ph-h3">Upload a file</h2>
+          <p class="ph-small ph-muted">The file goes into the library folder and is read like any other. Name, version and icon come from the file; change them afterwards if you want.</p>
+          <q-file v-model="u.file" outlined dense label="Installation file (.sisx, .apk, .exe, .deb, .zip ...)" data-test="up-file" />
+          <q-input v-model="u.version" outlined dense label="Version (only for files that do not carry one)" data-test="up-version" />
+          <q-toggle v-model="u.publish" label="Publish it in this catalogue now" data-test="up-publish" />
+          <p v-if="upMsg" :class="upMsg.ok ? 'ph-ok' : 'ph-error'" role="status" data-test="up-result">{{ upMsg.text }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Close" v-close-popup />
+          <q-btn unelevated color="primary" no-caps icon="sym_o_upload" label="Upload" :loading="busy === 'up'" data-test="up-go" @click="upload" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog :model-value="!!ed" @update:model-value="ed = null">
+      <q-card v-if="ed" class="ph-dialog" data-test="edit-dialog">
+        <q-card-section class="ph-form">
+          <h2 class="ph-h3">Details of {{ ed.entry.name }}</h2>
+          <p class="ph-small ph-muted">Leave a field empty to use what the file says. Your changes are kept when the folder is rescanned, unless the file turns out to be another app. A new version of the same app keeps them, except the version, which is read again.</p>
+          <q-input v-model="ed.e.name" outlined dense label="Name" :placeholder="ed.entry.meta.read ? '' : ed.entry.name" data-test="ed-name" />
+          <div class="ph-two">
+            <q-input v-model="ed.e.app_id" outlined dense label="App id" hint="lower case, for example my-app" data-test="ed-id" />
+            <q-input v-model="ed.e.version" outlined dense label="Version" data-test="ed-version" />
+          </div>
+          <q-input v-model="ed.e.summary" outlined dense label="One-line summary" data-test="ed-summary" />
+          <q-input v-model="ed.e.description" outlined dense type="textarea" label="Description" hint="Files do not carry one" data-test="ed-desc" />
+          <q-input v-model="ed.e.homepage" outlined dense label="Homepage (optional)" data-test="ed-home" />
+          <q-file v-model="ed.icon" outlined dense accept="image/png" label="Replace the icon (PNG)" data-test="ed-icon" />
+          <p v-if="ed.error" class="ph-error" role="alert">{{ ed.error }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" v-close-popup />
+          <q-btn unelevated color="primary" no-caps label="Save" data-test="ed-save" @click="saveEdit" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
+    <q-dialog :model-value="!!askDelete" @update:model-value="askDelete = null">
+      <q-card v-if="askDelete" class="ph-dialog" data-test="del-dialog">
+        <q-card-section>
+          Delete the entry "{{ askDelete.name }}"?
+          <q-checkbox v-if="askDelete.status !== 'missing' && askDelete.kind === 'library'" v-model="delFile" label="Also delete the file from the library folder (otherwise the next scan finds it again)" data-test="del-file" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat no-caps label="Cancel" v-close-popup />
+          <q-btn unelevated color="negative" no-caps label="Delete" data-test="del-yes" @click="deleteEntry" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
 
     <q-dialog v-model="creating">
       <q-card class="ph-dialog" data-test="cat-dialog">
@@ -163,32 +230,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { apiCall, apiUpload } from '../cloud'
-import type { CatAppReport, CatRelease, CatSourceInfo, CatSyncResult, CatalogueInfo } from '../proto'
+import type { CatAppReport, CatLibEntry, CatLibraryInfo, CatScanResult, CatSourceInfo, CatSyncResult, CatalogueInfo } from '../proto'
 
-/** The upload form: the installation file and icon, and the text fields (empty = taken from the file). */
-interface UploadForm { file: File | null; icon: File | null; app_id: string; version: string; name: string; summary: string; description: string; platform: string; arch: string; boards: string }
-type UploadText = Exclude<keyof UploadForm, 'file' | 'icon'>
+type Edits = CatLibEntry['edits']
 
 const cats = ref<CatalogueInfo[]>([])
 const cur = ref<CatalogueInfo | null>(null)
 const syncHours = ref(6)
 const sources = ref<CatSourceInfo[]>([])
 const apps = ref<CatAppReport[]>([])
-const releases = ref<CatRelease[]>([])
+const entries = ref<CatLibEntry[]>([])
+const libInfo = ref<CatLibraryInfo | null>(null)
+const selected = ref<string[]>([])
+const filter = ref('')
+const scanMsg = ref('')
+const libError = ref('')
 const error = ref('')
 const busy = ref('')
 const creating = ref(false)
 const addingSrc = ref(false)
+const uploading = ref(false)
 const askRemove = ref<CatalogueInfo | null>(null)
+const askDelete = ref<CatLibEntry | null>(null)
+const delFile = ref(false)
+const ed = ref<{ entry: CatLibEntry; e: Edits; icon: File | null; error: string } | null>(null)
 const upMsg = ref<{ ok: boolean; text: string } | null>(null)
 const nc = reactive({ id: '', name: '', public: false })
 const ns = reactive({ url: '', name: '', token: '', priority: 50, mirror: false })
-const blank = (): UploadForm => ({ file: null, app_id: '', version: '', name: '', summary: '', description: '', platform: '', arch: '', boards: '', icon: null })
-const u = reactive(blank())
-const platforms = [{ label: 'Detect from the file', value: '' }, { label: 'Symbian', value: 'symbian' }, { label: 'Android', value: 'android' }, { label: 'Windows', value: 'windows' },
-  { label: 'Linux', value: 'linux' }, { label: 'macOS', value: 'macos' }, { label: 'Other', value: 'other' }]
+const u = reactive<{ file: File | null; version: string; publish: boolean }>({ file: null, version: '', publish: false })
+
+const shown = computed(() => {
+  const f = (filter.value || '').toLowerCase()
+  return entries.value.filter((e) => !f || (e.name + ' ' + e.path + ' ' + e.app_id + ' ' + e.platform).toLowerCase().includes(f))
+})
+const missing = computed(() => entries.value.filter((e) => e.status === 'missing'))
+const allSelected = computed(() => shown.value.length > 0 && shown.value.every((e) => selected.value.includes(e.id)))
+const toggleAll = (v: boolean) => { selected.value = v ? shown.value.filter((e) => e.status !== 'missing').map((e) => e.id) : [] }
+const fmtSize = (n: number) => (n >= 1 << 20 ? (n / (1 << 20)).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB')
+function statusText(e: CatLibEntry) {
+  if (e.status === 'missing') return 'File missing'
+  if (e.status === 'unreadable') return e.published ? 'Published, unreadable' : 'Unreadable'
+  return e.published ? 'Published' : 'Unpublished'
+}
 
 async function guard<T>(fn: () => Promise<T>) { try { error.value = ''; return await fn() } catch (e) { error.value = (e as Error).message } }
 async function load() {
@@ -198,16 +283,23 @@ async function load() {
     if (cur.value) await loadCur()
   })
 }
+async function loadLibrary() {
+  if (!cur.value) return
+  const j = await apiCall('GET', '/phe/catalogue/library?catalogue=' + encodeURIComponent(cur.value.id))
+  entries.value = j.entries
+  libInfo.value = j.library
+  const ids = new Set(entries.value.map((e) => e.id))
+  selected.value = selected.value.filter((id) => ids.has(id))
+}
 async function loadCur() {
   if (!cur.value) return
   const id = encodeURIComponent(cur.value.id)
   syncHours.value = Math.round(cur.value.sync_interval / 3600)
   sources.value = (await apiCall('GET', '/phe/catalogue/sources?catalogue=' + id)).sources
-  const a = await apiCall('GET', '/phe/catalogue/apps?catalogue=' + id)
-  apps.value = a.apps
-  releases.value = a.releases
+  apps.value = (await apiCall('GET', '/phe/catalogue/apps?catalogue=' + id)).apps
+  await loadLibrary()
 }
-function open(c: CatalogueInfo) { cur.value = { ...c }; guard(loadCur) }
+function open(c: CatalogueInfo) { cur.value = { ...c }; selected.value = []; scanMsg.value = ''; guard(loadCur) }
 async function create() {
   await guard(async () => {
     const j = await apiCall('POST', '/phe/catalogues', { id: nc.id.trim(), name: nc.name.trim(), public: nc.public })
@@ -231,25 +323,74 @@ async function removeCat() {
   if (!c) return
   await guard(async () => { await apiCall('POST', '/phe/catalogues/remove', { id: c.id }); if (cur.value && cur.value.id === c.id) cur.value = null; await load() })
 }
+
+async function libGuard(fn: () => Promise<void>) { try { libError.value = ''; await fn() } catch (e) { libError.value = (e as Error).message } }
+async function rescan() {
+  busy.value = 'scan'
+  await libGuard(async () => {
+    const r = (await apiCall('POST', '/phe/catalogue/library/scan', {})).result as CatScanResult
+    const bits = [
+      r.added.length && r.added.length + ' added', r.changed.length && r.changed.length + ' changed', r.removed.length && r.removed.length + ' removed and unpublished',
+      r.restored.length && r.restored.length + ' back again', r.renamed.length && r.renamed.length + ' moved', r.unreadable.length && r.unreadable.length + ' unreadable',
+    ].filter(Boolean)
+    scanMsg.value = 'Scanned ' + r.total + ' file(s): ' + (bits.length ? bits.join(', ') : 'nothing new') + '.'
+    await loadCur()
+  })
+  busy.value = ''
+}
+async function publish(on: boolean) {
+  if (!cur.value || !selected.value.length) return
+  await libGuard(async () => {
+    const j = await apiCall('POST', '/phe/catalogue/library/publish', { catalogue: cur.value!.id, ids: selected.value, publish: on })
+    const probs = Object.entries(j.problems as Record<string, string>)
+    if (probs.length) {
+      const name = (id: string) => entries.value.find((e) => e.id === id)?.name || id
+      libError.value = probs.map(([id, why]) => name(id) + ': ' + why).join('; ')
+    }
+    await load()
+  })
+}
+function edit(e: CatLibEntry) { ed.value = { entry: e, e: { ...e.edits }, icon: null, error: '' } }
+async function saveEdit() {
+  const s = ed.value
+  if (!s) return
+  const clean: Edits = {}
+  for (const [k, v] of Object.entries(s.e)) if (typeof v === 'string' && v.trim()) (clean as Record<string, string>)[k] = v.trim()
+  try {
+    await apiCall('POST', '/phe/catalogue/library/edit', { id: s.entry.id, edits: clean })
+    if (s.icon) {
+      const f = new FormData()
+      f.append('id', s.entry.id)
+      f.append('icon', s.icon)
+      await apiUpload('/phe/catalogue/library/icon', f)
+    }
+    ed.value = null
+    await loadCur()
+  } catch (e) { s.error = (e as Error).message }
+}
+async function deleteEntry() {
+  const e = askDelete.value
+  askDelete.value = null
+  if (!e) return
+  await libGuard(async () => { await apiCall('POST', '/phe/catalogue/library/remove', { id: e.id, delete_file: delFile.value }); delFile.value = false; await loadCur() })
+}
 async function upload() {
   upMsg.value = null
   if (!u.file) { upMsg.value = { ok: false, text: 'Choose the installation file first.' }; return }
   busy.value = 'up'
   try {
     const f = new FormData()
-    f.append('catalogue', cur.value!.id) // the upload form shows only with a catalogue open
-    for (const k of ['app_id', 'version', 'name', 'summary', 'description', 'platform', 'arch', 'boards'] as UploadText[]) f.append(k, u[k] || '')
+    f.append('catalogue', cur.value!.id)
+    f.append('publish', u.publish ? '1' : '0')
+    if (u.version) f.append('version', u.version)
     f.append('file', u.file)
-    if (u.icon) f.append('icon', u.icon)
-    const j = await apiUpload('/phe/catalogue/upload', f)
-    upMsg.value = { ok: true, text: 'Uploaded ' + j.release.name + ' ' + j.release.version + '.' }
-    Object.assign(u, blank())
+    await apiUpload('/phe/catalogue/upload', f)
+    upMsg.value = { ok: true, text: 'Uploaded ' + u.file.name + '.' }
+    Object.assign(u, { file: null, version: '' })
     await loadCur()
   } catch (e) { upMsg.value = { ok: false, text: (e as Error).message } } finally { busy.value = '' }
 }
-async function removeRel(r: CatRelease) {
-  await guard(async () => { await apiCall('POST', '/phe/catalogue/release/remove', { catalogue: cur.value!.id, app_id: r.app_id, version: r.version }); await loadCur() })
-}
+
 async function addSource() {
   await guard(async () => {
     await apiCall('POST', '/phe/catalogue/sources', { catalogue: cur.value!.id, url: ns.url.trim(), name: ns.name.trim(), token: ns.token, priority: ns.priority || 0, mirror: ns.mirror })
@@ -279,3 +420,7 @@ const syncAll = () => runSync({ catalogue: cur.value!.id })
 
 onMounted(load)
 </script>
+
+<style scoped>
+.ph-icon { width: 48px; height: 48px; flex: none; object-fit: contain; display: flex; align-items: center; justify-content: center; text-align: center; border-radius: var(--ph-radius, 8px); }
+</style>
