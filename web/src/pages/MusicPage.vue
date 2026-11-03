@@ -174,7 +174,7 @@ watch(() => state.status === 'online' && state.admin, (on) => { if (on) api.devi
 .ph-nowbar__t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-nowbar__seek { display: flex; align-items: center; gap: var(--ph-s2); }
 .ph-nowbar__ctl { display: flex; align-items: center; gap: 10px; }
-/* Belle lit squircle buttons (dark glossy, top-lit) */
+/* Etesian lit squircle buttons (dark glossy, top-lit) */
 .ph-lit { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; color: #fff; cursor: pointer;
   background: linear-gradient(#4A4A4F, #1E1E21 50%, #0C0C0D); }
 .ph-lit--big { width: 46px; height: 46px; }

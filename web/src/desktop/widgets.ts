@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Desktop widgets (after the Etesian Belle widgets): what kinds there are, their size on the 90 px grid, and where they are.
+// Desktop widgets (after the Etesian widgets): what kinds there are, their size on the 90 px grid, and where they are.
 // The arrangement is kept on this device (localStorage), like the windows.
 
 export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'clock-gear' | 'clock-lcd' | 'weather' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'today'

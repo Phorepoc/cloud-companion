@@ -5,7 +5,7 @@
 //   BASE=http://localhost:8080 CODE=... CODE2=... OUT=/out node --experimental-strip-types files.ts
 //
 // Folders, upload, rename, delete (after the Undo toast), a public share link and stopping it; the music library from the
-// uploaded songs (generated cover), playing an album with seeking, "Play on" the other browser, and the Belle music widgets.
+// uploaded songs (generated cover), playing an album with seeking, "Play on" the other browser, and the Etesian music widgets.
 import { chromium, type Page } from 'playwright'
 import assert from 'node:assert/strict'
 
@@ -48,10 +48,10 @@ async function name(page: Page, n: string) {
 const pc = await device(process.env.CODE!, 'Desk')
 const phone = await device(process.env.CODE2!, 'Kitchen')
 
-step('Files: empty, then folders Music / Belle Band / First Light')
+step('Files: empty, then folders Music / Lumen Band / First Light')
 await pc.goto(BASE + '/#/files')
 await pc.waitForSelector('[data-test=files-empty]')
-for (const f of ['Music', 'Belle Band', 'First Light']) {
+for (const f of ['Music', 'Lumen Band', 'First Light']) {
   await pc.click('[data-test=files-mkdir]')
   await name(pc, f)
   await pc.click(`[data-test="file-${f}"]`)
@@ -91,13 +91,13 @@ assert.equal(r.status(), 200); assert.equal(await r.text(), 'liner notes', 'anyo
 await pc.keyboard.press('Escape')
 await pc.click('[data-test=files-crumb-root]')
 await pc.waitForSelector('[data-test=files-shares]')
-await pc.click('[data-test="unshare-Music/Belle Band/First Light/liner.txt"]')
+await pc.click('[data-test="unshare-Music/Lumen Band/First Light/liner.txt"]')
 await pc.waitForSelector('[data-test=files-shares]', { state: 'detached' })
 r = await anon.request.get(url)
 assert.equal(r.status(), 404, 'a link that is no longer shared stops working')
 
 step('delete waits for the toast: Undo keeps the file, otherwise it goes')
-await pc.click('[data-test="file-Music"]'); await pc.click('[data-test="file-Belle Band"]'); await pc.click('[data-test="file-First Light"]')
+await pc.click('[data-test="file-Music"]'); await pc.click('[data-test="file-Lumen Band"]'); await pc.click('[data-test="file-First Light"]')
 await pc.waitForSelector('[data-test="file-liner.txt"]')
 await pc.click('[data-test="file-more-liner.txt"]')
 await pc.click('[data-test="file-delete-liner.txt"]')
@@ -107,7 +107,7 @@ await pc.click('[data-test="file-more-liner.txt"]')
 await pc.click('[data-test="file-delete-liner.txt"]')
 await pc.waitForTimeout(4800)
 await pc.reload(); await pc.waitForSelector('[data-test=files-page]')
-await pc.click('[data-test="file-Music"]'); await pc.click('[data-test="file-Belle Band"]'); await pc.click('[data-test="file-First Light"]')
+await pc.click('[data-test="file-Music"]'); await pc.click('[data-test="file-Lumen Band"]'); await pc.click('[data-test="file-First Light"]')
 await pc.waitForSelector('[data-test="file-03 - Night.wav"]')
 assert.equal(await pc.locator('[data-test="file-liner.txt"]').count(), 0, 'deleted on the server')
 
@@ -134,7 +134,7 @@ await pc.click('[data-test=playon-Kitchen]')
 await phone.waitForFunction(() => (window as any).__pheMusic?.title === 'Evening' && (window as any).__pheMusic?.playing, null, { timeout: 15000 })
 await pc.waitForFunction(() => document.querySelector('[data-test=music-toggle]')?.getAttribute('aria-label') === 'Play', null, { timeout: 5000 })
 
-step('the Belle music widgets on the desktop follow the player')
+step('the Etesian music widgets on the desktop follow the player')
 await pc.goto(BASE + '/#/music')
 await pc.click('[data-test=desktop-view]')
 await pc.waitForSelector('[data-test=desktop]')
@@ -145,7 +145,7 @@ await pc.click('[data-test=widget-add-music-large]')
 await pc.click('[data-test=widgets-done]')
 await pc.keyboard.press('Control+Alt+d')
 await pc.waitForSelector('[data-test=widget-music-title]')
-assert.match(await pc.textContent('[data-test=widget-music-title]') || '', /Evening · Belle Band/)
+assert.match(await pc.textContent('[data-test=widget-music-title]') || '', /Evening · Lumen Band/)
 await pc.click('[data-test=widget-music-toggle]')
 await pc.waitForFunction(() => document.querySelector('[data-test=widget-music-toggle]')?.getAttribute('aria-label') === 'Pause', null, { timeout: 8000 })
 await pc.waitForTimeout(400)

@@ -93,9 +93,9 @@ func id3frame(id, text string) []byte {
 
 func TestMusic(t *testing.T) {
 	s := New(t.TempDir())
-	s.Mkdir("Music/Belle Band/First Light")
-	s.Save("Music/Belle Band/First Light", "02 - Second.mp3", strings.NewReader("no tags"))
-	s.Save("Music/Belle Band/First Light", "cover.jpg", strings.NewReader("jpg"))
+	s.Mkdir("Music/Lumen Band/First Light")
+	s.Save("Music/Lumen Band/First Light", "02 - Second.mp3", strings.NewReader("no tags"))
+	s.Save("Music/Lumen Band/First Light", "cover.jpg", strings.NewReader("jpg"))
 	// an ID3v2.3 tagged file in a loose folder
 	var fr []byte
 	fr = append(fr, id3frame("TIT2", "Tagged song")...)
@@ -125,7 +125,7 @@ func TestMusic(t *testing.T) {
 	if l[0].Title != "Flac song" || l[0].Artist != "Aardvark" {
 		t.Errorf("flac: %+v", l[0])
 	}
-	if l[1].Title != "Second" || l[1].Artist != "Belle Band" || l[1].Album != "First Light" || l[1].N != 2 || l[1].Cover != "Music/Belle Band/First Light/cover.jpg" {
+	if l[1].Title != "Second" || l[1].Artist != "Lumen Band" || l[1].Album != "First Light" || l[1].N != 2 || l[1].Cover != "Music/Lumen Band/First Light/cover.jpg" {
 		t.Errorf("from the path: %+v", l[1])
 	}
 	if l[2].Title != "Tagged song" || l[2].Artist != "Tag Artist" || l[2].Album != "Tag Album" || l[2].N != 7 {

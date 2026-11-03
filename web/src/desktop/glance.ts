@@ -30,7 +30,7 @@ const inboxes = async () => pickInboxes((await hubCall({ op: 'mail.folders' })).
 /** The accounts with an inbox, for the mail widgets' setting. */
 export const mailAccounts = async () => (await inboxes()).map((i) => i.account)
 
-/** The unread count and the newest messages, read or not (up to `n`, as the Belle Mail widget lists them), of one account's inbox,
+/** The unread count and the newest messages, read or not (up to `n`, as the Etesian Mail widget lists them), of one account's inbox,
  *  or of every inbox merged newest first when `account` is ''. */
 export async function loadMail(n = 20, account = ''): Promise<{ unread: number; items: MailItem[] }> {
   const boxes = (await inboxes()).filter((i) => !account || i.account === account)
