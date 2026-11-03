@@ -162,6 +162,26 @@ func MBMToPNG(b []byte) ([]byte, error) {
 			i++ // the mask belongs to this picture
 		}
 	}
+	return renderMBM(bms, best, bestMask)
+}
+
+// MBMBitmapToPNG decodes bitmap id of a multi-bitmap file with the following bitmap as its mask when it has the same size (icons are stored as such pairs).
+func MBMBitmapToPNG(b []byte, id int) ([]byte, error) {
+	bms, err := parseMBM(b)
+	if err != nil {
+		return nil, err
+	}
+	if id < 0 || id >= len(bms) {
+		return nil, errors.New("no such bitmap")
+	}
+	mask := -1
+	if id+1 < len(bms) && bms[id+1].w == bms[id].w && bms[id+1].h == bms[id].h && bms[id+1].bpp <= 8 && bms[id].bpp > 1 {
+		mask = id + 1
+	}
+	return renderMBM(bms, id, mask)
+}
+
+func renderMBM(bms []mbmBitmap, best, bestMask int) ([]byte, error) {
 	pic := bms[best]
 	img := image.NewNRGBA(image.Rect(0, 0, pic.w, pic.h))
 	for y := 0; y < pic.h; y++ {

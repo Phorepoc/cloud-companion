@@ -17,7 +17,7 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"regexp"
+	"sort"
 	"strings"
 	"unicode/utf16"
 )
@@ -430,75 +430,128 @@ func (g *sisData) arch(files []sisFile) []string {
 	return nil
 }
 
-var iconRef = regexp.MustCompile(`(?i)[A-Za-z0-9_$ .\\/-]{1,200}\.(mbm|mif|svg|aif)`)
-
 func baseName(p string) string { return strings.ToLower(path.Base(strings.ReplaceAll(p, "\\", "/"))) }
 
-// icon looks for the application's icon: the registration resource (xxx_reg.rsc) and the localisable resource name the icon file (searched as text,
-// 8-bit and UTF-16); failing that, a picture file of the package whose name says "icon", "aif" or "app".
+func stem(p string) string {
+	b := baseName(p)
+	return strings.TrimSuffix(b, path.Ext(b))
+}
+
+// icon finds the application's icon. The registration resource (xxx_reg.rsc) names the localisable resource file (xxx_loc); that file names the icon
+// file and the number of icons; the icon is number 0 of it. Failing that, the strings of the resources are searched, and last a picture file whose name
+// says "icon", "aif" or "app". A .mbm is decoded as picture 0 with its mask; a .mif by icon.go's MIFIcon (bitmap, NVG and SVG-T entries).
 func (g *sisData) icon(files []sisFile, info *Info) {
 	byBase := map[string]sisFile{}
-	var rscs []sisFile
+	var regs, locs []sisFile
 	for _, f := range files {
 		if f.op != 1 {
 			continue
 		}
 		bn := baseName(f.target)
 		byBase[bn] = f
-		lt := strings.ToLower(f.target)
-		if strings.HasSuffix(bn, ".rsc") && (strings.Contains(bn, "_reg") || strings.Contains(bn, "_loc") || strings.Contains(lt, "resource\\apps") || strings.Contains(lt, "import\\apps")) {
-			rscs = append(rscs, f)
+		if strings.HasSuffix(bn, "_reg.rsc") {
+			regs = append(regs, f)
 		}
+		if strings.Contains(bn, "_loc.r") {
+			locs = append(locs, f)
+		}
+	}
+	read := func(f sisFile) []byte {
+		b, err := g.file(f, 8<<20)
+		if err != nil {
+			return nil
+		}
+		return b
 	}
 	var cands []string
-	for _, r := range rscs {
-		b, err := g.file(r, 4<<20)
-		if err != nil {
-			continue
-		}
-		for _, m := range iconRef.FindAll(b, -1) {
-			cands = append(cands, baseName(string(m)))
-		}
-		w := make([]byte, 0, len(b)/2) // UTF-16 text: keep the low bytes of printable pairs
-		for i := 0; i+1 < len(b); i += 2 {
-			if b[i+1] == 0 && b[i] >= 32 && b[i] < 127 {
-				w = append(w, b[i])
-			} else {
-				w = append(w, 0)
+	addLoc := func(f sisFile) {
+		if b := read(f); b != nil {
+			for _, c := range locIcons(b) {
+				cands = append(cands, baseName(c))
 			}
 		}
-		for _, m := range iconRef.FindAll(w, -1) {
-			cands = append(cands, baseName(string(m)))
+	}
+	for _, r := range regs {
+		b := read(r)
+		if b == nil {
+			continue
+		}
+		ri := parseReg(b)
+		var named []sisFile
+		for _, l := range locs {
+			if ri.locFile != "" && stem(l.target) == ri.locFile {
+				named = append(named, l)
+			}
+		}
+		sort.Slice(named, func(i, j int) bool { return localeRank(named[i].target) < localeRank(named[j].target) })
+		for _, l := range named {
+			addLoc(l)
+		}
+		for _, c := range ri.icons {
+			cands = append(cands, baseName(c))
 		}
 	}
-	for bn := range byBase { // fallback: a picture file named like an icon (map order does not matter: a stable sort of names below)
+	if len(cands) == 0 {
+		sort.Slice(locs, func(i, j int) bool { return localeRank(locs[i].target) < localeRank(locs[j].target) })
+		for _, l := range locs {
+			addLoc(l)
+		}
+	}
+	var fallback []string
+	for bn := range byBase {
 		if (strings.HasSuffix(bn, ".mbm") || strings.HasSuffix(bn, ".mif")) && (strings.Contains(bn, "icon") || strings.Contains(bn, "_aif") || strings.Contains(bn, "app")) {
-			cands = append(cands, bn)
+			fallback = append(fallback, bn)
 		}
 	}
-	sawScalable := false
+	sort.Strings(fallback)
+	cands = append(cands, fallback...)
+	note := ""
 	for _, c := range cands {
 		f, ok := byBase[c]
 		if !ok {
 			continue
 		}
-		b, err := g.file(f, 16<<20)
-		if err != nil {
+		b := read(f)
+		if b == nil {
 			continue
 		}
 		switch {
 		case strings.HasSuffix(c, ".mbm"):
-			if png, err := MBMToPNG(b); err == nil {
+			png, err := MBMBitmapToPNG(b, 0)
+			if err != nil {
+				png, err = MBMToPNG(b)
+			}
+			if err == nil {
 				info.Icon, info.IconNote = png, ""
 				return
-			} else if info.IconNote == "" {
-				info.IconNote = "the icon is a bitmap this reader cannot decode (" + err.Error() + ")"
 			}
-		case strings.HasSuffix(c, ".mif"), strings.HasSuffix(c, ".svg"):
-			sawScalable = true
+			note = "the icon is a bitmap this reader cannot decode (" + err.Error() + ")"
+		case strings.HasSuffix(c, ".mif"):
+			var mbm []byte
+			if sf, ok := byBase[strings.TrimSuffix(c, ".mif")+".mbm"]; ok {
+				mbm = read(sf)
+			}
+			png, svg, err := MIFIcon(b, mbm, 0)
+			if err == nil {
+				info.Icon, info.IconSVG, info.IconNote = png, svg, ""
+				return
+			}
+			note = "the icon could not be shown (" + err.Error() + ")"
+			info.IconSVG = svg
 		}
 	}
-	if sawScalable && info.Icon == nil {
-		info.IconNote = "the package has a scalable icon (MIF / SVG-T), which is not shown here"
+	if note != "" && info.Icon == nil {
+		info.IconNote = note
 	}
+}
+
+// localeRank puts the English resource first (.rsc, .r01), then the other languages.
+func localeRank(target string) int {
+	switch strings.ToLower(path.Ext(strings.ReplaceAll(target, "\\", "/"))) {
+	case ".rsc":
+		return 0
+	case ".r01":
+		return 1
+	}
+	return 2
 }

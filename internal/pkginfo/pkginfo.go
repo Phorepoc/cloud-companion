@@ -29,6 +29,7 @@ type Info struct {
 	Languages []string `json:"languages,omitempty"` //
 	Files     int      `json:"files,omitempty"`     // number of files the package installs (SIS)
 	Icon      []byte   `json:"-"`                   // PNG
+	IconSVG   string   `json:"-"`                   // the vector source of the icon, when it was one
 	IconNote  string   `json:"icon_note,omitempty"` // why there is no icon, when the package has one we cannot show
 }
 

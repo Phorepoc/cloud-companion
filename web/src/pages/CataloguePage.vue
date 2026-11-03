@@ -70,7 +70,7 @@
         <ul v-else class="ph-list" aria-label="Library">
           <li v-for="e in shown" :key="e.id" data-test="lib-row">
             <q-checkbox v-model="selected" :val="e.id" :aria-label="'Select ' + e.name" :disable="e.status === 'missing' && !e.published" />
-            <img v-if="e.icon_data" :src="e.icon_data" alt="" width="48" height="48" class="ph-icon" data-test="lib-icon" />
+            <img v-if="e.icon_svg_data || e.icon_data" :src="e.icon_svg_data || e.icon_data" alt="" width="48" height="48" class="ph-icon" data-test="lib-icon" />
             <div v-else class="ph-icon ph-muted ph-small" :title="e.icon_note || 'No icon in the file'">{{ e.icon_note ? 'No icon shown' : '' }}</div>
             <div class="ph-grow">
               <strong>{{ e.name }}</strong> <span class="ph-small ph-muted">{{ e.version }}</span>

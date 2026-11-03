@@ -167,7 +167,7 @@ export interface CatSyncResult { id: string; name: string; ok: boolean; summary?
 export interface CatLibEntry {
   id: string; path: string; kind: 'library' | 'stored'; sha256: string; size: number; status: 'ok' | 'missing' | 'unreadable'; error: string
   name: string; app_id: string; version: string; platform: string; package: string; arch?: string[]; summary: string; description: string
-  problem?: string; published: boolean; published_in: string[]; icon_data?: string; icon_note?: string; added: number; changed: number
+  problem?: string; published: boolean; published_in: string[]; icon_data?: string; icon_svg_data?: string; icon_note?: string; added: number; changed: number
   meta: { vendor?: string; uid?: string; targets?: string[]; languages?: string[]; read: boolean }
   edits: { app_id?: string; version?: string; name?: string; summary?: string; description?: string; category?: string; license?: string; homepage?: string }
 }

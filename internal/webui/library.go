@@ -43,6 +43,7 @@ type libEntry struct {
 	PublishedIn []string          `json:"published_in"`
 	IconData    string            `json:"icon_data,omitempty"`
 	IconNote    string            `json:"icon_note,omitempty"`
+	IconSVGData string            `json:"icon_svg_data,omitempty"`
 	Extra       map[string]string `json:"-"`
 }
 
@@ -90,6 +91,9 @@ func (c *catAPI) entries(catID string) []libEntry {
 		}
 		e.IconData = c.iconData(icon)
 		e.IconNote = e.Meta.IconNote
+		if e.Meta.IconSVG != "" && e.Edits.Icon == nil {
+			e.IconSVGData = "data:image/svg+xml;base64," + base64.StdEncoding.EncodeToString([]byte(e.Meta.IconSVG))
+		}
 		if f.Kind == "stored" {
 			e.Path = "(stored by an earlier version)"
 		}

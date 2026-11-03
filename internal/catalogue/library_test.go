@@ -255,3 +255,18 @@ func TestMigrationOfReleases(t *testing.T) {
 		t.Fatal("the stored file is still on disk")
 	}
 }
+
+func TestScanVectorIcon(t *testing.T) {
+	m, dir := newLib(t)
+	put(t, dir, "vec.sisx", pkginfo.ExampleVectorSIS(0xE4444444, "Vector App"))
+	m.Scan(context.Background())
+	f := entry(t, m, "vec.sisx")
+	if f.IconSHA == "" || !strings.Contains(f.Meta, `"icon_svg"`) {
+		t.Fatalf("no icon kept: %q %s", f.IconSHA, f.Meta)
+	}
+	blob, _, err := m.OpenBlob(f.IconSHA)
+	if err != nil {
+		t.Fatal(err)
+	}
+	blob.Close()
+}

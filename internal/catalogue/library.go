@@ -42,6 +42,7 @@ type Meta struct {
 	Targets   []string `json:"targets,omitempty"`
 	Languages []string `json:"languages,omitempty"`
 	IconNote  string   `json:"icon_note,omitempty"`
+	IconSVG   string   `json:"icon_svg,omitempty"` // the vector source of the icon, when the package's icon is a vector one
 	Read      bool     `json:"read"` // false: the file type carries no metadata we read (name and version come from the owner)
 }
 
@@ -150,6 +151,9 @@ func (m *Manager) inspect(f *store.CatFile, abs string) (iconNote string) {
 			meta.Name = info.Name
 		}
 		meta.Version, meta.Vendor, meta.UID, meta.Arch, meta.Targets, meta.Languages, meta.IconNote = info.Version, info.Vendor, info.UID, info.Arch, info.Targets, info.Languages, info.IconNote
+		if len(info.IconSVG) <= 128<<10 {
+			meta.IconSVG = info.IconSVG
+		}
 		meta.Platform = info.Platform
 		if len(info.Icon) > 0 {
 			if sha, _, perr := m.PutBlob(strings.NewReader(string(info.Icon)), 4<<20, ""); perr == nil {

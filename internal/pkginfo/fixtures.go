@@ -10,6 +10,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"compress/zlib"
+	_ "embed"
 	"encoding/binary"
 	"image"
 	"image/color"
@@ -276,3 +277,67 @@ func ExampleSIS(uid uint32, name, vendor string, version [3]int32, payload strin
 
 // ExampleAPK is an APK for com.Example.App 1.2.3 labelled "Test App", with a 16x16 icon.
 func ExampleAPK() []byte { return buildAPK() }
+
+// buildMIF: an S60 icon file (version 2) from entries: {type, data} for vector icons, {-1, nil} for "bitmap number n of the .mbm" (n given in data[0]).
+type mifTestIcon struct {
+	typ  int
+	data []byte
+	mbm  int
+}
+
+func buildMIF(icons ...mifTestIcon) []byte {
+	out := le(int32(mifFileUID), int32(2), int32(0), int32(len(icons)))
+	// layout: header (16) | icons | index
+	body := []byte{}
+	var entries [][2]int32
+	for _, ic := range icons {
+		if ic.typ < 0 {
+			entries = append(entries, [2]int32{int32(-ic.mbm), 0})
+			continue
+		}
+		start := 16 + len(body)
+		h := le(int32(mifIconUID), int32(1), int32(32), int32(len(ic.data)), int32(ic.typ), int32(8), int32(0), int32(8))
+		body = append(body, h...)
+		body = append(body, ic.data...)
+		for len(body)%4 != 0 {
+			body = append(body, 0)
+		}
+		entries = append(entries, [2]int32{int32(start), int32(32 + len(ic.data))})
+	}
+	var idx []byte
+	for _, e := range entries {
+		idx = append(idx, le(e[0], e[1])...)
+	}
+	out = le(int32(mifFileUID), int32(2), int32(16+len(body)), int32(len(icons)))
+	return append(append(out, body...), idx...)
+}
+
+// buildRSC: a plain resource file (no compression) from resources.
+func buildRSC(res ...[]byte) []byte {
+	var out []byte
+	var offs []uint16
+	for _, r := range res {
+		offs = append(offs, uint16(len(out)))
+		out = append(out, r...)
+	}
+	start := len(out)
+	for _, o := range offs {
+		out = append(out, le(o)...)
+	}
+	return append(out, le(uint16(start))...)
+}
+
+// ltext: a counted UTF-16 string, as the resource compiler writes LTEXT in a Unicode build.
+func ltext(s string) []byte { return append([]byte{byte(len([]rune(s)))}, u16(s)...) }
+
+//go:embed testdata/icon.nvg
+var exampleNVG []byte
+
+// ExampleVectorSIS is a SISX whose application icon is a vector (NVG) icon in a .mif named by its registration and localisable resources.
+func ExampleVectorSIS(uid uint32, name string) []byte {
+	loc := buildRSC(append(append(append(ltext(name), 0, 0, 0, 0, 1, 0, 0, 0), ltext(`\resource\apps\v_icon.mif`)...), 0))
+	reg := buildRSC(append(append(ltext(`\sys\bin\v.exe`), 0, 0, 0, 0), ltext(`\resource\apps\v_loc`)...))
+	return buildSIS(uid, []string{name}, []string{"Acme"}, []uint16{1}, [3]int32{1, 0, 0}, 0, []sisTestFile{
+		{`!:\private\10003a3f\import\apps\v_reg.rsc`, reg}, {`!:\resource\apps\v_loc.rsc`, loc},
+		{`!:\resource\apps\v_icon.mif`, buildMIF(mifTestIcon{typ: 2, data: exampleNVG})}})
+}
