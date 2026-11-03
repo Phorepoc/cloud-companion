@@ -62,7 +62,9 @@ type cached struct {
 }
 
 // New returns a Service with a 20 second HTTP client.
-func New() *Service { return &Service{HTTP: &http.Client{Timeout: 20 * time.Second}, got: map[string]cached{}} }
+func New() *Service {
+	return &Service{HTTP: &http.Client{Timeout: 20 * time.Second}, got: map[string]cached{}}
+}
 
 // Check reports whether u can be a feed address (http or https, with a host).
 func Check(u string) error {
