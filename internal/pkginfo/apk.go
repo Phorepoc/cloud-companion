@@ -419,6 +419,13 @@ func ParseAPK(path string) (*Info, error) {
 	if iconRef != 0 && tab != nil || iconPath != "" {
 		apkIcon(&zr.Reader, tab, iconRef, iconPath, info)
 	}
+	if info.Icon == nil && info.IconNote == "" {
+		if iconRef == 0 && iconPath == "" {
+			info.IconNote = "the application declares no icon"
+		} else {
+			info.IconNote = "the icon the application names was not found in the package"
+		}
+	}
 	return info, nil
 }
 

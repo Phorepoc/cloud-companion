@@ -11,6 +11,7 @@ package pkginfo
 import (
 	"encoding/binary"
 	"errors"
+	"path"
 	"strings"
 	"unicode/utf16"
 )
@@ -94,6 +95,7 @@ func isIconName(s string) bool {
 // regInfo is what an application registration file (xxx_reg.rsc) names: the localisable resource file (xxx_loc) and any icon file.
 type regInfo struct {
 	locFile string   // base name without extension, lower case
+	refs    []string // stems of every path-like text (the localisable resource file is named without extension)
 	icons   []string // icon files named in it, in order
 }
 
@@ -109,9 +111,13 @@ func parseReg(b []byte) regInfo {
 		}
 	}
 	for _, t := range texts {
+		if (strings.Contains(t, "\\") || strings.Contains(t, "/")) && !strings.Contains(t, " ") {
+			ri.refs = append(ri.refs, strings.TrimSuffix(baseName(t), path.Ext(baseName(t))))
+		}
 		switch {
 		case isIconName(t):
 			ri.icons = append(ri.icons, t)
+		case false:
 		case ri.locFile == "" && strings.Contains(strings.ToLower(t), "_loc") && !strings.Contains(t, " "):
 			ri.locFile = baseName(t)
 		}

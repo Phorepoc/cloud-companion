@@ -9,10 +9,12 @@ package pkginfo
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"image"
 	"image/color"
+	_ "image/jpeg"
 	"image/png"
 	"io"
 	"math"
@@ -326,7 +328,7 @@ func SVGToPNG(svg string, size int) (out []byte, err error) {
 
 func (r *ras) draw(n *node, st style, ctm mat) {
 	switch n.name {
-	case "defs", "linearGradient", "radialGradient", "title", "desc", "metadata", "text", "image", "switch", "style", "solidColor":
+	case "defs", "linearGradient", "radialGradient", "title", "desc", "metadata", "text", "switch", "style", "solidColor":
 		return
 	}
 	if n.attrs["display"] == "none" || n.attrs["visibility"] == "hidden" {
@@ -335,6 +337,10 @@ func (r *ras) draw(n *node, st style, ctm mat) {
 	st = st.with(n)
 	if t := n.attrs["transform"]; t != "" {
 		ctm = ctm.mul(parseTransform(t))
+	}
+	if n.name == "image" {
+		r.drawImage(n, st, ctm)
+		return
 	}
 	switch n.name {
 	case "svg", "g", "a":
@@ -828,3 +834,76 @@ func arc(p0 pt, rx, ry, rotDeg float64, large, sweep bool, p1 pt) []pt {
 }
 
 var _ = color.NRGBA{}
+
+// drawImage draws an embedded picture (a data: URI holding a PNG or JPEG), as SVG-T icons carry their artwork.
+func (r *ras) drawImage(n *node, st style, ctm mat) {
+	href := n.attrs["href"]
+	i := strings.Index(href, "base64,")
+	if !strings.HasPrefix(href, "data:") || i < 0 {
+		return
+	}
+	raw, err := base64.StdEncoding.DecodeString(strings.Join(strings.Fields(href[i+7:]), ""))
+	if err != nil {
+		return
+	}
+	src, _, err := image.Decode(bytes.NewReader(raw))
+	if err != nil {
+		return
+	}
+	sb := src.Bounds()
+	x, y := num1(n.attrs["x"], 0), num1(n.attrs["y"], 0)
+	w, h := num1(n.attrs["width"], float64(sb.Dx())), num1(n.attrs["height"], float64(sb.Dy()))
+	if w <= 0 || h <= 0 {
+		return
+	}
+	// image pixel -> device
+	full := ctm.mul(mat{w / float64(sb.Dx()), 0, 0, h / float64(sb.Dy()), x, y})
+	inv, ok := full.inv()
+	if !ok {
+		return
+	}
+	corners := transformPts([]pt{{x, y}, {x + w, y}, {x + w, y + h}, {x, y + h}}, ctm)
+	cov := r.coverage([][]pt{orient(corners)}, false)
+	at := func(ix, iy int) (rr, gg, bb, aa float64) {
+		ix = max(0, min(sb.Dx()-1, ix))
+		iy = max(0, min(sb.Dy()-1, iy))
+		c := color.NRGBAModel.Convert(src.At(sb.Min.X+ix, sb.Min.Y+iy)).(color.NRGBA)
+		return float64(c.R) / 255, float64(c.G) / 255, float64(c.B) / 255, float64(c.A) / 255
+	}
+	for py := 0; py < r.h; py++ {
+		for px := 0; px < r.w; px++ {
+			cv := float64(cov[py*r.w+px])
+			if cv <= 0 {
+				continue
+			}
+			p := inv.apply(pt{float64(px) + .5, float64(py) + .5})
+			fx, fy := p.x-.5, p.y-.5
+			x0, y0 := int(math.Floor(fx)), int(math.Floor(fy))
+			tx, ty := fx-float64(x0), fy-float64(y0)
+			var cr, cg, cb, ca float64
+			for k := 0; k < 4; k++ {
+				wx, wy := tx, ty
+				dx, dy := k&1, k>>1
+				if dx == 0 {
+					wx = 1 - tx
+				}
+				if dy == 0 {
+					wy = 1 - ty
+				}
+				a, b2, c2, d := at(x0+dx, y0+dy)
+				wgt := wx * wy
+				cr, cg, cb, ca = cr+a*d*wgt, cg+b2*d*wgt, cb+c2*d*wgt, ca+d*wgt // premultiplied
+			}
+			if ca <= 0 {
+				continue
+			}
+			a := math.Min(1, cv) * ca * st.op
+			i := 4 * (py*r.w + px)
+			k := a / ca
+			r.buf[i] = cr*k + r.buf[i]*(1-a)
+			r.buf[i+1] = cg*k + r.buf[i+1]*(1-a)
+			r.buf[i+2] = cb*k + r.buf[i+2]*(1-a)
+			r.buf[i+3] = a + r.buf[i+3]*(1-a)
+		}
+	}
+}

@@ -442,7 +442,8 @@ func stem(p string) string {
 // says "icon", "aif" or "app". A .mbm is decoded as picture 0 with its mask; a .mif by icon.go's MIFIcon (bitmap, NVG and SVG-T entries).
 func (g *sisData) icon(files []sisFile, info *Info) {
 	byBase := map[string]sisFile{}
-	var regs, locs []sisFile
+	var regs, locs, otherRsc []sisFile
+	sawReg := false
 	for _, f := range files {
 		if f.op != 1 {
 			continue
@@ -454,6 +455,8 @@ func (g *sisData) icon(files []sisFile, info *Info) {
 		}
 		if strings.Contains(bn, "_loc.r") {
 			locs = append(locs, f)
+		} else if ext := path.Ext(bn); (ext == ".rsc" || (len(ext) == 4 && ext[1] == 'r' && ext[2] >= '0' && ext[2] <= '9')) && !strings.HasSuffix(bn, "_reg.rsc") {
+			otherRsc = append(otherRsc, f)
 		}
 	}
 	read := func(f sisFile) []byte {
@@ -483,6 +486,15 @@ func (g *sisData) icon(files []sisFile, info *Info) {
 				named = append(named, l)
 			}
 		}
+		for _, l := range otherRsc {
+			for _, ref := range ri.refs {
+				if ref != "" && stem(l.target) == ref {
+					named = append(named, l)
+					break
+				}
+			}
+		}
+		sawReg = true
 		sort.Slice(named, func(i, j int) bool { return localeRank(named[i].target) < localeRank(named[j].target) })
 		for _, l := range named {
 			addLoc(l)
@@ -506,9 +518,11 @@ func (g *sisData) icon(files []sisFile, info *Info) {
 	sort.Strings(fallback)
 	cands = append(cands, fallback...)
 	note := ""
+	var missing []string
 	for _, c := range cands {
 		f, ok := byBase[c]
 		if !ok {
+			missing = append(missing, c)
 			continue
 		}
 		b := read(f)
@@ -540,8 +554,17 @@ func (g *sisData) icon(files []sisFile, info *Info) {
 			info.IconSVG = svg
 		}
 	}
-	if note != "" && info.Icon == nil {
-		info.IconNote = note
+	if info.Icon == nil {
+		switch {
+		case note != "":
+			info.IconNote = note
+		case len(missing) > 0:
+			info.IconNote = "the application names its icon file " + missing[0] + ", which is not in the package (it is expected on the phone already)"
+		case !sawReg:
+			info.IconNote = "the package registers no application (it is a library, theme or data package), so it has no icon"
+		default:
+			info.IconNote = "the application's registration does not name an icon file the package contains"
+		}
 	}
 }
 

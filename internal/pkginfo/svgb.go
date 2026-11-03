@@ -283,10 +283,10 @@ func (r *svgbReader) element(out *strings.Builder, name string, depth *int) erro
 	}
 	out.WriteString("<" + name)
 	if name == "svg" {
-		out.WriteString(` xmlns="http://www.w3.org/2000/svg"`)
+		out.WriteString(` xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"`)
 	}
 	for _, a := range attrs {
-		if strings.HasPrefix(a.k, "xlink:") {
+		if strings.HasPrefix(a.k, "xlink:") && !(name == "image" && a.k == "xlink:href") {
 			continue
 		}
 		fmt.Fprintf(out, ` %s="%s"`, a.k, xmlEsc(a.v))
