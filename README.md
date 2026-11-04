@@ -24,16 +24,38 @@ All you need is Docker with the compose plugin, and a few GB of RAM.
 git clone https://github.com/Phorepoc/cloud-companion && cd cloud-companion
 docker compose pull
 docker compose up -d
-docker exec phe-cloud phecloud paircode --admin
+docker logs phe-cloud
 ```
 
 This pulls the released images from `ghcr.io/phorepoc` (`phecloud`, and `phecloud-android-bridge` for the optional Android page); the compose files default to the release this checkout was made for (v0.2.0;
 `PHECLOUD_VERSION=latest` or another `vX.Y.Z` overrides it). To update, `git pull` and `docker compose pull && docker compose up -d`. To build from this checkout instead (development):
 `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` (the Android bridge: add `-f docker-compose.android.build.yml`).
 
-The last command prints a one-time code like `HFRE-RHAX`, which is good for 10 minutes. Open
-<http://127.0.0.1:8080>, type the code in, and that browser becomes your admin device. In **Settings > Security** you
-can add a passkey and get a recovery code.
+A brand-new server has no owner yet, so at start it prints a **first-start code** in its log, in a box like this:
+
+```
++----------------------------------------------------------------------------+
+| FIRST START: this server has no owner yet.                                 |
+| Open http://127.0.0.1:8080                                                 |
+| and enter this code to register the first owner:                           |
+|         HFRE-RHAX-K3MN                                                     |
++----------------------------------------------------------------------------+
+```
+
+Open <http://127.0.0.1:8080>, type the code in, and that browser becomes your admin device. In **Settings > Security** you
+can add a passkey and get a recovery code. The first-start code stays valid until it is used (once), so there is no
+hurry; every restart of a server that still has no owner prints a new one and the old one stops working. As soon as
+the first owner exists (a passkey is registered or a first device is paired) the code is gone for good and nothing is
+printed any more. The code is stored only as a hash. A phone can use it as well: pairing the first device with it makes
+that phone the admin.
+
+Prefer to choose the code yourself? Set `PHECLOUD_FIRST_OWNER_CODE` (in `docker-compose.yml`, commented out there): at least
+12 letters, digits, `-` or `_` with at least 6 different characters. The log then only says that it is active and does not
+print it. A weak value is rejected with an error in the log and a generated code is used instead. It works once, only for
+the first owner, and is ignored (with a log line) once the server has an owner.
+
+Later admins (another browser or computer, a replacement passkey) need an admin pairing code, valid for 10 minutes:
+`docker exec phe-cloud phecloud paircode --admin`.
 
 To add a phone, run `docker exec phe-cloud phecloud paircode` without `--admin` and enter the code on the phone. For a
 Phorepoc OS phone, [docs/phorepoc-phone.md](docs/phorepoc-phone.md) explains the steps. `phecloud devices` lists what's
@@ -67,6 +89,7 @@ Everything is set through environment variables in `docker-compose.yml`. The one
 |---|---|
 | `PHECLOUD_DB` | where the data is kept. SQLite by default, or a `postgres://` or `mysql://` address ([docs/database.md](docs/database.md)) |
 | `PHECLOUD_TRUSTED_PROXIES` | your reverse proxy's address. Nobody is trusted by default |
+| `PHECLOUD_FIRST_OWNER_CODE` | your own first-start code for the very first owner, instead of the generated one in the log (see Getting started) |
 | `PHECLOUD_PUBLIC_URL` | the address people reach it at, needed for signing in with Google or Microsoft |
 | `PHECLOUD_OAUTH_*` | your own Google and Microsoft app registrations ([docs/connections.md](docs/connections.md)) |
 | `PHECLOUD_ANDROID_SECRET` | turns on the Android stream ([docs/android.md](docs/android.md)) |

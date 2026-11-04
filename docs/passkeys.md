@@ -5,7 +5,7 @@ a fingerprint, a face, a phone or a security key) and a **recovery code** as the
 another way to obtain a device (an admin web device, kept in the browser like a paired one); phones keep pairing with codes.
 
 ## Set up (once)
-1. On the server make an **admin** pairing code: `docker exec phe-cloud phecloud paircode --admin`.
+1. On a brand-new server read the **first-start code** from the log (`docker logs phe-cloud`; or set `PHECLOUD_FIRST_OWNER_CODE` yourself). It is valid until used and only while the server has no owner. For later admins make an **admin** pairing code: `docker exec phe-cloud phecloud paircode --admin`.
 2. Open the web app, enter that code in the pairing field and press **Set up a passkey**. The browser asks you to create a passkey.
 3. A **recovery code** (`ABCD-EFGH-JKLM-NPQR`) is shown once. Save it somewhere safe. **I saved it** continues into the app.
 More passkeys (another computer, a phone) are added the same way with a new admin code (**Add a passkey**).

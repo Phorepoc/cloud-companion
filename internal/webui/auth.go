@@ -204,9 +204,9 @@ func (a *auth) routes(mux *http.ServeMux) {
 		}
 		code := strings.ToUpper(strings.TrimSpace(in.Code))
 		authed := a.adminDevice(r)
-		if !authed && !a.st.CheckAdminCode(code) {
+		if !authed && !a.st.CheckAdminCode(code) && !a.st.CheckFirstCode(code) {
 			a.failed(r)
-			bad(w, 403, "that code did not work: it must be an unused admin code from `phecloud paircode --admin`")
+			bad(w, 403, "that code did not work: use the first-start code from the server log (`docker logs phe-cloud`), or an unused admin code from `phecloud paircode --admin`")
 			return
 		}
 		wa, err := a.wa(r)
@@ -256,7 +256,8 @@ func (a *auth) routes(mux *http.ServeMux) {
 				bad(w, 403, "sign in again")
 				return
 			}
-		} else if err := a.st.ConsumeAdminCode(p.code); err != nil {
+		} else if err := a.st.ConsumeAdminCode(p.code); err != nil && a.st.ConsumeFirstCode(p.code) != nil {
+			a.failed(r)
 			bad(w, 403, "the code was used or expired")
 			return
 		}

@@ -118,6 +118,11 @@ var migrations = []migration{
 			`CREATE TABLE IF NOT EXISTS cat_publish(catalogue VARCHAR(64) NOT NULL, file_id VARCHAR(32) NOT NULL, created BIGINT, PRIMARY KEY(catalogue, file_id))`,
 		},
 	}},
+	{version: 5, name: "first-owner code: one hashed code that registers the first owner while the server is uninitialised", stmts: map[Dialect][]string{
+		SQLite:   {`CREATE TABLE IF NOT EXISTS first_owner_code(id INTEGER PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL, created INTEGER, from_env INTEGER DEFAULT 0)`},
+		Postgres: {`CREATE TABLE IF NOT EXISTS first_owner_code(id BIGINT PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL, created BIGINT, from_env BIGINT DEFAULT 0)`},
+		MySQL:    {`CREATE TABLE IF NOT EXISTS first_owner_code(id BIGINT PRIMARY KEY, salt VARCHAR(64) NOT NULL, hash VARCHAR(64) NOT NULL, created BIGINT, from_env BIGINT DEFAULT 0)`},
+	}},
 }
 
 // SchemaVersion is the newest migration this build knows.

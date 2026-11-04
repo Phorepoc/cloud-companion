@@ -24,6 +24,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/phorepoc/cloud-companion/internal/browser"
@@ -100,6 +101,11 @@ func main() {
 		br := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH, 2)
 		defer br.Close()
 		log := slog.Default()
+		// a virgin server prints a first-owner code (or adopts PHECLOUD_FIRST_OWNER_CODE) so the first owner can register without a second command
+		webURL := env("PHECLOUD_PUBLIC_URL", "http://127.0.0.1:8080")
+		if err := store.FirstStart(st, strings.TrimSpace(os.Getenv("PHECLOUD_FIRST_OWNER_CODE")), webURL, os.Stderr, log); err != nil {
+			log.Error("first-owner code", "err", err)
+		}
 		tcfg, fp, err := tlsutil.LoadOrCreate(env("PHECLOUD_TLSDIR", "/data"))
 		if err != nil {
 			log.Error("tls", "err", err)

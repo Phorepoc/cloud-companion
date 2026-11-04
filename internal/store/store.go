@@ -92,10 +92,15 @@ func (s *Store) Pair(code, name string) (id string, key []byte, admin bool, err 
 	defer tx.Rollback()
 	var codeAdmin int
 	if err := tx.QueryRow(`SELECT admin FROM pair_codes WHERE code=? AND used=0 AND expires>?`, code, time.Now().Unix()).Scan(&codeAdmin); err != nil {
-		return "", nil, false, ErrBadCode
-	}
-	if _, err := tx.Exec(`UPDATE pair_codes SET used=1 WHERE code=?`, code); err != nil {
+		// not a pairing code: maybe the first-owner code of an uninitialised server; that device is the admin
+		if consumeFirst(tx, code) != nil {
+			return "", nil, false, ErrBadCode
+		}
+		codeAdmin = 1
+	} else if res, err := tx.Exec(`UPDATE pair_codes SET used=1 WHERE code=? AND used=0`, code); err != nil {
 		return "", nil, false, err
+	} else if n, _ := res.RowsAffected(); n == 0 {
+		return "", nil, false, ErrBadCode
 	}
 	var n int
 	tx.QueryRow(`SELECT COUNT(*) FROM devices`).Scan(&n)
