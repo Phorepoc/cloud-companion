@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: The next version (dry run: nothing is tagged yet)
+      - name: The next version (a dry run, nothing is tagged yet)
         id: v
         env:
           GITHUB_TOKEN: ${{ github.token }}
