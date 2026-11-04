@@ -10,8 +10,8 @@ ROOT=$(pwd)
 OUT=$ROOT/web/test/out
 mkdir -p "$OUT"
 export HUB_ENV_FILE HUB_NETWORK="${HUB_NETWORK:-phehub_default}"
-docker compose -f docker-compose.yml -f web/test/compose.hub.yml up -d >/dev/null 2>&1
-trap 'docker compose -f docker-compose.yml -f web/test/compose.hub.yml down >/dev/null 2>&1' EXIT
+docker compose -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.hub.yml up -d >/dev/null 2>&1
+trap 'docker compose -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.hub.yml down >/dev/null 2>&1' EXIT
 sleep 6
 NET=$(docker inspect phe-cloud --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | tr ' ' '\n' | grep -v '^$' | grep -v "^$HUB_NETWORK\$" | head -1)
 CODE=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)

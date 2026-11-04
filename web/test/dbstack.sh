@@ -11,7 +11,7 @@ case $KIND in
   postgres) export PHECLOUD_DB='postgres://phecloud:pw@postgres:5432/phecloud?sslmode=disable'; SVC=postgres ;;
   mariadb)  export PHECLOUD_DB='mysql://phecloud:pw@mariadb:3306/phecloud'; SVC=mariadb ;;
 esac
-DC="docker compose -p phedb -f docker-compose.yml -f docker-compose.db.yml -f web/test/compose.passkey.yml --profile db-$KIND"
+DC="docker compose -p phedb -f docker-compose.yml -f docker-compose.build.yml -f docker-compose.db.yml -f web/test/compose.passkey.yml --profile db-$KIND"
 $DC down -v >/dev/null 2>&1 || true
 trap '$DC down -v >/dev/null 2>&1' EXIT
 $DC up -d --build $SVC >/dev/null 2>&1

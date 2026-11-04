@@ -22,9 +22,14 @@ All you need is Docker with the compose plugin, and a few GB of RAM.
 
 ```sh
 git clone https://github.com/Phorepoc/cloud-companion && cd cloud-companion
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 docker exec phe-cloud phecloud paircode --admin
 ```
+
+This pulls the released images from `ghcr.io/phorepoc` (`phecloud`, and `phecloud-android-bridge` for the optional Android page); the compose files default to the release this checkout was made for (v0.1.0;
+`PHECLOUD_VERSION=latest` or another `vX.Y.Z` overrides it). To update, `git pull` and `docker compose pull && docker compose up -d`. To build from this checkout instead (development):
+`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` (the Android bridge: add `-f docker-compose.android.build.yml`).
 
 The last command prints a one-time code like `HFRE-RHAX`, which is good for 10 minutes. Open
 <http://127.0.0.1:8080>, type the code in, and that browser becomes your admin device. In **Settings > Security** you

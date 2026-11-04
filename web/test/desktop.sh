@@ -3,7 +3,7 @@
 # The desktop view and the Etesian theme (Docker, repo root): own compose project (phepk6), fresh volume. Screenshots: web/test/out/desktop-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
-DC="docker compose -p phepk6 -f docker-compose.yml -f web/test/compose.passkey.yml"
+DC="docker compose -p phepk6 -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml"
 $DC down -v >/dev/null 2>&1 || true
 $DC up -d --build phecloud >/dev/null 2>&1
 trap '$DC down -v >/dev/null 2>&1' EXIT

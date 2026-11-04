@@ -3,7 +3,7 @@
 # Chats page with a fake phone (Docker, repo root): own compose project (phepk4), fresh volume. Screenshots: web/test/out/chats-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
-DC="docker compose -p phepk4 -f docker-compose.yml -f web/test/compose.passkey.yml"
+DC="docker compose -p phepk4 -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml"
 $DC down -v >/dev/null 2>&1 || true
 $DC up -d --build phecloud >/dev/null 2>&1
 trap '$DC down -v >/dev/null 2>&1' EXIT

@@ -3,7 +3,7 @@
 # "Sign in with Google" against a fake provider (Docker, repo root): own compose project (phepk5), fresh volume. Screenshots: web/test/out/oauth-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
-DC="docker compose -p phepk5 -f docker-compose.yml -f web/test/compose.passkey.yml -f web/test/compose.oauth.yml"
+DC="docker compose -p phepk5 -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml -f web/test/compose.oauth.yml"
 $DC down -v >/dev/null 2>&1 || true
 $DC up -d --build phecloud >/dev/null 2>&1
 trap '$DC down -v >/dev/null 2>&1' EXIT

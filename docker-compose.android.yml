@@ -35,10 +35,7 @@ services:
     restart: unless-stopped
   android:
     profiles: ["android"]
-    build:
-      context: .
-      dockerfile: cmd/pheandroid/Dockerfile
-    image: phe-android-bridge:dev
+    image: ghcr.io/phorepoc/phecloud-android-bridge:${PHECLOUD_VERSION:-v0.1.0}   # the released image; docker-compose.android.build.yml builds from this checkout instead
     container_name: phe-android
     cpus: 1
     mem_limit: 256m

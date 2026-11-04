@@ -19,7 +19,7 @@ browser (WebCodecs) <-- WebSocket: video + input --> pheandroid (bridge) <-- adb
 ```
 export PHECLOUD_ANDROID_SECRET=$(openssl rand -hex 32)     # shared by phecloud and the bridge; keep it in your env file
 export PHE_SCRCPY_JAR=/path/to/scrcpy-server-v5.0.1
-docker compose -f docker-compose.yml -f docker-compose.hub.yml -f docker-compose.android.yml --profile hub --profile tls --profile android up -d --build
+docker compose -f docker-compose.yml -f docker-compose.hub.yml -f docker-compose.android.yml --profile hub --profile tls --profile android pull && docker compose -f docker-compose.yml -f docker-compose.hub.yml -f docker-compose.android.yml --profile hub --profile tls --profile android up -d
 ```
 The hub's Caddyfile sends `/android/*` to the bridge. Open **Android** in the web app (admin devices only).
 Without a reverse proxy, publish the bridge's port 8090 yourself and open `/?t=<ticket>`; the ticket comes from `GET /phe/android/ticket` (signed, admin device) and is good for two minutes.

@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# Developers: build the Android bridge image from this checkout instead of pulling the released one (use with docker-compose.android.yml).
+services:
+  android:
+    build:
+      context: .
+      dockerfile: cmd/pheandroid/Dockerfile
+    image: phe-android-bridge:dev
