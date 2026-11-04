@@ -1,7 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-# Releases. Every push to main runs the checks (ci.yml); when the Conventional Commits since the last release call for a version, semantic-release (.releaserc.json) works it out
-# (feat = minor, fix/perf = patch, breaking = major; docs, chore, ci, ... release nothing), both container images are built and pushed to ghcr.io/phorepoc/<name> as vX.Y.Z, vX.Y and latest,
-# and only then is the tag + GitHub release (with generated notes) made. Nothing is pushed when no version is due, and a pull request never reaches this workflow.
+# Releases. Every push to main runs the checks (ci.yml). When they pass, go-semantic-release reads the Conventional Commits since the last tag
+# (feat = minor, fix = patch, breaking = major; with allow-initial-development-versions a breaking change is only a minor bump below 1.0; docs, chore, ci, ... release nothing;
+# the first release is v0.1.0), makes the tag and the GitHub release with generated notes, and only when it published a version are both container images built and pushed
+# to ghcr.io/phorepoc/<name> as vX.Y.Z, vX.Y and latest. A pull request never reaches this workflow.
 name: release
 on:
   push:
@@ -23,35 +24,29 @@ jobs:
     permissions:
       contents: read
 
-  version:
+  release:
     needs: ci
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.v.outputs.version }}
     permissions:
-      contents: write   # (semantic-release checks it may push the tag, even in a dry run)
+      contents: write
+    outputs:
+      version: ${{ steps.semrel.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
+          fetch-depth: 0   # go-semantic-release needs the full tag history, not a shallow clone
+      - name: Next version, tag and GitHub release
+        id: semrel
+        uses: go-semantic-release/action@v1
         with:
-          node-version: 22
-      - name: The next version (a dry run, nothing is tagged yet)
-        id: v
+          allow-initial-development-versions: 'true'
+          custom-arguments: --allow-no-changes   # a push with no feat/fix commits yields an empty version, not a failure
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          : > "$RUNNER_TEMP/out"
-          GITHUB_OUTPUT="$RUNNER_TEMP/out" npx --yes -p semantic-release@24 -p conventional-changelog-conventionalcommits@8 -p @semantic-release/exec@7 \
-            semantic-release --dry-run
-          v=$(sed -n 's/^version=//p' "$RUNNER_TEMP/out" | tail -n 1)
-          echo "next version: ${v:-none (nothing to release)}"
-          echo "version=$v" >> "$GITHUB_OUTPUT"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   images:
-    needs: version
-    if: needs.version.outputs.version != ''
+    needs: release
+    if: needs.release.outputs.version != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -74,12 +69,12 @@ jobs:
         with:
           images: ${{ steps.img.outputs.ref }}
           tags: |
-            type=semver,pattern=v{{version}},value=${{ needs.version.outputs.version }}
-            type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.version.outputs.version }}
+            type=semver,pattern=v{{version}},value=${{ needs.release.outputs.version }}
+            type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.release.outputs.version }}
             type=raw,value=latest
           labels: |
             org.opencontainers.image.licenses=Apache-2.0
-            org.opencontainers.image.version=v${{ needs.version.outputs.version }}
+            org.opencontainers.image.version=v${{ needs.release.outputs.version }}
       - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -95,21 +90,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
-
-  release:
-    needs: [version, images]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Tag and GitHub release (generated notes)
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          npx --yes -p semantic-release@24 -p conventional-changelog-conventionalcommits@8 -p @semantic-release/exec@7 semantic-release
