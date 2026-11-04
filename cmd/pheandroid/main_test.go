@@ -115,3 +115,14 @@ func TestDisplayForAndIME(t *testing.T) {
 		t.Fatalf("no editor: %v %v", e, s)
 	}
 }
+
+// 2026-11-04: the phone home app was fixed to Launcher3, so leaving desktop mode on the Etesian image set a home app that does not exist.
+func TestStockHomeDefaultsToLauncher3(t *testing.T) {
+	if stockHome != "com.android.launcher3/.uioverrides.QuickstepLauncher" {
+		t.Fatalf("stockHome = %q without PHE_ANDROID_HOME", stockHome)
+	}
+	t.Setenv("PHE_ANDROID_HOME", "com.bompotis.etesian.launcher/.HomeActivity")
+	if got := env("PHE_ANDROID_HOME", "x"); got != "com.bompotis.etesian.launcher/.HomeActivity" {
+		t.Fatalf("PHE_ANDROID_HOME not read: %q", got)
+	}
+}

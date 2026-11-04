@@ -5,6 +5,7 @@
 # running stack's phe-redroid is not touched), capped, then a Playwright browser. A small loop runs the adb hooks the browser test asks for (settings, rotate, ...).
 # Needs: image phe-redroid-native:13 (deploy/android/Dockerfile.redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), an APK for the upload test
 # (APK=/path, any small app), the repo root as cwd.
+#   REDROID_IMAGE=etesian-redroid HOME_ACTIVITY=com.bompotis.etesian.launcher/.HomeActivity runs it on the Etesian image (inside a VM only: see etesian-redroid's vm-test.sh)
 #   QUERY='&codec=vp8' selects the codec (Playwright's Chromium has no H.264; real browsers do)
 set -eu
 JAR=${JAR:?path of the scrcpy server jar}
@@ -22,9 +23,10 @@ docker run -d --name phe-redroid-t --network phepa --privileged --cpus 2 --memor
 docker run -d --name phe-dockerproxy-t --network phepa --cpus 0.25 --memory 64m -e CONTAINERS=1 -e POST=1 -e ALLOW_START=1 -e ALLOW_STOP=1 -v /var/run/docker.sock:/var/run/docker.sock:ro tecnativa/docker-socket-proxy:0.3.0 >/dev/null
 docker build -q -f cmd/pheandroid/Dockerfile -t phe-android-bridge:dev . >/dev/null
 docker run -d --name phe-android-t --network phepa --cpus 1 --memory 256m -e PHE_ANDROID_SECRET=testsecret -e PHE_ANDROID_SERIAL=phe-redroid-t:5555 \
-    -e PHE_ANDROID_DOCKER=http://phe-dockerproxy-t:2375 -e PHE_ANDROID_CONTAINER=phe-redroid-t -e PHE_ANDROID_PARK_AFTER=${PARK_AFTER:-30s} \
+    -e PHE_ANDROID_DOCKER=http://phe-dockerproxy-t:2375 -e PHE_ANDROID_CONTAINER=phe-redroid-t -e PHE_ANDROID_PARK_AFTER=${PARK_AFTER:-30s} -e PHE_ANDROID_HOME=${HOME_ACTIVITY:-} \
     -v "$JAR":/scrcpy-server.jar:ro phe-android-bridge:dev >/dev/null
-until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; done
+# 2026-11-04: this waited forever when the image had no adbd; give up after 5 minutes with the bridge's log
+t=0; until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; t=$((t+2)); [ $t -lt 300 ] || { echo "bridge never reached the device:"; docker logs phe-android-t 2>&1 | tail -8; exit 1; }; done
 (
   while true; do
     for f in "$OUT"/hook-*.req; do

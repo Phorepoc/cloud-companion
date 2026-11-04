@@ -22,8 +22,10 @@ import (
 const (
 	taskbarPkg  = "com.farmerbb.taskbar"
 	taskbarHome = taskbarPkg + "/.activity.HomeActivity"
-	stockHome   = "com.android.launcher3/.uioverrides.QuickstepLauncher"
 )
+
+// stockHome is the phone home app the bridge returns to: the stock launcher, or the image's own (the Etesian image: com.bompotis.etesian.launcher/.HomeActivity).
+var stockHome = env("PHE_ANDROID_HOME", "com.android.launcher3/.uioverrides.QuickstepLauncher")
 
 // Taskbar's preferences: freeform windows, Taskbar as the home screen replacement, running.
 const taskbarPrefs = `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>
