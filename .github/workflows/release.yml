@@ -35,18 +35,19 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
         with:
           fetch-depth: 0   # go-semantic-release needs the full tag history, not a shallow clone
+      - name: The semantic-release binary, v2.31.0, checked against its published sha256
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/semantic-release" https://github.com/go-semantic-release/semantic-release/releases/download/v2.31.0/semantic-release_v2.31.0_linux_amd64
+          echo "b8f518b1aeb1d1742f4e6e91a179b707cea4309a64fe3854f465bf724f04f6d3  $RUNNER_TEMP/semantic-release" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/semantic-release"
       - name: Next version, tag and GitHub release
         id: semrel
-        continue-on-error: true   # (with nothing to release the action fails reading its changelog file, "no change" in the log; the version output is then empty)
         uses: go-semantic-release/action@2e9dc4247a6004f8377781bef4cb9dad273a741f   # v1
         with:
           allow-initial-development-versions: 'true'
-          custom-arguments: --allow-no-changes   # (no failure on a push without feat/fix commits)
+          bin: ${{ runner.temp }}/semantic-release   # the pinned binary from the step above (the action would download whatever is latest)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Nothing released, or a real failure?
-        if: steps.semrel.outcome == 'failure'
-        run: echo "::warning::go-semantic-release exited with an error and no version. Expected when no feat/fix commit is new (the log says no change); otherwise read the step log."
 
   images:
     needs: release

@@ -53,7 +53,7 @@ jobs:
       - run: go test -count=1 ./...
       - name: dependency licences (allow-list; see NOTICE)
         run: |
-          go install github.com/google/go-licenses@latest
+          go install github.com/google/go-licenses@v1.6.0
           go-licenses check ./cmd/... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0 --ignore modernc.org/mathutil
 
   images:
