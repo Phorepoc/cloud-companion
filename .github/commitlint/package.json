@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "description": "commitlint, installed by the ci workflow only",
+  "devDependencies": {
+    "@commitlint/cli": "19.8.1",
+    "@commitlint/config-conventional": "19.8.1"
+  }
+}

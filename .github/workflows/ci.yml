@@ -6,13 +6,37 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_call:   # the release workflow runs the same checks before it builds the images
 permissions:
   contents: read
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}   # (a call from the release workflow is its own group)
   cancel-in-progress: true
 
 jobs:
+  commits:
+    name: Commit messages are Conventional Commits (semantic-release reads them)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+        working-directory: .github/commitlint
+      - name: lint the commits of the pull request / of the push
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then from=$BASE; else from=$BEFORE; fi
+          case "$from" in ''|0000000000000000000000000000000000000000) from="$SHA~1" ;; esac
+          cd .github/commitlint && npx commitlint --config commitlint.config.js --cwd "$GITHUB_WORKSPACE" --from "$from" --to "$SHA" --verbose
+
   go:
     name: "Go: format, vet, tests (SQLite), licences"
     runs-on: ubuntu-latest

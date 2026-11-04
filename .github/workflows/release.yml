@@ -1,26 +1,61 @@
 # SPDX-License-Identifier: Apache-2.0
-# DRAFT release workflow: builds the container images and, only when asked, pushes them to ghcr.io. Nothing is pushed by default:
-#   - a tag push (v*) builds the images and does NOT push;
-#   - "Run workflow" (workflow_dispatch) with push=true builds and pushes (needs the repository's packages permission).
-# Before the first real release: decide the image names and platforms, check NOTICE against the current dependency list, and remove the guard below.
+# Releases. Every push to main runs the checks (ci.yml); when the Conventional Commits since the last release call for a version, semantic-release (.releaserc.json) works it out
+# (feat = minor, fix/perf = patch, breaking = major; docs, chore, ci, ... release nothing), both container images are built and pushed to ghcr.io/phorepoc/<name> as vX.Y.Z, vX.Y and latest,
+# and only then is the tag + GitHub release (with generated notes) made. Nothing is pushed when no version is due, and a pull request never reaches this workflow.
 name: release
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths-ignore: ["**.md", "docs/**"]   # documentation alone releases nothing
   workflow_dispatch:
-    inputs:
-      push:
-        description: 'Push the images to ghcr.io (default: build only)'
-        type: boolean
-        default: false
 permissions:
   contents: read
-  packages: write
+# one release run at a time, in push order: each works out its version from the tags the previous one made
+concurrency:
+  group: release
+  cancel-in-progress: false
 env:
   REGISTRY: ghcr.io
+
 jobs:
-  images:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  version:
+    needs: ci
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    permissions:
+      contents: write   # (semantic-release checks it may push the tag, even in a dry run)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: The next version (dry run: nothing is tagged yet)
+        id: v
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          : > "$RUNNER_TEMP/out"
+          GITHUB_OUTPUT="$RUNNER_TEMP/out" npx --yes -p semantic-release@24 -p conventional-changelog-conventionalcommits@8 -p @semantic-release/exec@7 \
+            semantic-release --dry-run
+          v=$(sed -n 's/^version=//p' "$RUNNER_TEMP/out" | tail -n 1)
+          echo "next version: ${v:-none (nothing to release)}"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+  images:
+    needs: version
+    if: needs.version.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         include:
@@ -39,12 +74,13 @@ jobs:
         with:
           images: ${{ steps.img.outputs.ref }}
           tags: |
-            type=ref,event=tag
-            type=raw,value=dev,enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=semver,pattern=v{{version}},value=${{ needs.version.outputs.version }}
+            type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.version.outputs.version }}
+            type=raw,value=latest
           labels: |
             org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.version=v${{ needs.version.outputs.version }}
       - uses: docker/login-action@v3
-        if: ${{ inputs.push == true }}
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -54,8 +90,26 @@ jobs:
           context: .
           file: ${{ matrix.file }}
           platforms: linux/amd64
-          push: ${{ inputs.push == true }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  release:
+    needs: [version, images]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Tag and GitHub release (generated notes)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          npx --yes -p semantic-release@24 -p conventional-changelog-conventionalcommits@8 -p @semantic-release/exec@7 semantic-release
