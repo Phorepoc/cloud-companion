@@ -43,7 +43,7 @@ type Meta struct {
 	Languages []string `json:"languages,omitempty"`
 	IconNote  string   `json:"icon_note,omitempty"`
 	IconSVG   string   `json:"icon_svg,omitempty"` // the vector source of the icon, when the package's icon is a vector one
-	Read      bool     `json:"read"` // false: the file type carries no metadata we read (name and version come from the owner)
+	Read      bool     `json:"read"`               // false: the file type carries no metadata we read (name and version come from the owner)
 }
 
 // Edits is what the owner set; an empty field means "as read from the file".

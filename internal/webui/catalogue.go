@@ -481,4 +481,3 @@ func splitList(s string) []string {
 	}
 	return out
 }
-
