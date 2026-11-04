@@ -37,12 +37,16 @@ jobs:
           fetch-depth: 0   # go-semantic-release needs the full tag history, not a shallow clone
       - name: Next version, tag and GitHub release
         id: semrel
+        continue-on-error: true   # (with nothing to release the action fails reading its changelog file, "no change" in the log; the version output is then empty)
         uses: go-semantic-release/action@2e9dc4247a6004f8377781bef4cb9dad273a741f   # v1
         with:
           allow-initial-development-versions: 'true'
-          custom-arguments: --allow-no-changes   # a push with no feat/fix commits yields an empty version, not a failure
+          custom-arguments: --allow-no-changes   # (no failure on a push without feat/fix commits)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Nothing released, or a real failure?
+        if: steps.semrel.outcome == 'failure'
+        run: echo "::warning::go-semantic-release exited with an error and no version. Expected when no feat/fix commit is new (the log says no change); otherwise read the step log."
 
   images:
     needs: release
