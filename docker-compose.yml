@@ -3,7 +3,7 @@ include:
   - docker-compose.hub.yml   # profile "hub" (Stalwart + Z-Push) and "hub-legacy"; see README, "Hub"
 services:
   phecloud:
-    image: ghcr.io/phorepoc/phecloud:${PHECLOUD_VERSION:-v0.1.0}   # the released image; docker-compose.build.yml builds from this checkout instead
+    image: ghcr.io/phorepoc/phecloud:${PHECLOUD_VERSION:-v0.2.0}   # the released image; docker-compose.build.yml builds from this checkout instead
     container_name: phe-cloud
     cpus: 2
     mem_limit: 2g
