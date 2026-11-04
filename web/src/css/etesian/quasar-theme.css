@@ -1,4 +1,4 @@
-/* Vendored from the Etesian Design Language (etesian-design quasar/etesian-quasar.css, commit 790fd52; the text field and button shapes from 9ee8dee, v0.3.2), MIT licence: see ./LICENSE.
+/* Vendored from the Etesian Design Language (etesian-design quasar/etesian-quasar.css, commit 3bc017a), MIT licence: see ./LICENSE.
    Do not edit here: change it in the design repo and copy it again. */
 /*
  * Etesian Design Language theme for Quasar 2 (all built-in components).
@@ -190,14 +190,10 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
   -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
 .hd-quasar .q-btn .q-icon { font-size: 1.4em; }
 .hd-quasar .q-btn.disabled { opacity: var(--hd-opacity-disabled) !important; }
-/* button groups read as ONE item (see .hd-btn-group-lit in base.css): shared rim + top-lit gradient, square inner edges, 1px dividers */
-.hd-quasar .q-btn-group { --hd-btn-base: var(--hd-c-button-bg); overflow: hidden; border: 1px solid var(--hd-btn-rim); border-radius: calc(var(--hd-size-button) * .21) !important; background: var(--hd-lit-fill); box-shadow: inset 0 1px 0 var(--hd-btn-rim-top) !important; }
-.hd-quasar .q-btn-group > .q-btn-item, .hd-quasar .q-btn-group > .q-btn-group > .q-btn-item { margin: 0 !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
-.hd-quasar .q-btn-group > .q-btn-item:not([class*="bg-"]):not([aria-pressed="true"]) { background: transparent !important; }
-.hd-quasar .q-btn-group > .q-btn-item::before { border: 0 !important; box-shadow: none !important; }
-.hd-quasar .q-btn-group > .q-btn-item + .q-btn-item { border-left: 1px solid var(--hd-btn-rim) !important; }
-.hd-quasar .q-btn-group.column, .hd-quasar .q-btn-group.hd-vertical { flex-direction: column; flex-wrap: nowrap; }
-.hd-quasar .q-btn-group.column > .q-btn-item + .q-btn-item, .hd-quasar .q-btn-group.hd-vertical > .q-btn-item + .q-btn-item { border-left: 0 !important; border-top: 1px solid var(--hd-btn-rim) !important; }
+/* button groups: the shape, rim, dividers and caps are .hd-btn-group-lit's (base.css). Each button is a flat lit face;
+   the stand-alone button's own edge (the element) and face (::before) give way to the group's. */
+.hd-quasar .q-btn-group > .q-btn-item:not([class*="bg-"]):not([aria-pressed="true"]) { background: var(--hd-lit-fill) !important; }
+.hd-quasar .q-btn-group > .q-btn-item::before { content: none !important; }
 /* QBtnToggle = N9 TabButton row */
 .hd-quasar .q-btn-toggle .q-btn-item { font-size: var(--hd-font-size-small); min-height: 36px; }
 .hd-quasar .q-btn-toggle .q-btn-item[aria-pressed="true"] { background: linear-gradient(color-mix(in srgb, var(--hd-accent) 88%, #fff), var(--hd-accent) 50%, color-mix(in srgb, var(--hd-accent) 88%, #000)) !important; color: #fff !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.3) !important; }
@@ -500,7 +496,7 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-date__calendar-item .q-btn { font-weight: var(--hd-font-weight-light); font-size: var(--hd-font-size-default); min-height: 0; }
 .hd-quasar .q-date__calendar-item--in .q-btn--flat { color: var(--hd-c-fg); }
 .hd-quasar .q-date__today { box-shadow: inset 0 0 0 2px var(--hd-accent) !important; }
-/* QDate: wide enough for the HDL type, everything inside the card in every view */
+/* QDate: wide enough for the Etesian type, everything inside the card in every view */
 .hd-quasar .q-date { width: 340px; min-width: 340px; max-width: 100%; overflow: hidden; }
 .hd-quasar .q-date__view { padding: 12px 14px; min-height: 300px; overflow: hidden; }
 .hd-quasar .q-date__navigation { flex-wrap: nowrap; }
