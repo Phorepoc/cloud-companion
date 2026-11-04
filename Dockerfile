@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # The web app (Quasar, MIT) is built first and embedded into the Go binary.
-FROM node:22-bookworm-slim AS web
+FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --no-fund
@@ -9,7 +9,7 @@ COPY web/ ./
 RUN apt-get update && apt-get install -y --no-install-recommends python3-fonttools python3-brotli && rm -rf /var/lib/apt/lists/* && python3 tools/subset-icons.py
 RUN npm run build
 
-FROM golang:1.26-bookworm AS build
+FROM golang:1.26-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 go build -trimpath -o /out/phecloud ./cmd/phecloud \
  && CGO_ENABLED=0 go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
 
 # Chromium is an external runtime dependency (not vendored), pinned to one version.
-FROM chromedp/headless-shell:156.0.8078.48
+FROM chromedp/headless-shell:156.0.8078.48@sha256:3da74b0945e4f80f00f0310bcda9f76cee283539ebd200a053a7bebf3de89423
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core fonts-noto-core \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/ /usr/local/bin/

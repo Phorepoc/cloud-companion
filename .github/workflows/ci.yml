@@ -18,10 +18,10 @@ jobs:
     name: Commit messages are Conventional Commits (the release reads them)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund
@@ -41,8 +41,8 @@ jobs:
     name: "Go: format, vet, tests (SQLite), licences"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff   # v5
         with:
           go-version-file: go.mod
       - name: the embedded web app directory must exist for the build
@@ -60,7 +60,7 @@ jobs:
     name: Container images build (phecloud with the web app, Android bridge)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: docker build -t phe-cloud:ci .
       - run: docker build -t phe-android-bridge:ci -f cmd/pheandroid/Dockerfile .
       - name: the image starts and answers
@@ -74,8 +74,8 @@ jobs:
     name: "Browser tests: TypeScript check (all of them, the Android ones included)"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4
         with:
           node-version: 22
       - run: npm install --no-audit --no-fund && npm run check
@@ -89,9 +89,9 @@ jobs:
       matrix:
         script: [csp.sh, desktop.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: sh web/test/${{ matrix.script }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
         if: always()
         with:
           name: shots-${{ matrix.script }}
@@ -102,7 +102,7 @@ jobs:
     name: Go tests on PostgreSQL and MariaDB
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: sh web/test/db_test.sh postgres
       - run: sh web/test/db_test.sh mariadb
 
@@ -110,6 +110,6 @@ jobs:
     name: C client core (self-test, sanitizers)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gcc make
       - run: make -C client check
