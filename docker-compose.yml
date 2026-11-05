@@ -13,6 +13,9 @@ services:
       # for anything else (profile "tls", docs/reverse-proxy.md), or set PHECLOUD_WEB_BIND=0.0.0.0 on a network you trust
       - "${PHECLOUD_PHONE_BIND:-0.0.0.0}:7400:7400"
       - "${PHECLOUD_WEB_BIND:-127.0.0.1}:8080:8080"
+      # the SIP front (docs/sip.md), only when PHECLOUD_SIP_LISTEN=:5060; set PHECLOUD_SIP_BIND=0.0.0.0 for phones on your network
+      - "${PHECLOUD_SIP_BIND:-127.0.0.1}:5060:5060/udp"
+      - "${PHECLOUD_SIP_BIND:-127.0.0.1}:5060:5060/tcp"
     volumes:
       - phecloud-data:/data
       # the catalogue library (docs/catalogue.md): drop .sisx / .apk files here (set PHECLOUD_CATALOGUE_LIBRARY_DIR to a host folder, e.g. /srv/apps); uploads land in its uploads/ folder
@@ -33,6 +36,7 @@ services:
       PHECLOUD_OAUTH_MS_SECRET: ${PHECLOUD_OAUTH_MS_SECRET:-}
       PHECLOUD_OAUTH_MS_TENANT: ${PHECLOUD_OAUTH_MS_TENANT:-common}
       PHECLOUD_PUBLIC_URL: ${PHECLOUD_PUBLIC_URL:-}
+      PHECLOUD_SIP_LISTEN: ${PHECLOUD_SIP_LISTEN:-}   # the SIP front, e.g. ":5060" (docs/sip.md); off when empty
       # the very first owner's code, instead of the generated one in `docker logs phe-cloud` (12+ letters/digits/-/_); works once, ignored after the first owner exists
       # PHECLOUD_FIRST_OWNER_CODE: ${PHECLOUD_FIRST_OWNER_CODE:-}
       PHECLOUD_CATALOGUE_LIBRARY: /library

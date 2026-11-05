@@ -124,6 +124,13 @@ This adds two more containers. [Stalwart](https://stalw.art) is a mail, calendar
 gets its own password that you can revoke (`phecloud hub apppw add`). Phones too old for modern TLS can use the tunnel,
 or an optional TLS 1.0 listener (`--profile hub-legacy`). [docs/hub.md](docs/hub.md) has the exact phone settings.
 
+## The SIP front
+
+Phones with a SIP client (the Nokia N9, Symbian, softphones) can register with Cloud Companion: a message to a phone number goes out
+as an SMS through one of your phones, SMS you receive come back to them, and your SIP devices can message each other. Set
+`PHECLOUD_SIP_LISTEN=:5060` and make a login per phone with `phecloud sip add <name>`. [docs/sip.md](docs/sip.md) has the phone
+settings.
+
 ## Security
 
 What the defaults do for you:

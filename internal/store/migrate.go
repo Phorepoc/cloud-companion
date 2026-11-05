@@ -123,6 +123,22 @@ var migrations = []migration{
 		Postgres: {`CREATE TABLE IF NOT EXISTS first_owner_code(id BIGINT PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL, created BIGINT, from_env BIGINT DEFAULT 0)`},
 		MySQL:    {`CREATE TABLE IF NOT EXISTS first_owner_code(id BIGINT PRIMARY KEY, salt VARCHAR(64) NOT NULL, hash VARCHAR(64) NOT NULL, created BIGINT, from_env BIGINT DEFAULT 0)`},
 	}},
+	{version: 6, name: "SIP front: per-device SIP logins (digest HA1 only) and messages waiting for a SIP device", stmts: map[Dialect][]string{
+		SQLite: {
+			`CREATE TABLE IF NOT EXISTS sip_users(name TEXT PRIMARY KEY, ha1 TEXT NOT NULL, created INTEGER, sms_cursor INTEGER DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS sip_queue(id INTEGER PRIMARY KEY AUTOINCREMENT, to_user TEXT NOT NULL, from_uri TEXT NOT NULL, from_name TEXT, body TEXT, ts INTEGER)`,
+			`CREATE INDEX IF NOT EXISTS sip_queue_to ON sip_queue(to_user, id)`,
+		},
+		Postgres: {
+			`CREATE TABLE IF NOT EXISTS sip_users(name TEXT PRIMARY KEY, ha1 TEXT NOT NULL, created BIGINT, sms_cursor BIGINT DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS sip_queue(id BIGSERIAL PRIMARY KEY, to_user TEXT NOT NULL, from_uri TEXT NOT NULL, from_name TEXT, body TEXT, ts BIGINT)`,
+			`CREATE INDEX IF NOT EXISTS sip_queue_to ON sip_queue(to_user, id)`,
+		},
+		MySQL: {
+			`CREATE TABLE IF NOT EXISTS sip_users(name VARCHAR(64) PRIMARY KEY, ha1 VARCHAR(64) NOT NULL, created BIGINT, sms_cursor BIGINT DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS sip_queue(id BIGINT AUTO_INCREMENT PRIMARY KEY, to_user VARCHAR(64) NOT NULL, from_uri VARCHAR(255) NOT NULL, from_name VARCHAR(255), body LONGTEXT, ts BIGINT, INDEX sip_queue_to(to_user, id))`,
+		},
+	}},
 }
 
 // SchemaVersion is the newest migration this build knows.

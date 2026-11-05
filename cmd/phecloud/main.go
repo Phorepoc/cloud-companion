@@ -8,9 +8,10 @@
 //	phecloud devices            list paired devices
 //	phecloud revoke <id>        revoke a device
 //	phecloud hub ...            personal hub: per-device app passwords (see hub.go)
+//	phecloud sip add <name>     a SIP login for a phone (prints its password once); sip list, sip rm <name> (docs/sip.md)
 //
 // Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400), PHECLOUD_CHROME (chromium binary),
-// PHECLOUD_MAX_PAGE_H (page height cap in px, 8192).
+// PHECLOUD_MAX_PAGE_H (page height cap in px, 8192), PHECLOUD_SIP_LISTEN (the SIP front, e.g. :5060; off when unset).
 package main
 
 import (
@@ -32,6 +33,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/server"
+	"github.com/phorepoc/cloud-companion/internal/sipgw"
 	"github.com/phorepoc/cloud-companion/internal/store"
 	"github.com/phorepoc/cloud-companion/internal/tlsutil"
 	"github.com/phorepoc/cloud-companion/internal/webui"
@@ -96,6 +98,8 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case "sip":
+		sipMain(st, os.Args[2:])
 	case "serve":
 		maxH, _ := strconv.Atoi(env("PHECLOUD_MAX_PAGE_H", "8192"))
 		br := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH, 2)
@@ -173,9 +177,57 @@ func main() {
 			hs := &http.Server{Handler: webui.Handler(srv, mgr, cat), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
 			go hs.Serve(hln)
 		}
+		if sl := os.Getenv("PHECLOUD_SIP_LISTEN"); sl != "" && sl != "off" {
+			// the SIP front (docs/sip.md): phones register here and chat through your SMS phones and with each other
+			gw, err := sipgw.New(st, log)
+			if err != nil {
+				log.Error("sip", "err", err)
+				os.Exit(1)
+			}
+			go func() { log.Error("sip listen", "err", gw.Listen(context.Background(), sl)) }()
+			go gw.Run(context.Background())
+			log.Info("SIP front listening (UDP and TCP)", "addr", sl)
+		}
 		log.Error("serve", "err", srv.Serve(ln))
 	default:
 		fmt.Fprintln(os.Stderr, "unknown command")
+		os.Exit(2)
+	}
+}
+
+// sipMain manages the SIP logins (docs/sip.md).
+func sipMain(st *store.Store, args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "usage: phecloud sip add <name> | list | rm <name>")
+		os.Exit(2)
+	}
+	switch args[0] {
+	case "add":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "sip add <name>")
+			os.Exit(2)
+		}
+		pw, err := st.AddSIPUser(args[1])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Printf("login %s\npassword %s\nrealm %s (shown once; only a hash is kept)\n", strings.ToLower(args[1]), pw, store.SIPRealm)
+	case "list":
+		for _, u := range st.SIPUsers() {
+			fmt.Printf("%-32s created %s\n", u.Name, time.Unix(u.Created, 0).Format(time.RFC3339))
+		}
+	case "rm":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "sip rm <name>")
+			os.Exit(2)
+		}
+		if err := st.RemoveSIPUser(args[1]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	default:
+		fmt.Fprintln(os.Stderr, "usage: phecloud sip add <name> | list | rm <name>")
 		os.Exit(2)
 	}
 }
