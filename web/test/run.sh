@@ -8,8 +8,9 @@ set -eu
 ROOT=$(pwd)
 OUT=$ROOT/web/test/out
 mkdir -p "$OUT"
-docker compose up -d --build >/dev/null 2>&1
-trap 'docker compose --profile tls down >/dev/null 2>&1' EXIT
+DC="docker compose -f docker-compose.yml -f docker-compose.build.yml"   # the checkout, not the released images
+$DC up -d --build >/dev/null 2>&1
+trap '$DC --profile tls down >/dev/null 2>&1' EXIT
 sleep 6
 CODE=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
 NET=$(docker inspect phe-cloud --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')
@@ -23,7 +24,7 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ip
 # HTTPS through the Caddy reverse proxy (compose profile "tls", internal CA): pair, open example.com, tap the link over wss
 if [ "${TLS_CHECK:-1}" = 1 ]; then
     echo "== HTTPS via Caddy (profile tls)"
-    PHECLOUD_HTTPS_PORT=18443 PHECLOUD_DOMAIN=caddy CADDYFILE=./deploy/Caddyfile.local docker compose --profile tls up -d caddy >/dev/null 2>&1
+    PHECLOUD_HTTPS_PORT=18443 PHECLOUD_DOMAIN=caddy CADDYFILE=./deploy/Caddyfile.local $DC --profile tls up -d caddy >/dev/null 2>&1
     sleep 6
     CODE2=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
     docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
