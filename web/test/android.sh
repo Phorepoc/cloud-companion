@@ -6,6 +6,7 @@
 # Needs: image phe-redroid-native:13 (deploy/android/Dockerfile.redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), an APK for the upload test
 # (APK=/path, any small app), the repo root as cwd.
 #   REDROID_IMAGE=etesian-redroid HOME_ACTIVITY=com.bompotis.etesian.launcher/.HomeActivity runs it on the Etesian image (inside a VM only: see etesian-redroid's vm-test.sh)
+#   (with QUERY='&codec=vp8' and APK=<Markor from F-Droid, net.gsantner.markor>: passes in full, 2026-11-04)
 #   QUERY='&codec=vp8' selects the codec (Playwright's Chromium has no H.264; real browsers do)
 set -eu
 JAR=${JAR:?path of the scrcpy server jar}
@@ -49,6 +50,7 @@ t=0; until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do slee
         settingsff) c='am start --windowingMode 5 -n com.android.settings/.Settings' ;;
         freeformcount) c='dumpsys activity activities | grep -c mode=freeform' ;;
         taskbarwin) c='dumpsys window windows | grep -c "Window{.* Taskbar}"' ;;
+        textfield) c='input keyevent 3; sleep 1; am start -a android.intent.action.SENDTO -d sms:5550100 >/dev/null; sleep 3; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep "class=.android.widget.EditText" | tail -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;  # a focused text field with any home app: a new message's body, tapped
         applist) c='am start -a android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS' ;;
         settingssearch) c='am start -a android.settings.SETTINGS >/dev/null; sleep 2; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep -i "Search settings" | head -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;
         *) c='true' ;;

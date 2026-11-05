@@ -137,10 +137,9 @@ results.rotateBack = port.h > port.w
 console.log('rotated back: canvas', port.w + 'x' + port.h)
 await hook('home'); await page.waitForTimeout(1200)
 
-// clipboard, browser -> phone: paste into a text field (Settings search), read it back from the UI hierarchy
-await swipe([0.5, 0.9], [0.5, 0.25]); await page.waitForTimeout(1500) // the launcher's app drawer has a search field
-let [sx, sy] = px(0.5, 0.115)
-await page.mouse.click(sx, sy); await page.waitForTimeout(1500)
+// clipboard, browser -> phone: paste into a text field, read it back from the UI hierarchy. A new message's
+// body (focused), not a launcher's search field: the home app varies (HOME_ACTIVITY, e.g. Etesian has no drawer).
+await hook('textfield'); await page.waitForTimeout(1500)
 await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
 await page.evaluate(() => navigator.clipboard.writeText('pasted from the browser 42'))
 await page.screenshot({ path: OUT + '/android-5a-search.png' })
