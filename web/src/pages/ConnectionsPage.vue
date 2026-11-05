@@ -100,6 +100,17 @@
             <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
             <p class="ph-muted ph-small">Cloud Companion signs in as one more device of your account and stays online to receive your messages.</p>
           </template>
+          <template v-else-if="f.kind === 'signal'">
+            <p class="ph-muted ph-small">Signal needs signal-cli-rest-api next to Cloud Companion: <code>docker compose --profile signal up -d</code>. Link it once as a device of your Signal account, then give your number.</p>
+            <q-input v-model="f.url" outlined dense label="signal-cli-rest-api" hint="With the compose profile: http://signal-cli:8080" data-test="f-url" />
+            <q-btn outline color="primary" no-caps icon="sym_o_qr_code_2" label="Link this device" :loading="busy === 'link'" data-test="f-signal-link" @click="signalLink" />
+            <div v-if="qr" class="ph-qr" data-test="f-signal-qr">
+              <img :src="'data:image/png;base64,' + qr" alt="QR code to link Cloud Companion" width="220" height="220" />
+              <p class="ph-small">On your phone: Signal → Settings → Linked devices → Link a new device, and scan this. Then Test.</p>
+            </div>
+            <q-input v-model="f.user" outlined dense label="Your number" hint="With the country code, e.g. +306912345678" autocomplete="off" data-test="f-user" />
+            <p class="ph-muted ph-small">Numbers go out as SMS unless a rule sends them here: add a rule such as <code>sig.</code> → this account and write to <code>sig.+30…</code>.</p>
+          </template>
           <template v-else-if="f.kind === 'nctalk'">
             <q-input v-model="f.url" outlined dense label="Nextcloud address" hint="For example https://cloud.example.org" data-test="f-url" />
             <q-input v-model="f.user" outlined dense label="User" autocomplete="off" data-test="f-user" />
@@ -181,7 +192,7 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this account?</h2>
-          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
+          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk', 'signal'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
           <p v-else>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
         </q-card-section>
         <q-card-actions align="right">
@@ -224,13 +235,13 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
 const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', insecure: false, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk' }
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal' }
 const kindText = (k: string) => KINDS[k] || k
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
@@ -246,7 +257,7 @@ function ago(t: number) {
 async function load() {
   try { const j = await apiCall('GET', '/phe/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = (e as Error).message }
 }
-function openAdd() { Object.assign(f, blank()); testResult.value = null; adding.value = true }
+function openAdd() { Object.assign(f, blank()); qr.value = ''; testResult.value = null; adding.value = true }
 
 function payload() {
   if (f.kind === 'imap') {
@@ -259,6 +270,7 @@ function payload() {
   }
   if (f.kind === 'matrix') return { kind: 'matrix', provider: 'generic', name: f.name, config: JSON.stringify({ homeserver: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'xmpp') return { kind: 'xmpp', provider: 'generic', name: f.name, config: JSON.stringify({ jid: f.user.trim(), server: f.xmppServer.trim(), insecure: f.insecure }), secret: f.secret }
+  if (f.kind === 'signal') return { kind: 'signal', provider: 'generic', name: f.name, config: JSON.stringify({ api: f.url.trim(), number: f.user.trim() }), secret: '' }
   if (f.kind === 'nctalk') return { kind: 'nctalk', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'irc') {
     const cfg = { server: f.ircServer.trim(), nick: f.user.trim(), channels: f.channels.split(',').map((x) => x.trim()).filter(Boolean), all: f.ircAll, insecure: f.insecure, server_pass: f.ircServerPass }
@@ -270,6 +282,11 @@ function payload() {
   }
   if (f.kind === 'ics') return { kind: 'ics', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim() }), secret: '' }
   return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
+}
+const qr = ref('')
+async function signalLink() {
+  busy.value = 'link'; testResult.value = null; qr.value = ''
+  try { qr.value = (await apiCall('POST', '/phe/signal/link', { api: f.url.trim() })).png } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
 }
 async function doTest() {
   busy.value = 'test'; testResult.value = null
@@ -357,4 +374,6 @@ onBeforeUnmount(() => clearInterval(timer))
 .ph-oauth { display: flex; flex-wrap: wrap; gap: var(--ph-s2); }
 .ph-changes { margin: var(--ph-s2) 0 0; padding-left: var(--ph-s4); display: flex; flex-direction: column; gap: var(--ph-s1, 4px); }
 .ph-h3 { font-size: var(--ph-text-h3, 1.1rem); margin: 0; }
+.ph-qr { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.ph-qr img { background: #fff; padding: 8px; border-radius: 8px; }
 </style>

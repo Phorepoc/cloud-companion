@@ -4,8 +4,8 @@ Cloud Companion passes messages between your devices and the services you use. I
 service is a **connection**, your **rules** say which connection an address goes to, and a **front** lets your devices take part.
 
 Connections today: **SMS through your phones** (docs/sms.md), **your SIP devices** (messages between your own logins) and **SIP
-services** (your own Asterisk or a provider, one per account), **Matrix**, **XMPP**, **IRC** and **Nextcloud Talk** accounts. Planned, in this
-order: Signal, Telegram; Microsoft Teams later.
+services** (your own Asterisk or a provider, one per account), **Matrix**, **XMPP**, **IRC**, **Nextcloud Talk** and **Signal** accounts. Planned:
+Telegram; Microsoft Teams later.
 
 Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones) and the **XMPP front** for phones
 with a Jabber client (the N9's and Symbian's built-in chat, any XMPP app). Both use the same logins.
@@ -111,6 +111,25 @@ was added is not replayed.
   the conversation. Mentions and shared files arrive written out (`@Bob`, `[file: plan.pdf]`).
 - Your own messages from other Talk apps, system lines and bots are not passed on.
 
+## Signal
+Signal has no API for other apps, so Cloud Companion goes through [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api)
+(MIT, with signal-cli inside, GPL-3.0), linked as one more device of your Signal account, the way Signal Desktop is:
+
+1. `docker compose --profile signal up -d` starts it as `signal-cli`, with no host ports: its API has no login and can read and send
+   your messages, so only Cloud Companion reaches it. It keeps the linked device's keys in the `signal-cli-config` volume.
+2. Connections → Add an account → **Signal**, then **Link this device**: on your phone, Signal → Settings → Linked devices → Link a
+   new device, and scan the code.
+3. Give your number (`+306912345678`), Test, Add.
+
+- People reach your devices from their number (or their account ID, when they hide their number), named as Signal shows them.
+  Numbers go out as SMS unless a rule says otherwise, so give the account a prefix: a rule `starting with sig.` → the account, and
+  write to `sig.+306912345678`.
+- Groups reach your devices as their ID (`group.…`), named "Bob (Team)"; answering goes to the group.
+- Pictures and files arrive as a line naming them. Receipts, typing, reactions and what you send from your other devices are not
+  passed on. A number that is not on Signal is refused.
+- signal-cli-rest-api in `json-rpc` mode (the profile's) hands messages over at once; in `normal` or `native` mode Cloud Companion
+  fetches them every 3 seconds. Signal unlinks devices it has not seen for about 30 days: keep the profile running.
+
 ## The SIP front
 Set `PHECLOUD_SIP_LISTEN=:5060` (UDP and TCP). In Docker Compose the port is published on 127.0.0.1 only; set
 `PHECLOUD_SIP_BIND=0.0.0.0` for phones on your network. Plain SIP is not encrypted: keep it on a network you trust or a VPN.
@@ -188,10 +207,14 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
   channel lines that name you, a long answer split into lines.
 - `sh testdata/nctalk/test.sh`: Nextcloud Talk against a real Nextcloud: one-to-one chats both ways (one made by Cloud Companion),
   a group with a mention, unknown users and conversations refused, nothing replayed.
+- `go test ./internal/signal`: Signal against a mock of signal-cli-rest-api's documented API, in both receive modes (people, hidden
+  numbers, groups, files; receipts, sync messages and reactions left out; a number not on Signal refused).
+- `sh testdata/signal/test.sh`: the real signal-cli-rest-api with nothing linked (the QR code, "not linked yet").
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
 - `sh web/test/xmpp.sh`: adding an XMPP account through the UI against Prosody, using it in a rule, removing it.
 - `sh web/test/irc.sh`: adding an IRC account through the UI against Ergo, using it in a rule, removing it.
 - `sh web/test/nctalk.sh`: adding a Nextcloud Talk account through the UI, using it in a rule, removing it.
+- `sh web/test/signal.sh`: the Signal dialog against the real API: the QR code shown (with the app's CSP on), unlinked refused.
 - `sh web/test/sipservice.sh`: adding a SIP service through the UI against the profile's Asterisk, using it in a rule, removing it.

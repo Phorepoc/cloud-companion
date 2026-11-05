@@ -9,11 +9,14 @@ package webui
 //	PUT  /phe/routing         {routes:[...], deliver:{conn:[login]}}   replaces the rules (first match wins) and who gets which connection
 //	POST /phe/sip/logins      {name}  -> {name, password, realm}   (the password is shown once)
 //	POST /phe/sip/logins/remove {name}
+//	POST /phe/signal/link     {api}   -> {png}   (base64; the QR code to scan in Signal → Settings → Linked devices)
 
 import (
+	"encoding/base64"
 	"net/http"
 
 	"github.com/phorepoc/cloud-companion/internal/chat"
+	"github.com/phorepoc/cloud-companion/internal/signal"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
@@ -98,5 +101,17 @@ func (c *chatAPI) routes(mux *http.ServeMux) {
 			return
 		}
 		reply(w, 200, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/phe/signal/link", func(w http.ResponseWriter, r *http.Request) {
+		var in struct{ API string }
+		if !c.owner(w, r) || r.Method != http.MethodPost || !readJSON(w, r, &in) {
+			return
+		}
+		png, err := signal.LinkQR(r.Context(), in.API)
+		if err != nil {
+			bad(w, 502, err.Error())
+			return
+		}
+		reply(w, 200, map[string]any{"png": base64.StdEncoding.EncodeToString(png)})
 	})
 }

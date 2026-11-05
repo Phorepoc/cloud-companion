@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# signal-cli-rest-api (MIT; signal-cli, GPL-3.0, inside) for the Signal connection (docs/messaging.md): it holds the keys of
+# Cloud Companion's linked device. No host ports: its API has no login and can read and send your messages, so only Cloud
+# Companion reaches it, on Docker's network.
+# Use:  docker compose --profile signal up -d
+# then Connections → Add an account → Signal: "Link this device" and scan the code with your phone, then your number.
+services:
+  signal-cli:
+    profiles: ["signal"]
+    image: bbernhard/signal-cli-rest-api:0.101
+    container_name: phe-signal-cli
+    cpus: 1
+    mem_limit: 768m
+    environment:
+      MODE: json-rpc   # messages arrive at once (a websocket) instead of being fetched
+    volumes:
+      - signal-cli-config:/home/.local/share/signal-cli
+    restart: unless-stopped
+volumes:
+  signal-cli-config:
