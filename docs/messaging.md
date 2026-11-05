@@ -7,8 +7,8 @@ Connections today: **SMS through your phones** (docs/sms.md), **your SIP devices
 services** (your own Asterisk or a provider, one per account), **Matrix** and **XMPP** accounts. Planned, in this order: IRC, Nextcloud
 Talk, Signal, Telegram; Microsoft Teams later.
 
-Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones). Planned: XMPP, which the N9 and
-Symbian also speak.
+Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones) and the **XMPP front** for phones
+with a Jabber client (the N9's and Symbian's built-in chat, any XMPP app). Both use the same logins.
 
 ## Routing
 Connections → **Messaging** in the web app.
@@ -116,6 +116,35 @@ can only register its own login. A message to an address no rule or default know
 send now, such as SMS with no phone syncing, gets 480. Messages wait for a device that is not registered, in order, until it takes
 them. Calls are not handled yet.
 
+## The XMPP front
+Set `PHECLOUD_XMPP_LISTEN=:5222`. In Docker Compose the port is published on 127.0.0.1 only; set `PHECLOUD_XMPP_BIND=0.0.0.0` for
+phones on your network. It uses the logins of the SIP front (above): a phone can use either front, or both.
+
+It is a small XMPP server for those logins only, with no federation and no accounts of its own. Every address is a contact at
+`cloud-companion`: write to `+306912345678@cloud-companion` for an SMS, `xm.bob@cloud-companion` for whatever the `xm.` rule
+names, `e7@cloud-companion` for your other device. Messages arrive from those same contacts, with the sender's name (XEP-0172),
+so answering goes back the way it came. Characters an XMPP name cannot hold are escaped as XEP-0106 says (`bob@other.org` becomes
+`bob\40other.org`). There is no contact list to keep: the front lists nobody, and everyone is reachable.
+
+TLS is required, with a certificate of its own (`legacy.crt` in the data folder, RSA 2048, made at first start; the log prints its
+fingerprint). Old phones know neither TLS 1.3 nor the phone port's ECDSA certificate, so this one also accepts TLS 1.0 with AES-CBC.
+That is weaker than the phone port: keep the front on a network you trust or a VPN, as with SIP. The password goes over SASL PLAIN
+inside TLS.
+
+Phone settings (on the N9: Settings → Accounts → Jabber, then Advanced):
+
+| | |
+|---|---|
+| Address / user name | `n9@cloud-companion` |
+| Password | from the login you made |
+| Server | `<server address>` |
+| Port | `5222` |
+| Encryption | required; ignore certificate errors (the certificate is self-made; compare the fingerprint if you can) |
+
+A message to an address nobody takes comes back as an XMPP error (item-not-found), one to a connection that cannot send now as
+recipient-unavailable. Messages wait for a device that is not signed in, in order; a login signed in on two devices gets them on
+both. Group chats and file transfers are not handled yet.
+
 ## Tests
 Every build and test needs the tag `goolm` (`go test -tags goolm ./...`, or `GOFLAGS=-tags=goolm`): Matrix encryption uses
 mautrix-go's pure-Go olm instead of cgo and libolm.
@@ -128,6 +157,11 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `sh testdata/matrix/test.sh`: Matrix against a real homeserver (Conduit): encrypted direct chats both ways, a group, unknown users.
 - `sh testdata/xmpp/test.sh`: XMPP against a real server (Prosody): wrong passwords, both directions, contact names, messages kept
   while offline, signing in again after a dropped connection.
+- `go test ./internal/xmppgw`: the XMPP front on localhost (wrong passwords, both directions through a connection with an escaped
+  address and a name, refusals as errors, device to device waiting until signed in).
+- `go test ./internal/tlsutil`: the front's certificate takes the N9's and Symbian's TLS 1.0 handshakes; the phone port's does not.
+- `sh web/test/xmppfront.sh`: logins made through the UI, then two independent Jabber clients (slixmpp) chat through the front,
+  over modern TLS and over TLS 1.0 as the N9.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.

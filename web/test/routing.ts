@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Connections → Messaging through the real UI: make a SIP login (its password shown once), add rules, reorder and save them, choose
+// Connections → Messaging through the real UI: make a phone login (its password shown once), add rules, reorder and save them, choose
 // who gets SMS, and find all of it again after a reload; a rule without a prefix is refused.
 //   BASE=http://localhost:8080 CODE=<admin code> OUT=/out node --experimental-strip-types routing.ts
 import { chromium } from 'playwright'
@@ -56,7 +56,7 @@ step('a prefix rule without its prefix is refused')
 
 await page.fill('[data-test=route-row] >> nth=0 >> [data-test=route-value]', 'home.')
 await page.locator('[data-test=route-row]').nth(0).locator('[data-test=route-conn]').click()
-await page.getByRole('option', { name: 'Your SIP devices' }).click()
+await page.getByRole('option', { name: 'Your devices' }).click()
 await page.click('[data-test=route-add]')
 await page.locator('[data-test=route-row]').nth(1).locator('[data-test=route-kind]').click()
 await page.getByRole('option', { name: 'Phone numbers' }).click()
@@ -75,7 +75,7 @@ await page.reload()
 await page.waitForFunction(() => document.querySelectorAll('[data-test=route-row]').length === 2)
 const rows = await page.locator('[data-test=route-row]').allTextContents()
 assert.match(rows[0], /Phone numbers/, 'numbers first after the move')
-assert.match(rows[1], /Your SIP devices/)
+assert.match(rows[1], /Your devices/)
 assert.equal(await page.locator('[data-test=route-row]').nth(1).locator('input[data-test=route-value]').inputValue(), 'home.')
 assert.match((await page.locator('[data-test=deliver-row]').nth(0).textContent()) ?? '', /SMS through your phones.*n9/s, 'SMS still go to n9')
 assert.equal(await page.locator('[data-test=sip-login-made]').count(), 0, 'the password is not shown again')

@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+# web/test/xmppfront.sh: the test Cloud Companion with its XMPP front on, no host ports
+services:
+  phecloud:
+    environment:
+      PHECLOUD_XMPP_LISTEN: ":5222"

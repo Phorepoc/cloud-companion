@@ -1,25 +1,26 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
-<!-- Messaging routing (docs/messaging.md): the SIP logins your phones use, which connection an address goes to (first rule that
+<!-- Messaging routing (docs/messaging.md): the logins your phones use (SIP and XMPP fronts), which connection an address goes to (first rule that
      matches wins; numbers go out as SMS and logins to that device when no rule says otherwise), and who gets each connection's
      messages. -->
 <template>
   <section class="ph-card ph-section" aria-labelledby="route-h" data-test="routing">
     <h2 id="route-h">Messaging</h2>
     <p class="ph-muted">
-      Phones with SIP (the N9, Symbian, softphones) sign in with a login of their own and chat through your connections. A message goes to the
+      Phones whose chat app speaks SIP or XMPP (the N9, Symbian, softphones, Jabber apps) sign in with a login of their own and chat
+      through your connections. A message goes to the
       first rule that matches its address; without a rule, a number goes out as SMS through your phones and a login goes to that device.
       Answering a message always goes back the way it came.
     </p>
 
-    <h3 class="ph-h3">SIP logins</h3>
-    <ul v-if="logins.length" class="ph-list" aria-label="SIP logins">
+    <h3 class="ph-h3">Phone logins</h3>
+    <ul v-if="logins.length" class="ph-list" aria-label="Phone logins">
       <li v-for="l in logins" :key="l.name" data-test="sip-login">
         <div class="ph-grow"><strong>{{ l.name }}</strong></div>
         <q-btn flat no-caps color="negative" icon="sym_o_delete" :label="'Remove'" :aria-label="'Remove ' + l.name" data-test="sip-login-remove" @click="removeLogin(l.name)" />
       </li>
     </ul>
-    <p v-else class="ph-muted" data-test="no-sip-logins">No SIP login yet.</p>
+    <p v-else class="ph-muted" data-test="no-sip-logins">No login yet.</p>
     <div class="ph-row ph-row--start">
       <q-input v-model="newLogin" dense outlined label="New login, e.g. n9" data-test="sip-login-name" @keyup.enter="addLogin" />
       <q-btn unelevated color="primary" no-caps icon="sym_o_add" label="Add login" :disable="!newLogin.trim()" data-test="sip-login-add" @click="addLogin" />
@@ -27,7 +28,8 @@
     <p v-if="made" class="ph-note" role="status" data-test="sip-login-made">
       <q-icon name="sym_o_key" size="20px" aria-hidden="true" />
       Login <strong>{{ made.name }}</strong>, password <code data-test="sip-login-password">{{ made.password }}</code>, realm <code>{{ made.realm }}</code>.
-      Write the password down now: it is not shown again.
+      On an XMPP (Jabber) app the address is <code data-test="sip-login-jid">{{ made.name }}@{{ made.realm }}</code>, with this machine as
+      the server. Write the password down now: it is not shown again.
     </p>
 
     <h3 class="ph-h3">Rules</h3>

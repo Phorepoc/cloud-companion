@@ -74,7 +74,7 @@ func New(st *store.Store, hub *chat.Hub, log *slog.Logger) (*Gateway, error) {
 	key := make([]byte, 32)
 	rand.Read(key)
 	g := &Gateway{St: st, Hub: hub, Log: log, Tick: 3 * time.Second, ua: ua, srv: srv, cli: cli, key: key, binds: map[string]binding{}, kick: make(chan struct{}, 1)}
-	hub.Notify = g.Kick
+	hub.OnIn(g.Kick)
 	srv.OnRegister(g.onRegister)
 	srv.OnMessage(g.onMessage)
 	srv.OnOptions(func(req *sip.Request, tx sip.ServerTransaction) {

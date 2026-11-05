@@ -41,6 +41,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/tlsutil"
 	"github.com/phorepoc/cloud-companion/internal/webui"
 	"github.com/phorepoc/cloud-companion/internal/xmpp"
+	"github.com/phorepoc/cloud-companion/internal/xmppgw"
 )
 
 func env(k, d string) string {
@@ -199,6 +200,18 @@ func main() {
 			go func() { log.Error("sip listen", "err", gw.Listen(context.Background(), sl)) }()
 			go gw.Run(context.Background())
 			log.Info("SIP front listening (UDP and TCP)", "addr", sl)
+		}
+		if xl := os.Getenv("PHECLOUD_XMPP_LISTEN"); xl != "" && xl != "off" {
+			// the XMPP front (docs/messaging.md): the same logins as the SIP front, for phones whose chat app speaks XMPP
+			lcfg, lfp, err := tlsutil.LoadOrCreateLegacy(env("PHECLOUD_TLSDIR", "/data"))
+			if err != nil {
+				log.Error("xmpp tls", "err", err)
+				os.Exit(1)
+			}
+			xf := xmppgw.New(st, hub, lcfg, log)
+			go func() { log.Error("xmpp listen", "err", xf.Listen(context.Background(), xl)) }()
+			go xf.Run(context.Background())
+			log.Info("XMPP front listening", "addr", xl, "certificate", lfp)
 		}
 		log.Error("serve", "err", srv.Serve(ln))
 	default:

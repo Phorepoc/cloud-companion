@@ -17,6 +17,8 @@ services:
       # the SIP front (docs/messaging.md), only when PHECLOUD_SIP_LISTEN=:5060; set PHECLOUD_SIP_BIND=0.0.0.0 for phones on your network
       - "${PHECLOUD_SIP_BIND:-127.0.0.1}:5060:5060/udp"
       - "${PHECLOUD_SIP_BIND:-127.0.0.1}:5060:5060/tcp"
+      # the XMPP front (docs/messaging.md), only when PHECLOUD_XMPP_LISTEN=:5222; set PHECLOUD_XMPP_BIND=0.0.0.0 for phones on your network
+      - "${PHECLOUD_XMPP_BIND:-127.0.0.1}:5222:5222"
     volumes:
       - phecloud-data:/data
       # the catalogue library (docs/catalogue.md): drop .sisx / .apk files here (set PHECLOUD_CATALOGUE_LIBRARY_DIR to a host folder, e.g. /srv/apps); uploads land in its uploads/ folder
@@ -38,6 +40,7 @@ services:
       PHECLOUD_OAUTH_MS_TENANT: ${PHECLOUD_OAUTH_MS_TENANT:-common}
       PHECLOUD_PUBLIC_URL: ${PHECLOUD_PUBLIC_URL:-}
       PHECLOUD_SIP_LISTEN: ${PHECLOUD_SIP_LISTEN:-}   # the SIP front, e.g. ":5060" (docs/messaging.md); off when empty
+      PHECLOUD_XMPP_LISTEN: ${PHECLOUD_XMPP_LISTEN:-} # the XMPP front, e.g. ":5222" (docs/messaging.md); off when empty
       # the very first owner's code, instead of the generated one in `docker logs phe-cloud` (12+ letters/digits/-/_); works once, ignored after the first owner exists
       # PHECLOUD_FIRST_OWNER_CODE: ${PHECLOUD_FIRST_OWNER_CODE:-}
       PHECLOUD_CATALOGUE_LIBRARY: /library

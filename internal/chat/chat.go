@@ -52,9 +52,8 @@ type optioner interface{ Options() []Option }
 
 // Hub holds the connections and routes between them.
 type Hub struct {
-	St *store.Store
-	// Notify is called after a message landed in the inbox (the SIP front delivers at once instead of at its next tick).
-	Notify func()
+	St     *store.Store
+	notify []func() // the fronts, told when a message landed in the inbox (they deliver at once instead of at their next tick)
 
 	mu    sync.RWMutex
 	conns map[string]Conn
@@ -173,8 +172,8 @@ func (h *Hub) Send(ctx context.Context, from, addr, body string) error {
 	if err := c.Send(ctx, from, peer, body, opt); err != nil {
 		return err
 	}
-	if c.ID() == "sip" && h.Notify != nil { // between your devices: the message is in the inbox already
-		h.Notify()
+	if c.ID() == "sip" { // between your devices: the message is in the inbox already
+		h.notifyAll()
 	}
 	return nil
 }
@@ -207,10 +206,17 @@ func (h *Hub) In(m store.ChatMessage) error {
 	if err := h.St.ChatIn(m); err != nil {
 		return err
 	}
-	if h.Notify != nil {
-		h.Notify()
-	}
+	h.notifyAll()
 	return nil
+}
+
+// OnIn adds a front to tell when a message landed in the inbox; call it before the hub is in use.
+func (h *Hub) OnIn(f func()) { h.notify = append(h.notify, f) }
+
+func (h *Hub) notifyAll() {
+	for _, f := range h.notify {
+		f()
+	}
 }
 
 // Run keeps the connections that poll (SMS) feeding the inbox until ctx ends.
@@ -294,7 +300,7 @@ func (s *SMS) Poll(h *Hub) {
 type Devices struct{ St *store.Store }
 
 func (*Devices) ID() string    { return "sip" }
-func (*Devices) Label() string { return "Your SIP devices" }
+func (*Devices) Label() string { return "Your devices" }
 
 func (d *Devices) Send(_ context.Context, from, peer, body, _ string) error {
 	peer = strings.ToLower(peer)
