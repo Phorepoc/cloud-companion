@@ -14,7 +14,7 @@
     <!-- global menu bar -->
     <header class="ph-menubar">
       <span class="ph-menubar__app" data-test="menubar-app">{{ focusedSection?.label || brand.name }}</span>
-      <q-btn flat dense no-caps label="Window" class="ph-menubar__menu" :disable="!openWins.length">
+      <q-btn flat dense no-caps label="Window" class="ph-menubar__menu hd-sqh" :disable="!openWins.length">
         <q-menu class="ph-desk-menu" anchor="bottom left" self="top left">
           <q-list dense>
             <q-item v-close-popup clickable :disable="!focusedWin" @click="minimise(focusedWin)"><q-item-section>Minimise</q-item-section></q-item>
@@ -32,7 +32,7 @@
           </q-list>
         </q-menu>
       </q-btn>
-      <q-btn flat dense no-caps label="View" class="ph-menubar__menu">
+      <q-btn flat dense no-caps label="View" class="ph-menubar__menu hd-sqh">
         <q-menu class="ph-desk-menu" anchor="bottom left" self="top left">
           <q-list dense>
             <q-item v-close-popup clickable data-test="menu-overview" @click="overview = true"><q-item-section>Overview</q-item-section><q-item-section side>Super</q-item-section></q-item>
@@ -50,7 +50,7 @@
         {{ statusText }}
       </span>
       <!-- the clock opens Events, as on the Etesian desktop; the dot says there is unread mail -->
-      <button type="button" class="ph-menubar__clock" :class="{ 'is-on': events }" :aria-expanded="events" data-test="clock"
+      <button type="button" class="ph-menubar__clock hd-sqh" :class="{ 'is-on': events }" :aria-expanded="events" data-test="clock"
               :aria-label="`${dateText} ${timeText}, events${unread ? ', ' + unread + ' unread mail' : ''}`" title="Events (Super+N)" @click="events = !events">
         <time :datetime="now.toISOString()">{{ dateText }} <b>{{ timeText }}</b></time>
         <span v-if="unread" class="ph-menubar__dot" aria-hidden="true" />
@@ -598,7 +598,7 @@ onBeforeUnmount(() => {
 .ph-menubar__status { display: inline-flex; align-items: center; gap: var(--ph-s1); color: var(--ph-chrome-fg-muted); margin-right: var(--ph-s4); }
 .ph-menubar__status.is-online { color: #8FD65A; }
 .ph-menubar__clock {
-  position: relative; height: 24px; padding: 0 var(--ph-s2); border: 0; border-radius: 4px; background: none; color: inherit; font: inherit;
+  position: relative; height: 24px; padding: 0 var(--ph-s2); border: 0; background: none; color: inherit; font: inherit;
   white-space: nowrap; cursor: pointer;
 }
 .ph-menubar__clock:hover, .ph-menubar__clock.is-on { background: rgba(255, 255, 255, 0.16); }
@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
 .ph-desk--bottom .ph-dock__edge { left: 0; right: 0; bottom: 0; height: 4px; }
 .ph-dset { min-width: 360px; }
 .ph-hcard { position: fixed; z-index: 9600; width: 260px; padding: 12px 12px 6px; border-radius: var(--ph-r-card); background: color-mix(in srgb, var(--hd-surface-overlay) 96%, transparent);
-  color: var(--hd-c-fg); box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); font-family: var(--ph-font); }
+  color: var(--hd-c-fg); box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); /* no backdrop blur: it bleeds icons and windows on the GPU */ font-family: var(--ph-font); }
 .ph-hcard header { display: flex; align-items: center; gap: 10px; font-size: 16px; }
 .ph-hcard p { margin: 6px 0 0; font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
 .ph-hcard .ph-hcard__line { color: var(--hd-c-fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -645,8 +645,8 @@ onBeforeUnmount(() => {
 .ph-dock {
   grid-column: 1; grid-row: 2; align-self: center; justify-self: center; z-index: 40;
   display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px; border-radius: 14px;
-  background: color-mix(in srgb, var(--hd-surface-overlay) 90%, transparent); color: var(--hd-c-fg);
-  box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--hd-surface-overlay) 97%, transparent); color: var(--hd-c-fg);
+  box-shadow: var(--hd-shadow-overlay), 0 0 0 1px var(--hd-c-divider); /* no backdrop blur: it bleeds icons and windows on the GPU */
 }
 .ph-dock__sep { flex: none; width: 70%; height: 1px; margin: 4px 0; background: var(--hd-c-divider); }
 .ph-dock__item { position: relative; display: grid; place-items: center; width: calc(var(--ph-dock-icon, 40px) + 8px); height: calc(var(--ph-dock-icon, 40px) + 8px); padding: 0; border: 0; background: none; cursor: pointer; }
@@ -666,7 +666,7 @@ onBeforeUnmount(() => {
 }
 .ph-dock__item.is-open.is-active::before { width: 5px; height: 5px; background: var(--hd-accent, #4591FF); }
 /* quick switcher: a dark strip of the windows in the middle of the desktop */
-.ph-wins { position: absolute; inset: 0; z-index: 9200; background: rgba(0, 0, 0, 0.72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.ph-wins { position: absolute; inset: 0; z-index: 9200; background: rgba(0, 0, 0, 0.72); }
 .ph-wins__head { position: absolute; left: 40px; right: 40px; top: 14px; display: flex; align-items: center; gap: 14px; color: #fff; font-family: var(--ph-font); }
 .ph-wins__head h2 { margin: 0; font: 300 28px/1 var(--ph-font-light); }
 .ph-wins__head > span { color: var(--ph-chrome-fg-muted); font-size: var(--hd-font-size-small); }
@@ -679,7 +679,7 @@ onBeforeUnmount(() => {
 /* the Overview: full screen over the desktop, slightly see-through and blurred */
 .ph-ov {
   position: absolute; inset: 0; z-index: 9500; display: grid; grid-template-columns: 380px 1fr 480px;
-  background: rgba(20, 20, 20, 0.92); color: #fff; backdrop-filter: blur(18px); font-family: var(--ph-font);
+  background: rgba(20, 20, 20, 0.92); color: #fff; font-family: var(--ph-font);
 }
 .ph-ov__events { position: relative; overflow: hidden; border-right: 1px solid rgba(255, 255, 255, 0.12); }
 .ph-ov__wins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: var(--ph-s4); padding: var(--ph-s5, 32px) var(--ph-s5, 32px); overflow-y: auto; }

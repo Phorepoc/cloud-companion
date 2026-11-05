@@ -43,7 +43,7 @@
       <div v-else-if="w.kind === 'mail'" class="ph-wg__panel">
         <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b class="ph-wg__acct">{{ w.opt || 'Mail' }}</b>
           <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the account" title="Pick the account" data-test="widget-mail-account" @pointerdown.stop @click="pickAccount(w)"><q-icon name="sym_o_settings" size="20px" /></button>
-          <span v-if="mailOf(w).unread" class="ph-wg__count" data-test="widget-mail-count">{{ mailOf(w).unread }} unread</span></header>
+          <span v-if="mailOf(w).unread" class="ph-wg__count hd-sqm" data-test="widget-mail-count">{{ mailOf(w).unread }} unread</span></header>
         <p v-if="mailOf(w).error" class="ph-wg__none">{{ mailOf(w).error }}</p>
         <p v-else-if="!mailOf(w).items.length" class="ph-wg__none">No mail.</p>
         <!-- the newest 20, read or not (unread marked), scrolling: as the Belle Mail widget -->
@@ -575,7 +575,7 @@ const musicButtons = computed(() => [
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 .ph-wg__head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; font-size: var(--hd-font-size-default); }
-.ph-wg__count { margin-left: auto; padding: 1px 10px; border-radius: 12px; background: #4591FF; font-size: var(--hd-font-size-xsmall); font-weight: 700; }
+.ph-wg__count { margin-left: auto; padding: 1px 10px; background: #4591FF; font-size: var(--hd-font-size-xsmall); font-weight: 700; }
 .ph-wg__none { margin: 4px 0; font-size: var(--hd-font-size-small); color: rgba(255, 255, 255, 0.6); }
 .ph-wg__row {
   display: flex; flex-direction: column; min-width: 0; padding: 6px 4px; border: 0; border-top: 1px solid rgba(255, 255, 255, 0.12);

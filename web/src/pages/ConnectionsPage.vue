@@ -24,7 +24,7 @@
         <li v-for="a in accounts" :key="a.id" data-test="account-row">
           <div class="ph-grow">
             <strong>{{ a.name }}</strong>
-            <span class="ph-chip" :class="'ph-' + a.status" data-test="account-status">{{ statusText(a) }}</span>
+            <span class="ph-chip hd-sqm" :class="'ph-' + a.status" data-test="account-status">{{ statusText(a) }}</span>
             <div class="ph-muted ph-small">{{ kindText(a.kind) }} Â· {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
             <div v-if="a.last_error" class="ph-error ph-small" role="alert">{{ a.last_error }}</div>
           </div>
@@ -292,7 +292,7 @@ onBeforeUnmount(() => clearInterval(timer))
 .ph-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
 .ph-list li { display: flex; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3); border: 1px solid var(--ph-border); border-radius: var(--ph-r-control); flex-wrap: wrap; }
 .ph-grow { flex: 1 1 220px; min-width: 0; }
-.ph-chip { display: inline-block; margin-left: var(--ph-s2); padding: 2px var(--ph-s2); border-radius: 999px; font-size: var(--ph-text-small); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-chip { display: inline-block; margin-left: var(--ph-s2); padding: 2px var(--ph-s2); font-size: var(--ph-text-small); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-ok { color: var(--ph-positive, #1b7f3b); display: flex; gap: var(--ph-s2); align-items: flex-start; }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
 .ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }

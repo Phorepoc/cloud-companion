@@ -29,8 +29,8 @@
         <button v-for="d in week" :key="ymd(d)" type="button" role="gridcell" class="ph-cell"
                 :class="{ 'is-out': d.getMonth() !== month.getMonth(), 'is-today': ymd(d) === ymd(new Date()), 'is-sel': ymd(d) === selected }"
                 :aria-label="cellLabel(d)" :aria-selected="ymd(d) === selected" :data-test="'cal-day-' + ymd(d)" @click="selected = ymd(d)">
-          <span class="ph-num">{{ d.getDate() }}</span>
-          <span v-for="e in (byDay[ymd(d)] || []).slice(0, 2)" :key="e.href" class="ph-chip" :class="{ 'ph-chip-dot': phone }">{{ phone ? '' : e.title }}</span>
+          <span class="ph-num hd-sqm">{{ d.getDate() }}</span>
+          <span v-for="e in (byDay[ymd(d)] || []).slice(0, 2)" :key="e.href" class="ph-chip" :class="phone ? 'ph-chip-dot' : 'hd-sqm'">{{ phone ? '' : e.title }}</span>
           <span v-if="(byDay[ymd(d)] || []).length > 2" class="ph-more">+{{ byDay[ymd(d)].length - 2 }}</span>
         </button>
       </div>
@@ -266,9 +266,9 @@ onMounted(load)
 @media (min-width: 600px) { .ph-cell { min-height: 92px; } }
 .ph-cell.is-out { color: var(--ph-text-muted); background: var(--ph-bg); }
 .ph-cell.is-sel { outline: 2px solid var(--ph-accent); outline-offset: -2px; }
-.ph-num { font-size: var(--ph-text-small); font-weight: 600; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; }
+.ph-num { font-size: var(--ph-text-small); font-weight: 600; width: 24px; height: 24px; display: grid; place-items: center; }
 .ph-cell.is-today .ph-num { background: var(--ph-accent); color: var(--ph-on-accent); }
-.ph-chip { font-size: var(--ph-text-caption); line-height: 1.3; background: var(--ph-accent-soft); color: var(--ph-accent); border-radius: 4px; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-chip { font-size: var(--ph-text-caption); line-height: 1.3; background: var(--ph-accent-soft); color: var(--ph-accent); padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-chip-dot { width: 8px; height: 8px; padding: 0; border-radius: 50%; background: var(--ph-accent); display: inline-block; }
 .ph-more { font-size: var(--ph-text-caption); color: var(--ph-text-muted); }
 .ph-day { margin-bottom: var(--ph-s4); }

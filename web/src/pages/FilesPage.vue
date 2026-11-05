@@ -14,9 +14,9 @@
       </span>
     </div>
     <nav class="ph-crumbs" aria-label="Folder">
-      <button type="button" data-test="files-crumb-root" @click="go('')">Files</button>
+      <button type="button" class="hd-sqh" data-test="files-crumb-root" @click="go('')">Files</button>
       <template v-for="(c, i) in crumbs" :key="c.path"><q-icon name="sym_o_chevron_right" size="18px" aria-hidden="true" />
-        <button type="button" :aria-current="i === crumbs.length - 1 ? 'page' : undefined" @click="go(c.path)">{{ c.name }}</button></template>
+        <button type="button" class="hd-sqh" :aria-current="i === crumbs.length - 1 ? 'page' : undefined" @click="go(c.path)">{{ c.name }}</button></template>
     </nav>
 
     <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
@@ -185,7 +185,7 @@ onMounted(load)
 .ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s2); }
 .ph-head__acts { display: flex; gap: var(--ph-s2); }
 .ph-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-bottom: var(--ph-s3); color: var(--ph-text-muted); }
-.ph-crumbs button { padding: 4px 6px; border: 0; border-radius: 4px; background: none; color: var(--ph-accent); font: inherit; cursor: pointer; }
+.ph-crumbs button { padding: 4px 6px; border: 0; background: none; color: var(--ph-accent); font: inherit; cursor: pointer; }
 .ph-crumbs button[aria-current] { color: var(--ph-text); font-weight: 600; cursor: default; }
 .ph-page.is-drop { outline: 3px dashed var(--ph-accent); outline-offset: -8px; }
 .ph-list { list-style: none; padding: 0; margin: 0; }

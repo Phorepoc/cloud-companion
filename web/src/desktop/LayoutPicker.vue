@@ -30,7 +30,7 @@ const emit = defineEmits<{ pick: [layout: number, zone: number] }>()
 <style scoped>
 .ph-lpick { position: absolute; z-index: 9300; top: 8px; left: 50%; transform: translateX(-50%); width: 640px; padding: 16px 18px 12px;
   border-radius: var(--ph-r-card); background: rgba(20, 20, 20, 0.96); color: #fff; box-shadow: var(--hd-shadow-overlay), 0 0 0 1px rgba(255, 255, 255, 0.16);
-  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font-family: var(--ph-font); }
+  font-family: var(--ph-font); }
 .ph-lpick__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .ph-lpick__head h2 { margin: 0; font: 300 21px/1 var(--ph-font-light); }
 kbd { min-width: 16px; padding: 2px 4px; border: 1px solid rgba(255, 255, 255, 0.16); border-radius: 3px; font: 700 10px/1 var(--ph-font); color: #C8C8C8; }

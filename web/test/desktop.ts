@@ -332,6 +332,16 @@ step('dock: a floating strip centred on the left edge, as in the design (regress
   assert(Math.abs((d.y + d.height / 2) - (a.y + a.height / 2)) <= 2, `the dock is centred vertically (${d.y + d.height / 2} vs ${a.y + a.height / 2})`)
   assert(d.height < a.height - 40, 'and only as long as its icons')
 }
+step('shapes (regression 2026-11-05): the clock lights up as a squircle on hover, the dock has no backdrop blur')
+await page.hover('[data-test=clock]')
+await page.waitForTimeout(250)
+const clock = await page.$eval('[data-test=clock]', (e) => { const a = getComputedStyle(e, '::before'); return { radius: getComputedStyle(e).borderTopLeftRadius, mask: a.maskImage, bg: a.backgroundColor } })
+assert.equal(clock.radius, '0px', 'the clock is not a rounded rectangle')
+assert.match(clock.mask, /svg/, 'its highlight is masked to the squircle-half ends')
+assert.notEqual(clock.bg, 'rgba(0, 0, 0, 0)', 'and shows on hover')
+assert.equal(await page.$eval('.ph-dock', (e) => getComputedStyle(e).backdropFilter), 'none', 'no backdrop blur on the dock')
+await page.mouse.move(600, 500)
+
 step('widgets: the default ones sit under the windows; Ctrl+Alt+D shows the desktop')
 for (const k of ['clock-digital', 'mail', 'agenda']) await page.waitForSelector(`[data-test=widget-${k}]`)
 // the same time as the menu bar, in the same (locale) format

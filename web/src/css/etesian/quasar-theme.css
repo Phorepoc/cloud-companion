@@ -1,4 +1,4 @@
-/* Vendored from the Etesian Design Language (etesian-design quasar/etesian-quasar.css, commit 3bc017a), MIT licence: see ./LICENSE.
+/* Vendored from the Etesian Design Language (etesian-design quasar/etesian-quasar.css, commit 841145b), MIT licence: see ./LICENSE.
    Do not edit here: change it in the design repo and copy it again. */
 /*
  * Etesian Design Language theme for Quasar 2 (all built-in components).
@@ -158,20 +158,30 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-btn:not(.q-btn--round):not(.q-btn--rounded):not(.q-btn--fab):not(.q-btn--fab-mini) { border-radius: calc(var(--hd-size-button) * .21); }
 /* N9: a button's ends are a squircle as tall as the button, cut in half and pulled apart (blanco button background, n = 2.8).
    The button itself is the 1px edge (its colour, darkened), ::before the lit face inset by 1px; both masked to that shape. */
-.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq) {
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq) {
   --h: var(--hd-sqf-h, var(--hd-size-button)); border: 0 !important; border-radius: 0 !important; box-shadow: none !important; isolation: isolate;
   -webkit-mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat; mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat;
 }
-.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):not([class*="bg-"]) { background: var(--hd-btn-rim); }
-.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)[class*="bg-"] { background-image: linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)) !important; }
-.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)::before {
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):not([class*="bg-"]) { background: var(--hd-btn-rim); }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)[class*="bg-"] { background-image: linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)) !important; }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)::before {
   content: ''; position: absolute; inset: 1px; z-index: -1; border: 0 !important; border-radius: 0; box-shadow: none !important; --h: calc(var(--hd-sqf-h, var(--hd-size-button)) - 2px);
   -webkit-mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat; mask: var(--hd-squircle-mask) left top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right top / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) left bottom / var(--h) var(--h) no-repeat, var(--hd-squircle-mask) right bottom / var(--h) var(--h) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--h)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--h)) no-repeat;
   background-color: inherit; background-image: var(--hd-lit-fill);
 }
-.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)[class*="bg-"]::before { background-image: linear-gradient(rgba(255,255,255,.12), transparent 50%, rgba(0,0,0,.12)); }
-.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):not([class*="bg-"]):active:not(.disabled)::before { background-image: linear-gradient(var(--hd-btn-bot), var(--hd-btn-base)); }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)[class*="bg-"]::before { background-image: linear-gradient(rgba(255,255,255,.12), transparent 50%, rgba(0,0,0,.12)); }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):not([class*="bg-"]):active:not(.disabled)::before { background-image: linear-gradient(var(--hd-btn-bot), var(--hd-btn-base)); }
 .hd-quasar .q-btn--dense { --hd-sqf-h: 32px; }
+/* A floating badge sits outside its button, so masking the button would cut it off (2026-11-05: the Inbox count).
+   Such a button draws its shape with layers instead: ::after the rim, ::before the face (as above), its own
+   background only behind the text (background-clip: text) so the colour classes still reach both layers. */
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):has(.q-badge--floating) { -webkit-mask: none; mask: none; background-clip: text !important; }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):has(.q-badge--floating)::before { -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):has(.q-badge--floating)::after { content: ''; position: absolute; inset: 0; z-index: -2; pointer-events: none; background-color: inherit; background-image: inherit; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar :is(.q-btn--standard, .q-btn--unelevated, .q-btn--push, .q-btn--flat[class*="bg-"]):not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq):has(.q-badge--floating) .q-focus-helper { -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+/* Outline buttons: the same ends, the button its 1px rim in the text colour, ::before the face inset by 1px. */
+.hd-quasar .q-btn--outline:not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq) { background: currentColor !important; border-radius: 0 !important; isolation: isolate; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar .q-btn--outline:not(.q-btn--round):not(.q-btn--fab):not(.q-btn--fab-mini):not(.hd-sq)::before { inset: 1px; z-index: -1; border: 0 !important; border-radius: 0 !important; background: var(--hd-c-bg); -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
 .hd-quasar .q-btn--push { border-bottom-width: 1px; }
 .hd-quasar .q-btn--push::before { border-bottom: 0 !important; }
 .hd-quasar .q-btn:hover:not(.disabled) { filter: brightness(.96); }
@@ -205,14 +215,21 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-fab__label { font: var(--hd-font-weight-bold) var(--hd-font-size-small)/1 var(--hd-font-family-base); }
 
 /* ---------- badge, chip, separator ---------- */
-.hd-quasar .q-badge { min-height: 21px; min-width: 21px; padding: 0 6px; border-radius: var(--hd-radius-pill); justify-content: center;
+.hd-quasar .q-badge { min-height: 21px; min-width: 21px; padding: 0 6px; border-radius: 0; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; justify-content: center;
   font: 700 var(--hd-font-size-xsmall)/1 var(--hd-font-family-base); background: var(--hd-accent); color: #fff; letter-spacing: 0; }
-.hd-quasar .q-badge--rounded { border-radius: var(--hd-radius-pill); }
-.hd-quasar .q-badge--outline { background: transparent; border: 1px solid currentColor; color: var(--hd-accent); }
+/* N9: badges have squircle-half ends (a single digit is a whole n = 2.8 squircle), never a pill; rounded too. */
+.hd-quasar .q-badge--rounded { border-radius: 0; }
+.hd-quasar .q-badge--outline { background: currentColor; border: 0; color: var(--hd-accent); isolation: isolate; }
+.hd-quasar .q-badge--outline::before { content: ''; position: absolute; inset: 1px; z-index: -1; background: var(--hd-c-bg); -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar .q-badge--outline { position: relative; }
 .hd-quasar .q-badge--floating { top: -6px; right: -8px; }
-.hd-quasar .q-chip { border-radius: var(--hd-radius-pill); background: var(--hd-c-surface-raised); color: var(--hd-c-fg); font-size: var(--hd-font-size-small); height: 28px; border: 1px solid var(--hd-c-divider); }
-.hd-quasar .q-chip--selected, .hd-quasar .q-chip--colored { border-color: transparent; }
-.hd-quasar .q-chip--outline { background: transparent; border-color: currentColor; }
+/* N9: chips have squircle-half ends like the buttons (n = 2.8), never a pill. The chip is its 1px rim, ::before
+   the face inset by 1px, both masked by the end caps so the rim follows the curve. */
+.hd-quasar .q-chip { border: 0; border-radius: 0; position: relative; isolation: isolate; background: var(--hd-c-divider); color: var(--hd-c-fg); font-size: var(--hd-font-size-small); height: 28px; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar .q-chip::before { content: ''; position: absolute; inset: 1px; z-index: -1; pointer-events: none; background: var(--hd-c-surface-raised); -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar .q-chip--selected::before, .hd-quasar .q-chip--colored::before { background: inherit; }
+.hd-quasar .q-chip--outline { background: currentColor !important; }
+.hd-quasar .q-chip--outline::before { background: var(--hd-c-bg); }
 .hd-quasar .q-chip .q-avatar { margin-left: -10px; }
 .hd-quasar .q-chip__icon--remove { opacity: .6; }
 .hd-quasar .q-separator { background: var(--hd-c-divider); }
@@ -470,6 +487,13 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-tab--active { background: var(--hd-accent); color: #fff; border-color: transparent; }
 .hd-quasar .q-tab__indicator { display: none; }
 .hd-quasar .q-tab .q-focus-helper { display: none; }
+/* Segmented tabs (outside the header and footer) take the text field shape, like the button groups: squircle-half
+   caps at start and end, flat between, a 1px rim around and between. */
+.hd-quasar .q-tabs:not(.q-tabs--vertical):not(:is(.q-header, .q-footer) *) .q-tabs__content { gap: 1px; padding: 1px; background: var(--hd-c-button-border); -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar .q-tabs:not(.q-tabs--vertical):not(:is(.q-header, .q-footer) *) .q-tab { border: 0; margin: 0; border-radius: 0 !important; }
+.hd-quasar .q-tabs:not(.q-tabs--vertical):not(:is(.q-header, .q-footer) *) .q-tab:first-child { -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat; }
+.hd-quasar .q-tabs:not(.q-tabs--vertical):not(:is(.q-header, .q-footer) *) .q-tab:last-child { -webkit-mask: var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask: var(--hd-sq-cap-r) right center / auto 100% no-repeat; }
+.hd-quasar .q-tabs:not(.q-tabs--vertical):not(:is(.q-header, .q-footer) *) .q-tab:only-child { -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
 .hd-quasar .q-tab__alert { background: var(--hd-color-palette-warning); }
 /* Toolbar icon tabs: the selected highlight is a 40px squircle behind the icon (n = 2.8), not a rounded rect */
 .hd-quasar .q-header .q-tab, .hd-quasar .q-footer .q-tab { background: transparent !important; color: inherit; border: 0; opacity: .6; border-radius: 0 !important; isolation: isolate; }
@@ -496,6 +520,10 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-date__calendar-item .q-btn { font-weight: var(--hd-font-weight-light); font-size: var(--hd-font-size-default); min-height: 0; }
 .hd-quasar .q-date__calendar-item--in .q-btn--flat { color: var(--hd-c-fg); }
 .hd-quasar .q-date__today { box-shadow: inset 0 0 0 2px var(--hd-accent) !important; }
+/* Month and year cells: today's ring has the button's squircle-half ends (the day grid stays square, as on the N9):
+   the cell is the ring in the accent, ::before the picker's own surface inset by 2px, both masked by the end caps. */
+.hd-quasar :is(.q-date__months-item, .q-date__years-item) .q-date__today:not([class*="bg-"]) { box-shadow: none !important; border-radius: 0 !important; background: var(--hd-accent) !important; isolation: isolate; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.hd-quasar :is(.q-date__months-item, .q-date__years-item) .q-date__today:not([class*="bg-"])::before { content: ''; inset: 2px; z-index: -1; border-radius: 0 !important; box-shadow: none !important; background: var(--hd-c-surface); -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
 /* QDate: wide enough for the Etesian type, everything inside the card in every view */
 .hd-quasar .q-date { width: 340px; min-width: 340px; max-width: 100%; overflow: hidden; }
 .hd-quasar .q-date__view { padding: 12px 14px; min-height: 300px; overflow: hidden; }
@@ -509,7 +537,7 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-date__calendar-item .q-btn__content { line-height: 1; }
 .hd-quasar .q-date__months-content, .hd-quasar .q-date__years-content { align-content: center; }
 .hd-quasar .q-date__months-item, .hd-quasar .q-date__years-item { min-width: 0; padding: 2px; }
-.hd-quasar .q-date__months-item .q-btn, .hd-quasar .q-date__years-item .q-btn { width: 100%; min-width: 0; padding: 0 4px; min-height: 34px; font-size: var(--hd-font-size-small); }
+.hd-quasar .q-date__months-item .q-btn, .hd-quasar .q-date__years-item .q-btn { --hd-sqf-h: 34px; width: 100%; min-width: 0; padding: 0 4px; min-height: 34px; font-size: var(--hd-font-size-small); }
 .hd-quasar .q-date__years { overflow: hidden; }
 .hd-quasar .q-date__range::before, .hd-quasar .q-date__range-from::before, .hd-quasar .q-date__range-to::before { background: color-mix(in srgb, var(--hd-accent) 20%, transparent); }
 .hd-quasar .q-date__event { background: var(--hd-color-palette-warning); }
@@ -606,7 +634,8 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-quasar .q-bottom-sheet .q-card__section { color: var(--hd-c-fg-secondary); font-size: var(--hd-font-size-small); }
 .hd-quasar .q-bottom-sheet .q-item { color: var(--hd-c-fg); min-height: var(--hd-size-list-item-small); }
 .hd-quasar .q-bottom-sheet .q-item__label, .hd-quasar .q-bottom-sheet .q-item__section { font: var(--hd-font-weight-light) var(--hd-font-size-large)/1.2 var(--hd-font-family-light); }
-.hd-quasar .q-bottom-sheet__item { border-radius: var(--hd-radius-control); }
+/* the grid tiles' highlight is a squircle (.hd-sqh rules in base.css); list rows are square and full width, as on the N9 */
+.hd-quasar .q-bottom-sheet .q-item { border-radius: 0; }
 .hd-quasar .q-bottom-sheet__avatar { background-color: var(--hd-accent); }
 .hd-quasar .q-bottom-sheet--grid .q-bottom-sheet__item { font-size: var(--hd-font-size-xsmall); }
 

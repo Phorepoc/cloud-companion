@@ -1,4 +1,4 @@
-/* Vendored from the Etesian Design Language (etesian-design styles/base.css, commit 3bc017a), MIT licence: see ./LICENSE.
+/* Vendored from the Etesian Design Language (etesian-design styles/base.css, commit 841145b), MIT licence: see ./LICENSE.
    Do not edit here: change it in the design repo and copy it again. */
 /* Etesian base styles. Import after tokens.css. */
 :root {
@@ -76,6 +76,45 @@
 .hd-sqf::before { background: var(--hd-sqf-edge); }
 .hd-sqf::after { inset: var(--hd-sqf-edge-w); --h: calc(var(--hd-sqf-h) - 2 * var(--hd-sqf-edge-w));
   background: var(--hd-sqf-fill); }
+
+/* Squircle-half ends by masking the element itself: badges, count bubbles, tags, chips and other small filled shapes
+   without an edge. The same two caps as the button groups, sized by the element's own height, so it works at any
+   size and a square one (a single-digit count) is a whole n = 2.8 squircle. Never border-radius; an element with a
+   1px edge uses .hd-sqf instead (a mask would cut its edge off at the ends). */
+.hd-sqm, .hd-count, .hd-app-icon__badge, .hd-tool-icon__badge, .x-wmail__count,
+.x-zones__cap, .x-win__address, .hd-tab-bar:not(.hd-tab-bar--segments) > .hd-tab-button.is-selected:not(.hd-tab-button--icon) {
+  border-radius: 0 !important;
+  -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat;
+  -webkit-mask-composite: source-in;
+  mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat;
+  mask-composite: intersect;
+}
+
+/* Squircle highlights: links and bar buttons whose background shows on hover, when open or selected (site header
+   links, the desktop menu bar, skip links). The element stays unmasked so its focus ring shows in full; its background
+   is drawn by ::before, masked to the squircle-half ends (a square one is a whole squircle), and the element's own
+   background only behind its text (2026-11-05: the site header links lit up as rounded rectangles). */
+:where(.hd-sqh, .hd-site-header__link, .hd-site-header__skip, .x-shell__skip, .x-mbar__menu, .x-mbar__events, .x-mbar__sicons, .x-mbar__clock, .hd-quasar .q-bottom-sheet__item) { position: relative; }   /* zero specificity: an absolutely placed one (skip links) stays so */
+.hd-sqh, .hd-site-header__link, .hd-site-header__skip, .x-shell__skip, .x-mbar__menu, .x-mbar__events, .x-mbar__sicons, .x-mbar__clock, .hd-quasar .q-bottom-sheet__item { isolation: isolate; border-radius: 0 !important; background-clip: text !important; }
+.hd-sqh::before, .hd-site-header__link::before, .hd-site-header__skip::before, .x-shell__skip::before, .x-mbar__menu::before, .x-mbar__events::before, .x-mbar__sicons::before, .x-mbar__clock::before, .hd-quasar .q-bottom-sheet__item::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: inherit; background-clip: border-box !important;
+  -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in; mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect;
+}
+
+/* Their keyboard focus ring follows the same shape (an outline is a rectangle, and a scrolling bar clipped it to a
+   line). One layer, composited in order: inner left ∩ inner right caps (on the content box, the ring's width in), then
+   outer right XOR that, then ∩ outer left: what is left is the ring, the same width at any height. */
+.hd-sqh:focus-visible, .hd-site-header__link:focus-visible, .hd-site-header__skip:focus-visible, .x-shell__skip:focus-visible, .x-mbar__menu:focus-visible, .x-mbar__events:focus-visible, .x-mbar__sicons:focus-visible, .x-mbar__clock:focus-visible, .hd-quasar .q-bottom-sheet__item:focus-visible { outline: none !important; }
+.hd-sqh:focus-visible::after, .hd-site-header__link:focus-visible::after, .hd-site-header__skip:focus-visible::after, .x-shell__skip:focus-visible::after, .x-mbar__menu:focus-visible::after, .x-mbar__events:focus-visible::after, .x-mbar__sicons:focus-visible::after, .x-mbar__clock:focus-visible::after, .hd-quasar .q-bottom-sheet__item:focus-visible::after {
+  content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; padding: var(--hd-size-focus-ring); background: var(--hd-c-focus);
+  -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat border-box, var(--hd-sq-cap-r) right center / auto 100% no-repeat border-box, var(--hd-sq-cap-r) right center / auto 100% no-repeat content-box, var(--hd-sq-cap-l) left center / auto 100% no-repeat content-box; -webkit-mask-composite: source-in, xor, source-in, source-over;
+  mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat border-box, var(--hd-sq-cap-r) right center / auto 100% no-repeat border-box, var(--hd-sq-cap-r) right center / auto 100% no-repeat content-box, var(--hd-sq-cap-l) left center / auto 100% no-repeat content-box; mask-composite: intersect, exclude, intersect, add;
+}
+
+/* The pickers' dark buttons (HdTimePicker, HdColorPicker). */
+/* N9: squircle-half ends with the rim following the curve, as HdButton variant="dark". */
+.hd-dark-btn.hd-sqf { --hd-sqf-h: 48px; --hd-sqf-edge: #393839; --hd-sqf-fill: linear-gradient(#1C1C1C, #101010 50%, #080808); border: 0; border-radius: 0; background: none; box-shadow: none; }
+.hd-dark-btn.hd-sqf:active { --hd-sqf-fill: #111; background: none; }
 
 /* Focus (extrapolated): visible only for keyboard users, 2px ring in focus colour, 2px offset. */
 .hd-focusable:focus { outline: none; }
@@ -204,3 +243,15 @@ a.hd-link, :where(.hd-root) a:where(:not([class])) { color: var(--hd-c-link); }
   mask: var(--hd-cap-a) var(--hd-cap-pos-a) / var(--hd-cap-size) no-repeat, var(--hd-cap-b) var(--hd-cap-pos-b) / var(--hd-cap-size) no-repeat !important;
   mask-composite: intersect;
 }
+
+/* Vertical groups: the ends are a button's height, not the column's width. Capping a narrow column with halves of a
+   squircle as wide as the column made a stack of two (AM/PM) read as an eye (2026-11-05). Each corner is a quarter of
+   an n = 2.8 squircle as tall as one button (--hd-vcap, the group's button height + its 1px rim), so the curve
+   takes at most half of the first and last button and the top and bottom run straight between, like a text field. */
+/* A column has no set height: its buttons keep their own (a zero basis collapsed AM/PM to 16px of text). */
+.hd-btn-group-lit.hd-tab-bar--vertical > *, .hd-btn-group-lit.hd-vertical > *, .hd-quasar .q-btn-group.column > *, .hd-quasar .q-btn-group.hd-vertical > * { flex: 1 1 auto; }
+.hd-btn-group-lit.hd-tab-bar--vertical, .hd-btn-group-lit.hd-vertical, .hd-quasar .q-btn-group.column, .hd-quasar .q-btn-group.hd-vertical { --hd-vcap: calc(var(--hd-size-button) + 2px); -webkit-mask: var(--hd-squircle-mask) left top / var(--hd-vcap) var(--hd-vcap) no-repeat, var(--hd-squircle-mask) right top / var(--hd-vcap) var(--hd-vcap) no-repeat, var(--hd-squircle-mask) left bottom / var(--hd-vcap) var(--hd-vcap) no-repeat, var(--hd-squircle-mask) right bottom / var(--hd-vcap) var(--hd-vcap) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--hd-vcap)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--hd-vcap)) no-repeat !important; -webkit-mask-composite: source-over !important; mask: var(--hd-squircle-mask) left top / var(--hd-vcap) var(--hd-vcap) no-repeat, var(--hd-squircle-mask) right top / var(--hd-vcap) var(--hd-vcap) no-repeat, var(--hd-squircle-mask) left bottom / var(--hd-vcap) var(--hd-vcap) no-repeat, var(--hd-squircle-mask) right bottom / var(--hd-vcap) var(--hd-vcap) no-repeat, linear-gradient(#000 0 0) center / calc(100% - var(--hd-vcap)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - var(--hd-vcap)) no-repeat !important; mask-composite: add !important; }
+.hd-btn-group-lit.hd-tab-bar--vertical > :first-child, .hd-btn-group-lit.hd-vertical > :first-child, .hd-quasar .q-btn-group.column > :first-child, .hd-quasar .q-btn-group.hd-vertical > :first-child { -webkit-mask: var(--hd-squircle-mask) left top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, linear-gradient(#000 0 0) center / calc(100% - calc(var(--hd-vcap) - 2px)) 100% no-repeat, linear-gradient(#000 0 0) bottom / 100% calc(100% - calc(var(--hd-vcap) - 2px) / 2) no-repeat !important; -webkit-mask-composite: source-over !important; mask: var(--hd-squircle-mask) left top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, linear-gradient(#000 0 0) center / calc(100% - calc(var(--hd-vcap) - 2px)) 100% no-repeat, linear-gradient(#000 0 0) bottom / 100% calc(100% - calc(var(--hd-vcap) - 2px) / 2) no-repeat !important; mask-composite: add !important; }
+.hd-btn-group-lit.hd-tab-bar--vertical > :last-child, .hd-btn-group-lit.hd-vertical > :last-child, .hd-quasar .q-btn-group.column > :last-child, .hd-quasar .q-btn-group.hd-vertical > :last-child { -webkit-mask: var(--hd-squircle-mask) left bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, linear-gradient(#000 0 0) center / calc(100% - calc(var(--hd-vcap) - 2px)) 100% no-repeat, linear-gradient(#000 0 0) top / 100% calc(100% - calc(var(--hd-vcap) - 2px) / 2) no-repeat !important; -webkit-mask-composite: source-over !important; mask: var(--hd-squircle-mask) left bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, linear-gradient(#000 0 0) center / calc(100% - calc(var(--hd-vcap) - 2px)) 100% no-repeat, linear-gradient(#000 0 0) top / 100% calc(100% - calc(var(--hd-vcap) - 2px) / 2) no-repeat !important; mask-composite: add !important; }
+.hd-btn-group-lit.hd-tab-bar--vertical > :only-child, .hd-btn-group-lit.hd-vertical > :only-child, .hd-quasar .q-btn-group.column > :only-child, .hd-quasar .q-btn-group.hd-vertical > :only-child { -webkit-mask: var(--hd-squircle-mask) left top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) left bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, linear-gradient(#000 0 0) center / calc(100% - calc(var(--hd-vcap) - 2px)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - calc(var(--hd-vcap) - 2px)) no-repeat !important; -webkit-mask-composite: source-over !important; mask: var(--hd-squircle-mask) left top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right top / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) left bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, var(--hd-squircle-mask) right bottom / calc(var(--hd-vcap) - 2px) calc(var(--hd-vcap) - 2px) no-repeat, linear-gradient(#000 0 0) center / calc(100% - calc(var(--hd-vcap) - 2px)) 100% no-repeat, linear-gradient(#000 0 0) center / 100% calc(100% - calc(var(--hd-vcap) - 2px)) no-repeat !important; mask-composite: add !important; }
+
