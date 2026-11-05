@@ -1,0 +1,15 @@
+{
+  "//": "The service worker as a plain script (no module) with the worker's types only, compiled by npm run emit into public/sw.js and committed.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "None",
+    "lib": ["ES2022", "WebWorker"],
+    "types": [],
+    "strict": true,
+    "skipLibCheck": true,
+    "removeComments": false,
+    "newLine": "lf",
+    "rootDir": "src"
+  },
+  "files": ["src/sw.ts"]
+}

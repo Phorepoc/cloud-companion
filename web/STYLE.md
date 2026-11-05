@@ -263,8 +263,9 @@ Images and the page canvas are never recoloured; the cloud page keeps its own co
 
 * **Code is TypeScript, strict.** `npm run check` type-checks the app (`vue-tsc`), and `npm run build` (the Docker build too)
   refuses to build with a type error. The protocol's frames and the hub's objects are typed in `src/proto.ts`, which follows
-  `internal/proto/proto.go`: change both together. `src/android/stream.js` stays JavaScript (the Android bridge serves the same
-  file to browsers) and is described by `stream.d.ts` next to it.
+  `internal/proto/proto.go`: change both together. Two files are also served as plain JavaScript: the Android stream
+  (`src/android/stream.ts`, which the bridge serves from `cmd/pheandroid/stream.js`) and the service worker (`src/sw.ts`, served
+  as `public/sw.js`). After changing either, run `npm run emit`; `npm run check` fails while the compiled copies are out of date.
 * **Rename or re-logo the product:** `src/brand.ts`, rebuild.
 * **Add a section:** `src/nav.ts` (label, icon, path, `primary` if it belongs in the phone's bottom bar), a route in `src/router.ts`, a page
   in `src/pages/`; until the page exists the `SectionPage` placeholder shows the empty state.

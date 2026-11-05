@@ -95,12 +95,12 @@ across the phone / large boundary (`web/test/screenshots/android/androiddesktop-
   (the bridge container needs internet access) and installs it. Apps whose suggested build is ARM-only fail with the install error text, since the image has no translation layer. Installing needs the viewer's session (given by the open stream), not just a ticket.
 
 ## In the web app
-**Android** (admin devices) is a native page of the app, not an embedded page: `web/src/pages/AndroidPage.vue` imports the stream module `web/src/android/stream.js` (framework-free: WebCodecs video and audio,
+**Android** (admin devices) is a native page of the app, not an embedded page: `web/src/pages/AndroidPage.vue` imports the stream module `web/src/android/stream.ts` (framework-free: WebCodecs video and audio,
 the WebSocket, pointer / wheel / keyboard / clipboard events, installs). The app fetches the ticket itself (`/phe/android/ticket`), draws into a canvas inside a phone-shaped frame that takes the stream's own aspect ratio
 (so it follows rotation) and is as large as the content area allows (desktop, tablet and phone widths), and offers the controls as app buttons: Back, Home, Recent, Sound, Copy from phone, Paste to phone, Install apps (a dialog for an
 APK file or an F-Droid package name). A status chip shows Connecting / Connected / the reason it closed (including "Another viewer took over this Android"), and **Reconnect** fetches a fresh ticket.
-The page's address accepts `#/android?codec=vp8&size=720&fps=30&kbps=2000&audio=0`. The bridge's standalone page at `/android/` (plain controls, no app around it) uses the same module: `cmd/pheandroid/stream.js` is an
-embedded copy, and a Go test fails if the two differ.
+The page's address accepts `#/android?codec=vp8&size=720&fps=30&kbps=2000&audio=0`. The bridge's standalone page at `/android/` (plain controls, no app around it) uses the same module: `cmd/pheandroid/stream.js` is
+compiled from it by `npm run emit` in `web/` and embedded; `npm run check` fails when it is out of date.
 
 ## Verified, and what only a real browser can check
 **Verified by the user in a real browser:** H.264 decoding (the default codec), the ticket path from the web app (the stream played), **audible sound** through the Sound button, and a YouTube video playing smoothly in Android's browser through the stream. **Copying text from Android to the host's clipboard works** (checked by the user). The framing of the page (iframe) was rejected, hence the native page above.

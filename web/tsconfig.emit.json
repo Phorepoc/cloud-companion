@@ -1,0 +1,16 @@
+{
+  "//": "The Android stream as plain JavaScript for the bridge's own page (the Go build embeds it), compiled by npm run emit and committed; tsconfig.sw.json does the same for the service worker. npm run check fails when they are out of date.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": [],
+    "strict": true,
+    "skipLibCheck": true,
+    "removeComments": false,
+    "newLine": "lf",
+    "rootDir": "src/android"
+  },
+  "files": ["src/android/stream.ts"]
+}

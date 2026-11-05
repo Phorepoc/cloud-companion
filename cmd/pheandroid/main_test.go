@@ -4,9 +4,7 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
-	"os"
 	"strings"
 	"testing"
 )
@@ -65,15 +63,17 @@ func TestScrollClipboardMessages(t *testing.T) {
 	}
 }
 
-// The web app imports web/src/android/stream.js; the bridge embeds and serves a copy for its standalone page. They must stay identical.
-func TestStreamModuleCopy(t *testing.T) {
-	src, err := os.ReadFile("../../web/src/android/stream.js")
-	if err != nil {
-		t.Skip("the web sources are not here")
+// The bridge serves the stream module compiled from web/src/android/stream.ts (npm run emit; npm run check fails when it is out
+// of date): plain JavaScript a browser runs as it is.
+func TestStreamModule(t *testing.T) {
+	js := string(streamJS)
+	if !strings.Contains(js, "export class AndroidStream") || !strings.Contains(js, "compiled from this file") {
+		t.Fatal("cmd/pheandroid/stream.js is not the compiled stream module: run npm run emit in web/")
 	}
-	noCR := func(b []byte) []byte { return bytes.ReplaceAll(b, []byte{13}, nil) } // checkouts on Windows may use CRLF
-	if !bytes.Equal(noCR(src), noCR(streamJS)) {
-		t.Fatal("cmd/pheandroid/stream.js differs from web/src/android/stream.js: copy it over")
+	for _, ts := range []string{"interface StreamOptions", ": HTMLCanvasElement", "declare global"} {
+		if strings.Contains(js, ts) {
+			t.Fatalf("TypeScript left in the compiled module: %q", ts)
+		}
 	}
 }
 

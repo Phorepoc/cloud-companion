@@ -5,8 +5,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "check": "vue-tsc -p .",
-    "build": "vue-tsc -p . && vite build"
+    "check": "vue-tsc -p . && node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/emit.ts --check",
+    "emit": "node --experimental-strip-types --no-warnings=ExperimentalWarning scripts/emit.ts",
+    "build": "npm run check && vite build"
   },
   "dependencies": {
     "@fontsource/fira-sans": "^5.3.0",

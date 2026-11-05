@@ -81,6 +81,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4
         with:
           node-version: 22
+      - run: npm ci --no-audit --no-fund && npm run check   # the app's types, and the compiled stream.js and sw.js up to date
+        working-directory: web
       - run: npm install --no-audit --no-fund && npm run check
         working-directory: web/test
 

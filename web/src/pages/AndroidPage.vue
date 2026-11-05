@@ -81,7 +81,7 @@ import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { apiCall, state } from '../cloud'
 import { useTitleActions } from '../components/titlebar'
-import { AndroidStream, type StreamState, type StreamStats } from '../android/stream.js'
+import { AndroidStream, type StreamState, type StreamStats } from '../android/stream'
 
 const route = useRoute()
 const titleActions = useTitleActions()

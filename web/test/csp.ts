@@ -42,6 +42,24 @@ await page.click('[data-test=clock]')
 await page.waitForSelector('[data-test=events]')
 await page.waitForTimeout(700) // its calendar, mail and chats requests
 console.log('desktop ok')
+
+// the service worker (compiled from src/sw.ts) runs under the policy and keeps the app shell; offline, a page it kept still opens
+// and one it never saw is a plain network error, not a broken response
+const sw = await page.evaluate(async () => { const r = await navigator.serviceWorker.ready; return r.active?.scriptURL || '' })
+assert.match(sw, /\/sw\.js$/, 'the service worker is active')
+await page.reload() // now it is in charge of the page's requests
+await page.waitForSelector('[data-test=dock-launcher]')
+await ctx.setOffline(true)
+await ctx.route('**/*', (r) => r.abort('internetdisconnected')) // the service worker's own requests too (PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS, csp.sh)
+const offline = await page.evaluate(async () => {
+  const kept = await fetch('./').then((r) => r.status, () => 'network error')
+  const never = await fetch('./never-seen-' + Date.now()).then((r) => r.status, () => 'network error')
+  return { kept, never }
+})
+await ctx.unroute('**/*')
+await ctx.setOffline(false)
+assert.deepEqual(offline, { kept: 200, never: 'network error' }, 'offline answers from the service worker')
+console.log('service worker ok')
 assert.deepEqual(bad, [], 'CSP violations or page errors')
 await browser.close()
-console.log('CSP: PASS (security headers present, every section and the desktop load under the policy)')
+console.log('CSP: PASS (security headers present, every section, the desktop and the service worker work under the policy)')
