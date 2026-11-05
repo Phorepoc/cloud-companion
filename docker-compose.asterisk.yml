@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# Asterisk as a SIP service Cloud Companion connects to (docs/messaging.md): your own extensions for phones and softphones, messages
+# between them and through your routing rules, calls between extensions. GPL-2.0, a separate container.
+# Use:  PHECLOUD_ASTERISK_SECRET=<a password> docker compose --profile asterisk up -d --build
+# then Connections → Add an account → SIP service: server "asterisk", user "cloud-companion", that password.
+services:
+  asterisk:
+    profiles: ["asterisk"]
+    build: deploy/asterisk
+    image: phecloud-asterisk:local
+    container_name: phe-asterisk
+    cpus: 1
+    mem_limit: 512m
+    environment:
+      PHECLOUD_ASTERISK_SECRET: ${PHECLOUD_ASTERISK_SECRET:-}
+      PHECLOUD_ASTERISK_PUBLIC: ${PHECLOUD_ASTERISK_PUBLIC:-}   # this machine's address on your network; needed for calls through Docker's NAT
+    ports:
+      # 5062 on the host: 5060 is Cloud Companion's own SIP front. Phones register at <this machine>:5062.
+      - "${PHECLOUD_ASTERISK_BIND:-127.0.0.1}:${PHECLOUD_ASTERISK_PORT:-5062}:5060/udp"
+      - "${PHECLOUD_ASTERISK_BIND:-127.0.0.1}:${PHECLOUD_ASTERISK_PORT:-5062}:5060/tcp"
+      - "${PHECLOUD_ASTERISK_BIND:-127.0.0.1}:10000-10099:10000-10099/udp"
+    volumes:
+      - asterisk-etc:/etc/asterisk
+    restart: unless-stopped
+volumes:
+  asterisk-etc:

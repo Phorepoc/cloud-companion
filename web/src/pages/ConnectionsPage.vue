@@ -87,6 +87,16 @@
             <q-input v-model="f.folders" outlined dense label="Folders to copy" hint="Comma separated. Default: INBOX" data-test="f-folders" />
             <q-input v-model.number="f.months" outlined dense type="number" label="Months back" data-test="f-months" />
           </template>
+          <template v-else-if="f.kind === 'sip'">
+            <q-input v-model="f.sipServer" outlined dense label="Server" hint="host or host:port; with the asterisk profile: asterisk" data-test="f-sip-server" />
+            <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.secret" outlined dense type="password" label="Password" autocomplete="new-password" data-test="f-secret" />
+            <q-input v-model="f.sipDomain" outlined dense label="SIP domain (optional)" hint="Only when addresses there are not @ the server's name" data-test="f-sip-domain" />
+            <div class="ph-two">
+              <q-select v-model="f.sipTransport" :options="sipTransports" emit-value map-options outlined dense label="Transport" data-test="f-sip-transport" />
+              <q-input v-model="f.sipListen" outlined dense label="Messages arrive on" hint="Cloud Companion's address for this service" data-test="f-sip-listen" />
+            </div>
+          </template>
           <template v-else-if="f.kind === 'ics'">
             <q-input v-model="f.url" outlined dense label="Calendar link (https:// or webcal://)" hint="A read-only calendar feed, for example a Proton calendar share link" data-test="f-url" />
           </template>
@@ -142,7 +152,8 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this account?</h2>
-          <p>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
+          <p v-if="askRemove && askRemove.kind === 'sip'">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
+          <p v-else>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps label="Cancel" @click="askRemove = null" />
@@ -184,12 +195,13 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }]
+const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
-const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '' })
+const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070' })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link' }
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service' }
 const kindText = (k: string) => KINDS[k] || k
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
@@ -215,6 +227,10 @@ function payload() {
       folders: f.folders.split(',').map((x) => x.trim()).filter(Boolean), months: f.months || 3, from: f.from.trim(),
     }
     return { kind: 'imap', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
+  }
+  if (f.kind === 'sip') {
+    const cfg = { server: f.sipServer.trim(), domain: f.sipDomain.trim(), user: f.user.trim(), transport: f.sipTransport, listen: f.sipListen.trim() }
+    return { kind: 'sip', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
   }
   if (f.kind === 'ics') return { kind: 'ics', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim() }), secret: '' }
   return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }

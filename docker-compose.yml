@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 include:
   - docker-compose.hub.yml   # profile "hub" (Stalwart + Z-Push) and "hub-legacy"; see README, "Hub"
+  - docker-compose.asterisk.yml   # profile "asterisk": a SIP service for your phones (docs/messaging.md)
 services:
   phecloud:
     image: ghcr.io/phorepoc/phecloud:${PHECLOUD_VERSION:-v0.2.0}   # the released image; docker-compose.build.yml builds from this checkout instead

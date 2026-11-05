@@ -14,6 +14,7 @@ import (
 
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/sipsvc"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
@@ -78,6 +79,12 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		return fmt.Sprintf("login works, %d entries", n), nil
+	case "sip":
+		var c sipsvc.Cfg
+		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
+			return "", err
+		}
+		return sipsvc.Test(ctx, c, secret)
 	}
 	return "", errors.New("unknown kind " + kind)
 }
@@ -87,7 +94,7 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	if strings.TrimSpace(name) == "" {
 		return store.Account{}, errors.New("give the account a name")
 	}
-	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" {
+	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" {
 		return store.Account{}, errors.New("unknown kind " + kind)
 	}
 	if !json.Valid([]byte(cfgJSON)) {
@@ -95,6 +102,9 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	}
 	return m.St.AddAccount(store.Account{Kind: kind, Provider: provider, Name: strings.TrimSpace(name), Config: cfgJSON, Secret: m.V.Seal([]byte(secret))})
 }
+
+// Secret opens an account's password (or fresh token) for the parts that log in outside the manager, like the SIP services.
+func (m *Manager) Secret(a store.Account) (string, error) { return m.secret(a) }
 
 // secret is what the connector logs in with: the password, or for an OAuth account a fresh access token (refreshed and re-sealed when it is about to expire).
 func (m *Manager) secret(a store.Account) (string, error) {
@@ -209,6 +219,17 @@ func (m *Manager) SyncNow(ctx context.Context, id string) (string, error) {
 }
 
 func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
+	if a.Kind == "sip" { // nothing to copy: messages pass through (package sipsvc); a sync checks the login
+		var c sipsvc.Cfg
+		if err := json.Unmarshal([]byte(a.Config), &c); err != nil {
+			return "", err
+		}
+		pass, err := m.secret(a)
+		if err != nil {
+			return "", errors.New("the stored secret cannot be opened (key changed?)")
+		}
+		return sipsvc.Test(ctx, c, pass)
+	}
 	if m.Hub == nil {
 		return "", errors.New("the hub is not configured")
 	}

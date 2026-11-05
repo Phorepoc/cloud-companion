@@ -35,6 +35,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/server"
 	"github.com/phorepoc/cloud-companion/internal/sipgw"
+	"github.com/phorepoc/cloud-companion/internal/sipsvc"
 	"github.com/phorepoc/cloud-companion/internal/store"
 	"github.com/phorepoc/cloud-companion/internal/tlsutil"
 	"github.com/phorepoc/cloud-companion/internal/webui"
@@ -158,6 +159,8 @@ func main() {
 			} else {
 				mgr = connectors.NewManager(st, srv.Hub, vault)
 				srv.Sender = mgr
+				// connected SIP services (docs/messaging.md): each account registers there and becomes a chat connection
+				go (&sipsvc.Pool{St: st, Hub: hub, Log: log, Secret: mgr.Secret}).Run(context.Background(), 10*time.Second)
 				if srv.Hub != nil {
 					go mgr.Loop(context.Background(), 15*time.Minute)
 				}

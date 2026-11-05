@@ -14,7 +14,7 @@ import (
 
 type Account struct {
 	ID        string `json:"id"`
-	Kind      string `json:"kind"`     // imap | carddav | caldav
+	Kind      string `json:"kind"`     // imap | carddav | caldav | ics | sip
 	Provider  string `json:"provider"` // generic | gmail | outlook | icloud | nextcloud ...
 	Name      string `json:"name"`
 	Config    string `json:"config"` // JSON, no secrets (host, port, user, folders, months, smtp host ...)

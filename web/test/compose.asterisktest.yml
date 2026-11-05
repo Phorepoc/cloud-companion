@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# web/test/sipservice.sh: the asterisk profile next to the test Cloud Companion, no host ports
+services:
+  asterisk:
+    container_name: phe-asterisk-ui
+    ports: !override []
+    environment:
+      PHECLOUD_ASTERISK_SECRET: ui-test-secret

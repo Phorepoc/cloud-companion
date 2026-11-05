@@ -74,6 +74,13 @@ func (h *Hub) Add(c Conn) {
 	h.mu.Unlock()
 }
 
+// Remove drops a connection (its account was removed). Rules that name it stop matching anything until it is back.
+func (h *Hub) Remove(id string) {
+	h.mu.Lock()
+	delete(h.conns, id)
+	h.mu.Unlock()
+}
+
 func (h *Hub) conn(id string) Conn {
 	h.mu.RLock()
 	defer h.mu.RUnlock()

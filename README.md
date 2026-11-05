@@ -126,8 +126,8 @@ or an optional TLS 1.0 listener (`--profile hub-legacy`). [docs/hub.md](docs/hub
 
 ## Messaging
 
-Cloud Companion passes messages between your devices and your services: SMS through your phones today, with a SIP service, Matrix,
-XMPP, IRC, Nextcloud Talk, Signal and Telegram planned. You decide in Connections → Messaging which address goes where. Phones with a
+Cloud Companion passes messages between your devices and your services: SMS through your phones and SIP services (your own Asterisk:
+`docker compose --profile asterisk`, or a provider) today, with Matrix, XMPP, IRC, Nextcloud Talk, Signal and Telegram planned. You decide in Connections → Messaging which address goes where. Phones with a
 SIP client (the Nokia N9, Symbian, softphones) can sign in and chat through it: set `PHECLOUD_SIP_LISTEN=:5060` and make a login per
 phone. [docs/messaging.md](docs/messaging.md) explains the rules and has the phone settings.
 
