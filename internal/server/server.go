@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/cloud-companion/internal/browser"
+	"github.com/phorepoc/cloud-companion/internal/chat"
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/store"
@@ -31,6 +32,7 @@ type Server struct {
 	Log     *slog.Logger
 	Hub     *davhub.Client // the personal hub (contacts, calendar); nil when not configured
 	Sender  MailSender     // connected mail accounts that can relay outgoing mail; nil when there are none
+	Chat    *chat.Hub      // the chat connections and their routing (docs/messaging.md)
 	reg     registry
 	fails   authFails
 }

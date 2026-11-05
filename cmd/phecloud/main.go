@@ -8,7 +8,7 @@
 //	phecloud devices            list paired devices
 //	phecloud revoke <id>        revoke a device
 //	phecloud hub ...            personal hub: per-device app passwords (see hub.go)
-//	phecloud sip add <name>     a SIP login for a phone (prints its password once); sip list, sip rm <name> (docs/sip.md)
+//	phecloud sip add <name>     a SIP login for a phone (prints its password once); sip list, sip rm <name> (docs/messaging.md)
 //
 // Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400), PHECLOUD_CHROME (chromium binary),
 // PHECLOUD_MAX_PAGE_H (page height cap in px, 8192), PHECLOUD_SIP_LISTEN (the SIP front, e.g. :5060; off when unset).
@@ -30,6 +30,7 @@ import (
 
 	"github.com/phorepoc/cloud-companion/internal/browser"
 	"github.com/phorepoc/cloud-companion/internal/catalogue"
+	"github.com/phorepoc/cloud-companion/internal/chat"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/server"
@@ -122,7 +123,9 @@ func main() {
 			os.Exit(1)
 		}
 		log.Info("phecloud listening", "addr", ln.Addr().String())
-		srv := &server.Server{Store: st, Browser: br, Log: log, Hub: davhub.FromEnv()}
+		hub := chat.NewHub(st) // the chat connections (docs/messaging.md): the web app's routing page and the SIP front use it
+		go hub.Run(context.Background(), 3*time.Second)
+		srv := &server.Server{Store: st, Browser: br, Log: log, Hub: davhub.FromEnv(), Chat: hub}
 		if pl := os.Getenv("PHECLOUD_PLAIN_LISTEN"); pl != "" {
 			// DEVELOPMENT ONLY: an unencrypted listener for the C client's host test (no TLS stack there).
 			pln, err := net.Listen("tcp", pl)
@@ -178,8 +181,8 @@ func main() {
 			go hs.Serve(hln)
 		}
 		if sl := os.Getenv("PHECLOUD_SIP_LISTEN"); sl != "" && sl != "off" {
-			// the SIP front (docs/sip.md): phones register here and chat through your SMS phones and with each other
-			gw, err := sipgw.New(st, log)
+			// the SIP front (docs/messaging.md): phones register here and chat through your SMS phones and with each other
+			gw, err := sipgw.New(st, hub, log)
 			if err != nil {
 				log.Error("sip", "err", err)
 				os.Exit(1)
@@ -195,7 +198,7 @@ func main() {
 	}
 }
 
-// sipMain manages the SIP logins (docs/sip.md).
+// sipMain manages the SIP logins (docs/messaging.md).
 func sipMain(st *store.Store, args []string) {
 	if len(args) == 0 {
 		fmt.Fprintln(os.Stderr, "usage: phecloud sip add <name> | list | rm <name>")

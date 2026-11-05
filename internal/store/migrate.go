@@ -123,20 +123,24 @@ var migrations = []migration{
 		Postgres: {`CREATE TABLE IF NOT EXISTS first_owner_code(id BIGINT PRIMARY KEY, salt TEXT NOT NULL, hash TEXT NOT NULL, created BIGINT, from_env BIGINT DEFAULT 0)`},
 		MySQL:    {`CREATE TABLE IF NOT EXISTS first_owner_code(id BIGINT PRIMARY KEY, salt VARCHAR(64) NOT NULL, hash VARCHAR(64) NOT NULL, created BIGINT, from_env BIGINT DEFAULT 0)`},
 	}},
-	{version: 6, name: "SIP front: per-device SIP logins (digest HA1 only) and messages waiting for a SIP device", stmts: map[Dialect][]string{
+	{version: 6, name: "chat connections: SIP logins (digest HA1 only), one inbox for every connection, the routing rules and who gets which connection", stmts: map[Dialect][]string{
 		SQLite: {
-			`CREATE TABLE IF NOT EXISTS sip_users(name TEXT PRIMARY KEY, ha1 TEXT NOT NULL, created INTEGER, sms_cursor INTEGER DEFAULT 0)`,
-			`CREATE TABLE IF NOT EXISTS sip_queue(id INTEGER PRIMARY KEY AUTOINCREMENT, to_user TEXT NOT NULL, from_uri TEXT NOT NULL, from_name TEXT, body TEXT, ts INTEGER)`,
-			`CREATE INDEX IF NOT EXISTS sip_queue_to ON sip_queue(to_user, id)`,
+			`CREATE TABLE IF NOT EXISTS sip_users(name TEXT PRIMARY KEY, ha1 TEXT NOT NULL, created INTEGER, inbox_cursor INTEGER DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS chat_inbox(id INTEGER PRIMARY KEY AUTOINCREMENT, conn TEXT NOT NULL, peer TEXT NOT NULL, peer_name TEXT, to_login TEXT, body TEXT, ts INTEGER)`,
+			`CREATE TABLE IF NOT EXISTS chat_routes(id INTEGER PRIMARY KEY AUTOINCREMENT, position INTEGER NOT NULL, match_kind TEXT NOT NULL, match_value TEXT, conn TEXT NOT NULL, opt TEXT)`,
+			`CREATE TABLE IF NOT EXISTS chat_deliver(conn TEXT NOT NULL, login TEXT NOT NULL, PRIMARY KEY(conn, login))`,
 		},
 		Postgres: {
-			`CREATE TABLE IF NOT EXISTS sip_users(name TEXT PRIMARY KEY, ha1 TEXT NOT NULL, created BIGINT, sms_cursor BIGINT DEFAULT 0)`,
-			`CREATE TABLE IF NOT EXISTS sip_queue(id BIGSERIAL PRIMARY KEY, to_user TEXT NOT NULL, from_uri TEXT NOT NULL, from_name TEXT, body TEXT, ts BIGINT)`,
-			`CREATE INDEX IF NOT EXISTS sip_queue_to ON sip_queue(to_user, id)`,
+			`CREATE TABLE IF NOT EXISTS sip_users(name TEXT PRIMARY KEY, ha1 TEXT NOT NULL, created BIGINT, inbox_cursor BIGINT DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS chat_inbox(id BIGSERIAL PRIMARY KEY, conn TEXT NOT NULL, peer TEXT NOT NULL, peer_name TEXT, to_login TEXT, body TEXT, ts BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS chat_routes(id BIGSERIAL PRIMARY KEY, position BIGINT NOT NULL, match_kind TEXT NOT NULL, match_value TEXT, conn TEXT NOT NULL, opt TEXT)`,
+			`CREATE TABLE IF NOT EXISTS chat_deliver(conn TEXT NOT NULL, login TEXT NOT NULL, PRIMARY KEY(conn, login))`,
 		},
 		MySQL: {
-			`CREATE TABLE IF NOT EXISTS sip_users(name VARCHAR(64) PRIMARY KEY, ha1 VARCHAR(64) NOT NULL, created BIGINT, sms_cursor BIGINT DEFAULT 0)`,
-			`CREATE TABLE IF NOT EXISTS sip_queue(id BIGINT AUTO_INCREMENT PRIMARY KEY, to_user VARCHAR(64) NOT NULL, from_uri VARCHAR(255) NOT NULL, from_name VARCHAR(255), body LONGTEXT, ts BIGINT, INDEX sip_queue_to(to_user, id))`,
+			`CREATE TABLE IF NOT EXISTS sip_users(name VARCHAR(64) PRIMARY KEY, ha1 VARCHAR(64) NOT NULL, created BIGINT, inbox_cursor BIGINT DEFAULT 0)`,
+			`CREATE TABLE IF NOT EXISTS chat_inbox(id BIGINT AUTO_INCREMENT PRIMARY KEY, conn VARCHAR(64) NOT NULL, peer VARCHAR(255) NOT NULL, peer_name VARCHAR(255), to_login VARCHAR(64), body LONGTEXT, ts BIGINT)`,
+			`CREATE TABLE IF NOT EXISTS chat_routes(id BIGINT AUTO_INCREMENT PRIMARY KEY, position BIGINT NOT NULL, match_kind VARCHAR(16) NOT NULL, match_value VARCHAR(255), conn VARCHAR(64) NOT NULL, opt VARCHAR(255))`,
+			`CREATE TABLE IF NOT EXISTS chat_deliver(conn VARCHAR(64) NOT NULL, login VARCHAR(64) NOT NULL, PRIMARY KEY(conn, login))`,
 		},
 	}},
 }

@@ -15,6 +15,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	"github.com/phorepoc/cloud-companion/internal/chat"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
@@ -123,7 +124,8 @@ func (p *phone) none(what string) {
 
 func startGateway(t *testing.T) (*store.Store, *Gateway, string, context.Context) {
 	st := store.OpenTest(t)
-	g, err := New(st, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	hub := chat.NewHub(st)
+	g, err := New(st, hub, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,6 +135,7 @@ func startGateway(t *testing.T) (*store.Store, *Gateway, string, context.Context
 	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
 	go g.Listen(ctx, addr)
 	go g.Run(ctx)
+	go hub.Run(ctx, 100*time.Millisecond)
 	time.Sleep(150 * time.Millisecond)
 	return st, g, addr, ctx
 }
@@ -201,6 +204,7 @@ func TestMessageToANumberGoesOutAsSMS(t *testing.T) {
 func TestIncomingSMSReachesTheDeviceAndRepliesRouteBack(t *testing.T) {
 	st, _, addr, ctx := startGateway(t)
 	st.SMSUpload("pixel", []store.SMS{{DevMsgID: "0", Number: "+49 171 5550100", Dir: "in", Body: "before the login existed", TS: 1}})
+	time.Sleep(400 * time.Millisecond) // the SMS connection has taken it into the inbox
 	pw, _ := st.AddSIPUser("n9")
 	p := newPhone(t, ctx, addr, "n9", pw)
 	if res := p.register(600); res.StatusCode != 200 {
@@ -237,7 +241,7 @@ func TestDeviceToDeviceWaitsUntilRegistered(t *testing.T) {
 	b.reply = 480 // the device refuses at first: the message must stay
 	b.register(600)
 	time.Sleep(600 * time.Millisecond)
-	if len(st.SIPPending("e7")) != 1 {
+	if len(st.ChatFor("e7")) != 1 {
 		t.Fatal("a refused message was dropped")
 	}
 	b.reply = 200
@@ -245,7 +249,7 @@ func TestDeviceToDeviceWaitsUntilRegistered(t *testing.T) {
 	if string(r.Body()) != "are you there?" || r.From().Address.User != "n9" {
 		t.Fatalf("got %q from %s", r.Body(), r.From().Value())
 	}
-	for i := 0; len(st.SIPPending("e7")) != 0; i++ { // the gateway drops it once the device's 200 is in
+	for i := 0; len(st.ChatFor("e7")) != 0; i++ { // the gateway drops it once the device's 200 is in
 		if i == 20 {
 			t.Fatal("a delivered message stayed queued")
 		}

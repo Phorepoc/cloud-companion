@@ -1,10 +1,11 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 
-// Package sipgw is the SIP front of Cloud Companion (docs/sip.md): phones register with it as with any SIP service and chat
-// through it. It is not a SIP service of its own but a gateway to the others: a message to a phone number goes out as an SMS
-// through one of your phones, and SMS that arrive there come back to every registered SIP device; a message to another login waits
-// for that device. Calls and connected SIP services (an Asterisk, a provider) are not handled yet.
+// Package sipgw is the SIP front of Cloud Companion (docs/messaging.md): phones register with it as with any SIP service and chat
+// through it. It is not a SIP service of its own but a front for the chat connections (package chat): a message goes to the
+// connection your routing rules pick for its address (a number to SMS through your phones by default, a login to that device), and
+// what arrives on the connections comes to the devices that get it, from an address that answers back the same way. Calls are not
+// handled yet.
 package sipgw
 
 import (
@@ -14,6 +15,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strconv"
@@ -23,6 +25,7 @@ import (
 
 	"github.com/emiago/sipgo"
 	"github.com/emiago/sipgo/sip"
+	"github.com/phorepoc/cloud-companion/internal/chat"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
@@ -41,6 +44,7 @@ type binding struct {
 // Gateway is the SIP front. Run starts it; Kick asks it to deliver what is waiting now rather than at the next tick.
 type Gateway struct {
 	St   *store.Store
+	Hub  *chat.Hub
 	Log  *slog.Logger
 	Tick time.Duration // how often waiting messages and new SMS are looked for (default 3 s)
 
@@ -54,7 +58,7 @@ type Gateway struct {
 }
 
 // New prepares a gateway; Listen and Run start it.
-func New(st *store.Store, log *slog.Logger) (*Gateway, error) {
+func New(st *store.Store, hub *chat.Hub, log *slog.Logger) (*Gateway, error) {
 	ua, err := sipgo.NewUA(sipgo.WithUserAgent("Cloud Companion"))
 	if err != nil {
 		return nil, err
@@ -69,7 +73,8 @@ func New(st *store.Store, log *slog.Logger) (*Gateway, error) {
 	}
 	key := make([]byte, 32)
 	rand.Read(key)
-	g := &Gateway{St: st, Log: log, Tick: 3 * time.Second, ua: ua, srv: srv, cli: cli, key: key, binds: map[string]binding{}, kick: make(chan struct{}, 1)}
+	g := &Gateway{St: st, Hub: hub, Log: log, Tick: 3 * time.Second, ua: ua, srv: srv, cli: cli, key: key, binds: map[string]binding{}, kick: make(chan struct{}, 1)}
+	hub.Notify = g.Kick
 	srv.OnRegister(g.onRegister)
 	srv.OnMessage(g.onMessage)
 	srv.OnOptions(func(req *sip.Request, tx sip.ServerTransaction) {
@@ -247,25 +252,6 @@ func (g *Gateway) onRegister(req *sip.Request, tx sip.ServerTransaction) {
 
 // ---- messages from a device
 
-// isNumber tells a phone-number address (sip:+491715550100@...) from a login.
-func isNumber(u string) bool {
-	u = strings.TrimPrefix(u, "tel:")
-	if u == "" {
-		return false
-	}
-	digits := 0
-	for _, r := range u {
-		switch {
-		case r >= '0' && r <= '9':
-			digits++
-		case r == '+' || r == '-' || r == '(' || r == ')' || r == '.':
-		default:
-			return false
-		}
-	}
-	return digits > 0
-}
-
 func (g *Gateway) onMessage(req *sip.Request, tx sip.ServerTransaction) {
 	user, ok := g.authenticate(req, tx)
 	if !ok {
@@ -284,26 +270,16 @@ func (g *Gateway) onMessage(req *sip.Request, tx sip.ServerTransaction) {
 	if to == "" && req.To() != nil {
 		to = req.To().Address.User
 	}
-	switch {
-	case isNumber(to):
-		dev := g.St.SMSRoute(to)
-		if dev == "" {
-			tx.Respond(sip.NewResponseFromRequest(req, 480, "No phone sends SMS", nil))
-			return
-		}
-		if _, err := g.St.SMSQueue(dev, to, body); err != nil {
-			tx.Respond(sip.NewResponseFromRequest(req, 500, "Could not queue the SMS", nil))
-			return
-		}
-		g.Log.Info("sip: message to a number queued as SMS", "login", user, "device", dev)
-	case g.St.SIPUserHA1(strings.ToLower(to)) != "":
-		if err := g.St.SIPQueue(strings.ToLower(to), "sip:"+user+"@"+store.SIPRealm, user, body); err != nil {
-			tx.Respond(sip.NewResponseFromRequest(req, 500, "Could not keep the message", nil))
-			return
-		}
-		g.Kick()
-	default:
-		tx.Respond(sip.NewResponseFromRequest(req, 404, "No such number or login", nil))
+	switch err := g.Hub.Send(context.Background(), user, to, body); {
+	case errors.Is(err, chat.ErrNoRoute):
+		tx.Respond(sip.NewResponseFromRequest(req, 404, "No connection for that address", nil))
+		return
+	case errors.Is(err, chat.ErrUnavailable):
+		tx.Respond(sip.NewResponseFromRequest(req, 480, "That connection cannot send now", nil))
+		return
+	case err != nil:
+		g.Log.Warn("sip: message not passed on", "login", user, "err", err)
+		tx.Respond(sip.NewResponseFromRequest(req, 500, "Could not pass the message on", nil))
 		return
 	}
 	tx.Respond(sip.NewResponseFromRequest(req, 202, "Accepted", nil))
@@ -327,18 +303,12 @@ func (g *Gateway) bound() map[string]binding {
 
 func (g *Gateway) deliverAll(ctx context.Context) {
 	for user, b := range g.bound() {
-		for _, m := range g.St.SIPPending(user) {
-			if g.send(ctx, b, m.FromURI, m.FromName, m.Body) != nil {
-				break
+		for _, m := range g.St.ChatFor(user) {
+			from := "sip:" + g.Hub.Address(m.Conn, m.Peer) + "@" + store.SIPRealm
+			if g.send(ctx, b, from, m.PeerName, m.Body) != nil {
+				break // keep the order: the rest waits for the next round
 			}
-			g.St.SIPDelivered(m.ID)
-		}
-		for _, m := range g.St.SIPNewSMS(user) {
-			from := "sip:" + strings.ReplaceAll(m.Number, " ", "") + "@" + store.SIPRealm
-			if g.send(ctx, b, from, m.Number, m.Body) != nil {
-				break
-			}
-			g.St.SIPSMSDone(user, m.ID)
+			g.St.ChatTaken(user, m.ID)
 		}
 	}
 }

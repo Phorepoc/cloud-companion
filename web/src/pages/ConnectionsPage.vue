@@ -35,6 +35,8 @@
       <p v-if="error" class="ph-error" role="alert" data-test="conn-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</p>
     </section>
 
+    <RoutingSection />
+
     <section class="ph-card ph-section" aria-labelledby="dup-h">
       <div class="ph-row">
         <h2 id="dup-h">Duplicate contacts</h2>
@@ -155,6 +157,7 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiCall } from '../cloud'
+import RoutingSection from '../components/RoutingSection.vue'
 import type { CheckResult, ConnAccount, DevMergePreview, DupSuggestion, OAuthProvider } from '../proto'
 
 const accounts = ref<ConnAccount[]>([])
