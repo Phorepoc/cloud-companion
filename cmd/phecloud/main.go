@@ -40,6 +40,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/store"
 	"github.com/phorepoc/cloud-companion/internal/tlsutil"
 	"github.com/phorepoc/cloud-companion/internal/webui"
+	"github.com/phorepoc/cloud-companion/internal/xmpp"
 )
 
 func env(k, d string) string {
@@ -160,10 +161,11 @@ func main() {
 			} else {
 				mgr = connectors.NewManager(st, srv.Hub, vault)
 				srv.Sender = mgr
-				// chat accounts (docs/messaging.md): SIP services and Matrix accounts, each a chat connection
+				// chat accounts (docs/messaging.md): SIP services, Matrix and XMPP accounts, each a chat connection
 				go (&chat.Accounts{St: st, Hub: hub, Log: log, Secret: mgr.Secret, Kinds: map[string]chat.Starter{
 					"sip":    sipsvc.Start(log),
 					"matrix": matrix.Start(env("PHECLOUD_TLSDIR", "/data"), log), // its encryption keys next to the other data
+					"xmpp":   xmpp.Start(log),
 				}}).Run(context.Background(), 10*time.Second)
 				if srv.Hub != nil {
 					go mgr.Loop(context.Background(), 15*time.Minute)

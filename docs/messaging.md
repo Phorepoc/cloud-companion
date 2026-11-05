@@ -4,7 +4,7 @@ Cloud Companion passes messages between your devices and the services you use. I
 service is a **connection**, your **rules** say which connection an address goes to, and a **front** lets your devices take part.
 
 Connections today: **SMS through your phones** (docs/sms.md), **your SIP devices** (messages between your own logins) and **SIP
-services** (your own Asterisk or a provider, one per account) and **Matrix** accounts. Planned, in this order: XMPP, IRC, Nextcloud
+services** (your own Asterisk or a provider, one per account), **Matrix** and **XMPP** accounts. Planned, in this order: IRC, Nextcloud
 Talk, Signal, Telegram; Microsoft Teams later.
 
 Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones). Planned: XMPP, which the N9 and
@@ -78,6 +78,17 @@ rules can send to.
 - **Rooms** reach your devices as `!roomid=example.org`, named "sender (room name)"; answering goes to the room.
 - Messages from before the account was connected are not replayed. Pictures and files arrive as a line naming them.
 
+## XMPP (Jabber)
+Connections → Add an account → **XMPP (Jabber)**: your address (`you@example.org`) and password; the server only when it is not
+found from the address (DNS SRV records), and "accept a certificate that cannot be checked" only for a server of your own with a
+self-made certificate. TLS is always required. Once added, Cloud Companion signs in as one more device (resource) of your account and
+stays online, so messages to your address reach it as well as your other XMPP apps.
+
+- People reach your devices as `bob` (on your own server) or `bob=other.org` (anyone else; a SIP phone cannot type `@`), named as in
+  your contact list. With a rule `starting with xm.` → the account, write to `xm.bob`.
+- Messages kept by the server while Cloud Companion was offline arrive when it is back. A message the server cannot deliver (no such
+  user) is logged. Group chats (MUC) are not passed through yet.
+
 ## The SIP front
 Set `PHECLOUD_SIP_LISTEN=:5060` (UDP and TCP). In Docker Compose the port is published on 127.0.0.1 only; set
 `PHECLOUD_SIP_BIND=0.0.0.0` for phones on your network. Plain SIP is not encrypted: keep it on a network you trust or a VPN.
@@ -115,7 +126,10 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `go test ./internal/sipsvc`: a SIP service against a stand-in (digest logins, registering, both directions, the account following).
 - `sh deploy/asterisk/test.sh`: the same against the real Asterisk of the profile, extension 201 playing a phone.
 - `sh testdata/matrix/test.sh`: Matrix against a real homeserver (Conduit): encrypted direct chats both ways, a group, unknown users.
+- `sh testdata/xmpp/test.sh`: XMPP against a real server (Prosody): wrong passwords, both directions, contact names, messages kept
+  while offline, signing in again after a dropped connection.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
+- `sh web/test/xmpp.sh`: adding an XMPP account through the UI against Prosody, using it in a rule, removing it.
 - `sh web/test/sipservice.sh`: adding a SIP service through the UI against the profile's Asterisk, using it in a rule, removing it.

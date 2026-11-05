@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# web/test/xmpp.sh: a throwaway XMPP server (Prosody, MIT) next to the test Cloud Companion, no host ports
+services:
+  prosody:
+    image: prosodyim/prosody:13.0
+    container_name: phe-prosody-ui
+    cpus: 1
+    mem_limit: 256m
+    environment:
+      PROSODY_VIRTUAL_HOSTS: localhost
