@@ -92,7 +92,11 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	if filesDir == "" {
 		filesDir = filepath.Join(envOr("PHECLOUD_TLSDIR", "/data"), "files")
 	}
-	newFilesAPI(a, s.Store, filesDir).routes(mux)
+	fa := newFilesAPI(a, s.Store, filesDir)
+	if m != nil {
+		fa.secret = m.Secret // the folders of other services (Nextcloud, WebDAV, Seafile accounts)
+	}
+	fa.routes(mux)
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)

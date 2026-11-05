@@ -15,12 +15,21 @@ package webui
 //	POST /phe/files/ticket       {path} -> {url}: /phe/files/raw?t=... (Range requests work: seeking, streaming)
 //	GET  /phe/files/shares       {shares}; POST /phe/files/share {path, days} -> {share, url}; POST /phe/files/unshare {token}
 //	GET  /s/{token}              the shared file (public)
+//	POST /phe/nextcloud/login    {url, insecure} -> {id, login}: open login, approve; GET /phe/nextcloud/login?id= -> {state, user, password}
 //	GET  /phe/music              {tracks}: every song, by artist, album, number
+//
+// The folders of other services (Nextcloud, WebDAV and Seafile accounts, package remote) are top folders named after their
+// account, at paths "~<account id>/...": listed, looked at and streamed like the owner's own, and read-only for now.
 //	POST /phe/music/cast         {device, paths, index}: play these on that device
 //	GET  /phe/music/remote       {cast} for this device (once), or {}
 
 import (
+	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"mime"
 	"net/http"
 	"path"
@@ -31,8 +40,93 @@ import (
 	"encoding/json"
 
 	"github.com/phorepoc/cloud-companion/internal/files"
+	"github.com/phorepoc/cloud-companion/internal/remote"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
+
+// ---- the folders of other services
+
+// remotePath splits "~<account id>/rest" into the account and the path in it.
+func remotePath(p string) (string, string, bool) {
+	c, err := files.Clean(p)
+	if err != nil || !strings.HasPrefix(c, "~") {
+		return "", "", false
+	}
+	id, rest, _ := strings.Cut(c[1:], "/")
+	return id, rest, true
+}
+
+// mounts are the accounts whose files show as folders.
+func (f *filesAPI) mounts() []store.Account {
+	if f.secret == nil {
+		return nil
+	}
+	var out []store.Account
+	for _, a := range f.st.Accounts() {
+		if remote.Kinds(a.Kind) {
+			out = append(out, a)
+		}
+	}
+	return out
+}
+
+func mountLabel(a store.Account) string {
+	var c remote.Cfg
+	json.Unmarshal([]byte(a.Config), &c)
+	switch {
+	case a.Kind == "seafile":
+		return "Seafile"
+	case c.Nextcloud:
+		return "Nextcloud"
+	}
+	return "WebDAV"
+}
+
+// source opens (or reuses) the files of account id.
+func (f *filesAPI) source(ctx context.Context, id string) (remote.Source, error) {
+	for _, a := range f.mounts() {
+		if a.ID != id {
+			continue
+		}
+		pass, err := f.secret(a)
+		if err != nil {
+			return nil, errors.New("the account's password cannot be opened (key changed?)")
+		}
+		sum := sha256.Sum256([]byte(a.Config + "\x00" + pass))
+		key := hex.EncodeToString(sum[:])
+		f.mu.Lock()
+		o, ok := f.sources[id]
+		f.mu.Unlock()
+		if ok && o.key == key {
+			return o.src, nil
+		}
+		src, err := remote.Connect(ctx, a.Kind, a.Config, pass)
+		if err != nil {
+			return nil, fmt.Errorf("%s (%s): %w", a.Name, mountLabel(a), err)
+		}
+		f.mu.Lock()
+		if f.sources == nil {
+			f.sources = map[string]openSource{}
+		}
+		f.sources[id] = openSource{key, src}
+		f.mu.Unlock()
+		return src, nil
+	}
+	return nil, remote.ErrNotFound
+}
+
+func remoteErr(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, files.ErrBadPath):
+		bad(w, 400, err.Error())
+	case errors.Is(err, remote.ErrNotFound):
+		bad(w, 404, "not found")
+	default:
+		bad(w, 502, err.Error())
+	}
+}
+
+var errReadOnly = errors.New("the folders of other services are read-only here for now: change them in that service")
 
 type filesAPI struct {
 	a      *auth
@@ -41,6 +135,22 @@ type filesAPI struct {
 	shares *files.Shares
 	mu     sync.Mutex
 	casts  map[string]cast // device id -> what to play
+	// secret opens an account's sealed password (connectors.Manager.Secret); nil: no folders of other services
+	secret   func(store.Account) (string, error)
+	sources  map[string]openSource // by account id
+	ncLogins map[string]*ncLogin
+}
+
+type openSource struct {
+	key string // the configuration and secret it was opened with: a change opens it again
+	src remote.Source
+}
+
+type ncLogin struct {
+	l       *remote.NCLogin
+	started time.Time
+	done    *remote.NCLoginResult
+	err     string
 }
 
 type cast struct {
@@ -104,12 +214,34 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			return
 		}
 		p := r.URL.Query().Get("path")
+		if id, rest, ok := remotePath(p); ok {
+			src, err := f.source(r.Context(), id)
+			var l []files.Entry
+			if err == nil {
+				l, err = src.List(r.Context(), rest)
+			}
+			if err != nil {
+				remoteErr(w, err)
+				return
+			}
+			for i := range l {
+				l[i].Path, l[i].ReadOnly = "~"+id+"/"+l[i].Path, true
+			}
+			c, _ := files.Clean(p)
+			reply(w, 200, map[string]any{"path": c, "entries": l, "readonly": true})
+			return
+		}
 		l, err := f.fs.List(p)
 		if err != nil {
 			fileErr(w, err)
 			return
 		}
 		c, _ := files.Clean(p)
+		if c == "" { // the other services' folders, after the owner's own
+			for _, a := range f.mounts() {
+				l = append(l, files.Entry{Name: a.Name, Path: "~" + a.ID, Dir: true, Source: mountLabel(a), ReadOnly: true})
+			}
+		}
 		reply(w, 200, map[string]any{"path": c, "entries": l})
 	})
 	one := func(name string, do func(in struct{ Path, From, To string }) error) {
@@ -120,6 +252,12 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			var in struct{ Path, From, To string }
 			if !readJSON(w, r, &in) {
 				return
+			}
+			for _, p := range []string{in.Path, in.From, in.To} {
+				if _, _, ok := remotePath(p); ok {
+					bad(w, 422, errReadOnly.Error())
+					return
+				}
 			}
 			if err := do(in); err != nil {
 				fileErr(w, err)
@@ -136,6 +274,10 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			return
 		}
 		dir := r.URL.Query().Get("path")
+		if _, _, ok := remotePath(dir); ok {
+			bad(w, 422, errReadOnly.Error())
+			return
+		}
 		mr, err := r.MultipartReader()
 		if err != nil {
 			bad(w, 400, "send the files as a form")
@@ -169,6 +311,23 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 		if !readJSON(w, r, &in) {
 			return
 		}
+		if id, rest, ok := remotePath(in.Path); ok {
+			src, err := f.source(r.Context(), id)
+			var e files.Entry
+			if err == nil {
+				e, err = src.Stat(r.Context(), rest)
+			}
+			if err == nil && e.Dir {
+				err = errors.New("that is a folder")
+			}
+			if err != nil {
+				remoteErr(w, err)
+				return
+			}
+			c, _ := files.Clean(in.Path)
+			reply(w, 200, map[string]any{"url": "/phe/files/raw?t=" + f.fs.TicketFor(c)})
+			return
+		}
 		t, err := f.fs.Ticket(in.Path)
 		if err != nil {
 			fileErr(w, err)
@@ -180,6 +339,15 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 		p, ok := f.fs.Redeem(r.URL.Query().Get("t"))
 		if !ok {
 			http.Error(w, "this link has expired", http.StatusForbidden)
+			return
+		}
+		if id, rest, ok := remotePath(p); ok {
+			src, err := f.source(r.Context(), id)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadGateway)
+				return
+			}
+			src.Serve(w, r, rest)
 			return
 		}
 		serveFile(w, r, f.fs, p, r.URL.Query().Get("dl") == "1")
@@ -199,6 +367,10 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			Days int
 		}
 		if !readJSON(w, r, &in) {
+			return
+		}
+		if _, _, ok := remotePath(in.Path); ok {
+			bad(w, 422, "share links are for your own files; share this one from its service")
 			return
 		}
 		e, err := f.fs.Stat(in.Path)
@@ -234,6 +406,69 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			return
 		}
 		serveFile(w, r, f.fs, p, r.URL.Query().Get("view") != "1")
+	})
+	// Nextcloud's sign-in from another app: the dialog opens login in a new tab and asks how it is going every 2 seconds
+	mux.HandleFunc("POST /phe/nextcloud/login", func(w http.ResponseWriter, r *http.Request) {
+		if !f.a.adminDevice(r) {
+			bad(w, 403, "sign in as the owner")
+			return
+		}
+		var in struct {
+			URL      string
+			Insecure bool
+		}
+		if !readJSON(w, r, &in) {
+			return
+		}
+		l, err := remote.StartNCLogin(r.Context(), in.URL, in.Insecure)
+		if err != nil {
+			bad(w, 400, err.Error())
+			return
+		}
+		id := rand.Text()
+		f.mu.Lock()
+		if f.ncLogins == nil {
+			f.ncLogins = map[string]*ncLogin{}
+		}
+		for k, o := range f.ncLogins { // Nextcloud forgets a sign-in after 20 minutes
+			if time.Since(o.started) > 20*time.Minute {
+				delete(f.ncLogins, k)
+			}
+		}
+		f.ncLogins[id] = &ncLogin{l: l, started: time.Now()}
+		f.mu.Unlock()
+		reply(w, 200, map[string]any{"id": id, "login": l.Login})
+	})
+	mux.HandleFunc("GET /phe/nextcloud/login", func(w http.ResponseWriter, r *http.Request) {
+		if !f.a.adminDevice(r) {
+			bad(w, 403, "sign in as the owner")
+			return
+		}
+		f.mu.Lock()
+		o := f.ncLogins[r.URL.Query().Get("id")]
+		f.mu.Unlock()
+		if o == nil {
+			bad(w, 404, "no such sign-in; start again")
+			return
+		}
+		if o.done == nil && o.err == "" {
+			res, err := o.l.Poll(r.Context())
+			f.mu.Lock()
+			if err != nil {
+				o.err = err.Error()
+			} else if res != nil {
+				o.done = res
+			}
+			f.mu.Unlock()
+		}
+		switch {
+		case o.err != "":
+			reply(w, 200, map[string]any{"state": "failed", "error": o.err})
+		case o.done != nil: // the app password goes to the owner's own dialog, which stores it as the account's secret
+			reply(w, 200, map[string]any{"state": "done", "user": o.done.LoginName, "password": o.done.AppPassword, "server": o.done.Server})
+		default:
+			reply(w, 200, map[string]any{"state": "waiting"})
+		}
 	})
 	mux.HandleFunc("GET /phe/music", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := f.dev(w, r); !ok {

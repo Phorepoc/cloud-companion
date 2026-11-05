@@ -30,7 +30,14 @@ type Entry struct {
 	Size int64     `json:"size"`
 	Mod  time.Time `json:"mod"`
 	Type string    `json:"type,omitempty"` // the media type, from the name
+	// Source is the account a folder of another service belongs to (internal/remote: Nextcloud, WebDAV, Seafile), on its top
+	// folder; ReadOnly marks what cannot be changed from here (those folders, for now).
+	Source   string `json:"source,omitempty"`
+	ReadOnly bool   `json:"readonly,omitempty"`
 }
+
+// TypeOf is the media type of a file name.
+func TypeOf(name string) string { return typeOf(name) }
 
 // Store is the root folder.
 type Store struct {
@@ -141,13 +148,18 @@ func (s *Store) List(p string) ([]Entry, error) {
 		}
 		out = append(out, entry(path.Join(c, d.Name()), fi))
 	}
+	Sort(out)
+	return out, nil
+}
+
+// Sort puts folders first, then by name, as a listing shows them.
+func Sort(out []Entry) {
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Dir != out[j].Dir {
 			return out[i].Dir
 		}
 		return strings.ToLower(out[i].Name) < strings.ToLower(out[j].Name)
 	})
-	return out, nil
 }
 
 // Stat describes one path.
@@ -293,6 +305,15 @@ func (s *Store) Ticket(p string) (string, error) {
 	}
 	s.tickets[t] = ticket{e.Path, now.Add(12 * time.Hour)}
 	return t, nil
+}
+
+// TicketFor is Ticket for a path the caller has checked itself (a file of another service, internal/remote).
+func (s *Store) TicketFor(p string) string {
+	t := token()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tickets[t] = ticket{p, time.Now().Add(12 * time.Hour)}
+	return t
 }
 
 // Redeem returns the path a ticket is for.

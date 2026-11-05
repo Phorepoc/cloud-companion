@@ -17,6 +17,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/matrix"
 	"github.com/phorepoc/cloud-companion/internal/nctalk"
 	"github.com/phorepoc/cloud-companion/internal/proto"
+	"github.com/phorepoc/cloud-companion/internal/remote"
 	"github.com/phorepoc/cloud-companion/internal/signal"
 	"github.com/phorepoc/cloud-companion/internal/sipsvc"
 	"github.com/phorepoc/cloud-companion/internal/store"
@@ -116,6 +117,8 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		return nctalk.Test(ctx, c, secret)
+	case "webdav", "seafile":
+		return remote.Test(ctx, kind, cfgJSON, secret)
 	case "signal":
 		var c signal.Cfg
 		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
@@ -137,7 +140,7 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	if strings.TrimSpace(name) == "" {
 		return store.Account{}, errors.New("give the account a name")
 	}
-	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" && kind != "xmpp" && kind != "irc" && kind != "nctalk" && kind != "signal" && kind != "telegram" {
+	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" && kind != "xmpp" && kind != "irc" && kind != "nctalk" && kind != "signal" && kind != "telegram" && !remote.Kinds(kind) {
 		return store.Account{}, errors.New("unknown kind " + kind)
 	}
 	if !json.Valid([]byte(cfgJSON)) {
@@ -264,6 +267,13 @@ func (m *Manager) SyncNow(ctx context.Context, id string) (string, error) {
 func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
 	if a.Kind == "matrix" || a.Kind == "xmpp" || a.Kind == "irc" || a.Kind == "nctalk" || a.Kind == "signal" || a.Kind == "telegram" { // nothing to copy: the connection keeps its own sync (packages matrix, xmpp, irc, nctalk, signal, telegram) and reports on the account
 		return "messages pass through", nil
+	}
+	if remote.Kinds(a.Kind) { // nothing to copy: Files reads them when asked (package remote); a sync checks the login
+		pass, err := m.secret(a)
+		if err != nil {
+			return "", errors.New("the stored secret cannot be opened (key changed?)")
+		}
+		return remote.Test(ctx, a.Kind, a.Config, pass)
 	}
 	if a.Kind == "sip" { // nothing to copy: messages pass through (package sipsvc); a sync checks the login
 		var c sipsvc.Cfg

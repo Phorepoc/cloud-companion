@@ -4,7 +4,8 @@
 // Files and Music on the server (internal/webui/files.go): the owner's own storage, shared by every paired device.
 import { apiCall, apiUpload } from './cloud'
 
-export interface FileEntry { name: string; path: string; dir: boolean; size: number; mod: string; type?: string }
+/** source: on the top folder of another service's account (Nextcloud, WebDAV, Seafile); readonly: cannot be changed from here. */
+export interface FileEntry { name: string; path: string; dir: boolean; size: number; mod: string; type?: string; source?: string; readonly?: boolean }
 export interface Share { token: string; path: string; created: string; expires?: string }
 export interface Track { path: string; title: string; artist: string; album: string; n?: number; cover?: string; size: number }
 

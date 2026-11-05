@@ -4,10 +4,10 @@
      type on a squircle tile; upload with the button or by dropping files on the page; a file opens in the browser (songs play in
      the music player), downloads, gets a public link to share, or is renamed or deleted (Undo while the toast shows). -->
 <template>
-  <q-page class="ph-page" :class="{ 'is-drop': dropping }" data-test="files-page" @dragover.prevent="dropping = true" @dragleave.self="dropping = false" @drop.prevent="onDrop">
+  <q-page class="ph-page" :class="{ 'is-drop': dropping }" data-test="files-page" @dragover.prevent="dropping = !readOnly" @dragleave.self="dropping = false" @drop.prevent="onDrop">
     <div class="ph-head">
       <h1>Files</h1>
-      <span class="ph-head__acts">
+      <span v-if="!readOnly" class="ph-head__acts">
         <q-btn flat no-caps icon="sym_o_create_new_folder" label="New folder" data-test="files-mkdir" @click="askFolder" />
         <q-btn unelevated no-caps color="primary" icon="sym_o_upload" label="Upload" :loading="uploading" data-test="files-upload" @click="picker?.click()" />
         <input ref="picker" type="file" multiple hidden data-test="files-input" @change="onPick">
@@ -19,6 +19,7 @@
         <button type="button" class="hd-sqh" :aria-current="i === crumbs.length - 1 ? 'page' : undefined" @click="go(c.path)">{{ c.name }}</button></template>
     </nav>
 
+    <p v-if="readOnly" class="ph-note q-mb-md" data-test="files-readonly"><q-icon name="sym_o_cloud" size="20px" aria-hidden="true" /> These files are in {{ mountName(path.split('/')[0]) }}. You can open and download them here; change them in that service.</p>
     <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
       {{ error }}
@@ -26,24 +27,24 @@
     </q-banner>
     <EmptyState v-if="loading && !entries.length" state="loading" title="Loading files" text="This takes a moment." />
     <EmptyState v-else-if="!loading && !entries.length && !error" icon="sym_o_folder" :title="path ? 'This folder is empty' : 'No files yet'"
-                text="Upload files, or drop them here. They are kept on your server and reach every device you pair." data-test="files-empty" />
+                :text="readOnly ? '' : 'Upload files, or drop them here. They are kept on your server and reach every device you pair.'" data-test="files-empty" />
 
     <ul v-if="entries.length" class="ph-list ph-card" data-test="files-list">
       <li v-for="e in entries" :key="e.path" class="ph-frow">
         <button type="button" class="ph-row" :data-test="'file-' + e.name" @click="openEntry(e)">
-          <span class="ph-ftile hd-squircle" :class="{ 'is-dir': e.dir }" aria-hidden="true"><q-icon :name="iconOf(e)" size="22px" /></span>
+          <span class="ph-ftile hd-squircle" :class="{ 'is-dir': e.dir }" aria-hidden="true"><q-icon :name="e.source ? 'sym_o_cloud' : iconOf(e)" size="22px" /></span>
           <span class="ph-row-main">
             <span class="ph-row-title">{{ e.name }}</span>
-            <span class="ph-small ph-muted">{{ e.dir ? 'Folder' : size(e.size) }} · {{ when(e.mod) }}<template v-if="sharedPaths.has(e.path)"> · Shared</template></span>
+            <span class="ph-small ph-muted"><template v-if="e.source">{{ e.source }}</template><template v-else>{{ e.dir ? 'Folder' : size(e.size) }} · {{ when(e.mod) }}</template><template v-if="sharedPaths.has(e.path)"> · Shared</template></span>
           </span>
         </button>
-        <q-btn flat round dense icon="sym_o_more_vert" :aria-label="'More for ' + e.name" :data-test="'file-more-' + e.name">
+        <q-btn v-if="!(e.dir && e.readonly)" flat round dense icon="sym_o_more_vert" :aria-label="'More for ' + e.name" :data-test="'file-more-' + e.name">
           <q-menu auto-close>
             <q-list dense style="min-width: 180px">
               <q-item v-if="!e.dir" clickable @click="download(e)"><q-item-section avatar><q-icon name="sym_o_download" /></q-item-section><q-item-section>Download</q-item-section></q-item>
-              <q-item v-if="!e.dir" clickable :data-test="'file-share-' + e.name" @click="askShare(e)"><q-item-section avatar><q-icon name="sym_o_share" /></q-item-section><q-item-section>Share a link</q-item-section></q-item>
-              <q-item clickable :data-test="'file-rename-' + e.name" @click="askRename(e)"><q-item-section avatar><q-icon name="sym_o_edit" /></q-item-section><q-item-section>Rename</q-item-section></q-item>
-              <q-item clickable class="text-negative" :data-test="'file-delete-' + e.name" @click="remove(e)"><q-item-section avatar><q-icon name="sym_o_delete" /></q-item-section><q-item-section>Delete</q-item-section></q-item>
+              <q-item v-if="!e.dir && !e.readonly" clickable :data-test="'file-share-' + e.name" @click="askShare(e)"><q-item-section avatar><q-icon name="sym_o_share" /></q-item-section><q-item-section>Share a link</q-item-section></q-item>
+              <q-item v-if="!e.readonly" clickable :data-test="'file-rename-' + e.name" @click="askRename(e)"><q-item-section avatar><q-icon name="sym_o_edit" /></q-item-section><q-item-section>Rename</q-item-section></q-item>
+              <q-item v-if="!e.readonly" clickable class="text-negative" :data-test="'file-delete-' + e.name" @click="remove(e)"><q-item-section avatar><q-icon name="sym_o_delete" /></q-item-section><q-item-section>Delete</q-item-section></q-item>
             </q-list>
           </q-menu>
         </q-btn>
@@ -104,7 +105,11 @@ const shares = ref<Share[]>([])
 const loading = ref(false), uploading = ref(false), dropping = ref(false)
 const error = ref('')
 const picker = ref<HTMLInputElement | null>(null)
-const crumbs = computed(() => { const out: { name: string; path: string }[] = []; let p = ''; for (const n of path.value.split('/').filter(Boolean)) { p = p ? p + '/' + n : n; out.push({ name: n, path: p }) } return out })
+const crumbs = computed(() => { const out: { name: string; path: string }[] = []; let p = ''; for (const n of path.value.split('/').filter(Boolean)) { p = p ? p + '/' + n : n; out.push({ name: p === n ? mountName(n) : n, path: p }) } return out })
+// another service's folders (paths "~<account>/..."): read-only here for now
+const readOnly = computed(() => path.value.startsWith('~'))
+const mounts = ref<Record<string, string>>({}) // "~<account>" -> its name, from the top listing
+const mountName = (top: string) => (top.startsWith('~') ? mounts.value[top] || 'another service' : top)
 const sharedPaths = computed(() => new Set(shares.value.map((s) => s.path)))
 const when = (iso: string) => { const d = new Date(iso); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString() }
 
@@ -115,6 +120,8 @@ async function load() {
     const [l, s] = await Promise.all([listFiles(path.value), listShares()])
     entries.value = l.entries
     shares.value = s
+    for (const e of l.entries) if (e.source) mounts.value[e.path] = e.name
+    if (path.value.startsWith('~') && !mounts.value[path.value.split('/')[0]]) for (const e of (await listFiles('')).entries) if (e.source) mounts.value[e.path] = e.name
   } catch (e) { error.value = (e as Error).message } finally { loading.value = false }
 }
 function go(p: string) { path.value = p; entries.value = []; load() }
@@ -127,11 +134,11 @@ async function upload(list: FileList | File[]) {
   catch (e) { error.value = (e as Error).message } finally { uploading.value = false }
 }
 function onPick(ev: Event) { const i = ev.target as HTMLInputElement; if (i.files) upload(i.files).then(() => { i.value = '' }) }
-function onDrop(ev: DragEvent) { dropping.value = false; if (ev.dataTransfer?.files) upload(ev.dataTransfer.files) }
+function onDrop(ev: DragEvent) { dropping.value = false; if (!readOnly.value && ev.dataTransfer?.files) upload(ev.dataTransfer.files) }
 
 async function openEntry(e: FileEntry) {
   if (e.dir) return go(e.path)
-  if (e.type?.startsWith('audio/')) {
+  if (e.type?.startsWith('audio/') && !e.readonly) {
     // play the song with the rest of its folder after it
     const all = await loadTracks().catch(() => [])
     const here = all.filter((t) => t.path.slice(0, t.path.lastIndexOf('/')) === path.value)

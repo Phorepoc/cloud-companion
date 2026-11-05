@@ -25,7 +25,7 @@
           <div class="ph-grow">
             <strong>{{ a.name }}</strong>
             <span class="ph-chip hd-sqm" :class="'ph-' + a.status" data-test="account-status">{{ statusText(a) }}</span>
-            <div class="ph-muted ph-small">{{ kindText(a.kind) }} · {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
+            <div class="ph-muted ph-small">{{ kindText(a.kind, a.provider) }} · {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
             <div v-if="a.last_error" class="ph-error ph-small" role="alert">{{ a.last_error }}</div>
           </div>
           <q-btn flat round icon="sym_o_sync" :aria-label="'Sync ' + a.name" :loading="syncing === a.id" data-test="account-sync" @click="sync(a)" />
@@ -129,6 +129,26 @@
             </div>
             <q-input v-model="f.user" outlined dense label="Your number" hint="With the country code, e.g. +306912345678" autocomplete="off" data-test="f-user" />
             <p class="ph-muted ph-small">Numbers go out as SMS unless a rule sends them here: add a rule such as <code>sig.</code> → this account and write to <code>sig.+30…</code>.</p>
+          </template>
+          <template v-else-if="f.kind === 'ncfiles'">
+            <q-input v-model="f.url" outlined dense label="Nextcloud address" hint="For example https://cloud.example.org" data-test="f-url" />
+            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
+            <q-btn outline color="primary" no-caps icon="sym_o_login" label="Sign in with Nextcloud" :disable="!f.url.trim()" :loading="nc.state === 'starting'" data-test="f-nc-signin" @click="ncStart" />
+            <p v-if="nc.state === 'waiting'" class="ph-small" role="status" data-test="f-nc-waiting">Approve Cloud Companion in the Nextcloud tab that opened. <a :href="nc.login" target="_blank" rel="noopener">Open it again</a></p>
+            <p v-if="nc.state === 'done'" class="ph-ok" role="status" data-test="f-nc-done"><q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Signed in as {{ f.user }}. Test, then Add.</p>
+            <p v-if="nc.error" class="ph-error ph-small" role="alert" data-test="f-nc-error">{{ nc.error }}</p>
+            <details class="ph-small"><summary>Or use an app password</summary>
+              <q-input v-model="f.user" outlined dense label="User" autocomplete="off" data-test="f-user" />
+              <q-input v-model="f.secret" outlined dense type="password" label="App password" hint="Nextcloud → Settings → Security → Create new app password" autocomplete="new-password" data-test="f-secret" />
+            </details>
+            <p class="ph-muted ph-small">Your Nextcloud files appear in Files as a folder named after this account, read-only for now.</p>
+          </template>
+          <template v-else-if="f.kind === 'webdav' || f.kind === 'seafile'">
+            <q-input v-model="f.url" outlined dense :label="f.kind === 'seafile' ? 'Seafile address' : 'WebDAV address'" :hint="f.kind === 'seafile' ? 'For example https://seafile.example.org' : 'The folder to show, e.g. https://nas.example.org/dav/'" data-test="f-url" />
+            <q-input v-model="f.user" outlined dense :label="f.kind === 'seafile' ? 'Email address' : 'User'" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.secret" outlined dense type="password" :label="f.kind === 'seafile' ? 'Password or API token' : 'Password'" :hint="f.kind === 'seafile' ? 'With two-step login: Seafile → Settings → Web API Auth Token' : ''" autocomplete="new-password" data-test="f-secret" />
+            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
+            <p class="ph-muted ph-small">{{ f.kind === 'seafile' ? 'Your libraries' : 'These files' }} appear in Files as a folder named after this account, read-only for now.</p>
           </template>
           <template v-else-if="f.kind === 'nctalk'">
             <q-input v-model="f.url" outlined dense label="Nextcloud address" hint="For example https://cloud.example.org" data-test="f-url" />
@@ -254,14 +274,14 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }, { label: 'Telegram', value: 'telegram' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }, { label: 'Telegram', value: 'telegram' }, { label: 'Files: Nextcloud', value: 'ncfiles' }, { label: 'Files: WebDAV (a NAS, ownCloud, …)', value: 'webdav' }, { label: 'Files: Seafile', value: 'seafile' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
 const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', rooms: '', nick: '', insecure: false, apiId: 0, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal', telegram: 'Telegram' }
-const kindText = (k: string) => KINDS[k] || k
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal', telegram: 'Telegram', webdav: 'Files (WebDAV)', seafile: 'Files (Seafile)' }
+const kindText = (k: string, provider = '') => (k === 'webdav' && provider === 'nextcloud' ? 'Files (Nextcloud)' : KINDS[k] || k)
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
 const short = (n: string) => (n || '').split(' ')[0] || 'this one'
@@ -276,7 +296,7 @@ function ago(t: number) {
 async function load() {
   try { const j = await apiCall('GET', '/phe/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = (e as Error).message }
 }
-function openAdd() { Object.assign(f, blank()); qr.value = ''; tgReset(); testResult.value = null; adding.value = true }
+function openAdd() { Object.assign(f, blank()); qr.value = ''; tgReset(); ncReset(); testResult.value = null; adding.value = true }
 
 function payload() {
   if (f.kind === 'imap') {
@@ -291,6 +311,8 @@ function payload() {
   if (f.kind === 'xmpp') return { kind: 'xmpp', provider: 'generic', name: f.name, config: JSON.stringify({ jid: f.user.trim(), server: f.xmppServer.trim(), insecure: f.insecure, rooms: f.rooms.split(',').map((x) => x.trim()).filter(Boolean), nick: f.nick.trim() }), secret: f.secret }
   if (f.kind === 'telegram') return { kind: 'telegram', provider: 'generic', name: f.name, config: JSON.stringify({ api_id: Number(f.apiId) || 0, user_id: tg.userId }), secret: f.secret }
   if (f.kind === 'signal') return { kind: 'signal', provider: 'generic', name: f.name, config: JSON.stringify({ api: f.url.trim(), number: f.user.trim() }), secret: '' }
+  if (f.kind === 'ncfiles') return { kind: 'webdav', provider: 'nextcloud', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim(), nextcloud: true, insecure: f.insecure }), secret: f.secret }
+  if (f.kind === 'webdav' || f.kind === 'seafile') return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim(), insecure: f.insecure }), secret: f.secret }
   if (f.kind === 'nctalk') return { kind: 'nctalk', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'irc') {
     const cfg = { server: f.ircServer.trim(), nick: f.user.trim(), channels: f.channels.split(',').map((x) => x.trim()).filter(Boolean), all: f.ircAll, insecure: f.insecure, server_pass: f.ircServerPass }
@@ -304,6 +326,28 @@ function payload() {
   return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
 }
 const qr = ref('')
+// Nextcloud's sign-in from another app: the server starts it, this tab opens Nextcloud's page and asks how it is going every 2 s
+const nc = reactive({ id: '', state: '', login: '', error: '' })
+let ncTimer: ReturnType<typeof setTimeout> | undefined
+function ncReset() { clearTimeout(ncTimer); Object.assign(nc, { id: '', state: '', login: '', error: '' }) }
+async function ncPoll() {
+  try {
+    const s = await apiCall('GET', '/phe/nextcloud/login?id=' + encodeURIComponent(nc.id))
+    if (s.state === 'done') { f.user = s.user; f.secret = s.password; nc.state = 'done'; return }
+    if (s.state === 'failed') { nc.state = 'failed'; nc.error = s.error; return }
+  } catch (e) { nc.state = 'failed'; nc.error = (e as Error).message; return }
+  ncTimer = setTimeout(ncPoll, 2000)
+}
+async function ncStart() {
+  ncReset(); nc.state = 'starting'; testResult.value = null
+  const tab = window.open('', '_blank') // opened in the click itself, so it is not blocked; pointed at Nextcloud below
+  try {
+    const j = await apiCall('POST', '/phe/nextcloud/login', { url: f.url.trim(), insecure: f.insecure })
+    Object.assign(nc, { id: j.id, login: j.login, state: 'waiting' })
+    if (tab) { tab.opener = null; tab.location.href = j.login }
+    ncTimer = setTimeout(ncPoll, 2000)
+  } catch (e) { tab?.close(); nc.state = 'failed'; nc.error = (e as Error).message }
+}
 // Telegram's QR sign-in, run by the server; the dialog asks how it is going every 1.5 s
 const tg = reactive({ id: '', state: '', png: '', error: '', userId: 0, name: '', password: '' })
 let tgTimer: ReturnType<typeof setTimeout> | undefined
@@ -393,8 +437,8 @@ onMounted(async () => {
   if (route.query.oauth === 'ok') oauthMsg.value = { ok: true, text: 'Signed in. The new accounts are syncing.' }
   else if (route.query.oauth === 'error') oauthMsg.value = { ok: false, text: String(route.query.msg || 'The sign-in did not complete.') }
 })
-onBeforeUnmount(() => { clearInterval(timer); tgReset() })
-watch(adding, (open) => { if (!open) tgReset() }) // a closed dialog stops asking about its sign-in
+onBeforeUnmount(() => { clearInterval(timer); tgReset(); ncReset() })
+watch(adding, (open) => { if (!open) { tgReset(); ncReset() } }) // a closed dialog stops asking about its sign-in
 </script>
 
 <style scoped>

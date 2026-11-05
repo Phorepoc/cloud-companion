@@ -143,6 +143,13 @@ planned. You decide in Connections → Messaging which address goes where. Phone
 Symbian, softphones) can sign in and chat through it: set `PHECLOUD_SIP_LISTEN=:5060` and/or `PHECLOUD_XMPP_LISTEN=:5222` and make
 a login per phone. [docs/messaging.md](docs/messaging.md) explains the rules and has the phone settings.
 
+## Your other clouds
+
+Your files on Nextcloud, Seafile or any WebDAV server (a NAS, ownCloud, a hosting provider) show up in Files next to the ones kept
+on Cloud Companion, one folder per account. Add them in Connections; Nextcloud signs in with its own approval page, so your
+password never passes through here. They are read-only for now: open, play and download them on any of your devices, and change
+them where they live. [docs/files.md](docs/files.md) has the details.
+
 ## Security
 
 What the defaults do for you:
@@ -248,7 +255,8 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 
 **The servers our tests run against**
 [Conduit](https://conduit.rs) (Matrix), [Prosody](https://prosody.im) (XMPP), [Ergo](https://ergo.chat) (IRC),
-[Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), and [slixmpp](https://codeberg.org/poezio/slixmpp).
+[Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), [Seafile](https://www.seafile.com) (with
+[Redis](https://redis.io) beside it), [curl](https://curl.se), and [slixmpp](https://codeberg.org/poezio/slixmpp).
 
 ## License
 
