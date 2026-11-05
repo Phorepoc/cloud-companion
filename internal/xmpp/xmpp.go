@@ -40,6 +40,10 @@ type Cfg struct {
 	Server string `json:"server,omitempty"` // host:port, when the server is not found from the domain (DNS SRV records)
 	// Insecure accepts a server certificate that cannot be checked (a server of your own with a self-made certificate).
 	Insecure bool `json:"insecure,omitempty"`
+	// Rooms are the group chats (XEP-0045) to join, as room@conference.example.org; Nick is the name shown there (default: the
+	// address's local part).
+	Rooms []string `json:"rooms,omitempty"`
+	Nick  string   `json:"nick,omitempty"`
 }
 
 func (c *Cfg) norm() (jid.JID, error) {
@@ -53,6 +57,22 @@ func (c *Cfg) norm() (jid.JID, error) {
 			c.Server = net.JoinHostPort(c.Server, "5222")
 		}
 	}
+	c.Nick = strings.TrimSpace(c.Nick)
+	if c.Nick == "" {
+		c.Nick = j.Localpart()
+	}
+	var rooms []string
+	for _, r := range c.Rooms {
+		if r = strings.TrimSpace(r); r == "" {
+			continue
+		}
+		rj, err := jid.Parse(r)
+		if err != nil || rj.Localpart() == "" || rj.Resourcepart() != "" {
+			return jid.JID{}, fmt.Errorf("%q is not a group chat address (room@conference.example.org)", r)
+		}
+		rooms = append(rooms, rj.String())
+	}
+	c.Rooms = rooms
 	return j.Bare(), nil
 }
 
@@ -147,7 +167,22 @@ type Conn struct {
 	mu    sync.Mutex
 	s     *xmpp.Session
 	names map[string]string // roster names by bare address
+	rooms map[string]*room  // the group chats, by bare address
 }
+
+// room is a group chat the account is in.
+type room struct {
+	jid  jid.JID
+	nick string               // ours there (a taken one gets "_" added)
+	last time.Time            // when the last line came: after a drop the room sends what came since, with a margin
+	seen map[string]time.Time // the lines of the last minutes, so the ones the room sends again are dropped
+}
+
+// the margin asked of a room after a drop, for its clock and ours not agreeing; lines are remembered a while longer
+const (
+	historyMargin = 2 * time.Minute
+	seenFor       = 10 * time.Minute
+)
 
 func ConnID(acc string) string { return "xmpp:" + acc }
 
@@ -174,6 +209,11 @@ func (x *Conn) Start() error {
 		return err
 	}
 	x.me = j
+	x.rooms = map[string]*room{}
+	for _, r := range x.Cfg.Rooms {
+		rj := jid.MustParse(r)
+		x.rooms[rj.String()] = &room{jid: rj, nick: x.Cfg.Nick, seen: map[string]time.Time{}}
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	s, err := connect(ctx, x.Cfg, x.Pass)
 	cancel()
@@ -235,6 +275,17 @@ func (x *Conn) serve(ctx context.Context, s *xmpp.Session) error {
 	if err := s.Send(ctx, stanza.Presence{}.Wrap(nil)); err != nil {
 		return err
 	}
+	x.mu.Lock()
+	rooms := make([]*room, 0, len(x.rooms))
+	for _, r := range x.rooms {
+		rooms = append(rooms, r)
+	}
+	x.mu.Unlock()
+	for _, r := range rooms {
+		if err := x.join(ctx, s, r); err != nil {
+			return err
+		}
+	}
 	if x.Status != nil {
 		x.Status(nil)
 	}
@@ -257,6 +308,24 @@ func (x *Conn) serve(ctx context.Context, s *xmpp.Session) error {
 		}
 	}
 }
+
+// join enters a group chat: the first time without its history (nothing is replayed), after a drop with what came since.
+func (x *Conn) join(ctx context.Context, s *xmpp.Session, r *room) error {
+	x.mu.Lock()
+	nick, last := r.nick, r.last
+	x.mu.Unlock()
+	h := xml.StartElement{Name: xml.Name{Local: "history"}, Attr: []xml.Attr{{Name: xml.Name{Local: "maxstanzas"}, Value: "0"}}}
+	if !last.IsZero() {
+		h.Attr = []xml.Attr{{Name: xml.Name{Local: "since"}, Value: last.Add(-historyMargin).UTC().Format(time.RFC3339)}}
+	}
+	to, err := r.jid.WithResource(nick)
+	if err != nil {
+		return err
+	}
+	return s.Send(ctx, stanza.Presence{To: to}.Wrap(xmlstream.Wrap(xmlstream.Wrap(nil, h), xml.StartElement{Name: xml.Name{Space: nsMUC, Local: "x"}})))
+}
+
+const nsMUC = "http://jabber.org/protocol/muc"
 
 func (x *Conn) loadRoster(ctx context.Context, s *xmpp.Session) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
@@ -301,6 +370,9 @@ func decode(t xml.TokenReader, start *xml.StartElement, v any) error {
 
 // handle takes the chat messages; IQs we don't know are answered by mellium with an error, as they must be.
 func (x *Conn) handle(t xmlstream.TokenReadEncoder, start *xml.StartElement) error {
+	if start.Name.Local == "presence" {
+		return x.presence(t, start)
+	}
 	if start.Name.Local != "message" {
 		return nil
 	}
@@ -320,14 +392,21 @@ func (x *Conn) handle(t xmlstream.TokenReadEncoder, start *xml.StartElement) err
 		x.Log.Warn("xmpp: a message was refused", "account", x.Name, "to", m.From.Bare().String(), "why", why)
 		return nil
 	}
-	if m.Body == "" || (m.Type != stanza.ChatMessage && m.Type != stanza.NormalMessage) || m.From.Bare().Equal(x.me) {
-		return nil
-	}
 	ts := time.Now()
 	if m.Delay != nil { // kept by the server while we were away
 		if d, err := time.Parse(time.RFC3339, m.Delay.Stamp); err == nil {
 			ts = d
 		}
+	}
+	x.mu.Lock()
+	r := x.rooms[m.From.Bare().String()]
+	x.mu.Unlock()
+	if r != nil {
+		x.groupMessage(r, m, ts)
+		return nil
+	}
+	if m.Body == "" || (m.Type != stanza.ChatMessage && m.Type != stanza.NormalMessage) || m.From.Bare().Equal(x.me) {
+		return nil
 	}
 	from := m.From.Bare()
 	x.mu.Lock()
@@ -342,7 +421,108 @@ func (x *Conn) handle(t xmlstream.TokenReadEncoder, start *xml.StartElement) err
 	return nil
 }
 
+// groupMessage passes on a line said in a group chat, named "Bob (room)". Our own lines (the room repeats them), the topic and
+// private messages through the room are not passed on.
+func (x *Conn) groupMessage(r *room, m message, ts time.Time) {
+	who := m.From.Resourcepart()
+	if m.Type != stanza.GroupChatMessage || m.Body == "" || who == "" {
+		return
+	}
+	now, key := time.Now(), who+"\x00"+m.Body
+	x.mu.Lock()
+	nick := r.nick
+	_, old := r.seen[key]
+	old = old && m.Delay != nil // only history repeats; someone saying the same thing again is passed on
+	for k, at := range r.seen {
+		if now.Sub(at) > seenFor {
+			delete(r.seen, k)
+		}
+	}
+	r.seen[key], r.last = now, now
+	x.mu.Unlock()
+	if old || who == nick {
+		return
+	}
+	if err := x.hub.In(store.ChatMessage{Conn: x.ID(), Peer: x.roomAddr(r.jid), PeerName: who + " (" + r.jid.Localpart() + ")", Body: m.Body, TS: ts.Unix()}); err != nil {
+		x.Log.Warn("xmpp: message not kept", "account", x.Name, "err", err)
+	}
+}
+
+// presence reads the group chats' answers to joining: a taken nickname is tried again with "_" added; other refusals are logged.
+func (x *Conn) presence(t xmlstream.TokenReadEncoder, start *xml.StartElement) error {
+	var p struct {
+		stanza.Presence
+		Error *struct {
+			Any []xml.Name `xml:",any"`
+		} `xml:"error"`
+	}
+	if err := decode(t, start, &p); err != nil && err != io.EOF {
+		return nil
+	}
+	if p.Type != stanza.ErrorPresence {
+		return nil
+	}
+	x.mu.Lock()
+	r := x.rooms[p.From.Bare().String()]
+	x.mu.Unlock()
+	if r == nil || p.Error == nil {
+		return nil
+	}
+	why := "refused"
+	for _, n := range p.Error.Any {
+		if n.Local != "text" {
+			why = n.Local
+		}
+	}
+	x.Log.Warn("xmpp: could not join a group chat", "account", x.Name, "room", r.jid.String(), "why", why)
+	x.mu.Lock()
+	retry := why == "conflict" && len(r.nick) < 40
+	if retry {
+		r.nick += "_"
+	}
+	s := x.s
+	x.mu.Unlock()
+	if retry && s != nil {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			x.join(ctx, s, r)
+		}()
+	}
+	return nil
+}
+
 // ---- addresses
+
+// roomAddr is how a group chat reaches your devices: "#room", or "#room=conference.example.org" when two of the account's group
+// chats share the name.
+func (x *Conn) roomAddr(j jid.JID) string {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	for k, r := range x.rooms {
+		if k != j.String() && r.jid.Localpart() == j.Localpart() {
+			return "#" + j.Localpart() + "=" + j.Domainpart()
+		}
+	}
+	return "#" + j.Localpart()
+}
+
+// room finds a group chat of the account from "#room" or "#room=conference.example.org".
+func (x *Conn) room(peer string) *room {
+	name, service, _ := strings.Cut(strings.TrimPrefix(peer, "#"), "=")
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	var found *room
+	for _, r := range x.rooms {
+		if r.jid.Localpart() == name && (service == "" || r.jid.Domainpart() == service) {
+			if found != nil {
+				return nil // two share the name: the address must say which
+			}
+			found = r
+		}
+	}
+	return found
+}
 
 func (x *Conn) addr(j jid.JID) string {
 	if j.Domainpart() == x.me.Domainpart() && j.Localpart() != "" {
@@ -372,11 +552,21 @@ func (x *Conn) target(peer string) (jid.JID, error) {
 	return j.Bare(), nil
 }
 
-// Send passes a message on as a chat message; the server says later when nobody is there (logged).
+// Send passes a message on as a chat message, or to a group chat ("#room"); the server says later when nobody is there (logged).
 func (x *Conn) Send(ctx context.Context, _, peer, body, _ string) error {
-	to, err := x.target(peer)
-	if err != nil {
-		return err
+	typ := stanza.ChatMessage
+	var to jid.JID
+	if strings.HasPrefix(strings.TrimSpace(peer), "#") {
+		r := x.room(strings.TrimSpace(peer))
+		if r == nil {
+			return chat.ErrNoRoute // only the account's own group chats
+		}
+		to, typ = r.jid, stanza.GroupChatMessage
+	} else {
+		var err error
+		if to, err = x.target(peer); err != nil {
+			return err
+		}
 	}
 	x.mu.Lock()
 	s := x.s
@@ -386,7 +576,7 @@ func (x *Conn) Send(ctx context.Context, _, peer, body, _ string) error {
 	}
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	msg := stanza.Message{To: to, Type: stanza.ChatMessage, ID: rand.Text()}
+	msg := stanza.Message{To: to, Type: typ, ID: rand.Text()}
 	if err := s.Send(ctx, msg.Wrap(xmlstream.Wrap(xmlstream.Token(xml.CharData(body)), xml.StartElement{Name: xml.Name{Local: "body"}}))); err != nil {
 		return fmt.Errorf("%w: %v", chat.ErrUnavailable, err)
 	}

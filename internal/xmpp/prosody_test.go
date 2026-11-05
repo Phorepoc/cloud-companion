@@ -176,3 +176,122 @@ func TestProsody(t *testing.T) {
 	waitFor(t, "a message after the drop", func() bool { return inbox(st, "bob", "after the drop") })
 	t.Log("after a dropped connection alice signs in again")
 }
+
+// joinRoom enters a group chat as nick; the first one in makes it and opens it at once (an "instant room").
+func (c *client) joinRoom(t *testing.T, room, nick string, create bool) {
+	to := jid.MustParse(room + "/" + nick)
+	x := xml.StartElement{Name: xml.Name{Space: nsMUC, Local: "x"}}
+	if err := c.s.Send(context.Background(), stanza.Presence{To: to}.Wrap(xmlstream.Wrap(nil, x))); err != nil {
+		t.Fatal(err)
+	}
+	if !create {
+		return
+	}
+	time.Sleep(300 * time.Millisecond)
+	form := xmlstream.Wrap(nil, xml.StartElement{Name: xml.Name{Space: "jabber:x:data", Local: "x"}, Attr: []xml.Attr{{Name: xml.Name{Local: "type"}, Value: "submit"}}})
+	q := xmlstream.Wrap(form, xml.StartElement{Name: xml.Name{Space: "http://jabber.org/protocol/muc#owner", Local: "query"}})
+	if _, err := c.s.SendIQ(context.Background(), stanza.IQ{To: jid.MustParse(room), Type: stanza.SetIQ}.Wrap(q)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (c *client) sayRoom(t *testing.T, room, body string) {
+	msg := stanza.Message{To: jid.MustParse(room), Type: stanza.GroupChatMessage}
+	if err := c.s.Send(context.Background(), msg.Wrap(xmlstream.Wrap(xmlstream.Token(xml.CharData(body)), xml.StartElement{Name: xml.Name{Local: "body"}}))); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func count(st *store.Store, peer, body string) int {
+	n := 0
+	for _, m := range st.ChatFor("me") {
+		if m.Peer == peer && m.Body == body {
+			n++
+		}
+	}
+	return n
+}
+
+// Group chats: carol (Cloud Companion) joins a room bob made, where her nickname is already taken by dave; nothing said before she
+// came is replayed; lines arrive named "bob (team)", hers go to the room, her own are not passed back; after a dropped connection
+// she gets what was said meanwhile, once.
+func TestProsodyGroupChat(t *testing.T) {
+	const team = "team@conference.localhost"
+	bob, dave := dialClient(t, "bob"), dialClient(t, "dave")
+	bob.joinRoom(t, team, "bob", true)
+	dave.joinRoom(t, team, "carol", false)
+	time.Sleep(300 * time.Millisecond)
+	bob.sayRoom(t, team, "before you came")
+	time.Sleep(300 * time.Millisecond)
+
+	c := cfg("carol")
+	c.Rooms = []string{" " + team + " ", ""}
+	if _, err := (&Cfg{JID: "carol@localhost", Rooms: []string{"team@conference.localhost/nick"}}).norm(); err == nil {
+		t.Fatal("a room address with a nickname taken")
+	}
+	st := store.OpenTest(t)
+	st.AddSIPUser("me")
+	hub := chat.NewHub(st)
+	var mu sync.Mutex
+	signedIn := 0
+	carol := &Conn{Acc: "c", Name: "carol", Cfg: c, Pass: "pw-carol", Log: quiet, Status: func(err error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if err == nil {
+			signedIn++
+		}
+	}}
+	hub.Add(carol)
+	if err := carol.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(carol.Stop)
+	waitFor(t, "carol in the room as carol_", func() bool {
+		carol.mu.Lock()
+		defer carol.mu.Unlock()
+		return carol.rooms[team].nick == "carol_"
+	})
+	time.Sleep(500 * time.Millisecond)
+
+	bob.sayRoom(t, team, "hello team")
+	waitFor(t, "bob's line", func() bool { return inbox(st, "#team", "hello team") })
+	for _, m := range st.ChatFor("me") {
+		if m.Peer == "#team" && m.Body == "hello team" && m.PeerName != "bob (team)" {
+			t.Fatalf("named %q", m.PeerName)
+		}
+	}
+	if inbox(st, "#team", "before you came") {
+		t.Fatal("the room's history was replayed on joining")
+	}
+	t.Log("a taken nickname gets _; no history on joining; lines arrive as #team from \"bob (team)\"")
+
+	if err := carol.Send(context.Background(), "me", "#team", "hi all", ""); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, "carol's line in the room", func() bool { return dave.has(team + ": hi all") }) // dave: the room's maker only gets the set-up
+	time.Sleep(500 * time.Millisecond)
+	if inbox(st, "#team", "hi all") {
+		t.Fatal("her own line came back")
+	}
+	if err := carol.Send(context.Background(), "me", "#elsewhere", "hm", ""); err != chat.ErrNoRoute {
+		t.Fatalf("a room she is not in: %v", err)
+	}
+	t.Log("answers go to the room; her own lines are not passed back; other rooms are refused")
+
+	carol.mu.Lock()
+	carol.s.Conn().Close()
+	carol.mu.Unlock()
+	bob.sayRoom(t, team, "while you were gone")
+	waitFor(t, "signed in again", func() bool { mu.Lock(); defer mu.Unlock(); return signedIn == 2 })
+	waitFor(t, "the line said meanwhile", func() bool { return inbox(st, "#team", "while you were gone") })
+	time.Sleep(time.Second)
+	if n := count(st, "#team", "hello team"); n != 1 {
+		t.Fatalf("an earlier line came %d times", n)
+	}
+	if n := count(st, "#team", "while you were gone"); n != 1 {
+		t.Fatalf("the line said meanwhile came %d times", n)
+	}
+	bob.sayRoom(t, team, "hello team")
+	waitFor(t, "the same words said again", func() bool { return count(st, "#team", "hello team") == 2 })
+	t.Log("after a drop she gets what was said meanwhile, once; the same words said again still arrive")
+}

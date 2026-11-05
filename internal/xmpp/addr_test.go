@@ -40,3 +40,27 @@ func TestCfg(t *testing.T) {
 		t.Fatalf("%v %v %q", j, err, c.Server)
 	}
 }
+
+// Two group chats with the same name on different services need the long address; one alone is "#name".
+func TestRoomAddresses(t *testing.T) {
+	x := &Conn{rooms: map[string]*room{}}
+	for _, r := range []string{"team@conference.a.org", "team@muc.b.org", "ops@conference.a.org"} {
+		j := jid.MustParse(r)
+		x.rooms[r] = &room{jid: j}
+	}
+	if a := x.roomAddr(jid.MustParse("ops@conference.a.org")); a != "#ops" {
+		t.Fatal(a)
+	}
+	if a := x.roomAddr(jid.MustParse("team@muc.b.org")); a != "#team=muc.b.org" {
+		t.Fatal(a)
+	}
+	if x.room("#team") != nil {
+		t.Fatal("#team chose one of two")
+	}
+	if r := x.room("#team=muc.b.org"); r == nil || r.jid.String() != "team@muc.b.org" {
+		t.Fatal("the long address")
+	}
+	if r := x.room("#ops"); r == nil || x.room("#nope") != nil {
+		t.Fatal("#ops / #nope")
+	}
+}

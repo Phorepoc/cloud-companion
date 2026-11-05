@@ -8,3 +8,4 @@ services:
     mem_limit: 256m
     environment:
       PROSODY_VIRTUAL_HOSTS: localhost
+      PROSODY_COMPONENTS: conference.localhost:muc

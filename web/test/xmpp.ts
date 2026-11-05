@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // Connections → Add an account → XMPP against a throwaway Prosody (user cc@localhost, made by xmpp.sh): a wrong password fails the
-// test, the right one passes, the account signs in (Connected) and shows up as a connection the Messaging rules can send to;
+// test, the right one passes, group chats need their service (room@conference.localhost), the account signs in (Connected) and shows up as a connection the Messaging rules can send to;
 // removed, it is gone from there.
 //   BASE=http://localhost:8080 CODE=<admin code> SERVER=<host of the XMPP server> OUT=/out node --experimental-strip-types xmpp.ts
 import { chromium } from 'playwright'
@@ -48,8 +48,18 @@ await page.waitForSelector('[data-test=test-result]')
 assert.match((await page.textContent('[data-test=test-result]')) ?? '', /login refused/i)
 step('a wrong password fails the test')
 await page.fill('[data-test=f-secret]', 'pw-cc')
+assert.equal(await page.locator('[data-test=f-nick]').count(), 0, 'the name field shows without group chats')
+await page.fill('[data-test=f-rooms]', 'team')
+await page.click('[data-test=f-test]')
+await page.locator('[data-test=test-result]', { hasText: 'is not a group chat address' }).waitFor()
+step('a group chat without its service is refused')
+await page.fill('[data-test=f-rooms]', 'team@conference.localhost, ops@conference.localhost')
+await page.fill('[data-test=f-nick]', 'Cloudy')
+let sent: Record<string, unknown> = {}
+page.on('request', (r) => { if (r.url().endsWith('/phe/connections/test')) sent = JSON.parse(String(r.postDataJSON().config)) })
 await page.click('[data-test=f-test]')
 await page.waitForFunction(() => /login works as cc@localhost/.test(document.querySelector('[data-test=test-result]')?.textContent || ''))
+assert.deepEqual([sent.rooms, sent.nick], [['team@conference.localhost', 'ops@conference.localhost'], 'Cloudy'])
 await shot('1-dialog')
 await page.click('[data-test=f-add]')
 await page.waitForSelector('[data-test=account-row]')

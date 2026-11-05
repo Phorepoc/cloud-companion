@@ -98,7 +98,9 @@
             <q-input v-model="f.secret" outlined dense type="password" label="Password" autocomplete="new-password" data-test="f-secret" />
             <q-input v-model="f.xmppServer" outlined dense label="Server (optional)" hint="host or host:port, only when it is not found from the address" data-test="f-xmpp-server" />
             <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
-            <p class="ph-muted ph-small">Cloud Companion signs in as one more device of your account and stays online to receive your messages.</p>
+            <q-input v-model="f.rooms" outlined dense label="Group chats (optional)" hint="Comma separated, e.g. team@conference.example.org" data-test="f-rooms" />
+            <q-input v-if="f.rooms.trim()" v-model="f.nick" outlined dense label="Your name in them (optional)" :hint="'Default: ' + (f.user.split('@')[0] || 'the first part of your address')" data-test="f-nick" />
+            <p class="ph-muted ph-small">Cloud Companion signs in as one more device of your account and stays online to receive your messages. A group chat reaches your devices as <code>#team</code>.</p>
           </template>
           <template v-else-if="f.kind === 'telegram'">
             <p class="ph-muted ph-small">Telegram needs an API ID and hash of your own: <a href="https://my.telegram.org" target="_blank" rel="noopener">my.telegram.org</a> → API development tools. Cloud Companion then signs in as one more device of your account.</p>
@@ -255,7 +257,7 @@ let timer: ReturnType<typeof setInterval> | undefined
 const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }, { label: 'Telegram', value: 'telegram' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
-const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', insecure: false, apiId: 0, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
+const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', rooms: '', nick: '', insecure: false, apiId: 0, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
 const f = reactive(blank())
 
 const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal', telegram: 'Telegram' }
@@ -286,7 +288,7 @@ function payload() {
     return { kind: 'imap', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
   }
   if (f.kind === 'matrix') return { kind: 'matrix', provider: 'generic', name: f.name, config: JSON.stringify({ homeserver: f.url.trim(), user: f.user.trim() }), secret: f.secret }
-  if (f.kind === 'xmpp') return { kind: 'xmpp', provider: 'generic', name: f.name, config: JSON.stringify({ jid: f.user.trim(), server: f.xmppServer.trim(), insecure: f.insecure }), secret: f.secret }
+  if (f.kind === 'xmpp') return { kind: 'xmpp', provider: 'generic', name: f.name, config: JSON.stringify({ jid: f.user.trim(), server: f.xmppServer.trim(), insecure: f.insecure, rooms: f.rooms.split(',').map((x) => x.trim()).filter(Boolean), nick: f.nick.trim() }), secret: f.secret }
   if (f.kind === 'telegram') return { kind: 'telegram', provider: 'generic', name: f.name, config: JSON.stringify({ api_id: Number(f.apiId) || 0, user_id: tg.userId }), secret: f.secret }
   if (f.kind === 'signal') return { kind: 'signal', provider: 'generic', name: f.name, config: JSON.stringify({ api: f.url.trim(), number: f.user.trim() }), secret: '' }
   if (f.kind === 'nctalk') return { kind: 'nctalk', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }

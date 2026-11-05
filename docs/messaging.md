@@ -87,7 +87,13 @@ stays online, so messages to your address reach it as well as your other XMPP ap
 - People reach your devices as `bob` (on your own server) or `bob=other.org` (anyone else; a SIP phone cannot type `@`), named as in
   your contact list. With a rule `starting with xm.` → the account, write to `xm.bob`.
 - Messages kept by the server while Cloud Companion was offline arrive when it is back. A message the server cannot deliver (no such
-  user) is logged. Group chats (MUC) are not passed through yet.
+  user) is logged.
+- **Group chats** (MUC): list the ones to join (`team@conference.example.org`, comma separated) and, if you like, the name to use
+  there (default: the first part of your address; if someone already has it, `_` is added). Join group chats that exist already:
+  one Cloud Companion makes stays locked until it is set up from another app. A group chat reaches your devices as `#team`
+  (`#team=conference.example.org` when two of the account's group chats share the name), its lines named "Bob (team)"; answering
+  goes to the group chat. Nothing said before Cloud Companion joined is replayed; after a dropped connection, what was said
+  meanwhile arrives once. Your own lines, the topic and private messages through a group chat are not passed on.
 
 ## IRC
 Connections → Add an account → **IRC**: the server (`irc.libera.chat`: TLS on port 6697; or `host:port`), your nick, and your
@@ -218,7 +224,8 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `sh deploy/asterisk/test.sh`: the same against the real Asterisk of the profile, extension 201 playing a phone.
 - `sh testdata/matrix/test.sh`: Matrix against a real homeserver (Conduit): encrypted direct chats both ways, a group, unknown users.
 - `sh testdata/xmpp/test.sh`: XMPP against a real server (Prosody): wrong passwords, both directions, contact names, messages kept
-  while offline, signing in again after a dropped connection.
+  while offline, signing in again after a dropped connection; a group chat (a taken name, no replay, both directions, what was
+  said during a drop arriving once).
 - `go test ./internal/xmppgw`: the XMPP front on localhost (wrong passwords, both directions through a connection with an escaped
   address and a name, refusals as errors, device to device waiting until signed in).
 - `go test ./internal/tlsutil`: the front's certificate takes the N9's and Symbian's TLS 1.0 handshakes; the phone port's does not.
@@ -237,7 +244,8 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
-- `sh web/test/xmpp.sh`: adding an XMPP account through the UI against Prosody, using it in a rule, removing it.
+- `sh web/test/xmpp.sh`: adding an XMPP account through the UI against Prosody (group chats need their service), using it in a
+  rule, removing it.
 - `sh web/test/irc.sh`: adding an IRC account through the UI against Ergo, using it in a rule, removing it.
 - `sh web/test/nctalk.sh`: adding a Nextcloud Talk account through the UI, using it in a rule, removing it.
 - `sh web/test/signal.sh`: the Signal dialog against the real API: the QR code shown (with the app's CSP on), unlinked refused.
