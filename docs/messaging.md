@@ -4,8 +4,8 @@ Cloud Companion passes messages between your devices and the services you use. I
 service is a **connection**, your **rules** say which connection an address goes to, and a **front** lets your devices take part.
 
 Connections today: **SMS through your phones** (docs/sms.md), **your SIP devices** (messages between your own logins) and **SIP
-services** (your own Asterisk or a provider, one per account), **Matrix**, **XMPP** and **IRC** accounts. Planned, in this order: Nextcloud
-Talk, Signal, Telegram; Microsoft Teams later.
+services** (your own Asterisk or a provider, one per account), **Matrix**, **XMPP**, **IRC** and **Nextcloud Talk** accounts. Planned, in this
+order: Signal, Telegram; Microsoft Teams later.
 
 Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones) and the **XMPP front** for phones
 with a Jabber client (the N9's and Symbian's built-in chat, any XMPP app). Both use the same logins.
@@ -99,6 +99,18 @@ Channels to join are comma separated. Cloud Companion stays connected with that 
   every channel line" for all of them. Answering goes to the channel: `irc.#team` (a SIP phone may need to write `#` as `%23`).
 - Long messages are split into IRC lines; `/me` lines arrive as `* bob waves`. A message to a nick that is not there is logged.
 
+## Nextcloud Talk
+Connections → Add an account → **Nextcloud Talk**: your Nextcloud's address, your user and an app password (Nextcloud → Settings →
+Security → Create new app password; your own password works too, but an app password can be revoked alone). Cloud Companion uses
+Talk's documented API: it looks at your conversations every 5 seconds and passes new messages on; what was there before the account
+was added is not replayed.
+
+- One-to-one chats reach your devices from the user ID (`bob`); with a rule `starting with nc.` → the account, write to `nc.bob`.
+  A one-to-one chat is made when you have none with them yet; a user nobody has is refused.
+- Group conversations reach your devices as `#token` (the code in the conversation's link), named "Bob (Team)"; answering goes to
+  the conversation. Mentions and shared files arrive written out (`@Bob`, `[file: plan.pdf]`).
+- Your own messages from other Talk apps, system lines and bots are not passed on.
+
 ## The SIP front
 Set `PHECLOUD_SIP_LISTEN=:5060` (UDP and TCP). In Docker Compose the port is published on 127.0.0.1 only; set
 `PHECLOUD_SIP_BIND=0.0.0.0` for phones on your network. Plain SIP is not encrypted: keep it on a network you trust or a VPN.
@@ -174,9 +186,12 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
   over modern TLS and over TLS 1.0 as the N9.
 - `sh testdata/irc/test.sh`: IRC against a real server (Ergo): SASL refused and accepted, private messages both ways, only the
   channel lines that name you, a long answer split into lines.
+- `sh testdata/nctalk/test.sh`: Nextcloud Talk against a real Nextcloud: one-to-one chats both ways (one made by Cloud Companion),
+  a group with a mention, unknown users and conversations refused, nothing replayed.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
 - `sh web/test/xmpp.sh`: adding an XMPP account through the UI against Prosody, using it in a rule, removing it.
 - `sh web/test/irc.sh`: adding an IRC account through the UI against Ergo, using it in a rule, removing it.
+- `sh web/test/nctalk.sh`: adding a Nextcloud Talk account through the UI, using it in a rule, removing it.
 - `sh web/test/sipservice.sh`: adding a SIP service through the UI against the profile's Asterisk, using it in a rule, removing it.

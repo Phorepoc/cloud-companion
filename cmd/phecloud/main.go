@@ -35,6 +35,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/davhub"
 	"github.com/phorepoc/cloud-companion/internal/irc"
 	"github.com/phorepoc/cloud-companion/internal/matrix"
+	"github.com/phorepoc/cloud-companion/internal/nctalk"
 	"github.com/phorepoc/cloud-companion/internal/server"
 	"github.com/phorepoc/cloud-companion/internal/sipgw"
 	"github.com/phorepoc/cloud-companion/internal/sipsvc"
@@ -163,12 +164,13 @@ func main() {
 			} else {
 				mgr = connectors.NewManager(st, srv.Hub, vault)
 				srv.Sender = mgr
-				// chat accounts (docs/messaging.md): SIP services, Matrix, XMPP and IRC accounts, each a chat connection
+				// chat accounts (docs/messaging.md): SIP services, Matrix, XMPP, IRC and Nextcloud Talk accounts, each a chat connection
 				go (&chat.Accounts{St: st, Hub: hub, Log: log, Secret: mgr.Secret, Kinds: map[string]chat.Starter{
 					"sip":    sipsvc.Start(log),
 					"matrix": matrix.Start(env("PHECLOUD_TLSDIR", "/data"), log), // its encryption keys next to the other data
 					"xmpp":   xmpp.Start(log),
 					"irc":    irc.Start(log),
+					"nctalk": nctalk.Start(log),
 				}}).Run(context.Background(), 10*time.Second)
 				if srv.Hub != nil {
 					go mgr.Loop(context.Background(), 15*time.Minute)

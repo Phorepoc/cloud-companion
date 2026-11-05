@@ -100,6 +100,12 @@
             <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
             <p class="ph-muted ph-small">Cloud Companion signs in as one more device of your account and stays online to receive your messages.</p>
           </template>
+          <template v-else-if="f.kind === 'nctalk'">
+            <q-input v-model="f.url" outlined dense label="Nextcloud address" hint="For example https://cloud.example.org" data-test="f-url" />
+            <q-input v-model="f.user" outlined dense label="User" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.secret" outlined dense type="password" label="App password" hint="Nextcloud → Settings → Security → Create new app password" autocomplete="new-password" data-test="f-secret" />
+            <p class="ph-muted ph-small">Cloud Companion looks at your Talk conversations every few seconds and passes new messages on.</p>
+          </template>
           <template v-else-if="f.kind === 'irc'">
             <q-input v-model="f.ircServer" outlined dense label="Server" hint="For example irc.libera.chat (TLS, port 6697), or host:port" data-test="f-irc-server" />
             <q-input v-model="f.user" outlined dense label="Nick" autocomplete="off" data-test="f-user" />
@@ -175,7 +181,7 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this account?</h2>
-          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
+          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
           <p v-else>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
         </q-card-section>
         <q-card-actions align="right">
@@ -218,13 +224,13 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
 const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', insecure: false, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC' }
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk' }
 const kindText = (k: string) => KINDS[k] || k
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
@@ -253,6 +259,7 @@ function payload() {
   }
   if (f.kind === 'matrix') return { kind: 'matrix', provider: 'generic', name: f.name, config: JSON.stringify({ homeserver: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'xmpp') return { kind: 'xmpp', provider: 'generic', name: f.name, config: JSON.stringify({ jid: f.user.trim(), server: f.xmppServer.trim(), insecure: f.insecure }), secret: f.secret }
+  if (f.kind === 'nctalk') return { kind: 'nctalk', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'irc') {
     const cfg = { server: f.ircServer.trim(), nick: f.user.trim(), channels: f.channels.split(',').map((x) => x.trim()).filter(Boolean), all: f.ircAll, insecure: f.insecure, server_pass: f.ircServerPass }
     return { kind: 'irc', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
