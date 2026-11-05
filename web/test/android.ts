@@ -145,6 +145,8 @@ await page.evaluate(() => navigator.clipboard.writeText('pasted from the browser
 await page.screenshot({ path: OUT + '/android-5a-search.png' })
 await page.click('#pasteto'); await page.waitForTimeout(2000)
 await page.screenshot({ path: OUT + '/android-5b-pasted.png' })
+const strip = await hook('wdump') // the keyboard's strip, to compare the clipboard chip with the row it sits in
+console.log('keyboard strip:', (strip.match(/<node[^>]*package="com.android.inputmethod.latin"[^>]*>/g) || []).filter((n) => /clipboard_suggestion_strip|etesian_strip_(emoticon|counter)|text="[^"]+"/.test(n)).map((n) => ((n.match(/resource-id="[^"]*\/([^"]*)"/) || [])[1] || (n.match(/text="[^"]*"/) || [''])[0]) + ' ' + (n.match(/bounds="([^"]*)"/) || [])[1]).join(' | '), strip.split('\n').slice(-3).join(' '))
 const ui = await hook('dump')
 console.log('ui edit fields:', (ui.match(/<node[^>]*EditText[^>]*>/g) || []).map((x) => (x.match(/text="[^"]*"/) || [''])[0]).join(' | '), '| note:', await page.textContent('#msg'))
 results.clipPaste = ui.includes('pasted from the browser 42')

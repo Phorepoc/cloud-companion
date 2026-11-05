@@ -41,6 +41,7 @@ t=0; until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do slee
         rot1) c='wm user-rotation lock 1' ;;
         rot0) c='wm user-rotation lock 0' ;;
         home) c='input keyevent 3' ;;
+        wdump) c='uiautomator dump --windows /sdcard/w.xml >/dev/null 2>&1; cat /sdcard/w.xml; wm size; wm density' ;;
         dump) c='uiautomator dump /sdcard/u.xml >/dev/null 2>&1; cat /sdcard/u.xml' ;;
         selectall) c='input keycombination CTRL_LEFT A' ;;
         pkgs) c='pm list packages -3' ;;
