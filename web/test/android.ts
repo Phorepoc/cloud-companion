@@ -77,12 +77,20 @@ console.log('after swipe: canvas changed =', a.hash !== b.hash)
 if (a.hash === b.hash) throw new Error('touch input did not change the screen')
 await page.screenshot({ path: OUT + '/android-2-drawer.png' })
 
-// keys: Home button, then open Settings search by tapping, typing is checked through the screen change
+// keys: Home button, then open Settings search by tapping, typing is checked through the screen change.
+// A sideways swipe first, so Home has something to undo whatever the home app (HOME_ACTIVITY): the stock
+// launcher is in its drawer already; Etesian's Applications view fits on one screen and Home there stays
+// on it, so it goes to another view (Events / Open applications) and Home brings it back.
+await swipe([0.9, 0.5], [0.1, 0.5])
+await page.waitForTimeout(1200)
+const side = await canvasInfo()
+console.log('after a sideways swipe: canvas changed =', side.hash !== b.hash)
+await page.screenshot({ path: OUT + '/android-2b-sideways.png' })
 await page.click('button[data-k="3"]')
 await page.waitForTimeout(1500)
 const c = await canvasInfo()
-console.log('after Home: canvas changed =', c.hash !== b.hash)
-if (c.hash === b.hash) throw new Error('the Home key did not change the screen')
+console.log('after Home: canvas changed =', c.hash !== side.hash)
+if (c.hash === side.hash) throw new Error('the Home key did not change the screen')
 await page.screenshot({ path: OUT + '/android-3-home-again.png' })
 
 // latency/CPU sample over 10 s of interaction (taps on the clock area and scroll)
