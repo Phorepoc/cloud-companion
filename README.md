@@ -1,10 +1,21 @@
 # Cloud Companion
 
-Cloud Companion is a small server you run yourself that helps old phones with the modern internet. It's for one
-person: you, your phones, and your accounts.
+Cloud Companion is a small server you run yourself, so your devices can keep doing what you need them to, whatever their
+age. It's for one person: you, your devices and your accounts, on a machine you control.
+
+It doesn't mind what you connect to it. A Nokia N9 or a Symbian phone that can no longer open a modern website, an
+Android phone, a laptop, or no phone at all: some people will only want their own cloud desktop in a browser tab, and
+that's a perfectly good way to use it. Old devices are where it helps the most, because they lost the most when the
+services they relied on moved on.
+
+Cloud Companion is a [Phorepoc](https://github.com/Phorepoc) project, and one of the places where Phorepoc (the Symbian
+revival) and [Etesian](https://etesian-design.com) (the design language) meet: its web desktop wears the Etesian look,
+and Phorepoc OS phones get a few extras, like pairing and the Catalogue store. Neither is needed to use it.
 
 - **A browser in the cloud.** Old phone browsers can't open most websites anymore. The server opens the page in
   Chromium instead and sends the phone pictures of it, over a compact encrypted connection.
+- **A messaging gateway.** Your SIP or XMPP phone, or the web app, can reach SMS, Matrix, XMPP, IRC, Nextcloud Talk,
+  Signal and Telegram, and you decide which address goes where.
 - **A web app** you can install on any device, with a browser, your text messages (sent through your own phone), mail,
   calendar and contacts in one place.
 - **Mail, calendar and contacts for old phones**, if you want them. An optional hub speaks Exchange ActiveSync, CalDAV
@@ -126,10 +137,11 @@ or an optional TLS 1.0 listener (`--profile hub-legacy`). [docs/hub.md](docs/hub
 
 ## Messaging
 
-Cloud Companion passes messages between your devices and your services: SMS through your phones and SIP services (your own Asterisk:
-`docker compose --profile asterisk`, or a provider) and Matrix (encrypted) today, with XMPP, IRC, Nextcloud Talk, Signal and Telegram planned. You decide in Connections → Messaging which address goes where. Phones with a
-SIP client (the Nokia N9, Symbian, softphones) can sign in and chat through it: set `PHECLOUD_SIP_LISTEN=:5060` and make a login per
-phone. [docs/messaging.md](docs/messaging.md) explains the rules and has the phone settings.
+Cloud Companion passes messages between your devices and your services: SMS through your phones, SIP services (your own Asterisk:
+`docker compose --profile asterisk`, or a provider), Matrix (encrypted), XMPP, IRC and Nextcloud Talk today, with Signal and Telegram
+planned. You decide in Connections → Messaging which address goes where. Phones with a SIP or XMPP (Jabber) client (the Nokia N9,
+Symbian, softphones) can sign in and chat through it: set `PHECLOUD_SIP_LISTEN=:5060` and/or `PHECLOUD_XMPP_LISTEN=:5222` and make
+a login per phone. [docs/messaging.md](docs/messaging.md) explains the rules and has the phone settings.
 
 ## Security
 
@@ -164,6 +176,79 @@ them except the Android tests, which need a Docker host with the `binder_linux` 
 
 The server and its admin commands are in `cmd/phecloud`. The web app is in `web/`, the phone-side code in `client/`, and
 the extra containers in `deploy/`. [docs/status.md](docs/status.md) has what works and what's still open.
+
+## Thank you
+
+Cloud Companion is a small layer on top of a great deal of other people's work. Every message it routes, every mail it copies and
+every page it shows depends on the projects below, and on the people who write, review, maintain, package and document them,
+often in their own time and for years. We are deeply grateful to all of them: none of this would be possible without the work and
+care they have put into their projects. If Cloud Companion is useful to you, please consider supporting them too.
+
+(`NOTICE` lists each one's licence.)
+
+**Built into the server**
+- Language and core: [Go](https://go.dev) and its [extended libraries](https://pkg.go.dev/golang.org/x) (crypto, net, sync, sys, text, exp)
+- Messaging:
+  [gotd/td](https://github.com/gotd/td) with [ige](https://github.com/gotd/ige), [neo](https://github.com/gotd/neo) and [log](https://github.com/gotd/log) (Telegram);
+  [mautrix-go](https://github.com/mautrix/go) and [go.mau.fi/util](https://github.com/mautrix/go-util) (Matrix);
+  [mellium xmpp](https://mellium.im/xmpp), [sasl](https://mellium.im/sasl), [xmlstream](https://mellium.im/xmlstream) and [reader](https://mellium.im/reader) (XMPP);
+  [ergochat/irc-go](https://github.com/ergochat/irc-go) (IRC);
+  [sipgo](https://github.com/emiago/sipgo) and [icholy/digest](https://github.com/icholy/digest) (SIP);
+  [rsc.io/qr](https://github.com/rsc/qr) (QR codes)
+- Mail: [go-imap](https://github.com/emersion/go-imap), [go-message](https://github.com/emersion/go-message), [go-sasl](https://github.com/emersion/go-sasl)
+- Sign-in and security: [go-webauthn](https://github.com/go-webauthn/webauthn) and [x](https://github.com/go-webauthn/x),
+  [golang-jwt](https://github.com/golang-jwt/jwt), [go-tpm](https://github.com/google/go-tpm),
+  [edwards25519](https://github.com/FiloSottile/edwards25519), [uTLS](https://github.com/refraction-networking/utls),
+  [bluemonday](https://github.com/microcosm-cc/bluemonday) with [douceur](https://github.com/aymerick/douceur) and [gorilla/css](https://github.com/gorilla/css)
+- Databases: [modernc.org/sqlite](https://gitlab.com/cznic/sqlite) with [libc](https://gitlab.com/cznic/libc), [memory](https://gitlab.com/cznic/memory)
+  and [mathutil](https://gitlab.com/cznic/mathutil), [bigfft](https://github.com/remyoudompheng/bigfft);
+  [pgx](https://github.com/jackc/pgx), [puddle](https://github.com/jackc/puddle), [pgpassfile](https://github.com/jackc/pgpassfile),
+  [pgservicefile](https://github.com/jackc/pgservicefile); [go-sql-driver/mysql](https://github.com/go-sql-driver/mysql)
+- Web and browser: [chromedp](https://github.com/chromedp/chromedp), [cdproto](https://github.com/chromedp/cdproto) and
+  [sysutil](https://github.com/chromedp/sysutil); [coder/websocket](https://github.com/coder/websocket); [gobwas ws](https://github.com/gobwas/ws),
+  [httphead](https://github.com/gobwas/httphead) and [pool](https://github.com/gobwas/pool)
+- Encoding, compression and tools: [fxamacker/cbor](https://github.com/fxamacker/cbor), [x448/float16](https://github.com/x448/float16),
+  [go-faster jx](https://github.com/go-faster/jx), [errors](https://github.com/go-faster/errors) and [xor](https://github.com/go-faster/xor),
+  [segmentio/asm](https://github.com/segmentio/asm), [klauspost/compress](https://github.com/klauspost/compress),
+  [brotli](https://github.com/andybalholm/brotli), [xxhash](https://github.com/cespare/xxhash), [easyjson](https://github.com/mailru/easyjson),
+  [intern](https://github.com/josharian/intern), [msgp](https://github.com/tinylib/msgp) with [fwd](https://github.com/philhofer/fwd),
+  [gjson](https://github.com/tidwall/gjson), [sjson](https://github.com/tidwall/sjson), [match](https://github.com/tidwall/match),
+  [pretty](https://github.com/tidwall/pretty), [mapstructure](https://github.com/go-viper/mapstructure),
+  [google/uuid](https://github.com/google/uuid), [go-humanize](https://github.com/dustin/go-humanize),
+  [backoff](https://github.com/cenkalti/backoff), [zerolog](https://github.com/rs/zerolog),
+  [go-colorable](https://github.com/mattn/go-colorable), [go-isatty](https://github.com/mattn/go-isatty),
+  [goid](https://github.com/petermattis/goid), [uber-go/atomic](https://github.com/uber-go/atomic),
+  [multierr](https://github.com/uber-go/multierr), [OpenTelemetry Go](https://github.com/open-telemetry/opentelemetry-go)
+
+**The web app**
+[Vue](https://vuejs.org), [Vue Router](https://router.vuejs.org), [Quasar](https://quasar.dev) and [Quasar extras](https://github.com/quasarframework/quasar/tree/dev/extras)
+(with Google's [Material Symbols](https://github.com/google/material-design-icons)), [Fira Sans](https://github.com/mozilla/Fira) via
+[Fontsource](https://fontsource.org), [noble-hashes](https://github.com/paulmillr/noble-hashes), [cbor-x](https://github.com/kriszyp/cbor-x),
+[Vite](https://vite.dev), [TypeScript](https://www.typescriptlang.org) and [vue-tsc](https://github.com/vuejs/language-tools), and
+[Playwright](https://playwright.dev) for the browser tests.
+
+**The phone client**
+[Mbed TLS](https://github.com/Mbed-TLS/mbedtls), [libpng](http://www.libpng.org/pub/png/libpng.html) and [libjpeg-turbo](https://libjpeg-turbo.org).
+
+**The containers the compose files run**
+- [Stalwart Mail Server](https://stalw.art), [Z-Push](https://github.com/Z-Hub/Z-Push), [Radicale](https://radicale.org),
+  [Asterisk](https://www.asterisk.org) (packaged by [Alpine Linux](https://alpinelinux.org)),
+  [signal-cli-rest-api](https://github.com/bbernhard/signal-cli-rest-api) and [signal-cli](https://github.com/AsamK/signal-cli)
+- [Caddy](https://caddyserver.com), [Traefik](https://traefik.io), [PostgreSQL](https://www.postgresql.org), [MariaDB](https://mariadb.org),
+  [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy), [nginx](https://nginx.org), [PHP](https://www.php.net),
+  [Docker](https://www.docker.com)
+- [Chromium](https://www.chromium.org) as [chromedp/headless-shell](https://github.com/chromedp/docker-headless-shell), with the
+  [Liberation](https://github.com/liberationfonts/liberation-fonts), [DejaVu](https://dejavu-fonts.github.io) and
+  [Noto](https://notofonts.github.io) fonts
+- Android: [Redroid](https://github.com/remote-android/redroid-doc), the [Android Open Source Project](https://source.android.com)
+  and its SDK tools, [Gradle](https://gradle.org), [Eclipse Temurin](https://adoptium.net), [scrcpy](https://github.com/Genymobile/scrcpy)
+  and [Taskbar](https://github.com/farmerbb/Taskbar)
+- The base systems under all of them: [Debian](https://www.debian.org), [Alpine Linux](https://alpinelinux.org), [Node.js](https://nodejs.org),
+  [OpenSSL](https://www.openssl.org) and [fontTools](https://github.com/fonttools/fonttools)
+
+**The servers our tests run against**
+[Conduit](https://conduit.rs) (Matrix), [Prosody](https://prosody.im) (XMPP), [Ergo](https://ergo.chat) (IRC),
+[Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), and [slixmpp](https://codeberg.org/poezio/slixmpp).
 
 ## License
 
