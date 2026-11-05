@@ -5,13 +5,13 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE). Ev
 are part of the project and under the same licence.
 
 Third-party software built into the phecloud binary (Go modules, as reported by google/go-licenses for ./cmd/...; re-run in CI, see .github/workflows/ci.yml; test-only modules such as go-smtp are not shipped):
-  MIT:           chromedp, cdproto, sysutil; emersion go-imap, go-message, go-sasl; fxamacker/cbor; jackc pgx, pgpassfile, pgservicefile, puddle; golang-jwt/jwt; gobwas httphead, pool, ws;
+  MIT:           gotd/td, gotd/ige, go-faster/jx, cenkalti/backoff, uber-go/atomic, multierr (Telegram); segmentio/asm (MIT-0), cespare/xxhash; chromedp, cdproto, sysutil; emersion go-imap, go-message, go-sasl; fxamacker/cbor; jackc pgx, pgpassfile, pgservicefile, puddle; golang-jwt/jwt; gobwas httphead, pool, ws;
                  aymerick/douceur; dustin/go-humanize; icholy/digest; rs/zerolog; mattn/go-colorable, go-isatty; tidwall/gjson, sjson, match, pretty; go-viper/mapstructure; josharian/intern; mailru/easyjson; philhofer/fwd; tinylib/msgp; x448/float16; modernc.org/libc
-  BSD-3-Clause:  go-webauthn/webauthn and x/encoding/asn1; microcosm-cc/bluemonday; google/uuid; gorilla/css; filippo.io/edwards25519; golang.org/x/{crypto,net,sync,sys,text};
+  BSD-3-Clause:  go-webauthn/webauthn and x/encoding/asn1; microcosm-cc/bluemonday; google/uuid; gorilla/css; rsc.io/qr, gotd/neo, go-faster/errors, xor, golang.org/x/exp (Telegram); filippo.io/edwards25519; golang.org/x/{crypto,net,sync,sys,text};
                  modernc.org/sqlite, memory, mathutil; remyoudompheng/bigfft
   BSD-2-Clause:  go-webauthn/x/revoke; emiago/sipgo; mellium.im/xmpp, sasl, xmlstream, reader (XMPP)
   ISC:           ergochat/irc-go (IRC; its ircevent package BSD-3-Clause, from thoj/go-ircevent); coder/websocket; go-webauthn/x/crypto/secp256k1
-  Apache-2.0:    google/go-tpm; petermattis/goid
+  Apache-2.0:    gotd/log, klauspost/compress (Telegram); google/go-tpm; petermattis/goid
   MPL-2.0:       go-sql-driver/mysql; maunium.net/go/mautrix, go.mau.fi/util (Matrix) (file-level copyleft; used unmodified as libraries)
 
 Third-party software built into the web app (web/, bundled by Vite): Vue, Vue Router, Quasar and @quasar/extras (MIT); cbor-x (MIT); @noble/hashes (MIT);

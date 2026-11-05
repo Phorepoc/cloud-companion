@@ -130,6 +130,27 @@ Signal has no API for other apps, so Cloud Companion goes through [signal-cli-re
 - signal-cli-rest-api in `json-rpc` mode (the profile's) hands messages over at once; in `normal` or `native` mode Cloud Companion
   fetches them every 3 seconds. Signal unlinks devices it has not seen for about 30 days: keep the profile running.
 
+## Telegram
+Cloud Companion signs in to Telegram as one more device of your account, the way Telegram Desktop does (MTProto, with
+[gotd/td](https://github.com/gotd/td), MIT). No bot and nothing else to run:
+
+1. On [my.telegram.org](https://my.telegram.org) → API development tools, make an app and copy its **API ID** and **API hash**.
+2. Connections → Add an account → **Telegram**, give both, then **Sign in with a QR code**: on your phone, Telegram → Settings →
+   Devices → Link Desktop Device, and scan the code (it changes every 30 seconds). If you set a two-step verification password,
+   the dialog asks for it.
+3. "Signed in as …": Test, Add.
+
+- The session is kept in the data directory (`/data/telegram-<your user ID>.session`, readable by Cloud Companion only); the API
+  hash goes in the vault like any secret. Ending the session on your phone (Settings → Devices) stops the account: sign in again.
+- People reach your devices from their username, or `u<ID>` when they have none; basic groups as `g<ID>` and supergroups as
+  `c<ID>`, named "Bob (Team)". Answering goes back the same way; you can also write to a username or to `+<number>` of a contact.
+  Give the account a prefix: a rule `starting with tg.` → the account, and write to `tg.bob_b`.
+- Channels (broadcasts) are not passed on, nor what you send from your other devices. Pictures, voice and files arrive as a line
+  naming them. A name, number or ID Telegram does not know is refused.
+
+API (owner only): `POST /phe/telegram/login {api_id, api_hash}` → `{id}`, `GET /phe/telegram/login?id=` → the state (`waiting`
+with a PNG, `password`, `done` with the user, `failed` with why), `POST /phe/telegram/login/password {id, password}`.
+
 ## The SIP front
 Set `PHECLOUD_SIP_LISTEN=:5060` (UDP and TCP). In Docker Compose the port is published on 127.0.0.1 only; set
 `PHECLOUD_SIP_BIND=0.0.0.0` for phones on your network. Plain SIP is not encrypted: keep it on a network you trust or a VPN.
@@ -210,6 +231,9 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `go test ./internal/signal`: Signal against a mock of signal-cli-rest-api's documented API, in both receive modes (people, hidden
   numbers, groups, files; receipts, sync messages and reactions left out; a number not on Signal refused).
 - `sh testdata/signal/test.sh`: the real signal-cli-rest-api with nothing linked (the QR code, "not linked yet").
+- `go test ./internal/telegram`: Telegram against a local Telegram (gotd's test cluster: the real protocol and encryption, answering
+  as Telegram's documented API does): people with and without a username, a group and a supergroup both ways, channels left out,
+  unknown names, numbers and IDs refused; and the QR sign-in to a kept session.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
@@ -217,4 +241,6 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `sh web/test/irc.sh`: adding an IRC account through the UI against Ergo, using it in a rule, removing it.
 - `sh web/test/nctalk.sh`: adding a Nextcloud Talk account through the UI, using it in a rule, removing it.
 - `sh web/test/signal.sh`: the Signal dialog against the real API: the QR code shown (with the app's CSP on), unlinked refused.
+- `sh web/test/telegram.sh`: the Telegram dialog: the real server refuses an account not signed in; then the sign-in as the server
+  reports it (a changing QR code, the two-step password, signed in) and what Test sends.
 - `sh web/test/sipservice.sh`: adding a SIP service through the UI against the profile's Asterisk, using it in a rule, removing it.

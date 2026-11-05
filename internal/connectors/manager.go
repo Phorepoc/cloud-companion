@@ -20,6 +20,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/signal"
 	"github.com/phorepoc/cloud-companion/internal/sipsvc"
 	"github.com/phorepoc/cloud-companion/internal/store"
+	"github.com/phorepoc/cloud-companion/internal/telegram"
 	"github.com/phorepoc/cloud-companion/internal/xmpp"
 )
 
@@ -28,7 +29,8 @@ type Manager struct {
 	St       *store.Store
 	Hub      *davhub.Client
 	V        *Vault
-	MaxMails int // per account and run (default 300)
+	MaxMails int    // per account and run (default 300)
+	DataDir  string // where connections keep files of their own (Telegram sessions)
 	mu       sync.Mutex
 	busy     map[string]bool
 }
@@ -120,6 +122,12 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		return signal.Test(ctx, c)
+	case "telegram":
+		var c telegram.Cfg
+		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
+			return "", err
+		}
+		return telegram.Test(ctx, m.DataDir, c, secret)
 	}
 	return "", errors.New("unknown kind " + kind)
 }
@@ -129,7 +137,7 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	if strings.TrimSpace(name) == "" {
 		return store.Account{}, errors.New("give the account a name")
 	}
-	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" && kind != "xmpp" && kind != "irc" && kind != "nctalk" && kind != "signal" {
+	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" && kind != "xmpp" && kind != "irc" && kind != "nctalk" && kind != "signal" && kind != "telegram" {
 		return store.Account{}, errors.New("unknown kind " + kind)
 	}
 	if !json.Valid([]byte(cfgJSON)) {
@@ -254,7 +262,7 @@ func (m *Manager) SyncNow(ctx context.Context, id string) (string, error) {
 }
 
 func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
-	if a.Kind == "matrix" || a.Kind == "xmpp" || a.Kind == "irc" || a.Kind == "nctalk" || a.Kind == "signal" { // nothing to copy: the connection keeps its own sync (packages matrix, xmpp, irc, nctalk, signal) and reports on the account
+	if a.Kind == "matrix" || a.Kind == "xmpp" || a.Kind == "irc" || a.Kind == "nctalk" || a.Kind == "signal" || a.Kind == "telegram" { // nothing to copy: the connection keeps its own sync (packages matrix, xmpp, irc, nctalk, signal, telegram) and reports on the account
 		return "messages pass through", nil
 	}
 	if a.Kind == "sip" { // nothing to copy: messages pass through (package sipsvc); a sync checks the login

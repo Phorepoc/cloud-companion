@@ -100,6 +100,23 @@
             <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
             <p class="ph-muted ph-small">Cloud Companion signs in as one more device of your account and stays online to receive your messages.</p>
           </template>
+          <template v-else-if="f.kind === 'telegram'">
+            <p class="ph-muted ph-small">Telegram needs an API ID and hash of your own: <a href="https://my.telegram.org" target="_blank" rel="noopener">my.telegram.org</a> → API development tools. Cloud Companion then signs in as one more device of your account.</p>
+            <q-input v-model.number="f.apiId" outlined dense type="number" label="API ID" data-test="f-tg-api-id" />
+            <q-input v-model="f.secret" outlined dense type="password" label="API hash" autocomplete="off" data-test="f-secret" />
+            <q-btn outline color="primary" no-caps icon="sym_o_qr_code_2" label="Sign in with a QR code" :disable="!f.apiId || !f.secret" :loading="tg.state === 'starting'" data-test="f-tg-signin" @click="tgStart" />
+            <div v-if="tg.state === 'waiting' && tg.png" class="ph-qr" data-test="f-tg-qr">
+              <img :src="'data:image/png;base64,' + tg.png" alt="QR code to sign Cloud Companion in to Telegram" width="220" height="220" />
+              <p class="ph-small">On your phone: Telegram → Settings → Devices → Link Desktop Device, and scan this. The code changes every 30 seconds.</p>
+            </div>
+            <div v-if="tg.state === 'password'" class="ph-row ph-row--start" data-test="f-tg-password-row">
+              <q-input v-model="tg.password" outlined dense type="password" label="Two-step verification password" autocomplete="off" data-test="f-tg-password" @keyup.enter="tgPassword" />
+              <q-btn unelevated color="primary" no-caps label="Continue" :disable="!tg.password" data-test="f-tg-password-send" @click="tgPassword" />
+            </div>
+            <p v-if="tg.state === 'done'" class="ph-ok" role="status" data-test="f-tg-done"><q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Signed in as {{ tg.name }}. Test, then Add.</p>
+            <p v-if="tg.error" class="ph-error ph-small" role="alert" data-test="f-tg-error">{{ tg.error }}</p>
+            <p class="ph-muted ph-small">Usernames, <code>u123</code> (people), <code>g123</code> and <code>c123</code> (groups) reach it with a rule such as <code>tg.</code> → this account.</p>
+          </template>
           <template v-else-if="f.kind === 'signal'">
             <p class="ph-muted ph-small">Signal needs signal-cli-rest-api next to Cloud Companion: <code>docker compose --profile signal up -d</code>. Link it once as a device of your Signal account, then give your number.</p>
             <q-input v-model="f.url" outlined dense label="signal-cli-rest-api" hint="With the compose profile: http://signal-cli:8080" data-test="f-url" />
@@ -192,7 +209,7 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this account?</h2>
-          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk', 'signal'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
+          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk', 'signal', 'telegram'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
           <p v-else>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
         </q-card-section>
         <q-card-actions align="right">
@@ -205,7 +222,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiCall } from '../cloud'
 import RoutingSection from '../components/RoutingSection.vue'
@@ -235,13 +252,13 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }, { label: 'Telegram', value: 'telegram' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
-const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', insecure: false, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
+const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', insecure: false, apiId: 0, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal' }
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal', telegram: 'Telegram' }
 const kindText = (k: string) => KINDS[k] || k
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
@@ -257,7 +274,7 @@ function ago(t: number) {
 async function load() {
   try { const j = await apiCall('GET', '/phe/connections'); accounts.value = j.accounts; hubOn.value = j.hub } catch (e) { error.value = (e as Error).message }
 }
-function openAdd() { Object.assign(f, blank()); qr.value = ''; testResult.value = null; adding.value = true }
+function openAdd() { Object.assign(f, blank()); qr.value = ''; tgReset(); testResult.value = null; adding.value = true }
 
 function payload() {
   if (f.kind === 'imap') {
@@ -270,6 +287,7 @@ function payload() {
   }
   if (f.kind === 'matrix') return { kind: 'matrix', provider: 'generic', name: f.name, config: JSON.stringify({ homeserver: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'xmpp') return { kind: 'xmpp', provider: 'generic', name: f.name, config: JSON.stringify({ jid: f.user.trim(), server: f.xmppServer.trim(), insecure: f.insecure }), secret: f.secret }
+  if (f.kind === 'telegram') return { kind: 'telegram', provider: 'generic', name: f.name, config: JSON.stringify({ api_id: Number(f.apiId) || 0, user_id: tg.userId }), secret: f.secret }
   if (f.kind === 'signal') return { kind: 'signal', provider: 'generic', name: f.name, config: JSON.stringify({ api: f.url.trim(), number: f.user.trim() }), secret: '' }
   if (f.kind === 'nctalk') return { kind: 'nctalk', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'irc') {
@@ -284,6 +302,25 @@ function payload() {
   return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
 }
 const qr = ref('')
+// Telegram's QR sign-in, run by the server; the dialog asks how it is going every 1.5 s
+const tg = reactive({ id: '', state: '', png: '', error: '', userId: 0, name: '', password: '' })
+let tgTimer: ReturnType<typeof setTimeout> | undefined
+function tgReset() { clearTimeout(tgTimer); Object.assign(tg, { id: '', state: '', png: '', error: '', userId: 0, name: '', password: '' }) }
+async function tgPoll() {
+  if (!tg.id) return
+  try {
+    const s = await apiCall('GET', '/phe/telegram/login?id=' + encodeURIComponent(tg.id))
+    Object.assign(tg, { state: s.state, png: s.png || '', error: s.error || '', userId: s.user_id || 0, name: s.name || '' })
+  } catch (e) { tg.state = 'failed'; tg.error = (e as Error).message }
+  if (tg.state !== 'done' && tg.state !== 'failed') tgTimer = setTimeout(tgPoll, 1500)
+}
+async function tgStart() {
+  tgReset(); tg.state = 'starting'; testResult.value = null // an earlier "not signed in yet" no longer applies
+  try { tg.id = (await apiCall('POST', '/phe/telegram/login', { api_id: Number(f.apiId) || 0, api_hash: f.secret.trim() })).id; tgPoll() } catch (e) { tg.state = 'failed'; tg.error = (e as Error).message }
+}
+async function tgPassword() {
+  try { await apiCall('POST', '/phe/telegram/login/password', { id: tg.id, password: tg.password }); tg.password = ''; tg.error = '' } catch (e) { tg.error = (e as Error).message }
+}
 async function signalLink() {
   busy.value = 'link'; testResult.value = null; qr.value = ''
   try { qr.value = (await apiCall('POST', '/phe/signal/link', { api: f.url.trim() })).png } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
@@ -354,7 +391,8 @@ onMounted(async () => {
   if (route.query.oauth === 'ok') oauthMsg.value = { ok: true, text: 'Signed in. The new accounts are syncing.' }
   else if (route.query.oauth === 'error') oauthMsg.value = { ok: false, text: String(route.query.msg || 'The sign-in did not complete.') }
 })
-onBeforeUnmount(() => clearInterval(timer))
+onBeforeUnmount(() => { clearInterval(timer); tgReset() })
+watch(adding, (open) => { if (!open) tgReset() }) // a closed dialog stops asking about its sign-in
 </script>
 
 <style scoped>

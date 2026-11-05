@@ -73,7 +73,11 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	a.pairRoutes(mux)
 	(&smsAPI{a: a, st: s.Store, hub: s.Hub}).routes(mux)
 	if s.Chat != nil {
-		(&chatAPI{a: a, st: s.Store, hub: s.Chat}).routes(mux)
+		ca := &chatAPI{a: a, st: s.Store, hub: s.Chat}
+		if m != nil {
+			ca.dataDir = m.DataDir
+		}
+		ca.routes(mux)
 	}
 	if cat != nil {
 		(&catAPI{a: a, st: s.Store, m: cat}).routes(mux)
