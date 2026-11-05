@@ -25,7 +25,7 @@
           <div class="ph-grow">
             <strong>{{ a.name }}</strong>
             <span class="ph-chip hd-sqm" :class="'ph-' + a.status" data-test="account-status">{{ statusText(a) }}</span>
-            <div class="ph-muted ph-small">{{ kindText(a.kind) }} Â· {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
+            <div class="ph-muted ph-small">{{ kindText(a.kind) }} · {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
             <div v-if="a.last_error" class="ph-error ph-small" role="alert">{{ a.last_error }}</div>
           </div>
           <q-btn flat round icon="sym_o_sync" :aria-label="'Sync ' + a.name" :loading="syncing === a.id" data-test="account-sync" @click="sync(a)" />
