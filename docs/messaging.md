@@ -4,7 +4,7 @@ Cloud Companion passes messages between your devices and the services you use. I
 service is a **connection**, your **rules** say which connection an address goes to, and a **front** lets your devices take part.
 
 Connections today: **SMS through your phones** (docs/sms.md), **your SIP devices** (messages between your own logins) and **SIP
-services** (your own Asterisk or a provider, one per account), **Matrix** and **XMPP** accounts. Planned, in this order: IRC, Nextcloud
+services** (your own Asterisk or a provider, one per account), **Matrix**, **XMPP** and **IRC** accounts. Planned, in this order: Nextcloud
 Talk, Signal, Telegram; Microsoft Teams later.
 
 Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones) and the **XMPP front** for phones
@@ -89,6 +89,16 @@ stays online, so messages to your address reach it as well as your other XMPP ap
 - Messages kept by the server while Cloud Companion was offline arrive when it is back. A message the server cannot deliver (no such
   user) is logged. Group chats (MUC) are not passed through yet.
 
+## IRC
+Connections → Add an account → **IRC**: the server (`irc.libera.chat`: TLS on port 6697; or `host:port`), your nick, and your
+account's password if you have one (signed in with SASL; tick "the password is the server's" for a bouncer such as ZNC instead).
+Channels to join are comma separated. Cloud Companion stays connected with that nick and connects again after a drop.
+
+- Private messages reach your devices from the nick (`bob`); with a rule `starting with irc.` → the account, write to `irc.bob`.
+- From a channel, only the lines that name you reach your devices (as IRC apps highlight them), named "bob (#team)"; tick "pass on
+  every channel line" for all of them. Answering goes to the channel: `irc.#team` (a SIP phone may need to write `#` as `%23`).
+- Long messages are split into IRC lines; `/me` lines arrive as `* bob waves`. A message to a nick that is not there is logged.
+
 ## The SIP front
 Set `PHECLOUD_SIP_LISTEN=:5060` (UDP and TCP). In Docker Compose the port is published on 127.0.0.1 only; set
 `PHECLOUD_SIP_BIND=0.0.0.0` for phones on your network. Plain SIP is not encrypted: keep it on a network you trust or a VPN.
@@ -162,8 +172,11 @@ mautrix-go's pure-Go olm instead of cgo and libolm.
 - `go test ./internal/tlsutil`: the front's certificate takes the N9's and Symbian's TLS 1.0 handshakes; the phone port's does not.
 - `sh web/test/xmppfront.sh`: logins made through the UI, then two independent Jabber clients (slixmpp) chat through the front,
   over modern TLS and over TLS 1.0 as the N9.
+- `sh testdata/irc/test.sh`: IRC against a real server (Ergo): SASL refused and accepted, private messages both ways, only the
+  channel lines that name you, a long answer split into lines.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
 - `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
 - `sh web/test/xmpp.sh`: adding an XMPP account through the UI against Prosody, using it in a rule, removing it.
+- `sh web/test/irc.sh`: adding an IRC account through the UI against Ergo, using it in a rule, removing it.
 - `sh web/test/sipservice.sh`: adding a SIP service through the UI against the profile's Asterisk, using it in a rule, removing it.

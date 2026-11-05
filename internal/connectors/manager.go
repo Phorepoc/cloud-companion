@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/irc"
 	"github.com/phorepoc/cloud-companion/internal/matrix"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/sipsvc"
@@ -99,6 +100,12 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		return xmpp.Test(ctx, c, secret)
+	case "irc":
+		var c irc.Cfg
+		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
+			return "", err
+		}
+		return irc.Test(ctx, c, secret)
 	}
 	return "", errors.New("unknown kind " + kind)
 }
@@ -108,7 +115,7 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	if strings.TrimSpace(name) == "" {
 		return store.Account{}, errors.New("give the account a name")
 	}
-	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" && kind != "xmpp" {
+	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" && kind != "xmpp" && kind != "irc" {
 		return store.Account{}, errors.New("unknown kind " + kind)
 	}
 	if !json.Valid([]byte(cfgJSON)) {
@@ -233,7 +240,7 @@ func (m *Manager) SyncNow(ctx context.Context, id string) (string, error) {
 }
 
 func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
-	if a.Kind == "matrix" || a.Kind == "xmpp" { // nothing to copy: the connection stays signed in (packages matrix, xmpp) and reports on the account
+	if a.Kind == "matrix" || a.Kind == "xmpp" || a.Kind == "irc" { // nothing to copy: the connection stays signed in (packages matrix, xmpp, irc) and reports on the account
 		return "messages pass through", nil
 	}
 	if a.Kind == "sip" { // nothing to copy: messages pass through (package sipsvc); a sync checks the login

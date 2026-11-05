@@ -89,7 +89,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        script: [csp.sh, desktop.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh, routing.sh, sipservice.sh, matrix.sh, xmpp.sh, xmppfront.sh]
+        script: [csp.sh, desktop.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh, routing.sh, sipservice.sh, matrix.sh, xmpp.sh, xmppfront.sh, irc.sh]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: sh web/test/${{ matrix.script }}
@@ -108,6 +108,7 @@ jobs:
       - run: sh deploy/asterisk/test.sh
       - run: sh testdata/matrix/test.sh
       - run: sh testdata/xmpp/test.sh
+      - run: sh testdata/irc/test.sh
 
   databases:
     name: Go tests on PostgreSQL and MariaDB

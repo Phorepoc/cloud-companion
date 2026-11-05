@@ -10,6 +10,7 @@ require (
 	github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 	github.com/emersion/go-smtp v0.25.0
 	github.com/emiago/sipgo v1.7.2
+	github.com/ergochat/irc-go v0.7.0
 	github.com/fxamacker/cbor/v2 v2.9.6
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/go-webauthn/webauthn v0.18.2

@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: Apache-2.0
+# web/test/irc.sh: a throwaway IRC server (Ergo, MIT) next to the test Cloud Companion, no host ports
+services:
+  ergo:
+    image: ghcr.io/ergochat/ergo:v2.19.1
+    container_name: phe-ergo-ui
+    cpus: 1
+    mem_limit: 256m
