@@ -87,6 +87,12 @@
             <q-input v-model="f.folders" outlined dense label="Folders to copy" hint="Comma separated. Default: INBOX" data-test="f-folders" />
             <q-input v-model.number="f.months" outlined dense type="number" label="Months back" data-test="f-months" />
           </template>
+          <template v-else-if="f.kind === 'matrix'">
+            <q-input v-model="f.url" outlined dense label="Homeserver" hint="For example https://matrix.example.org" data-test="f-url" />
+            <q-input v-model="f.user" outlined dense label="User" hint="@you:example.org, or just your name on that homeserver" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.secret" outlined dense type="password" label="Password" autocomplete="new-password" data-test="f-secret" />
+            <p class="ph-muted ph-small">Cloud Companion signs in as a device of its own, encryption included. Your other Matrix apps may ask you to verify it.</p>
+          </template>
           <template v-else-if="f.kind === 'sip'">
             <q-input v-model="f.sipServer" outlined dense label="Server" hint="host or host:port; with the asterisk profile: asterisk" data-test="f-sip-server" />
             <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
@@ -152,7 +158,7 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this account?</h2>
-          <p v-if="askRemove && askRemove.kind === 'sip'">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
+          <p v-if="askRemove && (askRemove.kind === 'sip' || askRemove.kind === 'matrix')">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
           <p v-else>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
         </q-card-section>
         <q-card-actions align="right">
@@ -195,13 +201,13 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
 const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070' })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service' }
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix' }
 const kindText = (k: string) => KINDS[k] || k
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
@@ -228,6 +234,7 @@ function payload() {
     }
     return { kind: 'imap', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }
   }
+  if (f.kind === 'matrix') return { kind: 'matrix', provider: 'generic', name: f.name, config: JSON.stringify({ homeserver: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'sip') {
     const cfg = { server: f.sipServer.trim(), domain: f.sipDomain.trim(), user: f.user.trim(), transport: f.sipTransport, listen: f.sipListen.trim() }
     return { kind: 'sip', provider: 'generic', name: f.name, config: JSON.stringify(cfg), secret: f.secret }

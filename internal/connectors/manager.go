@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/matrix"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/sipsvc"
 	"github.com/phorepoc/cloud-companion/internal/store"
@@ -85,6 +86,12 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		return sipsvc.Test(ctx, c, secret)
+	case "matrix":
+		var c matrix.Cfg
+		if err := json.Unmarshal([]byte(cfgJSON), &c); err != nil {
+			return "", err
+		}
+		return matrix.Test(ctx, c, secret)
 	}
 	return "", errors.New("unknown kind " + kind)
 }
@@ -94,7 +101,7 @@ func (m *Manager) Add(kind, provider, name, cfgJSON, secret string) (store.Accou
 	if strings.TrimSpace(name) == "" {
 		return store.Account{}, errors.New("give the account a name")
 	}
-	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" {
+	if kind != "imap" && kind != "carddav" && kind != "caldav" && kind != "ics" && kind != "sip" && kind != "matrix" {
 		return store.Account{}, errors.New("unknown kind " + kind)
 	}
 	if !json.Valid([]byte(cfgJSON)) {
@@ -219,6 +226,9 @@ func (m *Manager) SyncNow(ctx context.Context, id string) (string, error) {
 }
 
 func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
+	if a.Kind == "matrix" { // nothing to copy: the connection keeps its own sync (package matrix) and reports on the account
+		return "messages pass through", nil
+	}
 	if a.Kind == "sip" { // nothing to copy: messages pass through (package sipsvc); a sync checks the login
 		var c sipsvc.Cfg
 		if err := json.Unmarshal([]byte(a.Config), &c); err != nil {

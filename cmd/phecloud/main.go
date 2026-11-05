@@ -33,6 +33,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/chat"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/davhub"
+	"github.com/phorepoc/cloud-companion/internal/matrix"
 	"github.com/phorepoc/cloud-companion/internal/server"
 	"github.com/phorepoc/cloud-companion/internal/sipgw"
 	"github.com/phorepoc/cloud-companion/internal/sipsvc"
@@ -159,8 +160,11 @@ func main() {
 			} else {
 				mgr = connectors.NewManager(st, srv.Hub, vault)
 				srv.Sender = mgr
-				// connected SIP services (docs/messaging.md): each account registers there and becomes a chat connection
-				go (&sipsvc.Pool{St: st, Hub: hub, Log: log, Secret: mgr.Secret}).Run(context.Background(), 10*time.Second)
+				// chat accounts (docs/messaging.md): SIP services and Matrix accounts, each a chat connection
+				go (&chat.Accounts{St: st, Hub: hub, Log: log, Secret: mgr.Secret, Kinds: map[string]chat.Starter{
+					"sip":    sipsvc.Start(log),
+					"matrix": matrix.Start(env("PHECLOUD_TLSDIR", "/data"), log), // its encryption keys next to the other data
+				}}).Run(context.Background(), 10*time.Second)
 				if srv.Hub != nil {
 					go mgr.Loop(context.Background(), 15*time.Minute)
 				}

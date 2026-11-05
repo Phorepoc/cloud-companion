@@ -127,7 +127,7 @@ or an optional TLS 1.0 listener (`--profile hub-legacy`). [docs/hub.md](docs/hub
 ## Messaging
 
 Cloud Companion passes messages between your devices and your services: SMS through your phones and SIP services (your own Asterisk:
-`docker compose --profile asterisk`, or a provider) today, with Matrix, XMPP, IRC, Nextcloud Talk, Signal and Telegram planned. You decide in Connections → Messaging which address goes where. Phones with a
+`docker compose --profile asterisk`, or a provider) and Matrix (encrypted) today, with XMPP, IRC, Nextcloud Talk, Signal and Telegram planned. You decide in Connections → Messaging which address goes where. Phones with a
 SIP client (the Nokia N9, Symbian, softphones) can sign in and chat through it: set `PHECLOUD_SIP_LISTEN=:5060` and make a login per
 phone. [docs/messaging.md](docs/messaging.md) explains the rules and has the phone settings.
 
@@ -156,7 +156,8 @@ Please report vulnerabilities privately, as described in `SECURITY.md`.
 
 ## Working on it
 
-`go test ./...` runs the server tests. `sh web/test/db_test.sh` repeats them against PostgreSQL and MariaDB, the
+`go test -tags goolm ./...` runs the server tests (the tag, or `GOFLAGS=-tags=goolm`, is needed for every build: Matrix
+encryption uses mautrix-go's pure-Go olm instead of cgo and libolm). `sh web/test/db_test.sh` repeats them against PostgreSQL and MariaDB, the
 browser tests are in `web/test/` (TypeScript, run by Node directly with `--experimental-strip-types`; `npm run check` in that
 directory type-checks them), and `make -C client check` tests the phone-side code. GitHub Actions runs all of
 them except the Android tests, which need a Docker host with the `binder_linux` kernel module.

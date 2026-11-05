@@ -4,8 +4,8 @@ Cloud Companion passes messages between your devices and the services you use. I
 service is a **connection**, your **rules** say which connection an address goes to, and a **front** lets your devices take part.
 
 Connections today: **SMS through your phones** (docs/sms.md), **your SIP devices** (messages between your own logins) and **SIP
-services** (your own Asterisk or a provider, one per account). Planned, in this order: Matrix, XMPP, IRC, Nextcloud Talk, Signal,
-Telegram; Microsoft Teams later.
+services** (your own Asterisk or a provider, one per account) and **Matrix** accounts. Planned, in this order: XMPP, IRC, Nextcloud
+Talk, Signal, Telegram; Microsoft Teams later.
 
 Fronts today: the **SIP front** for phones with a SIP client (the Nokia N9, Symbian, softphones). Planned: XMPP, which the N9 and
 Symbian also speak.
@@ -65,6 +65,19 @@ calls ring the extension (media on UDP 10000-10099). Asterisk is GPL-2.0 and run
 (deploy/asterisk); add extensions by copying a 201 block in `pjsip.conf`, then
 `docker compose exec asterisk asterisk -rx "module reload res_pjsip.so"`.
 
+## Matrix
+Connections → Add an account → **Matrix**: the homeserver (`https://matrix.example.org`), your user (`@you:example.org`, or the name
+alone on that homeserver) and password. Test signs a check device in and out again. Once added, Cloud Companion signs in as a device
+of its own, **end-to-end encryption included**, and keeps it (and its keys, in `matrix-<account>.db` next to the other data) from then
+on; your other Matrix apps may show it as a new device to verify. It joins the chats you are invited to and becomes a connection your
+rules can send to.
+
+- **Direct chats** reach your devices from the person: `bob` for someone on your own homeserver, `bob=other.org` for anyone else
+  (a SIP phone cannot type `:`). With a rule `starting with mx.` → the account, write to `mx.bob`; a new direct chat is created
+  (encrypted) when you have none with them yet, and a name nobody has is refused.
+- **Rooms** reach your devices as `!roomid=example.org`, named "sender (room name)"; answering goes to the room.
+- Messages from before the account was connected are not replayed. Pictures and files arrive as a line naming them.
+
 ## The SIP front
 Set `PHECLOUD_SIP_LISTEN=:5060` (UDP and TCP). In Docker Compose the port is published on 127.0.0.1 only; set
 `PHECLOUD_SIP_BIND=0.0.0.0` for phones on your network. Plain SIP is not encrypted: keep it on a network you trust or a VPN.
@@ -93,11 +106,16 @@ send now, such as SMS with no phone syncing, gets 480. Messages wait for a devic
 them. Calls are not handled yet.
 
 ## Tests
+Every build and test needs the tag `goolm` (`go test -tags goolm ./...`, or `GOFLAGS=-tags=goolm`): Matrix encryption uses
+mautrix-go's pure-Go olm instead of cgo and libolm.
+
 - `go test ./internal/chat`: rules, defaults, reply addresses, who gets which connection, SMS taken into the inbox once.
 - `go test ./internal/sipgw`: the front on localhost against a SIP client playing the phone (registering, wrong passwords, a number
   queued on the right phone, incoming SMS delivered and answered, device to device with a device that refuses at first).
 - `go test ./internal/sipsvc`: a SIP service against a stand-in (digest logins, registering, both directions, the account following).
 - `sh deploy/asterisk/test.sh`: the same against the real Asterisk of the profile, extension 201 playing a phone.
+- `sh testdata/matrix/test.sh`: Matrix against a real homeserver (Conduit): encrypted direct chats both ways, a group, unknown users.
 - `go test ./internal/webui -run Routing`: the API, owner only.
 - `sh web/test/routing.sh`: the Messaging section through the real UI (logins, rules, order, delivery, after a reload).
+- `sh web/test/matrix.sh`: adding a Matrix account through the UI, using it in a rule, removing it.
 - `sh web/test/sipservice.sh`: adding a SIP service through the UI against the profile's Asterisk, using it in a rule, removing it.

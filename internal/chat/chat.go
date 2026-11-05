@@ -67,8 +67,14 @@ func NewHub(st *store.Store) *Hub {
 	return h
 }
 
+// hubbed is a connection that needs the hub for what arrives on it.
+type hubbed interface{ SetHub(*Hub) }
+
 // Add registers a connection (replacing one with the same id).
 func (h *Hub) Add(c Conn) {
+	if hc, ok := c.(hubbed); ok {
+		hc.SetHub(h)
+	}
 	h.mu.Lock()
 	h.conns[c.ID()] = c
 	h.mu.Unlock()

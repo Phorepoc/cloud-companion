@@ -6,13 +6,13 @@ are part of the project and under the same licence.
 
 Third-party software built into the phecloud binary (Go modules, as reported by google/go-licenses for ./cmd/...; re-run in CI, see .github/workflows/ci.yml; test-only modules such as go-smtp are not shipped):
   MIT:           chromedp, cdproto, sysutil; emersion go-imap, go-message, go-sasl; fxamacker/cbor; jackc pgx, pgpassfile, pgservicefile, puddle; golang-jwt/jwt; gobwas httphead, pool, ws;
-                 aymerick/douceur; dustin/go-humanize; icholy/digest; go-viper/mapstructure; josharian/intern; mailru/easyjson; philhofer/fwd; tinylib/msgp; x448/float16; modernc.org/libc
+                 aymerick/douceur; dustin/go-humanize; icholy/digest; rs/zerolog; mattn/go-colorable, go-isatty; tidwall/gjson, sjson, match, pretty; go-viper/mapstructure; josharian/intern; mailru/easyjson; philhofer/fwd; tinylib/msgp; x448/float16; modernc.org/libc
   BSD-3-Clause:  go-webauthn/webauthn and x/encoding/asn1; microcosm-cc/bluemonday; google/uuid; gorilla/css; filippo.io/edwards25519; golang.org/x/{crypto,net,sync,sys,text};
                  modernc.org/sqlite, memory, mathutil; remyoudompheng/bigfft
   BSD-2-Clause:  go-webauthn/x/revoke; emiago/sipgo
   ISC:           coder/websocket; go-webauthn/x/crypto/secp256k1
-  Apache-2.0:    google/go-tpm
-  MPL-2.0:       go-sql-driver/mysql (file-level copyleft; used unmodified as a library)
+  Apache-2.0:    google/go-tpm; petermattis/goid
+  MPL-2.0:       go-sql-driver/mysql; maunium.net/go/mautrix, go.mau.fi/util (Matrix) (file-level copyleft; used unmodified as libraries)
 
 Third-party software built into the web app (web/, bundled by Vite): Vue, Vue Router, Quasar and @quasar/extras (MIT); cbor-x (MIT); @noble/hashes (MIT);
 Material Symbols icon font, subset to the icons the app uses (Apache-2.0); the Etesian Design Language tokens, base styles and Quasar theme (MIT, vendored in
@@ -23,7 +23,7 @@ Symbian web-engine plug-in builds. The C client core (client/phc*.c) is ours.
 
 Container images. The phecloud image contains Chromium headless-shell (chromedp/headless-shell, BSD-3-Clause and the Chromium third-party licences) and the fonts Liberation, DejaVu and Noto
 (SIL OFL / free licences). Separate containers that the compose files can start, each under its own licence and not part of this project: Stalwart Mail Server (AGPL-3.0), Z-Push (AGPL-3.0),
-Radicale (GPL-3.0), Caddy (Apache-2.0), PostgreSQL (PostgreSQL licence), MariaDB (GPL-2.0), tecnativa/docker-socket-proxy, Redroid and the Android it runs (Apache-2.0 and Android's component licences), Asterisk from Alpine's package (GPL-2.0).
+Radicale (GPL-3.0), Conduit (Apache-2.0, Matrix tests only), Caddy (Apache-2.0), PostgreSQL (PostgreSQL licence), MariaDB (GPL-2.0), tecnativa/docker-socket-proxy, Redroid and the Android it runs (Apache-2.0 and Android's component licences), Asterisk from Alpine's package (GPL-2.0).
 Optional runtime downloads, never shipped by us: the scrcpy server jar (Apache-2.0), adb from Debian (Apache-2.0), Taskbar from F-Droid (Apache-2.0), and the apps a user installs.
 
 The services in the Docker images are separate programs that talk to phecloud over network protocols; nothing AGPL or GPL is linked into the phecloud binary.

@@ -8,7 +8,7 @@ cleanup() { docker rm -f phe-pg-t phe-maria-t >/dev/null 2>&1 || true; docker ne
 trap cleanup EXIT
 cleanup
 docker network create $NET >/dev/null
-go_test() { docker run --rm --cpus 2 --memory 2g --network $NET -e GOFLAGS=-buildvcs=false "$@" -v "$ROOT":/src -w /src golang:1.26-bookworm go test -count=1 ./internal/... 2>&1 | grep -E "^(ok|FAIL|---|panic)|Error" | head -30; }
+go_test() { docker run --rm --cpus 2 --memory 2g --network $NET -e GOFLAGS="-buildvcs=false -tags=goolm" -e CGO_ENABLED=0 "$@" -v "$ROOT":/src -w /src golang:1.26-bookworm go test -count=1 ./internal/... 2>&1 | grep -E "^(ok|FAIL|---|panic)|Error" | head -30; }
 case "${1:-all}" in all|sqlite) echo "== SQLite"; go_test ;; esac
 case "${1:-all}" in all|postgres)
   docker run -d --name phe-pg-t --network $NET --cpus 1 --memory 512m -e POSTGRES_PASSWORD=pw postgres:16-alpine >/dev/null

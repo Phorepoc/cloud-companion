@@ -8,6 +8,7 @@ package sipsvc
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -123,7 +124,7 @@ type Service struct {
 	Name string
 	Cfg  Cfg
 	Pass string
-	Hub  *chat.Hub
+	Hub  *chat.Hub // where its messages go; the hub that adds it sets this (chat.Hub.Add)
 	Log  *slog.Logger
 	// Status reports the registration (ok, or what went wrong) for the account's row.
 	Status func(err error)
@@ -138,10 +139,24 @@ type Service struct {
 
 func ConnID(acc string) string { return "sipsvc:" + acc }
 
+// Start is the chat.Starter for "sip" accounts.
+func Start(log *slog.Logger) chat.Starter {
+	return func(a store.Account, pass string, status func(error)) (chat.Running, error) {
+		var c Cfg
+		if err := json.Unmarshal([]byte(a.Config), &c); err != nil {
+			return nil, errors.New("bad configuration")
+		}
+		s := &Service{Acc: a.ID, Name: a.Name, Cfg: c, Pass: pass, Log: log, Status: status}
+		return s, s.Start()
+	}
+}
+
 func (s *Service) ID() string    { return ConnID(s.Acc) }
 func (s *Service) Label() string { return s.Name + " (SIP)" }
 
 // Start listens for the service's messages and keeps the registration until Stop.
+func (s *Service) SetHub(h *chat.Hub) { s.Hub = h }
+
 func (s *Service) Start() error {
 	if err := s.Cfg.norm(); err != nil {
 		return err

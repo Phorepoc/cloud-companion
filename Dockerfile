@@ -11,12 +11,14 @@ RUN npm run build
 
 FROM golang:1.26-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb AS build
 WORKDIR /src
+# goolm: Matrix encryption in pure Go (mautrix-go), so the binary needs no cgo or libolm
+ENV GOFLAGS=-tags=goolm CGO_ENABLED=0
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /web/dist internal/webui/dist
-RUN CGO_ENABLED=0 go build -trimpath -o /out/phecloud ./cmd/phecloud \
- && CGO_ENABLED=0 go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
+RUN go build -trimpath -o /out/phecloud ./cmd/phecloud \
+ && go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
 
 # Chromium is an external runtime dependency (not vendored), pinned to one version.
 FROM chromedp/headless-shell:156.0.8078.48@sha256:3da74b0945e4f80f00f0310bcda9f76cee283539ebd200a053a7bebf3de89423

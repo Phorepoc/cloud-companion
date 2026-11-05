@@ -152,6 +152,8 @@ func waitFor(t *testing.T, what string, ok func() bool) {
 
 var quiet = slog.New(slog.NewTextHandler(io.Discard, nil))
 
+func plain(a store.Account) (string, error) { return string(a.Secret), nil }
+
 func TestLoginCheck(t *testing.T) {
 	f := startFake(t)
 	if _, err := Test(context.Background(), Cfg{Server: f.addr, Domain: "test.local", User: "cc"}, "wrong"); err == nil || !strings.Contains(err.Error(), "login refused") {
@@ -228,20 +230,21 @@ func TestWrongPasswordShowsOnTheAccount(t *testing.T) {
 	f := startFake(t)
 	st := store.OpenTest(t)
 	a, _ := st.AddAccount(store.Account{Kind: "sip", Name: "PBX", Config: `{"server":"` + f.addr + `","domain":"test.local","user":"cc","listen":"` + freeAddr(t) + `"}`, Secret: []byte("wrong")})
-	p := &Pool{St: st, Hub: chat.NewHub(st), Log: quiet, Secret: func(a store.Account) (string, error) { return string(a.Secret), nil }}
-	p.Sync()
-	defer p.stop(a.ID)
+	p := &chat.Accounts{St: st, Hub: chat.NewHub(st), Log: quiet, Secret: plain, Kinds: map[string]chat.Starter{"sip": Start(quiet)}}
+	ctx, cancel := context.WithCancel(context.Background())
+	go p.Run(ctx, time.Hour)
+	defer cancel()
 	waitFor(t, "error status", func() bool {
 		x, _ := st.Account(a.ID)
 		return x.Status == "error" && strings.Contains(x.LastError, "login refused")
 	})
 }
 
-func TestPoolFollowsTheAccounts(t *testing.T) {
+func TestConnectionFollowsTheAccount(t *testing.T) {
 	f := startFake(t)
 	st := store.OpenTest(t)
 	hub := chat.NewHub(st)
-	p := &Pool{St: st, Hub: hub, Log: quiet, Secret: func(a store.Account) (string, error) { return string(a.Secret), nil }}
+	p := &chat.Accounts{St: st, Hub: hub, Log: quiet, Secret: plain, Kinds: map[string]chat.Starter{"sip": Start(quiet)}}
 	a, err := st.AddAccount(store.Account{Kind: "sip", Name: "PBX", Config: `{"server":"` + f.addr + `","domain":"test.local","user":"cc","listen":"` + freeAddr(t) + `"}`, Secret: []byte("secret")})
 	if err != nil {
 		t.Fatal(err)
