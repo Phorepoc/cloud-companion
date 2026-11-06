@@ -9,6 +9,8 @@ import { mkdirSync } from 'node:fs'
 import assert from 'node:assert/strict'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
+// the browser frame's address field (Etesian XBrowserFrame)
+const ADDR = '.x-bf__addr input'
 const OUT = process.env.OUT || './shots'
 const ROUTES = (process.env.ROUTES || 'pair,browse,devices,settings,desktop').split(',')
 mkdirSync(OUT, { recursive: true })
@@ -32,8 +34,8 @@ for (const [vpName, viewport] of Object.entries(viewports)) {
     await page.click('[data-test=pair]')
     await page.waitForFunction(() => window.__phe && window.__phe.state.status === 'online', null, { timeout: 20000 })
     await page.waitForSelector('[data-test=canvas]')
-    await page.fill('[data-test=url]', 'https://example.com')
-    await page.press('[data-test=url]', 'Enter')
+    await page.fill(ADDR, 'https://example.com')
+    await page.press(ADDR, 'Enter')
     await page.waitForFunction(() => window.__phe.state.page.title === 'Example Domain', null, { timeout: 30000 })
     await page.waitForFunction(() => !window.__phe.state.loading)
     await page.waitForTimeout(500)

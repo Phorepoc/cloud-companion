@@ -11,6 +11,7 @@
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { openApp } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const CODE = process.env.CODE
@@ -21,6 +22,16 @@ assert(CODE, 'CODE (a pairing code, preferably from `phecloud paircode --admin`)
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 900 }, ignoreHTTPSErrors: process.env.IGNORE_TLS === '1' })
 const page = await ctx.newPage()
+
+// the browser frame (Etesian XBrowserFrame): the address field, Back, the ⋮ menu (new tab, other devices, zoom, phone size) and the tab
+// picker (the tab count opens the pages as cards)
+const ADDR = '.x-bf__addr input'
+const BACK = '.x-bf__row [aria-label=Back]'
+async function more(p = page) { if (!(await p.locator('[data-test=browser-more]').isVisible())) { await p.click(".x-bf__row [aria-label^='More']"); await p.waitForSelector('[data-test=browser-more]') } }
+async function menuItem(id: string, p = page) { await more(p); await p.click(`[data-test=${id}]`) }
+async function picker(p = page) { if (!(await p.locator('.x-bf__picker').isVisible())) await p.click('.x-bf__count') }
+async function tabGo(n: number, p = page) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bf__shot`) }
+async function tabClose(n: number, p = page) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bt__x`); if (await p.locator('.x-bf__picker').isVisible()) await p.click('.x-bf__count') }
 // this test measures the phone layout (360 px wide pages: page heights, the 150% render); the browser's default is the whole window (test/desktop.ts covers that)
 await page.addInitScript(() => localStorage.setItem('phecloud-browser-phone', '1'))
 const log: string[] = []
@@ -34,8 +45,10 @@ const title = async () => (await text('[data-test=title]')).trim()
 const waitTitle = (t: string, ms = 30000) => page.waitForFunction((x) => window.__phe.state.page.title === x, t, { timeout: ms })
 const idle = () => page.waitForFunction(() => !window.__phe.state.loading && window.__phe.state.dialogs.length === 0)
 const openUrl = async (u: string) => {
-  await page.fill('[data-test=url]', u)
-  await page.press('[data-test=url]', 'Enter')
+  // the ⋮ menu stays open over zoom steps; close it first, as a person would
+  if (await page.locator('[data-test=browser-more]').isVisible()) { await page.keyboard.press('Escape'); await page.locator('[data-test=browser-more]').waitFor({ state: 'hidden' }) }
+  await page.fill(ADDR, u)
+  await page.press(ADDR, 'Enter')
 }
 
 // move the canvas so the region is inside it (scroll with the wheel), then return its client position
@@ -91,7 +104,7 @@ try {
   await page.screenshot({ path: OUT + '/web-after-tap.png' })
 
   // 4. back button
-  await page.click('[data-test=back]')
+  await page.click(BACK)
   await waitTitle('Example Domain')
   await idle()
   step('back button works')
@@ -100,8 +113,8 @@ try {
 
   // 5. zoom: the cloud re-renders at the nearest scale (sharp text); the tap still lands on the right region
   assert((await S(() => window.__phe.state.features)).includes('zoom'), 'the server must advertise the zoom feature')
-  await page.click('[data-test=zoom-in]')
-  await page.click('[data-test=zoom-in]') // 1.25^2 = 1.56 -> the 150% render
+  await menuItem('zoom-in')
+  await menuItem('zoom-in') // 1.25^2 = 1.56 -> the 150% render
   await page.waitForFunction(() => window.__phe.state.page.zoom === 150, null, { timeout: 20000 })
   await page.waitForFunction(() => !window.__phe.state.loading)
   const ph = await S(() => window.__phe.state.page.h)
@@ -114,7 +127,7 @@ try {
   await waitTitle('Example Domains')
   await idle()
   step('zoom: server render at 150%, page height ' + ph + ', tap correct')
-  await page.click('[data-test=back]')
+  await page.click(BACK)
   await waitTitle('Example Domain')
   await idle()
   // ctrl + wheel zoom to the top of the ladder, then back out to 100%
@@ -125,7 +138,7 @@ try {
   await page.mouse.wheel(0, -100)
   await page.keyboard.up('Control')
   await page.waitForFunction(() => window.__phe.state.page.zoom === 300, null, { timeout: 20000 })
-  for (let i = 0; i < 9; i++) await page.click('[data-test=zoom-out]')
+  for (let i = 0; i < 9; i++) await menuItem('zoom-out')
   await page.waitForFunction(() => window.__phe.state.page.zoom === 100, null, { timeout: 20000 })
   await page.waitForFunction(() => !window.__phe.state.loading)
   assert.equal(await S(() => window.__phe.renderer.view.zoom), 1)
@@ -213,29 +226,31 @@ try {
 
   // 7b. several tabs over one connection: three at most
   assert((await S(() => window.__phe.state.features)).includes('tabs'))
-  await page.click('[data-test=tab-new]')
+  await menuItem('tab-new')
   await page.waitForFunction(() => window.__phe.state.tabs.length === 2 && window.__phe.state.activeView === 2)
   await openUrl('https://example.com')
   await waitTitle('Example Domain')
   await idle()
-  await page.click('[data-test=tab-new]')
+  await menuItem('tab-new')
   await page.waitForFunction(() => window.__phe.state.tabs.length === 3 && window.__phe.state.activeView === 3)
   const gaps = readFileSync(new URL('./webgaps.html', import.meta.url), 'utf8')
   await openUrl('data:text/html,' + encodeURIComponent(gaps))
   await waitTitle('WebGaps')
   await idle()
-  assert(await page.locator('[data-test=tab-new]').isDisabled(), 'the fourth tab must be refused (cap of 3)')
+  await more()
+  assert.equal(await page.locator('[data-test=tab-new]').getAttribute('aria-disabled'), 'true', 'the fourth tab must be refused (cap of 3)')
+  await page.keyboard.press('Escape')
   await page.screenshot({ path: OUT + '/web-tabs.png' })
-  await page.click('[data-test=tab-2]')
+  await tabGo(2)
   await waitTitle('Example Domain')
   await idle()
-  await page.click('[data-test=tab-1]')
+  await tabGo(1)
   await page.waitForFunction(() => window.__phe.state.activeView === 1 && window.__phe.state.page.url.includes('httpbin.org'), null, { timeout: 20000 })
-  await page.click('[data-test=tab-3]')
+  await tabGo(3)
   await waitTitle('WebGaps')
-  await page.click('[data-test=tab-close-2]')
+  await tabClose(2)
   await page.waitForFunction(() => window.__phe.state.tabs.length === 2)
-  await page.click('[data-test=tab-new]')
+  await menuItem('tab-new')
   await page.waitForFunction(() => window.__phe.state.tabs.length === 3)
   step('tabs: three tabs, fourth refused, switching re-shows each page, close and new work')
 
@@ -253,7 +268,7 @@ try {
   assert((await ink()) > 1000, 'the page is drawn')
 
   // 8. devices page (the first/--admin device)
-  await page.click('[data-test=nav-devices]')
+  await openApp(page, 'Settings'); await page.click('[data-test=settings-devices]')
   await page.waitForSelector('[data-test=device-list] .q-item')
   const n = await page.locator('[data-test=device-list] .q-item').count()
   assert(n >= 1, 'the device list must show this browser')
@@ -261,18 +276,19 @@ try {
   await page.screenshot({ path: OUT + '/web-devices.png' })
 
   // 9. settings: set a byte budget
-  await page.click('[data-test=nav-settings]')
+  await openApp(page, 'Settings'); await page.click('[data-test=settings-data]')
   await page.click('[data-test=gray]')
   await page.click('[data-test=apply]')
   await page.waitForSelector('[data-test=saved]')
   step('settings applied')
   // dark mode: the toggle in settings, and the choice sticks
+  await page.click('[data-test=settings-appearance]')
   await page.locator('[data-test=theme]').getByRole('button', { name: 'Dark', exact: true }).click()
   await page.waitForFunction(() => document.body.classList.contains('body--dark'))
   await page.locator('[data-test=theme]').getByRole('button', { name: 'Match system', exact: true }).click()
   step('theme toggle: dark mode applies and system mode restores')
   // back to Browser: the page is drawn again from the tiles already received (the server does not send them twice)
-  await page.click('[data-test=nav-browse]')
+  await openApp(page, 'Browser')
   await page.waitForSelector('[data-test=canvas]')
   await page.waitForTimeout(400)
   assert((await ink()) > 1000, 'Browser shows the page again after visiting other sections')

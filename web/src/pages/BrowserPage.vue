@@ -2,41 +2,31 @@
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
   <q-page class="ph-browse" :class="{ 'is-phone': phoneSize }">
-    <!-- the buttons live in the title bar (the window's, or the app's top bar): the page keeps its room for the page -->
-    <Teleport v-if="titleActions" :to="titleActions">
-      <div class="ph-tb" role="toolbar" aria-label="Browser controls">
-        <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back" :disable="!state.page.back" data-test="back" @click="api.action('back')"><q-tooltip>Back</q-tooltip></q-btn>
-        <q-btn flat round dense icon="sym_o_arrow_forward" aria-label="Forward" :disable="!state.page.fwd" data-test="forward" @click="api.action('forward')"><q-tooltip>Forward</q-tooltip></q-btn>
-        <q-btn flat round dense icon="sym_o_refresh" aria-label="Reload" data-test="reload" @click="api.action('reload')"><q-tooltip>Reload</q-tooltip></q-btn>
-        <q-btn flat round dense icon="sym_o_add" aria-label="New tab" :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="api.tab('new')"><q-tooltip>New tab (up to 3)</q-tooltip></q-btn>
-        <q-btn flat round dense icon="sym_o_devices" aria-label="Tabs on your other devices" data-test="other-devices" @click="openOthers"><q-tooltip>Tabs on your other devices</q-tooltip></q-btn>
-        <q-btn v-if="!narrow" flat round dense icon="sym_o_zoom_out" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
-        <span v-if="!narrow" class="ph-tb-zoom ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
-        <q-btn v-if="!narrow" flat round dense icon="sym_o_zoom_in" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
-        <q-btn v-if="canFull && !narrow" flat round dense :icon="phoneSize ? 'sym_o_open_in_full' : 'sym_o_smartphone'" :aria-pressed="String(phoneSize)"
-               :aria-label="phoneSize ? 'Use the whole window' : 'Phone size'" data-test="phone-size" @click="togglePhone">
-          <q-tooltip>{{ phoneSize ? 'Use the whole window' : 'Phone size (360 x 640)' }}</q-tooltip>
-        </q-btn>
-      </div>
-    </Teleport>
-
-    <div class="ph-address" role="search">
-      <q-input v-model="urlInput" outlined dense square class="col ph-url" placeholder="Search or enter a web address" aria-label="Address" inputmode="url"
-               autocomplete="off" data-test="url" @keyup.enter="go" @focus="editing = true" @blur="editing = false">
-        <template #append><q-spinner v-if="state.loading" size="20px" color="primary" aria-label="Loading" data-test="spinner" /></template>
-      </q-input>
-    </div>
-    <!-- the tabs: only when there is more than one (the new-tab button is in the title bar) -->
-    <div v-if="state.tabs.length > 1" class="ph-tabs" data-test="tab-strip" role="tablist" aria-label="Open tabs">
-      <div v-for="t in state.tabs" :key="t.v" class="ph-tab" :class="{ 'is-active': t.v === state.activeView }" role="presentation">
-        <button type="button" class="ph-tab-main" role="tab" :aria-selected="t.v === state.activeView" :data-test="'tab-' + t.v" @click="api.tab('switch', t.v)">
-          {{ t.title || t.url || 'New tab' }}
-        </button>
-        <button type="button" class="ph-tab-close" :data-test="'tab-close-' + t.v" :aria-label="'Close ' + (t.title || 'tab')" @click="api.tab('close', t.v)">
-          <q-icon name="sym_o_close" size="20px" aria-hidden="true" />
-        </button>
-      </div>
-    </div>
+    <!-- the Etesian browser frame: Back, Forward, Reload, the address, the tab count (a picker of the pages) and More; on a wide window
+         the tabs are a list on the left. Below 560 px the row moves to the bottom, within the thumb's reach. -->
+    <XBrowserFrame class="ph-bf" :address="editing ? urlInput : state.page.url || urlInput" :secure="secure" :back="!!state.page.back" :forward="!!state.page.fwd"
+                   :loading="state.loading ? 60 : undefined" :tabs="tabs" :current="String(state.activeView)" :tabs-at="sideTabs ? 'side' : 'top'" :max="3"
+                   data-test="browser-frame"
+                   @go="(a: string) => { urlInput = a; go() }" @back="api.action('back')" @forward="api.action('forward')" @reload="api.action('reload')"
+                   @pick="(v: string) => api.tab('switch', Number(v))" @close="(v: string) => api.tab('close', Number(v))" @add="newTab" @more="moreOpen = true">
+      <q-menu v-model="moreOpen" target=".ph-bf .x-bf__row [aria-label^='More']" no-parent-event anchor="bottom right" self="top right" class="ph-bf-more" data-test="browser-more">
+        <q-list dense style="min-width: 220px">
+          <q-item clickable v-close-popup :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
+          <q-item clickable v-close-popup data-test="other-devices" @click="openOthers"><q-item-section>Tabs on your other devices</q-item-section></q-item>
+          <q-item>
+            <q-item-section>Zoom</q-item-section>
+            <q-item-section side class="row no-wrap items-center">
+              <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
+              <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
+              <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+            </q-item-section>
+          </q-item>
+          <q-item v-if="canFull" clickable v-close-popup :aria-pressed="String(phoneSize)" data-test="phone-size" @click="togglePhone">
+            <q-item-section>{{ phoneSize ? 'Use the whole window' : 'Phone size (360 x 640)' }}</q-item-section>
+          </q-item>
+        </q-list>
+      </q-menu>
+      <div class="ph-bf__page">
     <span class="ph-sr" data-test="title">{{ state.page.title }}</span>
 
     <q-banner v-if="state.error" class="ph-note is-error" rounded role="alert">
@@ -60,6 +50,8 @@
       </div>
     </div>
     <div v-if="state.page.trunc" class="ph-small ph-muted">The rest of this page is not shown. Open it on a larger screen to read on.</div>
+      </div>
+    </XBrowserFrame>
 
     <q-dialog :model-value="!!dlg" persistent>
       <q-card v-if="dlg" class="ph-dialog" data-test="dialog" role="alertdialog" :aria-label="dlgTitle">
@@ -127,14 +119,14 @@ import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, t
 import { state, api, connect, creds, openInNewTab } from '../cloud'
 import type { Region, SessionInfo, TabInfo } from '../proto'
 import EmptyState from '../components/EmptyState.vue'
+import { XBrowserFrame } from '@etesian-design/shell'
+/** a tab as the frame shows it (the BrowserTab of XBrowserTabs, not exported by name) */
+interface BrowserTab { id: string; title: string; icon?: string; address?: string; thumb?: string }
 import { Renderer } from '../renderer'
-import { useTitleActions } from '../components/titlebar'
 import { useQuasar } from 'quasar'
 
-const titleActions = useTitleActions()
 // on a phone-width screen the bar has room for the essentials only (pinch zooms, and the page already is phone sized)
 const $q = useQuasar()
-const narrow = computed(() => $q.screen.lt.sm)
 const stage = ref<HTMLElement | null>(null)
 const cv = ref<HTMLCanvasElement | null>(null)
 const ov = ref<HTMLInputElement | null>(null)
@@ -194,6 +186,13 @@ function reply(ok: boolean) {
 }
 
 watch(() => state.page.url, (u) => { if (!editing.value) urlInput.value = u })
+
+// the frame's tabs, the lock (https), a list on the left when the window is wide, and the ⋮ menu
+const tabs = computed<BrowserTab[]>(() => (state.tabs.length > 1 ? state.tabs : []).map((t) => ({ id: String(t.v), title: t.title || t.url || 'New tab', address: t.url })))
+const secure = computed(() => !state.page.url || state.page.url.startsWith('https:'))
+const sideTabs = computed(() => $q.screen.width >= 1100 && state.tabs.length > 1)
+const moreOpen = ref(false)
+function newTab() { if (state.tabs.length < 3 && state.features.includes('tabs')) api.tab('new') }
 
 function go() {
   let u = urlInput.value.trim()
@@ -300,15 +299,14 @@ onBeforeUnmount(() => clearInterval(poll))
 <style scoped>
 /* the page fills the whole content area: the buttons are in the title bar, the address bar is the first row, the web page gets everything else */
 .ph-browse { display: flex; flex-direction: column; padding: 0; gap: 0; }
-.ph-address { display: flex; align-items: center; flex: none; padding: 0; }
+/* the frame fills the page; the page area (banners, the rendered page) is a column inside it */
+.ph-bf { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.ph-bf :deep(.x-bf__addr) { /* a text field: squircle-half ends (the N9 rule), not the frame's pill */
+  border-radius: 0; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in;
+  mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
+.ph-bf__page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; height: 100%; }
 .ph-url { flex: 1 1 0; min-width: 0; }
 .ph-url :deep(.q-field__control) { border-radius: 0; }
-.ph-tabs { flex: none; display: flex; align-items: center; gap: 0; overflow-x: auto; }
-.ph-tab { flex: 1 1 0; min-width: 0; display: flex; align-items: center; height: 36px; border: 0; border-bottom: 2px solid transparent; background: var(--ph-surface); }
-.ph-tab.is-active { border-bottom-color: var(--ph-accent); background: var(--ph-accent-soft); }
-.ph-tab-main { flex: 1; min-width: 0; height: 100%; padding: 0 var(--ph-s2) 0 var(--ph-s3); background: none; border: 0; text-align: left; color: var(--ph-text); font: inherit; font-size: var(--ph-text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.ph-tab.is-active .ph-tab-main { font-weight: 600; }
-.ph-tab-close { flex: none; width: 36px; height: 36px; display: grid; place-items: center; background: none; border: 0; color: var(--ph-text-muted); cursor: pointer; }
 .ph-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .ph-note { flex: none; border-radius: 0; background: var(--ph-surface-2); color: var(--ph-text); border-bottom: 1px solid var(--ph-divider); }
 .ph-note.is-error { border-color: var(--ph-negative); }
@@ -316,8 +314,6 @@ onBeforeUnmount(() => clearInterval(poll))
 .ph-stage { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--ph-bg); }
 .ph-canvas { width: 100%; height: 100%; display: block; touch-action: none; background: #fff; }
 .is-phone .ph-canvas { border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); box-shadow: var(--ph-elev-1); }
-.ph-tb { display: flex; align-items: center; gap: 0; }
-.ph-tb-zoom { min-width: 3.2em; text-align: center; }
 .overlay { position: absolute; box-sizing: border-box; font: inherit; font-size: var(--ph-text-body); color: #1a1d21; border: 2px solid var(--ph-focus); border-radius: var(--ph-r-control); padding: 2px 8px; background: #fff; }
 .ph-dialog { width: min(92vw, 420px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); }

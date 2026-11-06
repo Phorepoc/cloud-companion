@@ -15,6 +15,16 @@ const browser = await chromium.launch()
 const t0 = Date.now()
 const step = (s: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${s}`)
 
+// the browser frame (Etesian XBrowserFrame): the address field, Back, the ⋮ menu (new tab, other devices, zoom, phone size) and the tab
+// picker (the tab count opens the pages as cards)
+const ADDR = '.x-bf__addr input'
+const BACK = '.x-bf__row [aria-label=Back]'
+async function more(p: any) { if (!(await p.locator('[data-test=browser-more]').isVisible())) { await p.click(".x-bf__row [aria-label^='More']"); await p.waitForSelector('[data-test=browser-more]') } }
+async function menuItem(id: string, p: any) { await more(p); await p.click(`[data-test=${id}]`) }
+async function picker(p: any) { if (!(await p.locator('.x-bf__picker').isVisible())) await p.click('.x-bf__count') }
+async function tabGo(n: number, p: any) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bf__shot`) }
+async function tabClose(n: number, p: any) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bt__x`); if (await p.locator('.x-bf__picker').isVisible()) await p.click('.x-bf__count') }
+
 async function device(code: string, name: string, viewport = { width: 1280, height: 800 }) {
   const ctx = await browser.newContext({ bypassCSP: true, viewport })
   const page = await ctx.newPage()
@@ -31,13 +41,13 @@ try {
   const B = await device(CODE_B, 'Phone', { width: 390, height: 844 })
   step('two devices paired and online')
 
-  await B.page.fill('[data-test=url]', 'https://example.com')
-  await B.page.press('[data-test=url]', 'Enter')
+  await B.page.fill(ADDR, 'https://example.com')
+  await B.page.press(ADDR, 'Enter')
   await B.page.waitForFunction(() => window.__phe.state.page.title === 'Example Domain', null, { timeout: 30000 })
   await B.page.waitForFunction(() => window.__phe.state.tabs.length === 1)
   step('Phone opened example.com')
 
-  await A.page.click('[data-test=other-devices]')
+  await menuItem('other-devices', A.page)
   await A.page.waitForSelector('[data-test=others-dialog]')
   await A.page.waitForSelector('[data-test^=dev-tab-] >> text=Example Domain', { timeout: 15000 })
   const dialogText = (await A.page.textContent('[data-test=others-dialog]')) ?? ''

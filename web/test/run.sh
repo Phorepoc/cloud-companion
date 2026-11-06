@@ -8,9 +8,9 @@ set -eu
 ROOT=$(pwd)
 OUT=$ROOT/web/test/out
 mkdir -p "$OUT"
-DC="docker compose -f docker-compose.yml -f docker-compose.build.yml"   # the checkout, not the released images
+DC="docker compose -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.noports.yml"   # the checkout, not the released images
 sh web/test/pull.sh $DC
-$DC up -d --build >/dev/null 2>&1
+$DC up -d --build > "$OUT/run-up.log" 2>&1 || { tail -20 "$OUT/run-up.log"; exit 1; }
 trap '$DC --profile tls down >/dev/null 2>&1' EXIT
 sleep 6
 CODE=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null)
