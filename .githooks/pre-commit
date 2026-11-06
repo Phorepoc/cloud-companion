@@ -19,5 +19,6 @@ if echo "$staged" | grep '^web/' | grep -qv '^web/test/'; then
 fi
 
 if echo "$staged" | grep -q '^web/test/.*\.ts$'; then
-  (cd "$root/web/test" && { [ -d node_modules ] || npm install --silent --no-audit --no-fund; } && npx tsc -p .)
+  [ -d "$root/web/test/node_modules" ] || { echo "web/test: run npm install there first"; exit 1; }
+  (cd "$root/web/test" && npx tsc -p .)
 fi
