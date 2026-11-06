@@ -23,6 +23,12 @@ COPY --from=web /web/dist internal/webui/dist
 RUN go build -trimpath -o /out/phecloud ./cmd/phecloud \
  && go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
 
+# the browser suites' stand-ins for outside services (cmd/fakesvc): a test tool, never in the release image (built only by name, the
+# last stage below is the default)
+FROM build AS fakes
+RUN go build -trimpath -o /usr/local/bin/fakesvc ./cmd/fakesvc
+ENTRYPOINT ["fakesvc"]
+
 # Chromium is an external runtime dependency (not vendored), pinned to one version.
 FROM chromedp/headless-shell:156.0.8078.48@sha256:3da74b0945e4f80f00f0310bcda9f76cee283539ebd200a053a7bebf3de89423
 RUN apt-get update && apt-get install -y --no-install-recommends fonts-liberation fonts-dejavu-core fonts-noto-core \

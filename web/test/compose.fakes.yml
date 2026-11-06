@@ -1,0 +1,16 @@
+# SPDX-License-Identifier: Apache-2.0
+# The browser suites' outside services, faked (cmd/fakesvc, built from this checkout): one small container answering under each real
+# service's name and port, so a suite downloads and starts nothing else. Name the fakes a suite needs: FAKES="nextcloud immich" (default: all).
+# The real services are in the integration scripts (testdata/*/test.sh, the "Integration" workflow).
+services:
+  fakes:
+    build:
+      context: .
+      target: fakes
+      secrets: [github_packages_token]
+    image: phe-fakes:dev
+    container_name: phe-fakes
+    command: ${FAKES:-all}
+    networks:
+      default:
+        aliases: [nextcloud, immich, matrix, xmpp, irc, signal-cli, asterisk]
