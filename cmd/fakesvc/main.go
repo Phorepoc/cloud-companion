@@ -22,6 +22,7 @@ import (
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/matrix"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/immich"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/nextcloud"
+	_ "github.com/phorepoc/cloud-companion/internal/fakes/irc"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/xmpp"
 )
 

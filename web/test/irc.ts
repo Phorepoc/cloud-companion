@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Connections → Add an account → IRC against a throwaway Ergo: a password for an account nobody registered fails the test, the nick
+// Connections → Add an account → IRC against the fake IRC server (internal/fakes/irc, no accounts registered): a password for an account nobody registered fails the test, the nick
 // alone passes, the account connects (Connected) and shows up as a connection the Messaging rules can send to; removed, it is gone.
 //   BASE=http://localhost:8080 CODE=<admin code> SERVER=<host of the IRC server> OUT=/out node --experimental-strip-types irc.ts
 import { chromium } from 'playwright'
