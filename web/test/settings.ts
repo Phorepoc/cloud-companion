@@ -24,7 +24,7 @@ const errors: string[] = []
 page.on('pageerror', (e) => errors.push(e.message))
 const t0 = Date.now()
 const step = (s: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${s}`)
-const side = '.ph-sset__side'
+const side = '.x-sset__side'
 const row = (title: string) => page.locator(`${side} .hd-list-item`, { hasText: title }).first()
 const hash = () => page.evaluate(() => location.hash)
 
@@ -41,18 +41,18 @@ const sideText = (await page.textContent(side)) ?? ''
 for (const t of ['This device', 'Appearance', 'Data use', 'Pair a new device', 'This browser', 'Your server', 'Connections', 'Devices', 'Catalogue', 'Weather', 'Security'])
   assert(sideText.includes(t), `the side panel has ${t}`)
 assert(await page.locator('[data-test=theme]').isVisible(), 'Appearance is the first page')
-const sb = (await page.locator(side).boundingBox())!, pb = (await page.locator('.ph-sset__page').boundingBox())!
+const sb = (await page.locator(side).boundingBox())!, pb = (await page.locator('.x-sset__page').boundingBox())!
 assert(pb.x >= sb.x + sb.width - 1, 'the page sits beside the panel')
 await page.screenshot({ path: `${OUT}/settings-wide.png` })
 
 step('picking Devices shows it and gives it its address')
 await row('Devices').click()
-await page.waitForSelector('.ph-sset__page h1:has-text("Devices")')
+await page.waitForSelector('.x-sset__page h1:has-text("Devices")')
 assert.equal(await hash(), '#/settings/devices')
 
 step('the old address /connections opens Connections in Settings')
 await page.goto(BASE + '/#/connections')
-await page.waitForSelector('.ph-sset__page h1:has-text("Connections")')
+await page.waitForSelector('.x-sset__page h1:has-text("Connections")')
 assert.equal(await hash(), '#/settings/connections')
 assert(await page.locator(`${side} .hd-list-item.is-selected`, { hasText: 'Connections' }).count(), 'Connections is marked in the panel')
 await page.click('.x-cl__apps')
@@ -75,17 +75,17 @@ await row('Data use').click()
 await page.waitForSelector('[data-test=quality]')
 assert(!(await page.locator(side).isVisible()), 'the list steps aside for the page')
 await page.screenshot({ path: `${OUT}/settings-phone-page.png` })
-await page.click('.ph-sset__back')
+await page.click('.x-sset__back')
 await page.waitForSelector(side)
 
 step('desktop: Settings in a window is the same split; a link to a page of Settings opens it there')
 await page.setViewportSize({ width: 1440, height: 900 })
 await page.goto(BASE + '/#/settings/appearance')
 await openApp(page, 'Desktop')
-await page.waitForSelector('.x-win[data-win=settings] .ph-sset').catch(async (e) => { await page.screenshot({ path: `${OUT}/settings-fail.png` }); throw e })
+await page.waitForSelector('.x-win[data-win=settings] .x-sset').catch(async (e) => { await page.screenshot({ path: `${OUT}/settings-fail.png` }); throw e })
 await page.screenshot({ path: `${OUT}/settings-desktop-open.png` })
 await page.evaluate(() => { location.hash = '#/connections' })
-await page.waitForSelector('.x-win[data-win=settings] .ph-sset__page h1:has-text("Connections")')
+await page.waitForSelector('.x-win[data-win=settings] .x-sset__page h1:has-text("Connections")')
 assert(await page.locator('[data-test=desktop]').isVisible(), 'still on the desktop')
 await page.screenshot({ path: `${OUT}/settings-desktop.png` })
 

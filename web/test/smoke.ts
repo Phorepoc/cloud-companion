@@ -268,7 +268,7 @@ try {
   assert((await ink()) > 1000, 'the page is drawn')
 
   // 8. devices page (the first/--admin device)
-  await openApp(page, 'Settings'); await page.click('[data-test=settings-devices]')
+  await openApp(page, 'Settings'); await page.click('.x-sset__side .hd-list-item:has-text("Devices")')
   await page.waitForSelector('[data-test=device-list] .q-item')
   const n = await page.locator('[data-test=device-list] .q-item').count()
   assert(n >= 1, 'the device list must show this browser')
@@ -276,13 +276,13 @@ try {
   await page.screenshot({ path: OUT + '/web-devices.png' })
 
   // 9. settings: set a byte budget
-  await openApp(page, 'Settings'); await page.click('[data-test=settings-data]')
+  await openApp(page, 'Settings'); await page.click('.x-sset__side .hd-list-item:has-text("Data use")')
   await page.click('[data-test=gray]')
   await page.click('[data-test=apply]')
   await page.waitForSelector('[data-test=saved]')
   step('settings applied')
   // dark mode: the toggle in settings, and the choice sticks
-  await page.click('[data-test=settings-appearance]')
+  await page.click('.x-sset__side .hd-list-item:has-text("Appearance")')
   await page.locator('[data-test=theme]').getByRole('button', { name: 'Dark', exact: true }).click()
   await page.waitForFunction(() => document.body.classList.contains('body--dark'))
   await page.locator('[data-test=theme]').getByRole('button', { name: 'Match system', exact: true }).click()

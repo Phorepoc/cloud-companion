@@ -125,7 +125,7 @@ step('a passkey is removed after confirmation')
 
 // 5b. Settings, "Pair a new device": codes made in the app, as the CLI makes them
 await ctx.grantPermissions(['clipboard-read', 'clipboard-write'])
-await page.click('[data-test=settings-pair]') // its own page of Settings
+await page.click('.x-sset__side .hd-list-item:has-text("Pair a new device")') // its own page of Settings
 await page.locator('[data-test=pair-device]').scrollIntoViewIfNeeded()
 assert.equal(await page.locator('[data-test=pair-result]').count(), 0, 'no code is shown before one is asked for')
 await page.click('[data-test=pair-generate]')

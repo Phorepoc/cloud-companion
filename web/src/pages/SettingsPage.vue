@@ -1,20 +1,20 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
 <!-- Settings: one place for this device and, for the owner, the server (Connections, Devices, Catalogue, Weather, Security). The Etesian
-     Settings split (components/settings/SettingsSplit.vue): on a wide window or screen a side panel of grouped pages with search
+     Settings split (@etesian-design/shell XSettingsSplit): on a wide window or screen a side panel of grouped pages with search
      and the page beside it, as iPad and macOS settings; narrower, the list drills down and the page has Back. Each page has its address
      (/settings/connections); the old /connections, /devices and /catalogue open their page here. -->
 <template>
   <q-page class="ph-settings">
     <div class="ph-settings__box">
-      <SettingsSplit :groups="groups" :owner="state.admin" :page="page" :narrow-page="!!route.params.page" @update:page="pick">
-        <template #default="{ page: id }">
+      <XSettingsSplit :groups="groups" :owner="state.admin" :page="page" :narrow-page="!!route.params.page" @update:page="pick">
+        <template #page="{ page: id }">
           <ConnectionsPage v-if="id === 'connections'" />
           <DevicesPage v-else-if="id === 'devices'" />
           <CataloguePage v-else-if="id === 'catalogue'" />
           <DeviceSettings v-else :part="id" />
         </template>
-      </SettingsSplit>
+      </XSettingsSplit>
     </div>
   </q-page>
 </template>
@@ -22,11 +22,10 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useChrome } from '@etesian-design/shell'
+import { XSettingsSplit, useChrome } from '@etesian-design/shell'
 import { state } from '../cloud'
 import { SETTINGS_GROUPS, settingsPage, settingsPageIds } from '../settingsNav'
 import DeviceSettings from '../components/settings/DeviceSettings.vue'
-import SettingsSplit from '../components/settings/SettingsSplit.vue'
 
 const ConnectionsPage = defineAsyncComponent(() => import('./ConnectionsPage.vue'))
 const DevicesPage = defineAsyncComponent(() => import('./DevicesPage.vue'))
@@ -49,8 +48,8 @@ useChrome(() => ({ title: 'Settings' }))
 .ph-settings { display: flex; }
 /* the split follows the room it has (a window, or the page), not the screen */
 .ph-settings__box { flex: 1; min-width: 0; display: flex; container-type: inline-size; }
-.ph-settings__box :deep(.ph-sset) { min-height: 100%; }
+.ph-settings__box :deep(.x-sset) { min-height: 100%; }
 /* the pages inside are pages of their own elsewhere: no second page height or margins */
 .ph-settings__box :deep(.q-page) { min-height: 0 !important; padding: 0; }
-.ph-settings__box :deep(.ph-sset__page) { padding-top: 4px; }
+.ph-settings__box :deep(.x-sset__page) { padding-top: 4px; }
 </style>
