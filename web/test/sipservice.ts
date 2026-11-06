@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Connections → Add an account → SIP service against the asterisk profile: a wrong password fails the test, the right one passes,
+// Connections → Add an account → SIP service against a SIP service (the fake Asterisk, internal/fakes/sip): a wrong password fails the test, the right one passes,
 // the account registers (Connected) and shows up as a connection the Messaging rules can send to; removed, it is gone from there.
 //   BASE=http://localhost:8080 CODE=<admin code> SECRET=<asterisk secret> OUT=/out node --experimental-strip-types sipservice.ts
 import { chromium } from 'playwright'
@@ -66,7 +66,7 @@ await page.reload()
 await page.waitForSelector('[data-test=account-row]')
 assert.match((await page.textContent('[data-test=account-status]')) ?? '', /Connected/, 'registered')
 assert.match((await page.textContent('[data-test=account-row]')) ?? '', /SIP service/)
-step('registered with Asterisk: Connected, and a connection for the rules')
+step('registered with the SIP service: Connected, and a connection for the rules')
 
 await page.click('[data-test=route-add]')
 await page.fill('[data-test=route-row] >> nth=0 >> input[data-test=route-value]', 'pbx.')
