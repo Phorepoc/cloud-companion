@@ -21,6 +21,7 @@ import (
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/sip"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/matrix"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/immich"
+	_ "github.com/phorepoc/cloud-companion/internal/fakes/nextcloud"
 )
 
 func main() {
