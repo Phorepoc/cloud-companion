@@ -4,10 +4,10 @@
   <q-page class="ph-page">
     <h1>Devices</h1>
     <p class="ph-muted">The phones, computers and browsers connected to your account.</p>
-    <EmptyState v-if="!state.admin" icon="sym_o_lock" title="Only an admin device can manage devices"
+    <HdStatusState v-if="!state.admin" icon="lock" title="Only an admin device can manage devices"
                 text="The first device you connect is the admin. You can also create an admin device with the server command paircode --admin." />
     <q-banner v-if="state.adminError" class="bg-negative text-white q-mb-md" rounded role="alert">{{ state.adminError }}</q-banner>
-    <EmptyState v-if="state.admin && !state.deviceList.length" state="loading" title="Loading devices" text="This takes a moment." />
+    <HdStatusState v-if="state.admin && !state.deviceList.length" state="loading" title="Loading devices" text="This takes a moment." />
     <ul v-if="state.admin && state.deviceList.length" class="ph-list ph-card" data-test="device-list">
       <li v-for="d in state.deviceList" :key="d.id" class="q-item ph-row" :data-test="'device-' + d.id">
         <div class="ph-row-main">
@@ -32,7 +32,7 @@
       </div>
       <p class="ph-muted">Phones and apps that cannot sign in the usual way (mail, calendar and contacts) each get their own password, which you can switch off here at any time.</p>
       <q-banner v-if="apppwError" class="bg-negative text-white q-mb-md" rounded role="alert">{{ apppwError }}</q-banner>
-      <EmptyState v-if="apppwLoaded && !apppws.length && !apppwError" icon="sym_o_key" title="No app passwords yet" text="Add a device to get a password for it." />
+      <HdStatusState v-if="apppwLoaded && !apppws.length && !apppwError" icon="lock" title="No app passwords yet" text="Add a device to get a password for it." />
       <ul v-if="apppws.length" class="ph-list ph-card" data-test="apppw-list">
         <li v-for="p in apppws" :key="p.id" class="ph-row" :data-test="'apppw-row-' + p.id">
           <div class="ph-row-main">
@@ -86,7 +86,7 @@ import { ref, onMounted } from 'vue'
 import { state, api, connect, hubCall } from '../cloud'
 import type { AppPassword, DeviceInfo } from '../proto'
 import { toast } from '../toast'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 
 const fmt = (t: number) => new Date(t * 1000).toLocaleString()
 function confirm(d: DeviceInfo) {

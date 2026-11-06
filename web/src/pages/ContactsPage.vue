@@ -16,11 +16,11 @@
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="load" /></template>
     </q-banner>
-    <EmptyState v-if="loading && !contacts.length" state="loading" title="Loading contacts" text="This takes a moment." />
-    <EmptyState v-else-if="!loading && !contacts.length && !error" icon="sym_o_contacts" title="No contacts yet"
+    <HdStatusState v-if="loading && !contacts.length" state="loading" title="Loading contacts" text="This takes a moment." />
+    <HdStatusState v-else-if="!loading && !contacts.length && !error" icon="person" title="No contacts yet"
                 text="Add your first contact. It will be available on every device that syncs with your hub.">
-      <template #action><q-btn outline color="primary" label="New contact" @click="openNew" /></template>
-    </EmptyState>
+      <q-btn outline color="primary" label="New contact" @click="openNew" />
+    </HdStatusState>
     <p v-else-if="contacts.length && !shown.length" class="ph-muted" data-test="contacts-none">No contact matches "{{ filter }}".</p>
 
     <ul v-if="shown.length" class="ph-list ph-card" data-test="contact-list">
@@ -97,7 +97,7 @@ import type { Contact, Labeled } from '../proto'
 /** The edit form: a contact's fields as plain strings and editable lists. */
 interface ContactForm { href?: string; etag?: string; given: string; family: string; org: string; note: string; phones: Required<Labeled>[]; emails: Required<Labeled>[] }
 import { toast } from '../toast'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 
 const contacts = ref<Contact[]>([])

@@ -31,8 +31,8 @@ export const sections: Section[] = [
 
 // what each placeholder section will hold (shown by the empty state until the section exists)
 export const placeholders: Record<string, { title: string; icon: string; text: string }> = {
-  chats: { title: 'Chats', icon: 'sym_o_chat', text: 'Your conversations from every messaging service will appear here, in one list.' },
-  mail: { title: 'Mail', icon: 'sym_o_mail', text: 'Your mailboxes will appear here, with one inbox across all your accounts.' },
-  calendar: { title: 'Calendar', icon: 'sym_o_calendar_month', text: 'Your events from every calendar will appear here.' },
-  contacts: { title: 'Contacts', icon: 'sym_o_contacts', text: 'Your contacts will appear here, merged from all your accounts and devices.' },
+  chats: { title: 'Chats', icon: 'message', text: 'Your conversations from every messaging service will appear here, in one list.' },
+  mail: { title: 'Mail', icon: 'mail', text: 'Your mailboxes will appear here, with one inbox across all your accounts.' },
+  calendar: { title: 'Calendar', icon: 'calendar', text: 'Your events from every calendar will appear here.' },
+  contacts: { title: 'Contacts', icon: 'person', text: 'Your contacts will appear here, merged from all your accounts and devices.' },
 }

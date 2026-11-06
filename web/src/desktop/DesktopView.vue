@@ -20,8 +20,8 @@
       <template #events="{ embedded, close }">
         <EventsPanel :now="now" :embedded="embedded" @open="(id: string) => { close(); open(id) }" @close="close" @unread="(n: number) => (unread = n)" />
       </template>
-      <template #widgets="{ editing, done }">
-        <div class="ph-desk__wg" :style="{ left: area.x + 'px' }"><DesktopWidgets :now="now" :area="area" :editing="editing" @open="open" @done="done" /></div>
+      <template #widgets="{ editing, done, area }">
+        <div class="ph-desk__wg" :style="{ left: area.x + 'px', top: area.y + 'px' }"><DesktopWidgets :now="now" :area="area" :editing="editing" @open="open" @done="done" /></div>
       </template>
     </XShell>
     <ToastHost />
@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, type Component } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
 import { QLayout, QPageContainer } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import { XShell, type ShellApp, type ShellMenu } from '@etesian-design/shell'
@@ -93,15 +93,8 @@ const now = ref(new Date())
 const unread = ref(0)
 async function checkUnread() { try { unread.value = (await loadUnread(0)).unread } catch { unread.value = 0 } }
 
-// the widgets lay themselves out on the desktop area
-const area = reactive({ x: 0, w: 1200, h: 800 })
-let ro: ResizeObserver | undefined
 let clock: ReturnType<typeof setInterval> | undefined, mailTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
-  const a = document.querySelector<HTMLElement>('.x-shell__area')
-  // beside the dock when it is always shown on the left
-  const fit = () => { const d = document.querySelector<HTMLElement>('.x-shell-dock:not(.is-autohide).x-dock--left'); const x = d ? d.offsetLeft + d.offsetWidth + 8 : 0; Object.assign(area, { x, w: a!.clientWidth - x, h: a!.clientHeight }) }
-  if (a) { ro = new ResizeObserver(fit); ro.observe(a); fit() }
   clock = setInterval(() => { now.value = new Date() }, 15000)
   checkUnread()
   mailTimer = setInterval(checkUnread, 120000)
@@ -111,7 +104,7 @@ onMounted(() => {
   else if (sections.some((s) => s.id === want)) open(want)
   else if (!shell.value?.wm.shown.value.length) open('browse')
 })
-onBeforeUnmount(() => { stopGuard(); ro?.disconnect(); clearInterval(clock); clearInterval(mailTimer) })
+onBeforeUnmount(() => { stopGuard(); clearInterval(clock); clearInterval(mailTimer) })
 </script>
 
 <style scoped>

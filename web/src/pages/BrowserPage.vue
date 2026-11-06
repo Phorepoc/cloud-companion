@@ -9,23 +9,25 @@
                    data-test="browser-frame"
                    @go="(a: string) => { urlInput = a; go() }" @back="api.action('back')" @forward="api.action('forward')" @reload="api.action('reload')"
                    @pick="(v: string) => api.tab('switch', Number(v))" @close="(v: string) => api.tab('close', Number(v))" @add="newTab" @more="moreOpen = true">
-      <q-menu v-model="moreOpen" target=".ph-bf .x-bf__row [aria-label^='More']" no-parent-event anchor="bottom right" self="top right" class="ph-bf-more" data-test="browser-more">
-        <q-list dense style="min-width: 220px">
-          <q-item clickable v-close-popup :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
-          <q-item clickable v-close-popup data-test="other-devices" @click="openOthers"><q-item-section>Tabs on your other devices</q-item-section></q-item>
-          <q-item>
-            <q-item-section>Zoom</q-item-section>
-            <q-item-section side class="row no-wrap items-center">
-              <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
-              <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
-              <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
-            </q-item-section>
-          </q-item>
-          <q-item v-if="canFull" clickable v-close-popup :aria-pressed="String(phoneSize)" data-test="phone-size" @click="togglePhone">
-            <q-item-section>{{ phoneSize ? 'Use the whole window' : 'Phone size (360 x 640)' }}</q-item-section>
-          </q-item>
-        </q-list>
-      </q-menu>
+      <template #more>
+        <q-menu v-model="moreOpen" no-parent-event anchor="bottom right" self="top right" class="ph-bf-more" data-test="browser-more">
+          <q-list dense style="min-width: 220px">
+            <q-item clickable v-close-popup :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
+            <q-item clickable v-close-popup data-test="other-devices" @click="openOthers"><q-item-section>Tabs on your other devices</q-item-section></q-item>
+            <q-item>
+              <q-item-section>Zoom</q-item-section>
+              <q-item-section side class="row no-wrap items-center">
+                <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
+                <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
+                <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+              </q-item-section>
+            </q-item>
+            <q-item v-if="canFull" clickable v-close-popup :aria-pressed="String(phoneSize)" data-test="phone-size" @click="togglePhone">
+              <q-item-section>{{ phoneSize ? 'Use the whole window' : 'Phone size (360 x 640)' }}</q-item-section>
+            </q-item>
+          </q-list>
+        </q-menu>
+      </template>
       <div class="ph-bf__page">
     <span class="ph-sr" data-test="title">{{ state.page.title }}</span>
 
@@ -89,7 +91,7 @@
         <q-card-section>
           <h2>Tabs on your devices</h2>
           <p class="ph-muted ph-small">Browser tabs that are open right now on the devices that are connected. Closing a tab here closes it on that device.</p>
-          <EmptyState v-if="!state.sessions.length" state="loading" title="Looking for devices" text="" />
+          <HdStatusState v-if="!state.sessions.length" state="loading" title="Looking for devices" text="" />
           <section v-for="s in state.sessions" :key="s.sid" class="ph-dev" :data-test="'dev-' + s.sid">
             <h3>{{ s.name || 'Device' }} <q-badge v-if="s.self" color="positive" text-color="white" label="This browser" /></h3>
             <p v-if="!s.tabs || !s.tabs.length" class="ph-muted ph-small">No tabs open.</p>
@@ -118,7 +120,7 @@
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, type HTMLAttributes } from 'vue'
 import { state, api, connect, creds, openInNewTab } from '../cloud'
 import type { Region, SessionInfo, TabInfo } from '../proto'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { XBrowserFrame } from '@etesian-design/shell'
 /** a tab as the frame shows it (the BrowserTab of XBrowserTabs, not exported by name) */
 interface BrowserTab { id: string; title: string; icon?: string; address?: string; thumb?: string }
@@ -301,9 +303,6 @@ onBeforeUnmount(() => clearInterval(poll))
 .ph-browse { display: flex; flex-direction: column; padding: 0; gap: 0; }
 /* the frame fills the page; the page area (banners, the rendered page) is a column inside it */
 .ph-bf { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
-.ph-bf :deep(.x-bf__addr) { /* a text field: squircle-half ends (the N9 rule), not the frame's pill */
-  border-radius: 0; -webkit-mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; -webkit-mask-composite: source-in;
-  mask: var(--hd-sq-cap-l) left center / auto 100% no-repeat, var(--hd-sq-cap-r) right center / auto 100% no-repeat; mask-composite: intersect; }
 .ph-bf__page { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; height: 100%; }
 .ph-url { flex: 1 1 0; min-width: 0; }
 .ph-url :deep(.q-field__control) { border-radius: 0; }

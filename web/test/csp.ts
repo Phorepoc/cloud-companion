@@ -37,7 +37,7 @@ await page.click('.x-shell-dock button[aria-label=Overview]')
 await page.keyboard.type('cal')
 await page.keyboard.press('Enter')
 await page.waitForSelector('.x-win[data-win=calendar]')
-assert(await page.evaluate(() => document.fonts.check('300 16px "HD Fira Sans"')), 'the bundled font loads under the policy')
+assert(await page.evaluate(async () => (await document.fonts.load('300 16px "HD Fira Sans"')).length > 0 && document.fonts.check('300 16px "HD Fira Sans"')), 'the bundled font loads under the policy')
 await page.click('.x-shell__clock')
 await page.waitForSelector('[data-test=events]')
 await page.waitForTimeout(700) // its calendar, mail and chats requests

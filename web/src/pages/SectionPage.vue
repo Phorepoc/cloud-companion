@@ -5,11 +5,11 @@
 <template>
   <q-page class="ph-page">
     <h1>{{ info.title }}</h1>
-    <EmptyState :title="'Nothing here yet'" :icon="info.icon" :text="info.text" :data-test="'section-' + id">
-      <template #action>
+    <HdStatusState :title="'Nothing here yet'" :icon="info.icon" :text="info.text" :data-test="'section-' + id">
+      
         <q-btn outline color="primary" label="Back to the browser" to="/browse" />
-      </template>
-    </EmptyState>
+      
+    </HdStatusState>
   </q-page>
 </template>
 
@@ -17,10 +17,10 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { placeholders } from '../nav'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 
 const props = defineProps({ sectionId: { type: String, default: '' } })
 const route = useRoute()
 const id = computed(() => props.sectionId || route.meta.id || '')
-const info = computed(() => placeholders[id.value] || { title: 'Section', icon: 'sym_o_inbox', text: '' })
+const info = computed(() => placeholders[id.value] || { title: 'Section', icon: 'mail', text: '' })
 </script>

@@ -52,11 +52,11 @@
 
     <!-- agenda -->
     <template v-if="view === 'agenda'">
-      <EmptyState v-if="loading && !events.length" state="loading" title="Loading events" text="This takes a moment." />
-      <EmptyState v-else-if="!loading && !events.length && !error" icon="sym_o_calendar_month" title="Nothing on this month"
+      <HdStatusState v-if="loading && !events.length" state="loading" title="Loading events" text="This takes a moment." />
+      <HdStatusState v-else-if="!loading && !events.length && !error" icon="calendar" title="Nothing on this month"
                   text="Add an event. It will show on every device that syncs with your hub.">
-        <template #action><q-btn outline color="primary" label="New event" @click="openNew()" /></template>
-      </EmptyState>
+        <q-btn outline color="primary" label="New event" @click="openNew()" />
+      </HdStatusState>
       <section v-for="g in groups" :key="g.key" class="ph-day" :aria-label="g.label">
         <h3 class="ph-day-head" :class="{ 'is-today': g.today }">{{ g.label }}<span v-if="g.today" class="ph-small"> (today)</span></h3>
         <ul class="ph-card ph-list">
@@ -128,7 +128,7 @@ import type { CalendarEvent } from '../proto'
 
 /** The edit form: the event's text fields and its start and end as date and time inputs. */
 interface EventForm extends EventFields { href?: string; etag?: string; title: string; location: string; notes: string }
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 
 const $q = useQuasar()

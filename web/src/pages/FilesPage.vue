@@ -27,8 +27,8 @@
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="load" /></template>
     </q-banner>
-    <EmptyState v-if="loading && !entries.length" state="loading" title="Loading files" text="This takes a moment." />
-    <EmptyState v-else-if="!loading && !entries.length && !error" icon="sym_o_folder" :title="path ? 'This folder is empty' : 'No files yet'"
+    <HdStatusState v-if="loading && !entries.length" state="loading" title="Loading files" text="This takes a moment." />
+    <HdStatusState v-else-if="!loading && !entries.length && !error" icon="folder" :title="path ? 'This folder is empty' : 'No files yet'"
                 :text="readOnly ? '' : 'Upload files, or drop them here. They are kept on your server and reach every device you pair.'" data-test="files-empty" />
 
     <ul v-if="entries.length" class="ph-list ph-card" data-test="files-list">
@@ -109,7 +109,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 import { toast } from '../toast'
 import { deleteFile, fileURL, iconOf, listFiles, listShares, loadTracks, makeFolder, moveFile, shareFile, shareLink, size, unshare, uploadFiles, type FileEntry, type Share } from '../files'

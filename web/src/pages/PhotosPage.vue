@@ -25,10 +25,10 @@
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="reload" /></template>
     </q-banner>
-    <EmptyState v-if="loading && !items.length && !albums.length" state="loading" title="Loading photos" text="This takes a moment." />
+    <HdStatusState v-if="loading && !items.length && !albums.length" state="loading" title="Loading photos" text="This takes a moment." />
 
     <template v-if="tab === 'albums' && !album">
-      <EmptyState v-if="!loading && !albums.length && !error" icon="sym_o_photo_album" title="No albums yet" data-test="photos-no-albums"
+      <HdStatusState v-if="!loading && !albums.length && !error" icon="photo" title="No albums yet" data-test="photos-no-albums"
                   text="Albums from Immich and your photo folders appear here." />
       <div v-else class="ph-palbums" data-test="photos-albums">
         <button v-for="a in albums" :key="a.src + a.id" type="button" class="ph-palbum" :data-test="'photos-album-' + a.name" @click="openAlbum(a)">
@@ -39,7 +39,7 @@
       </div>
     </template>
     <template v-else>
-      <EmptyState v-if="!loading && !items.length && !error" icon="sym_o_photo_library" :title="album ? 'This album is empty' : 'No photos yet'" data-test="photos-empty"
+      <HdStatusState v-if="!loading && !items.length && !error" icon="photo" :title="album ? 'This album is empty' : 'No photos yet'" data-test="photos-empty"
                   :text="album ? '' : state.admin ? 'Connect Immich in Connections, or mark folders in Files as photo folders.' : 'The owner can connect Immich, or mark folders as photo folders.'" />
       <section v-for="g in groups" :key="g.title" class="ph-month">
         <h2 class="ph-small">{{ g.title }}</h2>
@@ -88,7 +88,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 import { state } from '../cloud'
 import { hasThumb, loadAlbum, loadAlbums, loadTimeline, photoFolders, photoURL, setPhotoFolders, type Photo, type PhotoAlbum } from '../photos'

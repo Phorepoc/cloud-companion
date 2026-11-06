@@ -102,7 +102,7 @@ await pc.click('[data-test="file-Music"]'); await pc.click('[data-test="file-Bel
 await pc.waitForSelector('[data-test="file-liner.txt"]')
 await pc.click('[data-test="file-more-liner.txt"]')
 await pc.click('[data-test="file-delete-liner.txt"]')
-await pc.click('.ph-toast button:has-text("Undo"), [data-test=toast-undo]')
+await pc.click('[data-test=toast-action]:has-text("Undo")')
 await pc.waitForSelector('[data-test="file-liner.txt"]')
 await pc.click('[data-test="file-more-liner.txt"]')
 await pc.click('[data-test="file-delete-liner.txt"]')

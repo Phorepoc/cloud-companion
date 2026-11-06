@@ -22,8 +22,8 @@
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="init" /></template>
     </q-banner>
-    <EmptyState v-if="loading && !mails.length" state="loading" title="Loading mail" text="This takes a moment." />
-    <EmptyState v-else-if="!loading && !mails.length && !error && folder" icon="sym_o_inbox" title="No messages here" text="This folder is empty." />
+    <HdStatusState v-if="loading && !mails.length" state="loading" title="Loading mail" text="This takes a moment." />
+    <HdStatusState v-else-if="!loading && !mails.length && !error && folder" icon="mail" title="No messages here" text="This folder is empty." />
 
     <ul v-if="mails.length" class="ph-list ph-card" data-test="mail-list">
       <li v-for="(m, i) in mails" :key="m.id">
@@ -44,7 +44,7 @@
     <!-- reader -->
     <q-dialog v-model="open">
       <q-card class="ph-dialog" data-test="mail-view">
-        <q-card-section v-if="reading"><EmptyState state="loading" title="Opening the message" text="" /></q-card-section>
+        <q-card-section v-if="reading"><HdStatusState state="loading" title="Opening the message" text="" /></q-card-section>
         <q-card-section v-else-if="msg">
           <h2 data-test="mail-view-subject">{{ msg.subject || '(no subject)' }}</h2>
           <p class="ph-small ph-muted q-mb-xs">From {{ msg.from }}<span v-if="msg.date"> on {{ new Date(msg.date).toLocaleString() }}</span></p>
@@ -103,7 +103,7 @@ import type { MailAccount, MailBody, MailFolder, MailItem } from '../proto'
 /** The message being written: recipients, subject, text, the Message-ID it answers, and the account it goes out through. */
 interface Draft { rcpt: string; subject: string; body: string; replyTo: string; account: string }
 import { toast } from '../toast'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 
 const folders = ref<MailFolder[]>([])

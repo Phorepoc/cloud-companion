@@ -17,11 +17,11 @@
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="load" /></template>
     </q-banner>
-    <EmptyState v-if="loading && !tracks.length" state="loading" title="Loading your music" text="This takes a moment." />
-    <EmptyState v-else-if="!loading && !tracks.length && !error" icon="sym_o_music_note" title="No music yet" data-test="music-empty"
+    <HdStatusState v-if="loading && !tracks.length" state="loading" title="Loading your music" text="This takes a moment." />
+    <HdStatusState v-else-if="!loading && !tracks.length && !error" icon="music" title="No music yet" data-test="music-empty"
                 text="Upload songs in Files. A folder per artist with a folder per album inside works best; a cover.jpg in an album's folder becomes its art.">
-      <template #action><q-btn outline color="primary" label="Open Files" to="/files" /></template>
-    </EmptyState>
+      <q-btn outline color="primary" label="Open Files" to="/files" />
+    </HdStatusState>
 
     <!-- one album or one artist -->
     <template v-if="album">
@@ -86,7 +86,7 @@
 
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
-import EmptyState from '../components/EmptyState.vue'
+import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 import AlbumCover from '../components/AlbumCover.vue'
 import { api, connect, creds, state } from '../cloud'
