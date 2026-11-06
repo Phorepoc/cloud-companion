@@ -6,6 +6,7 @@ set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p phesip -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml -f web/test/compose.asterisktest.yml --profile asterisk"
 $DC down -v >/dev/null 2>&1 || true
+sh web/test/pull.sh $DC
 $DC up -d --build phecloud asterisk > "$OUT/sipservice-up.log" 2>&1 || { tail -20 "$OUT/sipservice-up.log"; exit 1; }
 trap '$DC down -v >/dev/null 2>&1' EXIT
 for i in $(seq 1 60); do docker logs phe-asterisk-ui 2>&1 | grep -q "Asterisk Ready" && break; sleep 1; done

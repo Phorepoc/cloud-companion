@@ -6,6 +6,7 @@ set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p phesig --profile signal -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml"
 $DC down -v >/dev/null 2>&1 || true
+sh web/test/pull.sh $DC
 $DC up -d --build phecloud signal-cli > "$OUT/signal-up.log" 2>&1 || { tail -20 "$OUT/signal-up.log"; exit 1; }
 trap '$DC down -v >/dev/null 2>&1' EXIT
 for i in $(seq 1 30); do docker logs phe-signal-cli 2>&1 | grep -qi "listening" && break; sleep 1; done

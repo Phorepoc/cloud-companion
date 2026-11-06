@@ -6,6 +6,7 @@ set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p pheirc -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml -f web/test/compose.irctest.yml"
 $DC down -v >/dev/null 2>&1 || true
+sh web/test/pull.sh $DC
 $DC up -d --build phecloud ergo > "$OUT/irc-up.log" 2>&1 || { tail -20 "$OUT/irc-up.log"; exit 1; }
 trap '$DC down -v >/dev/null 2>&1' EXIT
 for i in $(seq 1 30); do docker logs phe-ergo-ui 2>&1 | grep -q "Server running" && break; sleep 1; done

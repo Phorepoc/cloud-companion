@@ -6,6 +6,7 @@ set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p phetg -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml"
 $DC down -v >/dev/null 2>&1 || true
+sh web/test/pull.sh $DC
 $DC up -d --build phecloud > "$OUT/telegram-up.log" 2>&1 || { tail -20 "$OUT/telegram-up.log"; exit 1; }
 trap '$DC down -v >/dev/null 2>&1' EXIT
 sleep 2
