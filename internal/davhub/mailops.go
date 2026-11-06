@@ -10,27 +10,13 @@ import (
 	"os"
 	"strings"
 
-	"github.com/microcosm-cc/bluemonday"
+	"github.com/phorepoc/cloud-companion/internal/safehtml"
 )
 
 const capSubmit = "urn:ietf:params:jmap:submission"
 
-// safePolicy: formatting and structure only. No images, no styles, no scripts, no forms, no frames, no remote loads of any kind;
-// links stay as links (nothing is fetched until the person follows one) and open in a new context without a referrer.
-var safePolicy = func() *bluemonday.Policy {
-	p := bluemonday.NewPolicy()
-	p.AllowElements("p", "br", "div", "span", "b", "i", "u", "strong", "em", "ul", "ol", "li", "blockquote", "pre", "code", "hr",
-		"h1", "h2", "h3", "h4", "h5", "h6", "table", "thead", "tbody", "tr", "td", "th", "sub", "sup", "small", "s")
-	p.AllowAttrs("href").OnElements("a")
-	p.AllowURLSchemes("http", "https", "mailto")
-	p.RequireNoFollowOnLinks(true)
-	p.RequireNoReferrerOnLinks(true)
-	p.AddTargetBlankToFullyQualifiedLinks(true)
-	return p
-}()
-
 // SanitizeHTML returns a safe fragment of an HTML message body.
-func SanitizeHTML(s string) string { return strings.TrimSpace(safePolicy.Sanitize(s)) }
+func SanitizeHTML(s string) string { return safehtml.Sanitize(s) }
 
 // mailboxByRole finds the id of the folder with the given role.
 func (c *Client) mailboxByRole(acc, role string) (string, error) {
