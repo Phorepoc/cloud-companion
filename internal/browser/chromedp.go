@@ -29,7 +29,19 @@ import (
 	"github.com/chromedp/chromedp/kb"
 )
 
-const mobileUA = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36"
+const (
+	mobileUA  = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Mobile Safari/537.36"
+	desktopUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+)
+
+// userAgent: sites get the phone browser for the phone layout (no height given) and narrow windows, the desktop one otherwise.
+// With the phone one, a wide window got sites' touch pages (Google opened its full-screen search on a tap in the box).
+func userAgent(width, height int) string {
+	if height <= 0 || width < 600 {
+		return mobileUA
+	}
+	return desktopUA
+}
 
 const viewH = 640
 
@@ -275,7 +287,7 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	s.opened = true
 	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
-		emulation.SetUserAgentOverride(mobileUA),
+		emulation.SetUserAgentOverride(userAgent(s.width, s.height)),
 		chromedp.ActionFunc(func(c context.Context) error {
 			w, h := s.cssView() // not "mobile": the layout is always exactly 360/scale px wide, whatever the viewport meta says
 			s.cssW = w
@@ -890,9 +902,15 @@ func (s *cdpSession) SetViewport(ctx context.Context, width, height int) error {
 	if width == s.width && height == s.height {
 		return nil
 	}
+	ua := userAgent(s.width, s.height)
 	s.width, s.height = width, height
 	if !s.opened {
 		return nil
+	}
+	if nua := userAgent(width, height); nua != ua { // pages loaded from now on get the browser that fits the window
+		if err := s.run(ctx, 10*time.Second, emulation.SetUserAgentOverride(nua)); err != nil {
+			return err
+		}
 	}
 	if err := s.applyMetrics(ctx); err != nil {
 		return err
