@@ -20,3 +20,21 @@ func (s *Store) SetSetting(name, value string) error {
 	_, err := s.db.Exec(`INSERT INTO server_settings(name,value) VALUES(?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value`, name, value)
 	return err
 }
+
+// SettingsWithPrefix returns every setting whose name starts with prefix, by name without the prefix.
+func (s *Store) SettingsWithPrefix(prefix string) (map[string]string, error) {
+	rows, err := s.db.Query(`SELECT name, COALESCE(value,'') FROM server_settings WHERE substr(name,1,?)=?`, len(prefix), prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var n, v string
+		if err := rows.Scan(&n, &v); err != nil {
+			return nil, err
+		}
+		out[n[len(prefix):]] = v
+	}
+	return out, rows.Err()
+}

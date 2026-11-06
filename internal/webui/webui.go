@@ -89,6 +89,7 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	}
 	(&weatherAPI{a: a, st: s.Store, v: vault, w: weather.New()}).routes(mux)
 	(&feedsAPI{a: a, st: s.Store, f: feeds.New()}).routes(mux)
+	(&prefsAPI{a: a, st: s.Store}).routes(mux)
 	filesDir := os.Getenv("PHECLOUD_FILES_DIR")
 	if filesDir == "" {
 		filesDir = filepath.Join(envOr("PHECLOUD_TLSDIR", "/data"), "files")
