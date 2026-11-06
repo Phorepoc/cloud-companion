@@ -3,7 +3,7 @@
 # (feat = minor, fix = patch, breaking = major; with allow-initial-development-versions a breaking change is only a minor bump below 1.0; docs, chore, ci, ... release nothing;
 # the first release is v0.1.0), makes the tag and the GitHub release with generated notes, and only when it published a version are both container images built and pushed
 # to ghcr.io/phorepoc/<name> as vX.Y.Z, vX.Y and latest. A pull request never reaches this workflow.
-name: release
+name: Release
 on:
   push:
     branches: [main]

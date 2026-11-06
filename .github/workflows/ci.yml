@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # CI on a plain Linux runner. Everything here runs without Redroid, a GPU, a phone or any secret. (The Android stream suite, web/test/android.sh, needs the binder kernel module and
 # a Docker host you control: run it there, see docs/android.md.)
-name: ci
+name: CI
 on:
   # no push trigger: a push to main runs these checks once, inside the release workflow (which calls this one before it releases)
   pull_request:
