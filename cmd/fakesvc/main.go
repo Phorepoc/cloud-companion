@@ -19,6 +19,7 @@ import (
 	"github.com/phorepoc/cloud-companion/internal/fakes"
 	// each fake registers itself
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/sip"
+	_ "github.com/phorepoc/cloud-companion/internal/fakes/matrix"
 )
 
 func main() {

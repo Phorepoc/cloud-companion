@@ -1,7 +1,8 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Connections → Add an account → Matrix against a throwaway Conduit: a wrong password fails the test, the right one passes, the
+// Connections → Add an account → Matrix against the fake homeserver (internal/fakes/matrix, seeded with
+// @cc:test.local / pw-cc-123): a wrong password fails the test, the right one passes, the
 // account signs in (Connected) and shows up as a connection the Messaging rules can send to; removed, it is gone from there.
 //   BASE=http://localhost:8080 CODE=<admin code> HS=<homeserver URL> OUT=/out node --experimental-strip-types matrix.ts
 import { chromium } from 'playwright'
@@ -26,10 +27,6 @@ const shot = async (name: string) => {
   }
   await page.emulateMedia({ colorScheme: 'light' })
 }
-
-// an account on the homeserver
-const reg = await fetch(HS + '/_matrix/client/v3/register', { method: 'POST', body: JSON.stringify({ username: 'cc', password: 'pw-cc-123', auth: { type: 'm.login.dummy' } }) })
-assert.equal(reg.status, 200, 'register on the homeserver')
 
 await page.goto(BASE)
 await page.fill('[data-test=code]', CODE)
