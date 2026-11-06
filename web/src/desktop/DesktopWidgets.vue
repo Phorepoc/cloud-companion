@@ -229,12 +229,13 @@
 
       <!-- feeds (Belle RSS widget): orange header with the feed count, the newest posts below; tap opens the post -->
       <div v-else-if="w.kind === 'feeds'" class="ph-wg__rss" data-test="widget-feeds">
-        <header class="ph-wg__rsshead"><span><b>Feeds</b><small>{{ feedList.length === 1 ? feedList[0].title : feedList.length + ' feeds' }}</small></span>
-          <button type="button" class="ph-wg__arrow" aria-label="Refresh" :disabled="editing" @click="loadFeeds"><q-icon name="sym_o_refresh" size="24px" /></button></header>
+        <header class="ph-wg__rsshead"><span><b>{{ w.opt ? feedName(w.opt) : 'Feeds' }}</b><small>{{ w.opt ? 'Feed' : feedList.length === 1 ? feedList[0].title : feedList.length + ' feeds' }}</small></span>
+          <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the feed" title="Pick the feed" data-test="widget-feeds-pick" @pointerdown.stop @click="setting = w"><q-icon name="sym_o_settings" size="20px" /></button>
+          <button v-else type="button" class="ph-wg__arrow" aria-label="Refresh" @click="loadFeeds"><q-icon name="sym_o_refresh" size="24px" /></button></header>
         <div class="ph-wg__rssbody">
           <p v-if="feedsError" class="ph-wg__rssnone">Could not load: {{ feedsError }}</p>
-          <p v-else-if="!posts.length" class="ph-wg__rssnone">{{ feedList.length ? 'No posts yet.' : 'No feeds yet. Add them under Feeds in Events.' }}</p>
-          <button v-for="p in posts.slice(0, 20)" :key="p.link + p.title" type="button" class="ph-wg__rssrow" :disabled="editing" data-test="widget-feed" @click="openPost(p)">
+          <p v-else-if="!postsOf(w).length" class="ph-wg__rssnone">{{ feedList.length ? 'No posts yet.' : 'No feeds yet. Add them in Feeds.' }}</p>
+          <button v-for="p in postsOf(w).slice(0, 20)" :key="p.id" type="button" class="ph-wg__rssrow" :class="{ 'is-read': !isUnread(p) }" :disabled="editing" data-test="widget-feed" @click="showPost(p); emit('open', 'feeds')">
             <i class="ph-wg__rssdot" /><span class="ph-wg__rsst">{{ p.title || '(no title)' }}<small>{{ p.feed }}{{ postTs(p) ? ' · ' + ago(now, postTs(p)) : '' }}</small></span></button>
         </div>
       </div>
@@ -300,10 +301,14 @@
     <!-- the setting of a contact or web page widget, asked when it is added -->
     <q-dialog :model-value="!!setting" @update:model-value="(v) => { if (!v) setting = null }">
       <q-card class="ph-wg__setcard" data-test="widget-setting">
-        <q-card-section><b>{{ setting?.kind === 'web' ? 'Which page?' : setting?.kind === 'contact' ? 'Which contact?' : 'Which account?' }}</b></q-card-section>
+        <q-card-section><b>{{ setting?.kind === 'web' ? 'Which page?' : setting?.kind === 'contact' ? 'Which contact?' : setting?.kind === 'feeds' ? 'Which feed?' : 'Which account?' }}</b></q-card-section>
         <q-card-section v-if="setting?.kind === 'web'">
           <q-input v-model="settingText" dense outlined autofocus label="Address" placeholder="https://example.org" data-test="widget-setting-url" @keyup.enter="saveSetting" />
         </q-card-section>
+        <q-list v-else-if="setting?.kind === 'feeds'" dense class="ph-wg__setlist">
+          <q-item v-for="f in [{ url: '', title: 'Every feed' }, ...feedList]" :key="f.url" clickable data-test="widget-setting-feed" :active="(setting?.opt || '') === f.url" @click="setting!.opt = f.url || undefined; setting = null">
+            <q-item-section>{{ f.title || f.url }}</q-item-section></q-item>
+        </q-list>
         <q-list v-else-if="setting?.kind !== 'contact'" dense class="ph-wg__setlist">
           <q-item v-for="a in ['', ...accounts]" :key="a" clickable data-test="widget-setting-account" :active="(setting?.opt || '') === a" @click="setting!.opt = a || undefined; setting = null; refresh()">
             <q-item-section>{{ a || 'Every inbox' }}</q-item-section></q-item>
@@ -327,7 +332,7 @@ import AlbumCover from '../components/AlbumCover.vue'
 import { current as currentSong, next as musicNext, player, prev as musicPrev, toggle as musicToggle } from '../music'
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { state, api } from '../cloud'
-import { feedList, posts, feedsError, loadFeeds, openPost, postTs } from './feeds'
+import { feedList, posts, feedsError, loadFeeds, showPost, postTs, isUnread, type Post } from './feeds'
 import { sections } from '../nav'
 import { timeLabel, toDate, dayLabel } from '../dates'
 import type { CalendarEvent, Contact, MailItem, SmsConversation } from '../proto'
@@ -394,6 +399,7 @@ function add(kind: WidgetKind) {
   const at = freeSpot(kind, list, grid.value.cols, grid.value.rows)
   full.value = !at
   if (at) list.push({ id: 'w' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind, ...at })
+  if (at && kind === 'feeds' && feedList.value.length > 1) setting.value = list[list.length - 1]
   if (at && (kind === 'contact' || kind === 'web')) {
     setting.value = list[list.length - 1]; settingText.value = ''
     if (kind === 'contact') loadContacts().then((c) => { people.items = c; people.error = '' }, (e) => { people.error = quiet(e, 'Contacts') })
@@ -490,6 +496,10 @@ async function pickAccount(w: Widget) {
   setting.value = w
   try { accounts.value = await mailAccounts() } catch { accounts.value = [] }
 }
+
+// feeds widgets: every feed, or one (several widgets, each with its own source)
+const postsOf = (w: Widget): Post[] => (w.opt ? posts.value.filter((p) => p.feedURL === w.opt) : posts.value)
+const feedName = (url: string) => feedList.value.find((f) => f.url === url)?.title || url
 
 // contact and web page widgets: their setting
 const setting = ref<Widget | null>(null), settingText = ref('')
@@ -648,6 +658,7 @@ const musicButtons = computed(() => [
 .ph-wg__rssrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 14px; border: 0; border-bottom: 1px solid #DCDCDE; background: none; color: inherit; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
 .ph-wg__rssrow:hover { background: rgba(229, 98, 15, 0.08); }
 .ph-wg__rssdot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #E5620F; }
+.ph-wg__rssrow.is-read .ph-wg__rssdot { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; opacity: .5; }
 .ph-wg__rsst { display: flex; flex-direction: column; min-width: 0; }
 .ph-wg__rsst small { font-size: 12px; color: #666; }
 /* devices */
