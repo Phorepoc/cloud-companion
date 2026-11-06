@@ -46,6 +46,7 @@ import EventsPanel from './EventsPanel.vue'
 import DesktopWidgets from './DesktopWidgets.vue'
 import { loadUnread } from './glance'
 import { getLayout, setLayout } from './layout'
+import { settingsPage, settingsPageIds } from '../settingsNav'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,7 +57,7 @@ const apps = computed<ShellApp[]>(() => visible.value.map((s) => ({ id: s.id, ti
 
 // each section's page, as the router knows it (lazy), plus the section id for the placeholder page
 const pages: Record<string, { component: Component | undefined; props: Record<string, unknown> }> = Object.fromEntries(sections.map((s) => {
-  const rec = router.getRoutes().find((r) => r.path === s.path)
+  const rec = router.getRoutes().find((r) => r.path === s.path || r.path.startsWith(s.path + '/:')) // /settings/:page?
   const c = rec?.components?.default
   return [s.id, { component: typeof c === 'function' ? defineAsyncComponent(c as () => Promise<Component>) : c, props: rec?.meta?.id ? { sectionId: s.id } : {} }]
 }))
@@ -80,7 +81,7 @@ function leave() {
   leaving = true
   setLayout('classic')
   const f = shell.value?.wm.focused.value
-  router.push(sections.find((s) => s.id === f)?.path ?? '/browse')
+  router.push(f === 'settings' ? '/settings/' + settingsPage.value : sections.find((s) => s.id === f)?.path ?? '/browse')
 }
 function open(id: string) { shell.value?.open(id) }
 /** a page that links to another section opens it as a window instead of leaving the desktop */
@@ -88,6 +89,8 @@ const stopGuard = router.beforeEach((to, from) => {
   if (leaving || !from.meta.desktop || getLayout() !== 'desktop') return
   const s = sections.find((x) => x.path === to.path)
   if (s) { open(s.id); return false }
+  const sp = to.path.match(/^\/(?:settings\/)?(\w+)$/)?.[1] // a page of Settings, also by its old address (/connections)
+  if (sp && settingsPageIds.includes(sp)) { settingsPage.value = sp; open('settings'); return false }
 })
 
 const statusText = computed(() => ({ online: 'Connected', connecting: 'Connecting', offline: 'Offline' } as Record<string, string>)[state.status] || state.status)
@@ -108,7 +111,9 @@ onMounted(() => {
   checkUnread()
   mailTimer = setInterval(checkUnread, 120000)
   const want = String(route.query.open || '')
-  if (sections.some((s) => s.id === want)) open(want)
+  const sp = want.match(/^settings\/(\w+)$/)?.[1]
+  if (sp && settingsPageIds.includes(sp)) { settingsPage.value = sp; open('settings') }
+  else if (sections.some((s) => s.id === want)) open(want)
   else if (!shell.value?.wm.shown.value.length) open('browse')
 })
 onBeforeUnmount(() => { stopGuard(); ro?.disconnect(); clearInterval(clock); clearInterval(mailTimer) })

@@ -95,7 +95,7 @@ const wide = computed(() => $q.screen.gt.sm)
 const visible = computed(() => sections.filter((s) => !s.admin || state.admin))
 const primary = computed(() => visible.value.filter((s) => s.primary))
 const secondary = computed(() => visible.value.filter((s) => !s.primary))
-const isActive = (s: Section) => route.path === s.path
+const isActive = (s: Section) => route.path === s.path || route.path.startsWith(s.path + '/')
 const moreActive = computed(() => secondary.value.some(isActive))
 const statusText = computed(() => ({ online: 'Connected', connecting: 'Connecting', offline: 'Offline' })[state.status] || state.status)
 

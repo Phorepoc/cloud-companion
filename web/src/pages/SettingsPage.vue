@@ -1,0 +1,56 @@
+<!-- Copyright The Phorepoc Authors
+     SPDX-License-Identifier: Apache-2.0 -->
+<!-- Settings: one place for this device and, for the owner, the server (Connections, Devices, Catalogue, Weather, Security). The Etesian
+     Settings split (components/settings/SettingsSplit.vue): on a wide window or screen a side panel of grouped pages with search
+     and the page beside it, as iPad and macOS settings; narrower, the list drills down and the page has Back. Each page has its address
+     (/settings/connections); the old /connections, /devices and /catalogue open their page here. -->
+<template>
+  <q-page class="ph-settings">
+    <div class="ph-settings__box">
+      <SettingsSplit :groups="groups" :owner="state.admin" :page="page" :narrow-page="!!route.params.page" @update:page="pick">
+        <template #default="{ page: id }">
+          <ConnectionsPage v-if="id === 'connections'" />
+          <DevicesPage v-else-if="id === 'devices'" />
+          <CataloguePage v-else-if="id === 'catalogue'" />
+          <DeviceSettings v-else :part="id" />
+        </template>
+      </SettingsSplit>
+    </div>
+  </q-page>
+</template>
+
+<script setup lang="ts">
+import { computed, defineAsyncComponent, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { useChrome } from '@etesian-design/shell'
+import { state } from '../cloud'
+import { SETTINGS_GROUPS, settingsPage, settingsPageIds } from '../settingsNav'
+import DeviceSettings from '../components/settings/DeviceSettings.vue'
+import SettingsSplit from '../components/settings/SettingsSplit.vue'
+
+const ConnectionsPage = defineAsyncComponent(() => import('./ConnectionsPage.vue'))
+const DevicesPage = defineAsyncComponent(() => import('./DevicesPage.vue'))
+const CataloguePage = defineAsyncComponent(() => import('./CataloguePage.vue'))
+
+const route = useRoute()
+const router = useRouter()
+const groups = SETTINGS_GROUPS
+// the classic layout follows the address; in a desktop window the route is /desktop and the page comes from settingsPage alone
+watch(() => route.params.page, (p) => { if (typeof p === 'string' && settingsPageIds.includes(p)) settingsPage.value = p }, { immediate: true })
+const page = computed(() => settingsPage.value)
+function pick(id: string) {
+  settingsPage.value = id
+  if (route.path.startsWith('/settings')) router.replace('/settings/' + id)
+}
+useChrome(() => ({ title: 'Settings' }))
+</script>
+
+<style scoped>
+.ph-settings { display: flex; }
+/* the split follows the room it has (a window, or the page), not the screen */
+.ph-settings__box { flex: 1; min-width: 0; display: flex; container-type: inline-size; }
+.ph-settings__box :deep(.ph-sset) { min-height: 100%; }
+/* the pages inside are pages of their own elsewhere: no second page height or margins */
+.ph-settings__box :deep(.q-page) { min-height: 0 !important; padding: 0; }
+.ph-settings__box :deep(.ph-sset__page) { padding-top: 4px; }
+</style>

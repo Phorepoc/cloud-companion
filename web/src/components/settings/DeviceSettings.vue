@@ -1,10 +1,10 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
+<!-- The settings of this device and the server's own (weather, security): one part at a time, a page of Settings (SettingsPage.vue). -->
 <template>
-  <q-page class="ph-page">
-    <h1>Settings</h1>
+  <div class="ph-dev-settings">
 
-    <section class="ph-card ph-section" aria-labelledby="set-appearance">
+    <section v-if="part === 'appearance'" class="ph-card ph-section" aria-labelledby="set-appearance">
       <h2 id="set-appearance">Appearance</h2>
       <p class="ph-muted">Choose how the app looks. "Match system" follows your device's light or dark setting.</p>
       <q-btn-toggle v-model="choice" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
@@ -19,7 +19,7 @@
       </template>
     </section>
 
-    <section class="ph-card ph-section" aria-labelledby="set-data">
+    <section v-if="part === 'data'" class="ph-card ph-section" aria-labelledby="set-data">
       <h2 id="set-data">Data use</h2>
       <p class="ph-muted">Lower picture quality and grayscale send fewer bytes. Text always stays sharp. This applies to this device only.</p>
       <div id="q-label" class="ph-small">Picture quality: {{ q }}</div>
@@ -31,11 +31,11 @@
       </div>
     </section>
 
-    <PairNewDevice />
+    <PairNewDevice v-if="part === 'pair'" />
 
-    <WeatherSettings v-if="state.admin" />
+    <WeatherSettings v-if="part === 'weather' && state.admin" />
 
-    <section v-if="state.admin" class="ph-card ph-section" aria-labelledby="set-security" data-test="security">
+    <section v-if="part === 'security' && state.admin" class="ph-card ph-section" aria-labelledby="set-security" data-test="security">
       <h2 id="set-security">Security</h2>
       <p v-if="blocker" class="ph-note" role="note" data-test="passkey-blocker"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> {{ blocker }}</p>
       <h3 class="ph-h3">Passkeys</h3>
@@ -87,23 +87,26 @@
       </q-card>
     </q-dialog>
 
-    <section class="ph-card ph-section" aria-labelledby="set-device">
+    <section v-if="part === 'browser'" class="ph-card ph-section" aria-labelledby="set-device">
       <h2 id="set-device">This browser</h2>
       <p class="ph-muted">Device ID: <span class="ph-mono">{{ state.dev || 'not connected' }}</span></p>
       <q-btn outline color="negative" label="Disconnect this browser" @click="forgetIt" />
     </section>
-  </q-page>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+
+/** which part: appearance, data, pair, weather, security or browser */
+defineProps<{ part: string }>()
 import { useRouter } from 'vue-router'
-import { state, api, forget, connect, passkeyList, passkeyRemove, passkeyAdd, recoveryRegenerate, passkeyBlocker } from '../cloud'
-import { theme, applyTheme } from '../theme'
-import { getLayout, setLayout, DESKTOP_MIN_WIDTH, type Layout } from '../desktop/layout'
-import type { PasskeyInfo } from '../proto'
-import PairNewDevice from '../components/PairNewDevice.vue'
-import WeatherSettings from '../components/WeatherSettings.vue'
+import { state, api, forget, connect, passkeyList, passkeyRemove, passkeyAdd, recoveryRegenerate, passkeyBlocker } from '../../cloud'
+import { theme, applyTheme } from '../../theme'
+import { getLayout, setLayout, DESKTOP_MIN_WIDTH, type Layout } from '../../desktop/layout'
+import type { PasskeyInfo } from '../../proto'
+import PairNewDevice from '../PairNewDevice.vue'
+import WeatherSettings from '../WeatherSettings.vue'
 
 const router = useRouter()
 const choice = ref(theme.value)

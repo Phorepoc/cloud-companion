@@ -22,10 +22,11 @@ const router = createRouter({
     { path: '/photos', component: () => import('./pages/PhotosPage.vue') },
     { path: '/music', component: () => import('./pages/MusicPage.vue') },
     { path: '/android', component: () => import('./pages/AndroidPage.vue') },
-    { path: '/connections', component: () => import('./pages/ConnectionsPage.vue') },
-    { path: '/catalogue', component: () => import('./pages/CataloguePage.vue') },
-    { path: '/devices', component: () => import('./pages/DevicesPage.vue') },
-    { path: '/settings', component: () => import('./pages/SettingsPage.vue') },
+    // Connections, Devices and Catalogue are pages of Settings; their old addresses open them there
+    { path: '/connections', redirect: '/settings/connections' },
+    { path: '/catalogue', redirect: '/settings/catalogue' },
+    { path: '/devices', redirect: '/settings/devices' },
+    { path: '/settings/:page?', component: () => import('./pages/SettingsPage.vue') },
   ],
 })
 

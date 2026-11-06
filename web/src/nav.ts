@@ -15,6 +15,7 @@ export interface Section {
   admin?: boolean   // admin devices only
 }
 
+// Connections, Devices and Catalogue are pages of Settings (settingsNav.ts), not sections of their own
 export const sections: Section[] = [
   { id: 'browse', glyph: 'globe', label: 'Browser', icon: 'sym_o_language', color: '#4591FF', path: '/browse', primary: true },
   { id: 'chats', glyph: 'message', label: 'Chats', icon: 'sym_o_chat', color: '#09A7CC', path: '/chats', primary: true },
@@ -25,9 +26,6 @@ export const sections: Section[] = [
   { id: 'photos', glyph: 'photo', label: 'Photos', icon: 'sym_o_photo_library', color: '#7A3FD0', path: '/photos' },
   { id: 'music', glyph: 'music', label: 'Music', icon: 'sym_o_music_note', color: '#E6007E', path: '/music' },
   { id: 'android', glyph: 'phone', label: 'Android', icon: 'sym_o_smartphone', color: '#62B700', path: '/android', admin: true },
-  { id: 'connections', glyph: 'split', label: 'Connections', icon: 'sym_o_sync_alt', color: '#347708', path: '/connections', admin: true },
-  { id: 'catalogue', glyph: 'bag', label: 'Catalogue', icon: 'sym_o_storefront', color: '#1C51AF', path: '/catalogue', admin: true },
-  { id: 'devices', glyph: 'window', label: 'Devices', icon: 'sym_o_devices', color: '#F77219', path: '/devices', admin: true },
   { id: 'settings', glyph: 'settings', label: 'Settings', icon: 'sym_o_settings', color: '#6A6A6A', path: '/settings' },
 ]
 
