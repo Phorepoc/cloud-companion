@@ -27,8 +27,7 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund
-        working-directory: .github/commitlint
+      - run: npm ci --no-audit --no-fund
       - name: Lint commits
         env:
           EVENT: ${{ github.event_name }}
@@ -38,7 +37,7 @@ jobs:
         run: |
           if [ "$EVENT" = pull_request ]; then from=$BASE; else from=$BEFORE; fi
           case "$from" in ''|0000000000000000000000000000000000000000) from="$SHA~1" ;; esac
-          cd .github/commitlint && npx commitlint --config "$GITHUB_WORKSPACE/.github/commitlint/commitlint.config.js" --cwd "$GITHUB_WORKSPACE" --from "$from" --to "$SHA" --verbose
+          npx commitlint --from "$from" --to "$SHA" --verbose
 
   go:
     name: Go

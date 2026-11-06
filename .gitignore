@@ -7,6 +7,7 @@
 /.deps/
 /internal/webui/dist/*
 !/internal/webui/dist/placeholder.txt
+/node_modules/
 /web/node_modules/
 /web/dist/
 /web/test/out/

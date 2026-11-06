@@ -1,10 +1,2 @@
 #!/bin/sh
-# Lints the commit message with CI's commitlint config. commitlint runs from npx's cache (the versions in
-# .github/commitlint/package.json), so nothing is installed in the repository.
-set -e
-root=$(git rev-parse --show-toplevel)
-v() { sed -n "s/.*\"@commitlint\/$1\": \"\([^\"]*\)\".*/\1/p" "$root/.github/commitlint/package.json"; }
-R="$root" MSG="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")" npx --yes -p "@commitlint/cli@$(v cli)" -p "@commitlint/config-conventional@$(v config-conventional)" -c '
-  d="$(dirname "$(command -v commitlint)")/../.."   # the config has to sit next to the packages it extends
-  cp "$R/.github/commitlint/commitlint.config.js" "$d/commitlint.config.cjs"
-  commitlint --config "$d/commitlint.config.cjs" --cwd "$R" --edit "$MSG"'
+npx --no -- commitlint --edit "$1"
