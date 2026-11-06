@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# The same Go suite against SQLite, PostgreSQL and MariaDB: an integration check to run by hand before deploying on an external database, not in CI. Throwaway containers phe-pg-t and phe-maria-t on their own
+# The same Go suite against SQLite, PostgreSQL and MariaDB (Docker, repo root). Throwaway containers phe-pg-t and phe-maria-t on their own
 # network, capped; every test makes and drops its own database (store.OpenTest). Usage: sh web/test/db_test.sh [sqlite|postgres|mariadb|all]
 set -eu
 ROOT=$(pwd); NET=phe-dbtest

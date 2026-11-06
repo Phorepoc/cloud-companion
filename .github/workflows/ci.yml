@@ -103,6 +103,14 @@ jobs:
           path: web/test/out/*.png
           if-no-files-found: ignore
 
+  databases:
+    name: Go databases
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - run: sh web/test/db_test.sh postgres
+      - run: sh web/test/db_test.sh mariadb
+
   client:
     name: C client
     runs-on: ubuntu-latest
