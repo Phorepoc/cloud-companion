@@ -8,6 +8,8 @@ package feeds
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -18,6 +20,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/phorepoc/cloud-companion/internal/safehtml"
 )
 
 // Feed is one of the owner's feeds: its address and the title it gives itself.
@@ -28,12 +32,14 @@ type Feed struct {
 
 // Post is one item of a feed.
 type Post struct {
+	ID        string    `json:"id"`   // the same for the same post on every read: its feed, link and title, hashed
 	Feed      string    `json:"feed"` // the feed's title
 	FeedURL   string    `json:"feedURL"`
 	Title     string    `json:"title"`
 	Link      string    `json:"link"`
 	Published time.Time `json:"published"`
 	Summary   string    `json:"summary,omitempty"`
+	HTML      string    `json:"html,omitempty"` // the post's content, made safe (internal/safehtml), at most maxHTML bytes
 }
 
 // Result is the merged posts and the feeds that could not be read (address -> error).
@@ -46,6 +52,7 @@ const (
 	maxBody  = 4 << 20 // a feed larger than this is cut off
 	maxPosts = 30      // per feed
 	keepFor  = 30 * time.Minute
+	maxHTML  = 64 << 10
 )
 
 // Service reads feeds and keeps them for a while.
@@ -196,7 +203,7 @@ func Parse(r io.Reader, feedURL string) (string, []Post, error) {
 	case "rss", "rdf":
 		title = clean(doc.Channel.Title)
 		for _, it := range append(doc.Channel.Items, doc.Items...) {
-			posts = append(posts, Post{Title: clean(it.Title), Link: abs(it.Link), Published: when(it.PubDate, it.Date), Summary: short(it.Description)})
+			posts = append(posts, Post{Title: clean(it.Title), Link: abs(it.Link), Published: when(it.PubDate, it.Date), Summary: short(it.Description), HTML: content(it.Content, it.Description)})
 		}
 	case "feed":
 		title = clean(doc.Title)
@@ -208,7 +215,7 @@ func Parse(r io.Reader, feedURL string) (string, []Post, error) {
 					break
 				}
 			}
-			posts = append(posts, Post{Title: clean(e.Title), Link: abs(link), Published: when(e.Published, e.Updated), Summary: short(e.Summary + e.Content)})
+			posts = append(posts, Post{Title: clean(e.Title), Link: abs(link), Published: when(e.Published, e.Updated), Summary: short(e.Summary + e.Content), HTML: content(e.Content, e.Summary)})
 		}
 	default:
 		return "", nil, errors.New("not a feed (RSS or Atom)")
@@ -219,6 +226,7 @@ func Parse(r io.Reader, feedURL string) (string, []Post, error) {
 	for i := range posts {
 		posts[i].FeedURL = feedURL
 		posts[i].Feed = title
+		posts[i].ID = postID(feedURL, posts[i].Link, posts[i].Title)
 	}
 	return title, posts, nil
 }
@@ -229,6 +237,7 @@ type rssItem struct {
 	PubDate     string `xml:"pubDate"`
 	Date        string `xml:"date"` // dc:date
 	Description string `xml:"description"`
+	Content     string `xml:"encoded"` // content:encoded, the whole post where the description is a teaser
 }
 
 type atomEntry struct {
@@ -259,6 +268,25 @@ func when(vals ...string) time.Time {
 }
 
 // clean collapses whitespace in a title.
+// content is the fullest of the post's texts, made safe; a post too long for the reader is left to its page.
+func content(texts ...string) string {
+	for _, t := range texts {
+		if strings.TrimSpace(t) == "" {
+			continue
+		}
+		if h := safehtml.Sanitize(t); len(h) <= maxHTML {
+			return h
+		}
+		return ""
+	}
+	return ""
+}
+
+func postID(feedURL, link, title string) string {
+	h := sha256.Sum256([]byte(feedURL + "\n" + link + "\n" + title))
+	return hex.EncodeToString(h[:8])
+}
+
 func clean(s string) string { return strings.Join(strings.Fields(s), " ") }
 
 // short is the summary as plain text, at most 200 characters.

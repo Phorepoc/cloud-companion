@@ -37,6 +37,28 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestPostContent(t *testing.T) {
+	const doc = `<?xml version="1.0"?><rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>T</title>
+<item><title>Full</title><link>https://x.test/f</link><description>teaser</description><content:encoded><![CDATA[<p>Whole <b>post</b> <a href="https://x.test/more">more</a><script>alert(1)</script><img src="https://track.test/p.gif"></p>]]></content:encoded></item>
+<item><title>Short</title><link>https://x.test/s</link><description>&lt;p&gt;Only &lt;i&gt;this&lt;/i&gt;&lt;/p&gt;</description></item>
+</channel></rss>`
+	_, posts, err := Parse(strings.NewReader(doc), "https://x.test/feed")
+	if err != nil || len(posts) != 2 {
+		t.Fatalf("%v %v", posts, err)
+	}
+	full := posts[0].HTML
+	if !strings.Contains(full, "<b>post</b>") || !strings.Contains(full, `href="https://x.test/more"`) || strings.Contains(full, "script") || strings.Contains(full, "<img") {
+		t.Errorf("the whole post, made safe: %s", full)
+	}
+	if posts[1].HTML != "<p>Only <i>this</i></p>" {
+		t.Errorf("the description when there is no content: %q", posts[1].HTML)
+	}
+	_, again, _ := Parse(strings.NewReader(doc), "https://x.test/feed")
+	if posts[0].ID == "" || posts[0].ID != again[0].ID || posts[0].ID == posts[1].ID {
+		t.Errorf("ids: the same post keeps its id, posts differ: %q %q %q", posts[0].ID, again[0].ID, posts[1].ID)
+	}
+}
+
 func TestAll(t *testing.T) {
 	hits := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
