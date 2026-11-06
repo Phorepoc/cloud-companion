@@ -20,6 +20,7 @@ const router = createRouter({
     { path: '/contacts', component: () => import('./pages/ContactsPage.vue') },
     { path: '/files', component: () => import('./pages/FilesPage.vue') },
     { path: '/photos', component: () => import('./pages/PhotosPage.vue') },
+    { path: '/feeds', component: () => import('./pages/FeedsPage.vue') },
     { path: '/music', component: () => import('./pages/MusicPage.vue') },
     { path: '/android', component: () => import('./pages/AndroidPage.vue') },
     // Connections, Devices and Catalogue are pages of Settings; their old addresses open them there

@@ -64,7 +64,7 @@
         <q-btn v-if="state.admin" flat dense no-caps size="sm" color="white" :label="editingFeeds ? 'Done' : 'Edit'" data-test="events-feeds-edit" @click="editingFeeds = !editingFeeds" /></h2>
       <p v-if="feedsError" class="ph-events__none">Could not load: {{ feedsError }}</p>
       <p v-else-if="!feedList.length" class="ph-events__none">{{ state.admin ? 'Paste a feed address below to add one.' : 'No feeds yet. The owner adds them here.' }}</p>
-      <button v-for="p in posts.slice(0, 6)" :key="p.link + p.title" type="button" class="ph-events__row" data-test="events-feed" @click="openPost(p)">
+      <button v-for="p in posts.slice(0, 6)" :key="p.link + p.title" type="button" class="ph-events__row" data-test="events-feed" @click="showPost(p); emit('open', 'feeds')">
         <span class="ph-events__rss" aria-hidden="true"><q-icon name="sym_o_rss_feed" size="20px" /></span>
         <span class="ph-events__main"><span class="ph-events__title">{{ p.title || '(no title)' }}</span>
           <span class="ph-events__meta">{{ p.feed }}</span></span>
@@ -107,7 +107,7 @@ import { quiet, loadEvents, eventsOn, loadUnread, loadChats, ago as agoAt } from
 import SectionTile from '../components/SectionTile.vue'
 import WeatherPlaceDialog from './WeatherPlaceDialog.vue'
 import { forecast, noPlace, weatherError, loadWeather, weatherIcon } from './weather'
-import { feedList, posts, feedErrors, feedsError, loadFeeds, addFeed, removeFeed, openPost, postTs } from './feeds'
+import { feedList, posts, feedErrors, feedsError, loadFeeds, addFeed, removeFeed, showPost, postTs } from './feeds'
 import { state } from '../cloud'
 
 const props = defineProps({ now: { type: Date, required: true }, /** inside the Overview: fills its column, no shadow */ embedded: { type: Boolean, default: false } })
