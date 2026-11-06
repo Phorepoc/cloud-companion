@@ -105,7 +105,7 @@ onBeforeUnmount(() => { window.clearInterval(timer); window.clearTimeout(copiedT
 .ph-bigcode { font-family: var(--ph-font-mono, ui-monospace, Menlo, Consolas, monospace); font-size: 2rem; font-weight: 600; letter-spacing: 0.08em; padding: var(--ph-s2) var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); user-select: all; }
 .ph-bigcode.is-expired { opacity: 0.45; text-decoration: line-through; }
 .ph-mono { font-family: var(--ph-font-mono); font-size: var(--ph-text-small); overflow-wrap: anywhere; user-select: all; }
-.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--hd-radius-card); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
 .ph-ok { display: inline-flex; align-items: center; gap: var(--ph-s1); color: var(--ph-positive); }
 .ph-actions { display: flex; align-items: center; gap: var(--ph-s4); }

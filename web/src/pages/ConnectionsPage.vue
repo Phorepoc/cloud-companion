@@ -458,7 +458,7 @@ watch(adding, (open) => { if (!open) { tgReset(); ncReset() } }) // a closed dia
 .ph-chip { display: inline-block; margin-left: var(--ph-s2); padding: 2px var(--ph-s2); font-size: var(--ph-text-small); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-ok { color: var(--ph-positive, #1b7f3b); display: flex; gap: var(--ph-s2); align-items: flex-start; }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
-.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--hd-radius-card); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-dialog { width: min(94vw, 480px); background: var(--ph-surface); color: var(--ph-text); max-height: 90vh; overflow: auto; }
 .ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-two { display: grid; grid-template-columns: 1fr 110px; gap: var(--ph-s2); }

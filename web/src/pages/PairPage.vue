@@ -135,7 +135,7 @@ function savedIt() { recoveryDialog.value = false; shownCode.value = ''; router.
 .ph-stack { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-h2 { font-size: var(--ph-text-h3, 1.1rem); margin: 0; }
 .ph-sep { margin: var(--ph-s2) 0; }
-.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--hd-radius-card); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
 .ph-dialog { width: min(92vw, 440px); background: var(--ph-surface); color: var(--ph-text); }
 .ph-dialog p { margin: var(--ph-s3) 0 0; }

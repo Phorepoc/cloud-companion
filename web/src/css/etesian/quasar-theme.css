@@ -674,3 +674,6 @@ body.hd-quasar.body--dark, .hd-quasar .q-dark, .hd-quasar.q-dark { color: var(--
 .hd-alarms__t small { font: 400 var(--hd-font-size-small)/1 var(--hd-font-family-base); color: #9a9a9a; }
 .hd-quasar .q-time { background: #000; color: #fff; border-color: #262626; }
 .hd-alarms .hd-switch__track[aria-checked='false'] { background: #2a2a2a; border-color: #4a4a4a; }
+
+/* a banner is a surface (a notice), not a control: the card radius, not Quasar's 4 px rounded rectangle */
+.hd-quasar .q-banner.rounded-borders { border-radius: var(--hd-radius-card); }
