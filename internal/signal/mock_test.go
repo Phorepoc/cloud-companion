@@ -5,97 +5,31 @@ package signal
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
-	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/phorepoc/cloud-companion/internal/chat"
+	fake "github.com/phorepoc/cloud-companion/internal/fakes/signal"
 	"github.com/phorepoc/cloud-companion/internal/store"
 )
 
 const me = "+306900000001"
 
-// mockAPI plays signal-cli-rest-api as its README and Swagger describe it: /v1/about, /v1/accounts, /v1/groups/{number},
-// /v2/send, and /v1/receive/{number} as a websocket (json-rpc mode) or a list (normal mode).
-type mockAPI struct {
-	mode  string
-	mu    sync.Mutex
-	queue []string // envelopes waiting to be received
-	sent  []map[string]any
-	push  chan string
+// the API is the fake in internal/fakes/signal, with me linked in the group Team
+func mockAPI(mode string) *fake.API {
+	m := fake.New(mode)
+	m.Link(me, `[{"name":"Team","id":"group.dGVhbQ==","internal_id":"dGVhbQ==","members":["`+me+`","+306900000002"]}]`)
+	return m
 }
 
-func (m *mockAPI) envelope(s string) {
-	if m.mode == "json-rpc" {
-		m.push <- s
-		return
-	}
-	m.mu.Lock()
-	m.queue = append(m.queue, s)
-	m.mu.Unlock()
-}
-
-func (m *mockAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch {
-	case r.URL.Path == "/v1/about":
-		w.Write([]byte(`{"versions":["v1","v2"],"build":2,"mode":"` + m.mode + `","version":"0.101"}`))
-	case r.URL.Path == "/v1/accounts":
-		w.Write([]byte(`["` + me + `"]`))
-	case r.URL.Path == "/v1/groups/"+me:
-		w.Write([]byte(`[{"name":"Team","id":"group.dGVhbQ==","internal_id":"dGVhbQ==","members":["` + me + `","+306900000002"]}]`))
-	case r.URL.Path == "/v1/receive/"+me && m.mode == "json-rpc":
-		c, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			return
-		}
-		defer c.CloseNow()
-		for {
-			select {
-			case s := <-m.push:
-				if c.Write(r.Context(), websocket.MessageText, []byte(s)) != nil {
-					return
-				}
-			case <-r.Context().Done():
-				return
-			}
-		}
-	case r.URL.Path == "/v1/receive/"+me:
-		m.mu.Lock()
-		q := m.queue
-		m.queue = nil
-		m.mu.Unlock()
-		w.Write([]byte("[" + strings.Join(q, ",") + "]"))
-	case r.URL.Path == "/v2/send" && r.Method == "POST":
-		var in map[string]any
-		json.NewDecoder(r.Body).Decode(&in)
-		if rc, _ := in["recipients"].([]any); len(rc) == 1 && rc[0] == "+306999999999" {
-			w.WriteHeader(400)
-			w.Write([]byte(`{"error":"Failed to send message: Unregistered user \"+306999999999\""}`))
-			return
-		}
-		m.mu.Lock()
-		m.sent = append(m.sent, in)
-		m.mu.Unlock()
-		w.WriteHeader(201)
-		w.Write([]byte(`{"timestamp":"1793910347000"}`))
-	default:
-		w.WriteHeader(404)
-		w.Write([]byte(`{"error":"not found"}`))
-	}
-}
-
-func (m *mockAPI) wasSent(to, body string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	for _, s := range m.sent {
+func wasSent(m *fake.API, to, body string) bool {
+	for _, s := range m.Sent() {
 		if rc, _ := s["recipients"].([]any); len(rc) == 1 && rc[0] == to && s["message"] == body && s["number"] == me {
 			return true
 		}
@@ -135,7 +69,7 @@ const (
 func TestBothModes(t *testing.T) {
 	for _, mode := range []string{"json-rpc", "normal"} {
 		t.Run(mode, func(t *testing.T) {
-			m := &mockAPI{mode: mode, push: make(chan string, 16)}
+			m := mockAPI(mode)
 			srv := httptest.NewServer(m)
 			defer srv.Close()
 			if d, err := Test(context.Background(), Cfg{API: srv.URL, Number: me}); err != nil || !strings.Contains(d, mode) {
@@ -164,7 +98,7 @@ func TestBothModes(t *testing.T) {
 			defer x.Stop()
 			waitFor(t, "receiving", func() bool { mu.Lock(); defer mu.Unlock(); return ok > 0 })
 			for _, e := range []string{receipt, syncedSelf, reaction, fromBob, hidden, inGroup, withFile} {
-				m.envelope(e)
+				m.Envelope(e)
 			}
 			waitFor(t, "the messages", func() bool { return inbox(st, "+306900000002", "look [file: cat.jpg]") != nil })
 			if g := inbox(st, "+306900000002", "hello"); g == nil || g.PeerName != "Bob" || g.TS != 1793910347 {
@@ -181,11 +115,11 @@ func TestBothModes(t *testing.T) {
 			}
 
 			for to, body := range map[string]string{"+306900000002": "hi bob", "group.dGVhbQ==": "hi team", "5e3c-uuid": "hi carol"} {
-				if err := x.Send(context.Background(), "me", to, body, ""); err != nil || !m.wasSent(to, body) {
+				if err := x.Send(context.Background(), "me", to, body, ""); err != nil || !wasSent(m, to, body) {
 					t.Fatalf("to %s: %v", to, err)
 				}
 			}
-			if err := x.Send(context.Background(), "me", "+306999999999", "anyone?", ""); !errors.Is(err, chat.ErrNoRoute) {
+			if err := x.Send(context.Background(), "me", fake.Unregistered, "anyone?", ""); !errors.Is(err, chat.ErrNoRoute) {
 				t.Fatalf("a number not on Signal: %v", err)
 			}
 		})
