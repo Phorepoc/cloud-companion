@@ -5,6 +5,7 @@
 // add "laptop" and note the password; Files → upload hello.txt; Files → Use from other apps shows the address (this site's /dav/).
 // Writes "<address> <login> <password>" to $OUT/dav-login for dav.sh.
 import { chromium } from 'playwright'
+import { tool } from './chrome.ts'
 import assert from 'node:assert/strict'
 import { writeFileSync } from 'node:fs'
 
@@ -37,7 +38,7 @@ await page.goto(BASE + '/#/files')
 await page.waitForSelector('[data-test=files-page]')
 await page.setInputFiles('[data-test=files-input]', { name: 'hello.txt', mimeType: 'text/plain', buffer: Buffer.from('hello from the browser') })
 await page.waitForSelector('[data-test="file-hello.txt"]')
-await page.click('[data-test=files-dav]')
+await tool(page, 'Use from other apps')
 const url = await page.inputValue('[data-test=files-dav-url]')
 assert.equal(url, BASE + '/dav/')
 for (const s of ['light', 'dark'] as const) { await page.emulateMedia({ colorScheme: s }); await page.waitForTimeout(300); await page.screenshot({ path: `${OUT}/dav-${s}-dialog.png` }) }

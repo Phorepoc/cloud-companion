@@ -6,7 +6,8 @@
      the generated cover. -->
 <template>
   <q-page class="ph-page ph-music" data-test="music-page">
-    <div class="ph-head">
+    <!-- with a header (the classic bar, a desktop window) Albums | Artists | Songs is the title's menu -->
+    <div v-if="!chrome.hosted" class="ph-head">
       <h1>Music</h1>
       <q-btn-toggle v-model="tab" no-caps unelevated toggle-color="primary" data-test="music-tabs"
                     :options="[{ label: 'Albums', value: 'albums' }, { label: 'Artists', value: 'artists' }, { label: 'Songs', value: 'songs' }]" @update:model-value="album = null; artist = ''" />
@@ -86,6 +87,7 @@
 <script setup lang="ts">
 import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
+import { useChrome } from '@etesian-design/shell'
 import AlbumCover from '../components/AlbumCover.vue'
 import { api, connect, creds, state } from '../cloud'
 import { loadTracks, type Track } from '../files'
@@ -98,6 +100,10 @@ const loading = ref(false), error = ref('')
 const tab = ref<'albums' | 'artists' | 'songs'>('albums')
 const album = ref<Album | null>(null)
 const artist = ref('')
+
+const VIEWS: Record<string, 'albums' | 'artists' | 'songs'> = { Albums: 'albums', Artists: 'artists', Songs: 'songs' }
+const chrome = useChrome(() => ({ title: 'Music', views: Object.keys(VIEWS), view: tab.value[0]!.toUpperCase() + tab.value.slice(1) }))
+chrome.on('view', (v) => { const t = v ? VIEWS[v] : undefined; if (t) { tab.value = t; album.value = null; artist.value = '' } })
 const now = computed(() => current())
 
 const albums = computed(() => {

@@ -10,6 +10,7 @@
 import { chromium } from 'playwright'
 import http from 'node:http'
 import assert from 'node:assert/strict'
+import { openApp } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const CODE = process.env.CODE
@@ -49,7 +50,7 @@ await page.click('[data-test=pair]')
 await page.waitForFunction(() => window.__phe && window.__phe.state.status === 'online', null, { timeout: 20000 })
 
 step('Settings → Weather: Open-Meteo on our own address, default place Tampere')
-await page.goto(BASE + '/#/settings')
+await page.goto(BASE + '/#/settings/weather')
 await page.waitForSelector('[data-test=weather-provider]')
 await page.click('text=Own server')
 await page.fill('[data-test=weather-base]', 'http://127.0.0.1:6197')
@@ -72,12 +73,12 @@ await page.waitForSelector('[data-test=weather-error]')
 assert.match(await page.textContent('[data-test=weather-error]') || '', /did not answer/)
 assert.doesNotMatch(await page.textContent('[data-test=weather-error]') || '', /not-a-key/)
 await page.goto(BASE + '/#/') // away and back: the card reads the stored config again
-await page.goto(BASE + '/#/settings')
+await page.goto(BASE + '/#/settings/weather')
 await page.waitForSelector('[data-test=weather-provider]')
 assert(await page.locator('[data-test=weather-provider] [aria-checked=true]:has-text("Open-Meteo")').count(), 'Open-Meteo is still the source')
 
 step('desktop: add the Weather widget; it shows the default place')
-await page.click('[data-test=desktop-view]')
+await openApp(page, 'Desktop')
 await page.waitForSelector('[data-test=desktop]')
 await page.getByRole('menuitem', { name: 'View', exact: true }).click()
 await page.getByRole('menu', { name: 'View' }).getByText('Edit desktop').click()

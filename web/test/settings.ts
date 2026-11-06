@@ -10,6 +10,7 @@
 
 import { firefox } from 'playwright'
 import assert from 'node:assert/strict'
+import { openApp } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const CODE = process.env.CODE
@@ -54,7 +55,9 @@ await page.goto(BASE + '/#/connections')
 await page.waitForSelector('.ph-sset__page h1:has-text("Connections")')
 assert.equal(await hash(), '#/settings/connections')
 assert(await page.locator(`${side} .hd-list-item.is-selected`, { hasText: 'Connections' }).count(), 'Connections is marked in the panel')
-assert.equal(await page.locator('[data-test=nav-connections]').count(), 0, 'no separate Connections section in the navigation')
+await page.click('.x-cl__apps')
+assert.equal(await page.locator('.x-cl__grid .x-cl__icon', { hasText: 'Connections' }).count(), 0, 'no separate Connections section in the apps menu')
+await page.click('.x-cl__apps')
 
 step('search narrows the panel')
 await page.fill(`${side} input`, 'sec')
@@ -78,7 +81,7 @@ await page.waitForSelector(side)
 step('desktop: Settings in a window is the same split; a link to a page of Settings opens it there')
 await page.setViewportSize({ width: 1440, height: 900 })
 await page.goto(BASE + '/#/settings/appearance')
-await page.click('[data-test=desktop-view]')
+await openApp(page, 'Desktop')
 await page.waitForSelector('.x-win[data-win=settings] .ph-sset').catch(async (e) => { await page.screenshot({ path: `${OUT}/settings-fail.png` }); throw e })
 await page.screenshot({ path: `${OUT}/settings-desktop-open.png` })
 await page.evaluate(() => { location.hash = '#/connections' })

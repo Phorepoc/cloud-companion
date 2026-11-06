@@ -8,6 +8,7 @@
 // uploaded songs (generated cover), playing an album with seeking, "Play on" the other browser, and the Belle music widgets.
 import { chromium, type Page } from 'playwright'
 import assert from 'node:assert/strict'
+import { openApp, tool } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const OUT = process.env.OUT || '.'
@@ -52,7 +53,7 @@ step('Files: empty, then folders Music / Belle Band / First Light')
 await pc.goto(BASE + '/#/files')
 await pc.waitForSelector('[data-test=files-empty]')
 for (const f of ['Music', 'Belle Band', 'First Light']) {
-  await pc.click('[data-test=files-mkdir]')
+  await tool(pc, 'New folder')
   await name(pc, f)
   await pc.click(`[data-test="file-${f}"]`)
   await pc.waitForSelector('[data-test=files-empty]')
@@ -136,7 +137,7 @@ await pc.waitForFunction(() => document.querySelector('[data-test=music-toggle]'
 
 step('the Belle music widgets on the desktop follow the player')
 await pc.goto(BASE + '/#/music')
-await pc.click('[data-test=desktop-view]')
+await openApp(pc, 'Desktop')
 await pc.waitForSelector('[data-test=desktop]')
 await pc.getByRole('menuitem', { name: 'View', exact: true }).click()
 await pc.getByRole('menu', { name: 'View' }).getByText('Edit desktop').click()

@@ -2,7 +2,8 @@
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
   <q-page class="ph-page">
-    <div class="ph-head">
+    <!-- with a header (the classic bar, a desktop window) the title and New contact are there -->
+    <div v-if="!chrome.hosted" class="ph-head">
       <h1>Contacts</h1>
       <q-btn unelevated color="primary" icon="sym_o_add" label="New contact" data-test="contact-new" @click="openNew" />
     </div>
@@ -97,6 +98,7 @@ import type { Contact, Labeled } from '../proto'
 interface ContactForm { href?: string; etag?: string; given: string; family: string; org: string; note: string; phones: Required<Labeled>[]; emails: Required<Labeled>[] }
 import { toast } from '../toast'
 import EmptyState from '../components/EmptyState.vue'
+import { useChrome } from '@etesian-design/shell'
 
 const contacts = ref<Contact[]>([])
 const loading = ref(false)
@@ -139,6 +141,9 @@ function friendly(m: string) {
 
 const openView = (c: Contact) => { current.value = c; viewOpen.value = true }
 function openNew() { form.value = blank(); formError.value = ''; editOpen.value = true }
+
+const chrome = useChrome(() => ({ title: 'Contacts', tools: [{ icon: 'add', label: 'New contact' }] }))
+chrome.on('tool', (l) => { if (l === 'New contact') openNew() })
 function openEdit(c: Contact) {
   viewOpen.value = false
   form.value = { href: c.href, etag: c.etag, given: c.given || '', family: c.family || '', org: c.org || '', note: c.note || '',

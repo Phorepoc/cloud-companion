@@ -2,7 +2,8 @@
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
   <q-page class="ph-page">
-    <div class="ph-head">
+    <!-- with a header (the classic bar, a desktop window) the title and New event are there -->
+    <div v-if="!chrome.hosted" class="ph-head">
       <h1>Calendar</h1>
       <q-btn unelevated color="primary" icon="sym_o_add" label="New event" data-test="event-new" @click="openNew()" />
     </div>
@@ -128,6 +129,7 @@ import type { CalendarEvent } from '../proto'
 /** The edit form: the event's text fields and its start and end as date and time inputs. */
 interface EventForm extends EventFields { href?: string; etag?: string; title: string; location: string; notes: string }
 import EmptyState from '../components/EmptyState.vue'
+import { useChrome } from '@etesian-design/shell'
 
 const $q = useQuasar()
 const phone = computed(() => $q.screen.lt.sm)
@@ -144,6 +146,9 @@ const formError = ref('')
 const form = ref<EventForm>({ title: '', location: '', notes: '', allday: false, startDate: '', startTime: '', endDate: '', endTime: '' })
 const zone = browserZone()
 const view = ref('month')
+
+const chrome = useChrome(() => ({ title: 'Calendar', tools: [{ icon: 'add', label: 'New event' }] }))
+chrome.on('tool', (l) => { if (l === 'New event') openNew() })
 const selected = ref(ymd(now))
 const dows = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 try { view.value = localStorage.getItem('phecloud-cal-view') || 'month' } catch (e) { /* ignore */ }

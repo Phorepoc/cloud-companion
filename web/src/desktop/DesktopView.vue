@@ -17,7 +17,6 @@
       <template #window="{ id }">
         <WinPage :id="id" :page="pages[id]" />
       </template>
-      <template #actions="{ id }"><span :id="'ph-acts-' + id" class="ph-desk__acts" /></template>
       <template #events="{ embedded, close }">
         <EventsPanel :now="now" :embedded="embedded" @open="(id: string) => { close(); open(id) }" @close="close" @unread="(n: number) => (unread = n)" />
       </template>
@@ -30,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, defineComponent, h, onBeforeUnmount, onMounted, provide, reactive, ref, type Component } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, onBeforeUnmount, onMounted, reactive, ref, type Component } from 'vue'
 import { QLayout, QPageContainer } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import { XShell, type ShellApp, type ShellMenu } from '@etesian-design/shell'
@@ -41,7 +40,6 @@ import { sections } from '../nav'
 import { brand } from '../brand'
 import BrandLogo from '../components/BrandLogo.vue'
 import ToastHost from '../components/ToastHost.vue'
-import { TITLE_ACTIONS } from '../components/titlebar'
 import EventsPanel from './EventsPanel.vue'
 import DesktopWidgets from './DesktopWidgets.vue'
 import { loadUnread } from './glance'
@@ -62,13 +60,10 @@ const pages: Record<string, { component: Component | undefined; props: Record<st
   return [s.id, { component: typeof c === 'function' ? defineAsyncComponent(c as () => Promise<Component>) : c, props: rec?.meta?.id ? { sectionId: s.id } : {} }]
 }))
 
-/** a page in its window: it finds its header's action slot there (for pages that still teleport their buttons) */
+/** a page in its window (its title, views and actions reach the window's header through useChrome) */
 const WinPage = defineComponent({
   props: { id: { type: String, required: true }, page: { type: Object, required: true } },
   setup(p) {
-    const el = ref<HTMLElement | null>(null)
-    provide(TITLE_ACTIONS, el)
-    onMounted(() => { el.value = document.getElementById('ph-acts-' + p.id) })
     // a page is a QPage: it needs a layout around it, here one that fills the window
     return () => (p.page.component ? h(QLayout, { view: 'hhh lpr fff', container: true, class: 'ph-win__layout' }, () => h(QPageContainer, null, () => h(p.page.component, p.page.props))) : null)
   },
@@ -124,8 +119,6 @@ onBeforeUnmount(() => { stopGuard(); ro?.disconnect(); clearInterval(clock); cle
 .ph-desk > :deep(.x-desktop) { flex: 1; min-height: 0; }
 .ph-desk__status { font-size: 12px; color: var(--hd-c-fg-secondary); margin-right: 6px; }
 .ph-desk__status.is-online { color: #7BD34A; }
-.ph-desk__acts { display: inline-flex; align-items: center; }
-.ph-desk__acts:empty { display: none; }
 .ph-desk__wg { position: absolute; top: 0; right: 0; bottom: 0; left: 0; }
 .ph-desk :deep(.ph-win__layout) { height: 100%; width: 100%; }
 </style>

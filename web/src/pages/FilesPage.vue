@@ -5,13 +5,14 @@
      the music player), downloads, gets a public link to share, or is renamed or deleted (Undo while the toast shows). -->
 <template>
   <q-page class="ph-page" :class="{ 'is-drop': dropping }" data-test="files-page" @dragover.prevent="dropping = !readOnly" @dragleave.self="dropping = false" @drop.prevent="onDrop">
-    <div class="ph-head">
+    <!-- with a header (the classic bar, a desktop window) the title and the actions are there; the file picker stays in the page -->
+    <input ref="picker" type="file" multiple hidden data-test="files-input" @change="onPick">
+    <div v-if="!chrome.hosted" class="ph-head">
       <h1>Files</h1>
       <span v-if="!readOnly" class="ph-head__acts">
         <q-btn v-if="!path" flat no-caps icon="sym_o_lan" label="Use from other apps" data-test="files-dav" @click="davOpen = true" />
         <q-btn flat no-caps icon="sym_o_create_new_folder" label="New folder" data-test="files-mkdir" @click="askFolder" />
         <q-btn unelevated no-caps color="primary" icon="sym_o_upload" label="Upload" :loading="uploading" data-test="files-upload" @click="picker?.click()" />
-        <input ref="picker" type="file" multiple hidden data-test="files-input" @change="onPick">
       </span>
     </div>
     <nav class="ph-crumbs" aria-label="Folder">
@@ -109,6 +110,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
+import { useChrome } from '@etesian-design/shell'
 import { toast } from '../toast'
 import { deleteFile, fileURL, iconOf, listFiles, listShares, loadTracks, makeFolder, moveFile, shareFile, shareLink, size, unshare, uploadFiles, type FileEntry, type Share } from '../files'
 import { play } from '../music'
@@ -185,6 +187,16 @@ async function download(e: FileEntry) {
 
 const naming = reactive({ open: false, name: '', from: '', error: '' })
 function askFolder() { Object.assign(naming, { open: true, name: '', from: '', error: '' }) }
+
+// a read-only folder (another server's) offers nothing to change
+const chrome = useChrome(() => ({
+  title: 'Files',
+  tools: readOnly.value ? [] : [
+    { icon: 'save', label: 'Upload' }, { icon: 'folder', label: 'New folder' },
+    ...(path.value ? [] : [{ icon: 'globe', label: 'Use from other apps' }]),
+  ],
+}))
+chrome.on('tool', (l) => { if (l === 'Upload') picker.value?.click(); else if (l === 'New folder') askFolder(); else if (l === 'Use from other apps') davOpen.value = true })
 function askRename(e: FileEntry) { Object.assign(naming, { open: true, name: e.name, from: e.path, error: '' }) }
 async function saveName() {
   const n = naming.name.trim()

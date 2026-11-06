@@ -11,6 +11,7 @@
 
 import { firefox } from 'playwright'
 import assert from 'node:assert/strict'
+import { openApp } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const CODE = process.env.CODE
@@ -51,7 +52,7 @@ for (let i = 0; !(await page.evaluate(() => window.__phe?.state.status === 'onli
 
 step('enter the desktop from the top bar: the current section opens as a window and names the menu bar')
 await page.goto(BASE + '/#/settings')
-await page.click('[data-test=desktop-view]')
+await openApp(page, 'Desktop')
 await page.waitForSelector('[data-test=desktop]')
 await page.waitForSelector(win('settings'))
 assert.equal(await barApp(), 'Settings')

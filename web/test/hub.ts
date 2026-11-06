@@ -7,6 +7,7 @@
 // it. Screenshots (light and dark, phone and desktop) go to OUT.
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
+import { tool } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
 const CODE = process.env.CODE
@@ -47,13 +48,13 @@ try {
 
   // ---- contacts ----
   await go('contacts')
-  await page.waitForSelector('[data-test=contact-new]')
+  await page.waitForSelector('[aria-label="New contact"]')
   await page.waitForTimeout(1200)
   const before = await page.locator('[data-test^=contact-row-]').count()
   step('contacts page loaded, ' + before + ' existing contact(s)')
   await shots('contacts')
 
-  await page.click('[data-test=contact-new]')
+  await tool(page, 'New contact')
   await page.fill('[data-test=contact-given]', NAME)
   await page.fill('[data-test=contact-family]', 'Tester')
   await page.fill('[data-test=contact-org]', 'Playwright Ltd')
@@ -109,12 +110,12 @@ try {
 
   // ---- calendar ----
   await go('calendar')
-  await page.waitForSelector('[data-test=event-new]')
+  await page.waitForSelector('[aria-label="New event"]')
   await page.waitForTimeout(1200)
   const today = new Date()
   const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   await shots('calendar')
-  await page.click('[data-test=event-new]')
+  await tool(page, 'New event')
   await page.fill('[data-test=event-title]', `Event ${stamp}`)
   await page.fill('[data-test=event-start-date]', iso)
   await page.fill('[data-test=event-start-time]', '14:00')
@@ -160,7 +161,7 @@ try {
   // ---- month grid (the default view) and the agenda toggle; times are written with the browser's zone ----
   await go('calendar')
   await page.waitForSelector('[data-test=cal-grid]')
-  await page.click('[data-test=event-new]')
+  await tool(page, 'New event')
   await page.fill('[data-test=event-title]', `Zoned ${stamp}`)
   await page.fill('[data-test=event-start-date]', iso)
   await page.fill('[data-test=event-start-time]', '10:15')

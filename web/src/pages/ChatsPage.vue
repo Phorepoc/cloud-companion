@@ -2,7 +2,7 @@
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
   <q-page class="ph-page">
-    <h1>Chats</h1>
+    <h1 v-if="!chrome.hosted">Chats</h1>
     <p class="ph-muted">Text messages (SMS) from your own phones. Each phone syncs its own messages here; a message you send goes out through the phone you pick.</p>
 
     <div v-if="error" class="ph-error" role="alert" data-test="chat-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</div>
@@ -53,8 +53,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useChrome } from '@etesian-design/shell'
 import { apiCall } from '../cloud'
 import type { SmsConversation, SmsDevice, SmsMessage } from '../proto'
+
+// the title is in the host's header (the classic bar, a desktop window)
+const chrome = useChrome(() => ({ title: 'Chats' }))
 
 /** The open conversation: a stored one, or a new message (empty key) still to be addressed. */
 type Current = Pick<SmsConversation, 'key' | 'number'> & Partial<SmsConversation>
@@ -136,7 +140,7 @@ onBeforeUnmount(() => clearInterval(timer))
 .ph-out .ph-bubble { background: var(--ph-accent, #0b5cab); color: var(--ph-on-accent, #fff); }
 .ph-compose { display: flex; flex-direction: column; gap: var(--ph-s2); }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
-.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); }
+.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--hd-radius-card); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-back { display: none; }
 @media (max-width: 719px) {
   .ph-chat { grid-template-columns: 1fr; }

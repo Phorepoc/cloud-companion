@@ -8,6 +8,7 @@
 // and "Camera"; an album shows its photo; removing the photo folder takes its photo off the timeline.
 //   BASE=http://localhost:8080 CODE=<admin code> SERVER=http://immich:2283 KEY=<API key> OUT=/out node --experimental-strip-types photos.ts
 import { chromium, type Page } from 'playwright'
+import { shownTitle, tool, view } from './chrome.ts'
 import assert from 'node:assert/strict'
 import { deflateSync } from 'node:zlib'
 
@@ -79,7 +80,7 @@ step('Connections: Immich added; Test found its one album')
 
 await page.goto(BASE + '/#/files')
 await page.waitForSelector('[data-test="file-Home photos"]')
-await page.click('[data-test=files-mkdir]')
+await tool(page, 'New folder')
 await page.fill('[data-test=files-name-input]', 'Camera')
 await page.click('[data-test=files-name-save]')
 await page.click('[data-test=file-Camera]')
@@ -94,7 +95,7 @@ step('Files: a folder Camera with a photo, marked Show in Photos from its menu')
 await page.goto(BASE + '/#/photos')
 await page.waitForSelector('[data-test=photos-grid]')
 await poll('the timeline', async () => (await names()).join() === 'hill.png,sea.png,snow.png')
-for (let i = 0; !(await allShown()); i++) { assert(i < 30, 'thumbnails'); await page.waitForTimeout(1000); if (i % 5 === 4) { await page.click('[data-test=photos-tab-albums]'); await page.click('[data-test=photos-tab-timeline]'); await page.waitForSelector('[data-test=photos-grid]') } }
+for (let i = 0; !(await allShown()); i++) { assert(i < 30, 'thumbnails'); await page.waitForTimeout(1000); if (i % 5 === 4) { await view(page, 'Albums'); await view(page, 'Timeline'); await page.waitForSelector('[data-test=photos-grid]') } }
 const months = await page.locator('.ph-month h2').allTextContents()
 assert.equal(months.length, 3, 'one heading per month: ' + months)
 assert.match(months[1]!, /July 2024/)
@@ -115,7 +116,7 @@ await page.keyboard.press('Escape')
 await page.waitForSelector('[data-test=photos-viewer]', { state: 'detached' })
 step('the viewer: a preview of the photo, Older and the arrow key, Escape closes')
 
-await page.click('[data-test=photos-tab-albums]')
+await view(page, 'Albums')
 await page.waitForSelector('[data-test=photos-albums]')
 const albums = await page.locator('.ph-palbum b').allTextContents()
 assert.deepEqual(albums, ['Camera', 'Summer'])
@@ -123,16 +124,16 @@ await poll('album covers', () => page.locator('.ph-palbum img').evaluateAll((l) 
 await shot(page, '3-albums')
 await page.click('[data-test=photos-album-Summer]')
 await poll('the album', async () => (await names()).join() === 'sea.png')
-assert.equal(await page.textContent('h1'), 'Summer')
-await page.click('[data-test=photos-back]')
+assert.equal(await shownTitle(page), 'Summer')
+await page.click('.x-cl__bar [aria-label=Back]')
 await page.waitForSelector('[data-test=photos-albums]')
 step('Albums: the photo folder and the Immich album, with covers; Summer holds sea.png')
 
-await page.click('[data-test=photos-folders]')
+await tool(page, 'Photo folders')
 await page.click('[data-test=photos-folder-remove-Camera]')
 await page.waitForSelector('[data-test=photos-folders-none]')
 await page.keyboard.press('Escape')
-await page.click('[data-test=photos-tab-timeline]')
+await view(page, 'Timeline')
 await poll('the folder photo gone', async () => (await names()).join() === 'sea.png,snow.png')
 step('Photo folders: removing Camera takes its photo off the timeline')
 

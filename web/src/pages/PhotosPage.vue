@@ -4,17 +4,21 @@
 -->
 <template>
   <q-page class="ph-page ph-photos" data-test="photos-page">
-    <div class="ph-head">
+    <!-- in a host with a header (the classic bar, a desktop window) the title, Timeline | Albums, Back from an album and Photo folders
+         are there (useChrome); without one the page draws them itself -->
+    <div v-if="!chrome.hosted" class="ph-head">
       <h1>{{ album ? album.name : 'Photos' }}</h1>
       <span class="ph-head__acts">
         <q-btn v-if="state.admin && !album" flat no-caps icon="sym_o_folder_special" label="Photo folders" data-test="photos-folders" @click="openFolders" />
       </span>
     </div>
+    <template v-if="!chrome.hosted">
     <nav v-if="!album" class="ph-tabs" aria-label="Photos">
       <button type="button" class="hd-sqh" :aria-current="tab === 'timeline' ? 'page' : undefined" data-test="photos-tab-timeline" @click="tab = 'timeline'">Timeline</button>
       <button type="button" class="hd-sqh" :aria-current="tab === 'albums' ? 'page' : undefined" data-test="photos-tab-albums" @click="tab = 'albums'">Albums</button>
     </nav>
     <q-btn v-else flat no-caps icon="sym_o_arrow_back" label="Albums" class="ph-back" data-test="photos-back" @click="closeAlbum" />
+    </template>
 
     <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
@@ -85,6 +89,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import EmptyState from '../components/EmptyState.vue'
+import { useChrome } from '@etesian-design/shell'
 import { state } from '../cloud'
 import { hasThumb, loadAlbum, loadAlbums, loadTimeline, photoFolders, photoURL, setPhotoFolders, type Photo, type PhotoAlbum } from '../photos'
 
@@ -120,6 +125,19 @@ async function loadMore() {
 }
 function openAlbum(a: PhotoAlbum) { album.value = a; items.value = []; reload() }
 function closeAlbum() { album.value = null; items.value = []; reload() }
+
+// the header: the album's name with Back, or Photos with its two views
+const VIEWS: Record<string, 'timeline' | 'albums'> = { Timeline: 'timeline', Albums: 'albums' }
+const chrome = useChrome(() => ({
+  title: album.value ? album.value.name : 'Photos',
+  back: !!album.value,
+  views: album.value ? undefined : Object.keys(VIEWS),
+  view: tab.value === 'albums' ? 'Albums' : 'Timeline',
+  tools: state.admin && !album.value ? [{ icon: 'folder', label: 'Photo folders' }] : [],
+}))
+chrome.on('back', closeAlbum)
+chrome.on('view', (v) => { const t = v ? VIEWS[v] : undefined; if (t) tab.value = t })
+chrome.on('tool', (l) => { if (l === 'Photo folders') openFolders() })
 watch(tab, () => { items.value = []; reload() })
 watch(() => state.status === 'online', (on) => { if (on) reload() }, { immediate: true })
 
