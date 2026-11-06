@@ -20,7 +20,7 @@ docker run -d --name phe-sf-t --network $NET --network-alias seafile.test --cpus
 	-e SEAFILE_SERVER_HOSTNAME=seafile.test -e SEAFILE_SERVER_PROTOCOL=http -e JWT_PRIVATE_KEY=test-jwt-key-0123456789012345678901234567890 \
 	-e ENABLE_SEADOC=false -e CACHE_PROVIDER=redis -e REDIS_HOST=redis seafileltd/seafile-mc:14.0.9 >/dev/null
 
-for i in $(seq 1 120); do docker exec -u www-data phe-rnc-t php occ status 2>/dev/null | grep -q "installed: true" && break; sleep 2; done
+sh testdata/nctalk/wait.sh phe-rnc-t
 docker exec -u www-data -e OC_PASS=pw-ann-12345 phe-rnc-t php occ user:add --password-from-env ann >/dev/null
 docker exec -u www-data phe-rnc-t php occ user:setting ann settings email ann@example.org
 echo "nextcloud ready"

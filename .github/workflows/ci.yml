@@ -3,10 +3,10 @@
 # a Docker host you control: run it there, see docs/android.md.)
 name: ci
 on:
-  push:
-    branches: [main, master]
+  # no push trigger: a push to main runs these checks once, inside the release workflow (which calls this one before it releases)
   pull_request:
-  workflow_call:   # the release workflow runs the same checks before it builds the images
+  workflow_call:
+  workflow_dispatch:
 permissions:
   contents: read
   packages: read   # the Etesian design packages (GitHub Packages) for the web app

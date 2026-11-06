@@ -7,8 +7,9 @@ ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p phercf -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml -f web/test/compose.nctalktest.yml"
 $DC down -v >/dev/null 2>&1 || true
 $DC up -d --build phecloud nextcloud > "$OUT/remotefiles-up.log" 2>&1 || { tail -20 "$OUT/remotefiles-up.log"; exit 1; }
-trap '$DC down -v >/dev/null 2>&1' EXIT
-for i in $(seq 1 120); do docker exec -u www-data phe-nc-ui php occ status 2>/dev/null | grep -q "installed: true" && break; sleep 2; done
+# on a failure anywhere (set -e stops quietly), show what the servers said before they go
+trap 'rc=$?; [ $rc -eq 0 ] || { echo "failed (exit $rc): the last log lines" >&2; docker logs --tail 30 phe-nc-ui >&2 2>&1; docker logs --tail 15 phe-cloud-pk >&2 2>&1; }; $DC down -v >/dev/null 2>&1' EXIT
+sh testdata/nctalk/wait.sh phe-nc-ui
 docker exec -u www-data -e OC_PASS=pw-ann-12345 phe-nc-ui php occ user:add --password-from-env ann >/dev/null
 # a folder with a photo in it (a 2x2 PNG), put there over WebDAV as any client would
 docker exec phe-nc-ui curl -sf -u ann:pw-ann-12345 -X MKCOL "http://localhost/remote.php/dav/files/ann/CC%20Photos" >/dev/null
