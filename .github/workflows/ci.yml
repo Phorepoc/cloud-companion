@@ -27,17 +27,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4
         with:
           node-version: 22
-      - run: npm ci --no-audit --no-fund
-      - name: Lint commits
-        env:
-          EVENT: ${{ github.event_name }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          BEFORE: ${{ github.event.before }}
-          SHA: ${{ github.sha }}
-        run: |
-          if [ "$EVENT" = pull_request ]; then from=$BASE; else from=$BEFORE; fi
-          case "$from" in ''|0000000000000000000000000000000000000000) from="$SHA~1" ;; esac
-          npx commitlint --from "$from" --to "$SHA" --verbose
+      - name: Install commitlint
+        run: npm ci --no-audit --no-fund
+      - name: Lint pushed commits
+        if: github.event_name == 'push'
+        run: npx commitlint --from ${{ github.event.before }} --to ${{ github.sha }} --verbose
+      - name: Lint PR commits
+        if: github.event_name == 'pull_request'
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
   go:
     name: Go
