@@ -1,20 +1,20 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Photos through the real UI (photos.sh: a throwaway Immich next to Cloud Companion). Immich gets an owner, an API key, two photos
-// (2024 in the album "Summer", 2023) through its own API, as its app would. Then, as a person would: Connections → Add →
+// Photos through the real UI (photos.sh: a fake Immich next to Cloud Companion). Immich comes with an owner, an API key, two photos
+// (2024 in the album "Summer", 2023). Then, as a person would: Connections → Add →
 // Photos: Immich, Test, Add; Files → a new folder "Camera" with a photo uploaded, and "Show in Photos" from its menu. Photos shows
 // all three newest first under their months; a photo opens in the viewer, and the arrows go to the older one; Albums has "Summer"
 // and "Camera"; an album shows its photo; removing the photo folder takes its photo off the timeline.
-//   BASE=http://localhost:8080 CODE=<admin code> SERVER=http://immich:2283 OUT=/out node --experimental-strip-types photos.ts
+//   BASE=http://localhost:8080 CODE=<admin code> SERVER=http://immich:2283 KEY=<API key> OUT=/out node --experimental-strip-types photos.ts
 import { chromium, type Page } from 'playwright'
 import assert from 'node:assert/strict'
 import { deflateSync } from 'node:zlib'
 
 const BASE = process.env.BASE || 'http://localhost:8080'
 const OUT = process.env.OUT || '.'
-const { CODE, SERVER } = process.env
-assert(CODE && SERVER, 'CODE and SERVER are required')
+const { CODE, SERVER, KEY } = process.env
+assert(CODE && SERVER && KEY, 'CODE, SERVER and KEY are required')
 const t0 = Date.now()
 const step = (s: string) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s] ${s}`)
 
@@ -28,33 +28,13 @@ function png(w: number, h: number, rgb: [number, number, number]) {
   return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(Buffer.concat(Array(h).fill(row)))), chunk('IEND', Buffer.alloc(0))])
 }
 
-// Immich, set up through its own API
+// Immich (the fake, internal/fakes/immich) comes seeded: the owner's API key KEY, sea.png (July 2024, in the album Summer), snow.png (2023)
 for (let i = 0, last = ''; ; i++) {
   if (await fetch(SERVER + '/api/server/ping').then((r) => r.ok || !(last = String(r.status)), (e) => { last = String(e.cause ?? e); return false })) break
-  assert(i < 120, 'Immich did not start: ' + last); await new Promise((r) => setTimeout(r, 3000))
+  assert(i < 60, 'Immich did not start: ' + last); await new Promise((r) => setTimeout(r, 1000))
 }
-const im = async (p: string, init: RequestInit & { json?: unknown; token?: string; key?: string } = {}) => {
-  const h: Record<string, string> = {}
-  if (init.json !== undefined) h['Content-Type'] = 'application/json'
-  if (init.token) h.Authorization = 'Bearer ' + init.token
-  if (init.key) h['x-api-key'] = init.key
-  const r = await fetch(SERVER + '/api' + p, { ...init, headers: h, body: init.json !== undefined ? JSON.stringify(init.json) : init.body })
-  assert(r.ok, `${p}: ${r.status} ${await r.clone().text()}`)
-  return r.json()
-}
-await im('/auth/admin-sign-up', { method: 'POST', json: { email: 'ann@example.org', password: 'pw-ann-12345', name: 'Ann' } })
-const { accessToken } = await im('/auth/login', { method: 'POST', json: { email: 'ann@example.org', password: 'pw-ann-12345' } })
-const { secret: KEY } = await im('/api-keys', { method: 'POST', token: accessToken, json: { name: 'Cloud Companion', permissions: ['all'] } })
-const upload = async (name: string, when: string, rgb: [number, number, number]) => {
-  const f = new FormData()
-  f.append('assetData', new Blob([png(320, 240, rgb)], { type: 'image/png' }), name)
-  for (const [k, v] of Object.entries({ fileCreatedAt: when, fileModifiedAt: when, deviceAssetId: name, deviceId: 'cc-test' })) f.append(k, v)
-  return (await im('/assets', { method: 'POST', key: KEY, body: f })).id as string
-}
-const sea = await upload('sea.png', '2024-07-01T10:00:00Z', [30, 110, 220])
-await upload('snow.png', '2023-01-05T09:00:00Z', [235, 238, 245])
-await im('/albums', { method: 'POST', token: accessToken, json: { albumName: 'Summer', assetIds: [sea] } })
-step('Immich: owner, API key, two photos and the album Summer')
+assert.equal((await fetch(SERVER + '/api/users/me', { headers: { 'x-api-key': 'wrong' } })).status, 401, 'a wrong key is refused')
+step('Immich: up, a wrong key refused')
 
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ viewport: { width: 900, height: 1100 }, serviceWorkers: 'block' })
