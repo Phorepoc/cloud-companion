@@ -9,6 +9,9 @@ on:
   workflow_call:   # the release workflow runs the same checks before it builds the images
 permissions:
   contents: read
+  packages: read   # the Etesian design packages (GitHub Packages) for the web app
+env:
+  GITHUB_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}   # (a call from the release workflow is its own group)
   cancel-in-progress: true
@@ -64,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
-      - run: docker build -t phe-cloud:ci .
+      - run: docker build --secret id=github_packages_token,env=GITHUB_PACKAGES_TOKEN -t phe-cloud:ci .
       - run: docker build -t phe-android-bridge:ci -f cmd/pheandroid/Dockerfile .
       - name: the image starts and answers
         run: |

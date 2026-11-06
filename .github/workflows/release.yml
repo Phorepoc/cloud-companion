@@ -23,6 +23,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+      packages: read
 
   release:
     needs: ci
@@ -95,3 +96,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          secrets: github_packages_token=${{ secrets.GITHUB_TOKEN }}   # the Etesian design packages for the web app

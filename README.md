@@ -40,7 +40,7 @@ docker logs phe-cloud
 
 This pulls the released images from `ghcr.io/phorepoc` (`phecloud`, and `phecloud-android-bridge` for the optional Android page); the compose files default to the release this checkout was made for (v0.2.0;
 `PHECLOUD_VERSION=latest` or another `vX.Y.Z` overrides it). To update, `git pull` and `docker compose pull && docker compose up -d`. To build from this checkout instead (development):
-`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` (the Android bridge: add `-f docker-compose.android.build.yml`).
+`docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` (the Android bridge: add `-f docker-compose.android.build.yml`). Building needs a GitHub token that can read packages (a classic token with only `read:packages`) in `GITHUB_PACKAGES_TOKEN`: the web app uses the Etesian design packages, which GitHub Packages serves only to signed-in users. The token is passed as a build secret and is not kept in the image.
 
 A brand-new server has no owner yet, so at start it prints a **first-start code** in its log, in a box like this:
 
@@ -236,7 +236,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
   [multierr](https://github.com/uber-go/multierr), [OpenTelemetry Go](https://github.com/open-telemetry/opentelemetry-go)
 
 **The web app**
-[Vue](https://vuejs.org), [Vue Router](https://router.vuejs.org), [Quasar](https://quasar.dev) and [Quasar extras](https://github.com/quasarframework/quasar/tree/dev/extras)
+[Vue](https://vuejs.org), [Vue Router](https://router.vuejs.org), the [Etesian Design Language](https://etesian-design.com) packages (the desktop, windows and components), [Quasar](https://quasar.dev) and [Quasar extras](https://github.com/quasarframework/quasar/tree/dev/extras)
 (with Google's [Material Symbols](https://github.com/google/material-design-icons)), [Fira Sans](https://github.com/mozilla/Fira) via
 [Fontsource](https://fontsource.org), [noble-hashes](https://github.com/paulmillr/noble-hashes), [cbor-x](https://github.com/kriszyp/cbor-x),
 [Vite](https://vite.dev), [TypeScript](https://www.typescriptlang.org) and [vue-tsc](https://github.com/vuejs/language-tools), and

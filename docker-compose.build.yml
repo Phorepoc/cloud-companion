@@ -1,7 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0
 # Developers: build the phecloud image from this checkout instead of pulling the released one.
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# The build installs the Etesian design packages from GitHub Packages: set GITHUB_PACKAGES_TOKEN (a classic token with read:packages).
 services:
   phecloud:
-    build: .
+    build:
+      context: .
+      secrets: [github_packages_token]
     image: phe-cloud:dev
+secrets:
+  github_packages_token:
+    environment: GITHUB_PACKAGES_TOKEN

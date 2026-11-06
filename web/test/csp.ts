@@ -31,14 +31,14 @@ for (const sec of ['browse', 'chats', 'mail', 'calendar', 'contacts', 'files', '
 }
 // the desktop view: windows, dock tiles (inline custom properties), the launcher and the self-hosted fonts, under the policy
 await page.goto(BASE + '/#/desktop?open=settings')
-await page.waitForSelector('[data-test=win-settings]')
-await page.click('[data-test=dock-mail]')
-await page.click('[data-test=dock-launcher]')
+await page.waitForSelector('.x-win[data-win=settings]')
+await page.click('.x-shell-dock button[aria-label=Mail]')
+await page.click('.x-shell-dock button[aria-label=Overview]')
 await page.keyboard.type('cal')
 await page.keyboard.press('Enter')
-await page.waitForSelector('[data-test=win-calendar]')
+await page.waitForSelector('.x-win[data-win=calendar]')
 assert(await page.evaluate(() => document.fonts.check('300 16px "HD Fira Sans"')), 'the bundled font loads under the policy')
-await page.click('[data-test=clock]')
+await page.click('.x-shell__clock')
 await page.waitForSelector('[data-test=events]')
 await page.waitForTimeout(700) // its calendar, mail and chats requests
 console.log('desktop ok')
@@ -48,7 +48,7 @@ console.log('desktop ok')
 const sw = await page.evaluate(async () => { const r = await navigator.serviceWorker.ready; return r.active?.scriptURL || '' })
 assert.match(sw, /\/sw\.js$/, 'the service worker is active')
 await page.reload() // now it is in charge of the page's requests
-await page.waitForSelector('[data-test=dock-launcher]')
+await page.waitForSelector('.x-shell-dock button[aria-label=Overview]')
 await ctx.setOffline(true)
 await ctx.route('**/*', (r) => r.abort('internetdisconnected')) // the service worker's own requests too (PW_EXPERIMENTAL_SERVICE_WORKER_NETWORK_EVENTS, csp.sh)
 const offline = await page.evaluate(async () => {

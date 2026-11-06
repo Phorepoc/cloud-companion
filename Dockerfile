@@ -1,9 +1,12 @@
+# syntax=docker/dockerfile:1
 # SPDX-License-Identifier: Apache-2.0
 # The web app (Quasar, MIT) is built first and embedded into the Go binary.
 FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS web
 WORKDIR /web
-COPY web/package.json web/package-lock.json ./
-RUN npm ci --no-audit --no-fund
+COPY web/package.json web/package-lock.json web/.npmrc ./
+# the Etesian design packages come from GitHub Packages: a read:packages token as a build secret (never kept in the image), e.g.
+#   GITHUB_PACKAGES_TOKEN=... docker build --secret id=github_packages_token,env=GITHUB_PACKAGES_TOKEN .
+RUN --mount=type=secret,id=github_packages_token,env=GITHUB_PACKAGES_TOKEN npm ci --no-audit --no-fund
 COPY web/ ./
 # subset the icon font to the icons the app uses (tools/subset-icons.py)
 RUN apt-get update && apt-get install -y --no-install-recommends python3-fonttools python3-brotli && rm -rf /var/lib/apt/lists/* && python3 tools/subset-icons.py

@@ -91,7 +91,7 @@ docker stats --no-stream --format 'redroid {{.CPUPerc}} {{.MemUsage}}' phe-redro
 fi
 [ "${ONLY:-}" = android ] && exit 0
 # the web app's own page: phecloud (with the web app) + Caddy in front, as in the hub; the standalone run above has finished, so the single viewer slot is free
-docker build -q -t phe-cloud-t:dev . >/dev/null
+docker build -q --secret id=github_packages_token,env=GITHUB_PACKAGES_TOKEN -t phe-cloud-t:dev . >/dev/null
 docker run -d --name phe-cloud-t --network phepa --cpus 1 --memory 512m -e PHECLOUD_ANDROID_SECRET=testsecret phe-cloud-t:dev >/dev/null
 cat > "$OUT/Caddyfile.t" <<'EOC'
 :8080 {
