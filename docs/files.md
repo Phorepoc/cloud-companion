@@ -64,3 +64,27 @@ own files. Uploads follow the same size limit as the Files section.
 Tests: `go test ./internal/webui` (a WebDAV session against the server, with an account's folder, writes refused there, and
 links out of the files folder refused) and `sh web/test/dav.sh` (a login made in the UI, then rclone, a real client: listing,
 reading, a byte range, writing, moving, deleting, a wrong password).
+
+# On TVs and players (DLNA)
+
+Cloud Companion can be a DLNA (UPnP) media server: smart TVs, game consoles, receivers, Kodi, VLC, BubbleUPnP and the media
+apps of the N9 and Symbian find it on their own and play your music, videos and photos. It shares Files: your own folders and
+those of your other services (Nextcloud, WebDAV, Seafile, Immich albums), showing only folders, music, videos and pictures.
+
+DLNA has no passwords: everyone on your network can browse and play what it shares. So it is off until you turn it on:
+
+```yaml
+services:
+  phecloud:
+    network_mode: host          # players find servers by multicast, which needs the home network itself
+    environment:
+      PHECLOUD_DLNA_LISTEN: ":8200"
+      PHECLOUD_DLNA_NAME: "Living room cloud"   # the name TVs show; "Cloud Companion" when unset
+```
+
+With `network_mode: host` the other ports are the machine's own too; drop any `ports:` entries. On a server that is reachable
+from the internet, make sure port 8200 is not: keep it to your home network.
+
+Tests: `go test ./internal/dlna` (the description, Browse in pages, a song played with a byte range, other files never shared,
+discovery answers) and `sh testdata/dlna/test.sh` (async-upnp-client, the UPnP library Home Assistant uses, finds the server by
+multicast on a Docker network, browses to a song and plays part of it).

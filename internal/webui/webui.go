@@ -18,6 +18,7 @@ import (
 
 	"github.com/phorepoc/cloud-companion/internal/catalogue"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
+	"github.com/phorepoc/cloud-companion/internal/dlna"
 	"github.com/phorepoc/cloud-companion/internal/feeds"
 	"github.com/phorepoc/cloud-companion/internal/proto"
 	"github.com/phorepoc/cloud-companion/internal/server"
@@ -97,6 +98,15 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 		fa.secret = m.Secret // the folders of other services (Nextcloud, WebDAV, Seafile accounts)
 	}
 	fa.routes(mux)
+	if dl := os.Getenv("PHECLOUD_DLNA_LISTEN"); dl != "" && dl != "off" {
+		// the media server for TVs and players on the home network (no sign-in there: off unless asked for)
+		ds := dlna.New(envOr("PHECLOUD_DLNA_NAME", "Cloud Companion"), dlnaLib{fa}, slog.Default())
+		go func() {
+			if err := ds.ListenAndServe(context.Background(), dl); err != nil {
+				slog.Error("DLNA media server", "err", err)
+			}
+		}()
+	}
 	if m != nil {
 		(&conns{a: a, st: s.Store, hub: s.Hub, m: m}).routes(mux)
 		(&oauthAPI{a: a, m: m, st: map[string]*oauthState{}}).routes(mux)

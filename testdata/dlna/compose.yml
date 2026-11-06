@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# testdata/dlna/test.sh: the media server on, on the test network only (no host ports)
+services:
+  phecloud:
+    environment:
+      PHECLOUD_DLNA_LISTEN: ":8200"
+      PHECLOUD_DLNA_NAME: "Test Living Room"

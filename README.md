@@ -103,6 +103,7 @@ Everything is set through environment variables in `docker-compose.yml`. The one
 | `PHECLOUD_FIRST_OWNER_CODE` | your own first-start code for the very first owner, instead of the generated one in the log (see Getting started) |
 | `PHECLOUD_PUBLIC_URL` | the address people reach it at, needed for signing in with Google or Microsoft |
 | `PHECLOUD_OAUTH_*` | your own Google and Microsoft app registrations ([docs/connections.md](docs/connections.md)) |
+| `PHECLOUD_DLNA_LISTEN`, `PHECLOUD_DLNA_NAME` | turns on the DLNA media server for TVs and players on your home network, e.g. `:8200`, and the name they show ([docs/files.md](docs/files.md)) |
 | `PHECLOUD_ANDROID_SECRET` | turns on the Android stream ([docs/android.md](docs/android.md)) |
 | `PHECLOUD_CATALOGUE_DIR`, `PHECLOUD_CATALOGUE_MAX_FILE` | where uploaded and kept installation files live (default `/data/catalogue`) and the largest file in bytes ([docs/catalogue.md](docs/catalogue.md)) |
 | `PHECLOUD_FILES_DIR` | the Files section and the Music library: the owner's files, shared by every paired device (default `/data/files`); public share links are served at `/s/<token>` |
@@ -154,7 +155,8 @@ password never passes through here. They are read-only for now: open, play and d
 them where they live.
 
 Files also opens in file managers and phones that speak WebDAV (Dolphin, Nautilus, Windows, iOS Files, Symbian and N9 apps) at
-`/dav/` on this server, with a phone login. [docs/files.md](docs/files.md) has the details.
+`/dav/` on this server, with a phone login. TVs, consoles and media players on your home network can play your music, videos
+and photos too, over DLNA, once you turn it on. [docs/files.md](docs/files.md) has the details.
 
 ## Security
 
@@ -264,7 +266,8 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 [Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), [Seafile](https://www.seafile.com) (with
 [Redis](https://redis.io) beside it), [Immich](https://immich.app) (with [Valkey](https://valkey.io), and PostgreSQL with
 [VectorChord](https://github.com/tensorchord/VectorChord) and [pgvecto.rs](https://github.com/tensorchord/pgvecto.rs)), [curl](https://curl.se),
-[rclone](https://rclone.org) and [slixmpp](https://codeberg.org/poezio/slixmpp).
+[rclone](https://rclone.org), [async-upnp-client](https://github.com/StevenLooman/async_upnp_client)
+with [Python](https://www.python.org), and [slixmpp](https://codeberg.org/poezio/slixmpp).
 
 ## License
 

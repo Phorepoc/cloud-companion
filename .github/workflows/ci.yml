@@ -115,6 +115,7 @@ jobs:
       - run: sh testdata/nctalk/test.sh
       - run: sh testdata/remote/test.sh
       - run: sh testdata/immich/test.sh
+      - run: sh testdata/dlna/test.sh
       - run: sh testdata/signal/test.sh
 
   databases:
