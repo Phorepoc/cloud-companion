@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   commits:
-    name: Commit messages are Conventional Commits (the release reads them)
+    name: Commit lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
@@ -29,7 +29,7 @@ jobs:
           node-version: 22
       - run: npm install --no-audit --no-fund
         working-directory: .github/commitlint
-      - name: lint the commits of the pull request / of the push
+      - name: Lint commits
         env:
           EVENT: ${{ github.event_name }}
           BASE: ${{ github.event.pull_request.base.sha }}
@@ -41,7 +41,7 @@ jobs:
           cd .github/commitlint && npx commitlint --config "$GITHUB_WORKSPACE/.github/commitlint/commitlint.config.js" --cwd "$GITHUB_WORKSPACE" --from "$from" --to "$SHA" --verbose
 
   go:
-    name: "Go: format, vet, tests (SQLite), licences"
+    name: Go
     runs-on: ubuntu-latest
     env:
       GOFLAGS: -tags=goolm   # Matrix encryption in pure Go (mautrix-go): no cgo, no libolm
@@ -50,26 +50,26 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff   # v5
         with:
           go-version-file: go.mod
-      - name: the embedded web app directory must exist for the build
+      - name: Create web dist placeholder
         run: mkdir -p internal/webui/dist && touch internal/webui/dist/placeholder.txt
       - name: gofmt
         run: test -z "$(gofmt -l cmd internal)" || { gofmt -l cmd internal; exit 1; }
       - run: go vet ./...
       - run: go test -count=1 ./...
-      - name: dependency licences (allow-list; see NOTICE)
+      - name: Check licenses
         run: |
           # segmentio/asm (via gotd/td) is MIT-0, which go-licenses does not recognise; checked by hand
           go install github.com/google/go-licenses@v1.6.0
           go-licenses check ./cmd/... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0 --ignore modernc.org/mathutil --ignore github.com/segmentio/asm
 
   images:
-    name: Container images build (phecloud with the web app, Android bridge)
+    name: Docker images
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: docker build --secret id=github_packages_token,env=GITHUB_PACKAGES_TOKEN -t phe-cloud:ci .
       - run: docker build -t phe-android-bridge:ci -f cmd/pheandroid/Dockerfile .
-      - name: the image starts and answers
+      - name: Smoke test image
         run: |
           docker run -d --name ci-cloud -p 127.0.0.1:8080:8080 phe-cloud:ci
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
@@ -77,7 +77,7 @@ jobs:
           docker logs ci-cloud | tail -5
 
   browser-types:
-    name: "Browser tests: TypeScript check (all of them, the Android ones included)"
+    name: Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
@@ -90,7 +90,7 @@ jobs:
         working-directory: web/test
 
   browser:
-    name: Browser suite (${{ matrix.script }})
+    name: Browser (${{ matrix.script }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -107,7 +107,7 @@ jobs:
           if-no-files-found: ignore
 
   databases:
-    name: Go tests on PostgreSQL and MariaDB
+    name: Go databases
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
@@ -115,7 +115,7 @@ jobs:
       - run: sh web/test/db_test.sh mariadb
 
   client:
-    name: C client core (self-test, sanitizers)
+    name: C client
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4

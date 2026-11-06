@@ -1,0 +1,7 @@
+#!/bin/sh
+# Lints the commit message with the same commitlint config as CI.
+set -e
+root=$(git rev-parse --show-toplevel)
+cl="$root/.github/commitlint"
+[ -x "$cl/node_modules/.bin/commitlint" ] || (cd "$cl" && npm install --silent --no-audit --no-fund)
+"$cl/node_modules/.bin/commitlint" --config "$cl/commitlint.config.js" --cwd "$root" --edit "$1"

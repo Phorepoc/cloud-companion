@@ -1,0 +1,23 @@
+#!/bin/sh
+# Runs the CI checks that apply to the staged files: gofmt, the web app's types, the browser tests' types.
+set -e
+root=$(git rev-parse --show-toplevel)
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+go_files=$(echo "$staged" | grep '\.go$' || true)
+if [ -n "$go_files" ]; then
+  if command -v gofmt >/dev/null; then
+    bad=$(cd "$root" && gofmt -l $go_files)
+  else
+    bad=$(docker run --rm -v "$root:/src" -w /src golang:1.26-bookworm gofmt -l $go_files)
+  fi
+  [ -z "$bad" ] || { echo "gofmt needed:"; echo "$bad"; exit 1; }
+fi
+
+if echo "$staged" | grep '^web/' | grep -qv '^web/test/'; then
+  (cd "$root/web" && npm run --silent check)
+fi
+
+if echo "$staged" | grep -q '^web/test/.*\.ts$'; then
+  (cd "$root/web/test" && { [ -d node_modules ] || npm install --silent --no-audit --no-fund; } && npx tsc -p .)
+fi
