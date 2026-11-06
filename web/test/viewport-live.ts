@@ -5,12 +5,23 @@
 // Pairs a throwaway admin browser named "viewport-live" (revoke it afterwards: `phecloud devices`, `phecloud revoke <id>`).
 //   BASE=https://host:9443 CODE=<admin code> OUT=/out node --experimental-strip-types viewport-live.ts
 import { chromium } from 'playwright'
+import { view } from './chrome.ts'
 import assert from 'node:assert/strict'
 
 const BASE = process.env.BASE!, CODE = process.env.CODE!, OUT = process.env.OUT || '.'
 const browser = await chromium.launch()
 const ctx = await browser.newContext({ bypassCSP: true, ignoreHTTPSErrors: true, viewport: { width: 1400, height: 900 } })
 const page = await ctx.newPage()
+
+// the browser frame (Etesian XBrowserFrame): the address field, Back, the ⋮ menu (new tab, other devices, zoom, phone size) and the tab
+// picker (the tab count opens the pages as cards)
+const ADDR = '.x-bf__addr input'
+const BACK = '.x-bf__row [aria-label=Back]'
+async function more(p = page) { if (!(await p.locator('[data-test=browser-more]').isVisible())) { await p.click(".x-bf__row [aria-label^='More']"); await p.waitForSelector('[data-test=browser-more]') } }
+async function menuItem(id: string, p = page) { await more(p); await p.click(`[data-test=${id}]`) }
+async function picker(p = page) { if (!(await p.locator('.x-bf__picker').isVisible())) await p.click('.x-bf__count') }
+async function tabGo(n: number, p = page) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bf__shot`) }
+async function tabClose(n: number, p = page) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bt__x`); if (await p.locator('.x-bf__picker').isVisible()) await p.click('.x-bf__count') }
 const errors: string[] = []
 page.on('pageerror', (e) => errors.push(e.message))
 const box = async (sel: string) => { const b = await page.locator(sel).first().boundingBox(); assert(b, sel + ' has no box'); return b }
@@ -40,12 +51,12 @@ await page.waitForFunction(() => window.__phe.state.page.pid > 0 && window.__phe
 console.log('browser: page laid out at', await page.evaluate(() => window.__phe.state.page.w), 'px wide (the window), stage', Math.round(st.width), 'x', Math.round(st.height))
 await page.waitForTimeout(1500)
 await shots('live-browser-wide')
-await page.click('[data-test=phone-size]')
+await menuItem('phone-size')
 await page.waitForFunction(() => window.__phe.state.page.w === 360, null, { timeout: 30000 })
 console.log('browser: phone size -> page 360 px wide')
 await page.waitForTimeout(1200)
 await shots('live-browser-phone-size')
-await page.click('[data-test=phone-size]')
+await menuItem('phone-size')
 await page.waitForFunction(() => window.__phe.state.page.w > 400, null, { timeout: 30000 })
 // live window resize
 await page.setViewportSize({ width: 1100, height: 800 })
@@ -70,12 +81,12 @@ let fr = await box('.ph-frame')
 assert(fr.width * fr.height >= st.width * st.height * 0.9, `Android fills the window in desktop mode (${JSON.stringify(fr)} in ${JSON.stringify(st)})`)
 console.log('android: desktop mode, frame', Math.round(fr.width), 'x', Math.round(fr.height), 'in stage', Math.round(st.width), 'x', Math.round(st.height))
 await shots('live-android-desktop')
-await page.click('[data-test=android-mode-phone]')
+await view(page, 'Phone mode')
 await shape(false)
 await page.waitForTimeout(2500)
 console.log('android: phone mode -> portrait', await page.evaluate(() => { const c = document.querySelector('[data-test=android-screen]') as HTMLCanvasElement; return c.width + 'x' + c.height }))
 await shots('live-android-phone-mode')
-await page.click('[data-test=android-mode-desktop]')
+await view(page, 'Desktop mode')
 await shape(true)
 await page.waitForTimeout(2000)
 console.log('android: back to desktop mode')

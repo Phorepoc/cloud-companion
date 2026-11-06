@@ -3,6 +3,7 @@
 // The web app's own Android page (#/android): a native component, not an iframe. Pairs as admin, streams (VP8 in this headless Chromium), checks layout at phone and
 // desktop widths in light and dark, input through the page, rotation (the frame follows), the app's own controls, reconnect. Screenshots: OUT/androidapp-*.png
 import { chromium } from 'playwright'
+import { tool, view, shownTitle } from './chrome.ts'
 import assert from 'node:assert/strict'
 import fs from 'fs'
 
@@ -71,7 +72,7 @@ assert(g.fb <= g.vh + 40, 'the whole screen should be (nearly) visible without s
 await shots('1-desktop')
 
 // the app's own controls work: Home, then a click on Taskbar's start button (desktop mode: the large display has a taskbar, not an app drawer) opens the start menu
-await page.click('[data-test=android-home]'); await page.waitForTimeout(2500)
+await tool(page, 'Home'); await page.waitForTimeout(2500)
 const h0 = (await canvas()).hash
 const box = await page.locator('[data-test=android-screen]').boundingBox()
 assert(box, 'the screen is laid out')
@@ -79,9 +80,9 @@ await page.mouse.click(box.x + box.width * 0.418, box.y + box.height * 0.957)
 await page.waitForTimeout(1800)
 assert.notEqual((await canvas()).hash, h0, 'a click on the start button through the page canvas did not change the screen')
 await page.screenshot({ path: `${OUT}/androidapp-start-menu.png` })
-await page.click('[data-test=android-back]'); await page.waitForTimeout(800)
+await tool(page, 'Back'); await page.waitForTimeout(800)
 console.log('input through the page: ok')
-await page.click('[data-test=android-home]'); await page.waitForTimeout(1000)
+await tool(page, 'Home'); await page.waitForTimeout(1000)
 
 // the screen fills the window in desktop mode: no padding around it
 {
@@ -91,22 +92,22 @@ await page.click('[data-test=android-home]'); await page.waitForTimeout(1000)
   assert(fr.width >= st.width - 3 || fr.height >= st.height - 3, `the screen touches the stage on one axis (${JSON.stringify(fr)} in ${JSON.stringify(st)})`)
   assert(fr.width * fr.height >= st.width * st.height * 0.9, `the screen uses at least 90% of the area (${JSON.stringify(fr)} in ${JSON.stringify(st)})`)
   // the controls are in the title bar
-  const hdr = await page.locator('header.q-header').boundingBox()
-  const hb = await page.locator('[data-test=android-home]').boundingBox()
+  const hdr = await page.locator('.x-cl__bar').boundingBox()
+  const hb = await page.locator('.x-cl__actions [aria-label=Home]').boundingBox()
   assert(hdr && hb && hb.y >= hdr.y - 1 && hb.y + hb.height <= hdr.y + hdr.height + 1, 'the Android buttons are in the title bar')
   console.log('desktop mode fills the window')
 }
 
 // the mode buttons: phone mode in a desktop-sized window (a portrait display, the phone launcher), then desktop mode again
-await page.click('[data-test=android-mode-phone]')
+await view(page, 'Phone mode')
 await shapeIs(false, 'phone mode in a wide window')
-assert.equal(await page.getAttribute('[data-test=android-mode-phone]', 'aria-pressed'), 'true')
+assert.equal(await shownTitle(page), 'Phone mode')
 g = await layout('phone mode, wide window')
 assert(g.fh > g.fw, 'phone mode is portrait whatever the window')
 await shots('2a-phone-mode')
-await page.click('[data-test=android-mode-desktop]')
+await view(page, 'Desktop mode')
 await shapeIs(true, 'desktop mode again')
-assert.equal(await page.getAttribute('[data-test=android-mode-desktop]', 'aria-pressed'), 'true')
+assert.equal(await shownTitle(page), 'Desktop mode')
 g = await layout('desktop mode again')
 assert(g.fw > g.fh)
 console.log('the mode buttons switch between phone and desktop Android')
@@ -125,10 +126,9 @@ g = await layout('desktop again'); assert(g.fw > g.fh)
 await shots('3-desktop-again')
 
 // the controls: sound toggles, install dialog, APK upload through the app, reconnect
-await page.click('[data-test=android-sound]')
-assert.equal(await page.getAttribute('[data-test=android-sound]', 'aria-label'), 'Sound on') // an icon button: named for assistive technology
-await page.click('[data-test=android-sound]')
-await page.click('[data-test=android-install]'); await page.waitForSelector('[data-test=android-install-dialog]')
+await tool(page, 'Sound off')
+await tool(page, 'Sound on') // the action is named for what it shows: it now reads Sound on
+await tool(page, 'Install apps'); await page.waitForSelector('[data-test=android-install-dialog]')
 await page.setInputFiles('[data-test=android-apk]', '/t/markor.apk')
 await page.waitForFunction(() => /installed|failed/.test((document.querySelector('[data-test=android-install-note]')?.textContent ?? '')), null, { timeout: 120000 })
 const inst = (await page.textContent('[data-test=android-install-note]')) ?? ''
@@ -136,7 +136,7 @@ console.log('install through the app:', inst.trim())
 assert(inst.includes('installed. Success'))
 await page.screenshot({ path: `${OUT}/androidapp-5-install-dialog.png` })
 await page.keyboard.press('Escape'); await page.waitForTimeout(400)
-await page.click('[data-test=android-reconnect]')
+await tool(page, 'Reconnect')
 await page.waitForFunction(() => document.querySelector('[data-test=android-state]')?.textContent?.includes('Connected'), null, { timeout: 60000 })
 assert((await canvas()).range > 30)
 console.log('reconnect: live again')

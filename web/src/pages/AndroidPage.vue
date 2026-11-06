@@ -3,40 +3,12 @@
 <template>
   <q-page class="ph-android" :class="{ 'is-phone-mode': kind === 'phone' }">
     <!-- the controls live in the title bar (the window's, or the app's top bar); the screen gets everything else -->
-    <Teleport v-if="titleActions && configured" :to="titleActions">
-      <div class="ph-tb" role="toolbar" aria-label="Android controls">
-        <span class="ph-conn" :class="'is-' + conn" role="status" data-test="android-state" :title="connText">
-          <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' || conn === 'starting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="20px" aria-hidden="true" />
-          <span class="ph-conn-text">{{ connText }}</span>
-        </span>
-        <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back" data-test="android-back" @click="stream.key(4)"><q-tooltip>Back</q-tooltip></q-btn>
-        <q-btn flat round dense icon="sym_o_home" aria-label="Home" data-test="android-home" @click="stream.key(3)"><q-tooltip>Home</q-tooltip></q-btn>
-        <q-btn flat round dense icon="sym_o_crop_square" aria-label="Recent" data-test="android-recent" @click="stream.key(187)"><q-tooltip>Recent apps</q-tooltip></q-btn>
-        <q-btn flat round dense :icon="sound ? 'sym_o_volume_up' : 'sym_o_volume_off'" :aria-label="sound ? 'Sound on' : 'Sound off'" :aria-pressed="String(sound)" data-test="android-sound" @click="toggleSound"><q-tooltip>{{ sound ? 'Sound on' : 'Sound off' }}</q-tooltip></q-btn>
-        <template v-if="!narrow">
-          <q-btn flat round dense icon="sym_o_content_copy" aria-label="Copy from phone" data-test="android-copy" @click="stream.copyFromPhone()"><q-tooltip>Copy from phone</q-tooltip></q-btn>
-          <q-btn flat round dense icon="sym_o_content_paste" aria-label="Paste to phone" data-test="android-paste" @click="stream.pasteToPhone()"><q-tooltip>Paste to phone</q-tooltip></q-btn>
-          <q-btn flat round dense icon="sym_o_download" aria-label="Install apps" data-test="android-install" @click="installOpen = true"><q-tooltip>Install apps</q-tooltip></q-btn>
-          <q-btn flat round dense icon="sym_o_refresh" aria-label="Reconnect" :loading="busy" data-test="android-reconnect" @click="connect"><q-tooltip>Reconnect</q-tooltip></q-btn>
-        </template>
-        <!-- on a phone-width screen the bar has room for the essentials; the rest is one tap away -->
-        <q-btn v-else flat round dense icon="sym_o_more_vert" aria-label="More" data-test="android-more">
-          <q-menu>
-            <q-list dense style="min-width: 190px">
-              <q-item v-close-popup clickable data-test="android-copy" @click="stream.copyFromPhone()"><q-item-section avatar><q-icon name="sym_o_content_copy" /></q-item-section><q-item-section>Copy from phone</q-item-section></q-item>
-              <q-item v-close-popup clickable data-test="android-paste" @click="stream.pasteToPhone()"><q-item-section avatar><q-icon name="sym_o_content_paste" /></q-item-section><q-item-section>Paste to phone</q-item-section></q-item>
-              <q-item v-close-popup clickable data-test="android-install" @click="installOpen = true"><q-item-section avatar><q-icon name="sym_o_download" /></q-item-section><q-item-section>Install apps</q-item-section></q-item>
-              <q-item v-close-popup clickable data-test="android-reconnect" @click="connect"><q-item-section avatar><q-icon name="sym_o_refresh" /></q-item-section><q-item-section>Reconnect</q-item-section></q-item>
-            </q-list>
-          </q-menu>
-        </q-btn>
-        <!-- Android has two modes, whatever the window: a phone (portrait, the phone launcher) and a desktop (landscape, windows and a taskbar) -->
-        <span class="ph-seg" role="group" aria-label="Android mode">
-          <q-btn flat dense no-caps icon="sym_o_smartphone" aria-label="Phone mode" :aria-pressed="String(kind === 'phone')" :class="{ 'is-on': kind === 'phone' }" data-test="android-mode-phone" @click="setMode('phone')"><q-tooltip>Phone mode</q-tooltip></q-btn>
-          <q-btn flat dense no-caps icon="sym_o_desktop_windows" aria-label="Desktop mode" :aria-pressed="String(kind === 'desktop')" :class="{ 'is-on': kind === 'desktop' }" data-test="android-mode-desktop" @click="setMode('desktop')"><q-tooltip>Desktop mode</q-tooltip></q-btn>
-        </span>
-      </div>
-    </Teleport>
+    <!-- the controls are in the header (the window's, or the classic bar): Back, Home and Recent apps first, the rest folds into ⋮ when
+         there is no room; the title is a menu of the two modes. The connection state shows over the screen. -->
+    <span v-if="configured" class="ph-conn" :class="'is-' + conn" role="status" data-test="android-state" :title="connText">
+      <q-icon :name="conn === 'live' ? 'sym_o_cloud_done' : conn === 'connecting' || conn === 'starting' ? 'sym_o_sync' : 'sym_o_cloud_off'" size="18px" aria-hidden="true" />
+      <span class="ph-conn-text">{{ connText }}</span>
+    </span>
 
     <h1 class="ph-sr">Android</h1>
     <p v-if="state.admin === false" class="ph-note" role="note">Only an admin device can open Android.</p>
@@ -80,11 +52,35 @@ import { ref, shallowRef, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { useQuasar } from 'quasar'
 import { apiCall, state } from '../cloud'
-import { useTitleActions } from '../components/titlebar'
+import { useChrome } from '@etesian-design/shell'
 import { AndroidStream, type StreamState, type StreamStats } from '../android/stream'
 
 const route = useRoute()
-const titleActions = useTitleActions()
+// the header: Android's two modes are the title's views (a phone: portrait, the launcher; a desktop: landscape, windows and a taskbar)
+const MODES: Record<string, 'phone' | 'desktop'> = { 'Phone mode': 'phone', 'Desktop mode': 'desktop' }
+const chrome = useChrome(() => ({
+  title: 'Android',
+  views: configured.value ? Object.keys(MODES) : undefined,
+  view: kind.value === 'desktop' ? 'Desktop mode' : 'Phone mode',
+  tools: configured.value ? [
+    { icon: 'back', label: 'Back' }, { icon: 'home', label: 'Home' }, { icon: 'window', label: 'Recent apps' },
+    { icon: 'speaker', label: sound.value ? 'Sound on' : 'Sound off' },
+    { icon: 'share', label: 'Copy from phone' }, { icon: 'attach', label: 'Paste to phone' }, { icon: 'bag', label: 'Install apps' }, { icon: 'refresh', label: 'Reconnect' },
+  ] : [],
+}))
+chrome.on('view', (v) => { const m = v ? MODES[v] : undefined; if (m) setMode(m) })
+chrome.on('tool', (l) => {
+  switch (l) {
+    case 'Back': stream.value.key(4); break
+    case 'Home': stream.value.key(3); break
+    case 'Recent apps': stream.value.key(187); break
+    case 'Sound on': case 'Sound off': toggleSound(); break
+    case 'Copy from phone': stream.value.copyFromPhone(); break
+    case 'Paste to phone': stream.value.pasteToPhone(); break
+    case 'Install apps': installOpen.value = true; break
+    case 'Reconnect': connect(); break
+  }
+})
 const $q = useQuasar()
 const narrow = computed(() => $q.screen.lt.sm)
 const cv = ref<HTMLCanvasElement | null>(null), file = ref<HTMLInputElement | null>(null), stage = ref<HTMLElement | null>(null)
