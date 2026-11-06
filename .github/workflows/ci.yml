@@ -70,6 +70,7 @@ jobs:
           docker run -d --name ci-cloud -p 127.0.0.1:8080:8080 phe-cloud:ci
           for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
           curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy"
+          docker exec ci-cloud test -s /etc/ssl/certs/ca-certificates.crt
           docker logs ci-cloud | tail -5
 
   browser-types:
@@ -91,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        script: [csp.sh, desktop.sh, settings.sh, shapes.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh, routing.sh, sipservice.sh, matrix.sh, xmpp.sh, xmppfront.sh, irc.sh, nctalk.sh, signal.sh, telegram.sh, remotefiles.sh, photos.sh, dav.sh]
+        script: [csp.sh, desktop.sh, settings.sh, browserinput.sh, shapes.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh, routing.sh, sipservice.sh, matrix.sh, xmpp.sh, xmppfront.sh, irc.sh, nctalk.sh, signal.sh, telegram.sh, remotefiles.sh, photos.sh, dav.sh]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
       - run: sh web/test/${{ matrix.script }}
