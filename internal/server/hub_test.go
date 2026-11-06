@@ -253,8 +253,8 @@ func TestOtherDevicesTabs(t *testing.T) {
 		t.Fatalf("remote close queued on the other session: %v %d", err, len(b.ops))
 	}
 	op := <-b.ops
-	if err := op(context.Background()); err != nil || len(b.tabs) != 0 {
-		t.Fatalf("the tab was closed in its own session: %v %v", err, b.tabs)
+	if err := op(context.Background()); err != nil || b.tabs[1] != nil || len(b.tabs) != 1 {
+		t.Fatalf("the tab was closed in its own session (a blank one in its place): %v %v", err, b.tabs)
 	}
 	s.unregister(b)
 	if err := a.remote(raw); err == nil {

@@ -8,7 +8,7 @@
                    :loading="state.loading ? 60 : undefined" :tabs="tabs" :current="String(state.activeView)" :tabs-at="browserPrefs.tabsAt" :max="3"
                    data-test="browser-frame"
                    @go="(a: string) => { urlInput = a; go() }" @back="api.action('back')" @forward="api.action('forward')" @reload="api.action('reload')"
-                   @pick="(v: string) => api.tab('switch', Number(v))" @close="(v: string) => api.tab('close', Number(v))" @add="newTab" @more="moreOpen = true">
+                   @pick="(v: string) => api.tab('switch', Number(v))" @close="closeTab" @add="newTab" @more="moreOpen = true">
       <template #more>
         <q-menu v-model="moreOpen" no-parent-event anchor="bottom right" self="top right" class="ph-bf-more" data-test="browser-more">
           <q-list dense style="min-width: 220px">
@@ -16,19 +16,21 @@
             <q-item clickable v-close-popup data-test="other-devices" @click="openOthers"><q-item-section>Tabs on your other devices</q-item-section></q-item>
             <q-item>
               <q-item-section>Zoom</q-item-section>
-              <q-item-section side class="row no-wrap items-center">
-                <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
-                <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
-                <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+              <q-item-section side>
+                <div class="ph-bf-zoom">
+                  <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
+                  <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
+                  <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+                </div>
               </q-item-section>
             </q-item>
             <q-item v-if="canFull" clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(desktopSite)" data-test="desktop-site" @click="toggleSite">
               <q-item-section>Desktop site</q-item-section>
-              <q-item-section side><q-checkbox :model-value="desktopSite" dense tabindex="-1" /></q-item-section>
+              <q-item-section side><q-toggle :model-value="desktopSite" dense tabindex="-1" aria-hidden="true" @click.stop="toggleSite" /></q-item-section>
             </q-item>
-            <q-item clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(browserPrefs.tabsAt === 'side')" data-test="tabs-side" @click="setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side')">
+            <q-item clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(browserPrefs.tabsAt === 'side')" data-test="tabs-side" @click="toggleSide">
               <q-item-section>Tabs on the side</q-item-section>
-              <q-item-section side><q-checkbox :model-value="browserPrefs.tabsAt === 'side'" dense tabindex="-1" /></q-item-section>
+              <q-item-section side><q-toggle :model-value="browserPrefs.tabsAt === 'side'" dense tabindex="-1" aria-hidden="true" @click.stop="toggleSide" /></q-item-section>
             </q-item>
           </q-list>
         </q-menu>
@@ -193,9 +195,13 @@ function reply(ok: boolean) {
 watch(() => state.page.url, (u) => { if (!editing.value) urlInput.value = u })
 
 // the frame's tabs, the lock (https), a list on the left when the window is wide, and the ⋮ menu
-const tabs = computed<BrowserTab[]>(() => state.tabs.map((t) => ({ id: String(t.v), title: t.title || t.url || 'New tab', address: t.url })))
+// before any page or New tab the window still shows one tab: the view it is on
+const tabs = computed<BrowserTab[]>(() => (state.tabs.length ? state.tabs : [{ v: state.activeView, title: state.page.title, url: state.page.url }])
+  .map((t) => ({ id: String(t.v), title: t.title || t.url || 'New tab', address: t.url })))
+function toggleSide() { setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side') }
 const secure = computed(() => !state.page.url || state.page.url.startsWith('https:'))
 const moreOpen = ref(false)
+function closeTab(v: string) { if (state.tabs.some((t) => String(t.v) === v)) api.tab('close', Number(v)) }
 function newTab() { if (state.tabs.length < 3 && state.features.includes('tabs')) api.tab('new') }
 
 function go() {
@@ -327,4 +333,9 @@ onBeforeUnmount(() => clearInterval(poll))
 .ph-ttitle, .ph-turl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-send { display: flex; gap: var(--ph-s2); align-items: center; }
 .ph-send .q-field { flex: 1; }
+</style>
+
+<style>
+/* the More menu is drawn outside the page (a popup): its Zoom row on one line */
+.ph-bf-zoom { display: flex; align-items: center; gap: 2px; white-space: nowrap; }
 </style>

@@ -386,6 +386,11 @@ func (s *session) tabAction(ctx context.Context, raw []byte) error {
 	case "list":
 		return s.sendTabs()
 	case "new":
+		if len(s.tabs) == 0 { // the page shown before any tab was asked for is tab 1, so a new one is the second
+			if _, err := s.tabFor(1, true); err != nil {
+				return err
+			}
+		}
 		id := 1
 		for s.tabs[id] != nil {
 			id++
@@ -408,8 +413,16 @@ func (s *session) tabAction(ctx context.Context, raw []byte) error {
 		if s.tab == tb {
 			s.tab = nil
 		}
+		if len(s.tabs) == 0 { // the last tab: a blank one takes its place under a new number, so the browser shows it afresh
+			id := ta.V + 1
+			nt, err := s.tabFor(id, true)
+			if err != nil {
+				return err
+			}
+			s.tab, s.active = nt, id
+			return s.sendTabs()
+		}
 		if s.active == ta.V { // fall back to the lowest remaining view and show it
-			s.active = 0
 			for id := 1; id <= 64; id++ {
 				if s.tabs[id] != nil {
 					s.active = id
@@ -420,10 +433,7 @@ func (s *session) tabAction(ctx context.Context, raw []byte) error {
 		if err := s.sendTabs(); err != nil {
 			return err
 		}
-		if s.active != 0 {
-			return s.showTab(ctx, s.tabs[s.active])
-		}
-		return nil
+		return s.showTab(ctx, s.tabs[s.active])
 	case "switch":
 		tb := s.tabs[ta.V]
 		if tb == nil {
