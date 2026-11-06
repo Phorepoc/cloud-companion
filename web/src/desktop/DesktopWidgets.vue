@@ -82,6 +82,14 @@
       </div>
 
       <!-- latest mail, one at a time (Belle "Latest mail"): ▲ ▼ step through, disabled at the ends -->
+      <!-- mail, light: the Etesian Belle mail widgets (blue header, white list), with this server's mail -->
+      <div v-else-if="w.kind === 'mail-light' || w.kind === 'mail-stack-light'" class="ph-wg__belle" :data-test="'widget-' + w.kind + '-body'">
+        <BelleWidget :kind="w.kind === 'mail-light' ? 'mail' : 'stackmail'" :cols="KINDS[w.kind].w" :rows="KINDS[w.kind].h" :cell="CELL" :editing="editing"
+                     :account="w.opt || 'Mail'" :empty="mailOf(w).error || 'No mail.'" :mails="mailOf(w).items.map((m) => ({ from: m.from || '(no sender)', subject: m.subject || '(no subject)', when: mailTime(m.date), unread: !!m.unread }))"
+                     @open="emit('open', 'mail')" />
+        <button v-if="editing" type="button" class="ph-wg__arrow ph-wg__belleset" aria-label="Pick the account" title="Pick the account" @pointerdown.stop @click="pickAccount(w)"><q-icon name="sym_o_settings" size="20px" /></button>
+      </div>
+
       <div v-else-if="w.kind === 'mail-stack'" class="ph-wg__panel ph-wg__stack">
         <header class="ph-wg__head"><SectionTile :section="byId.mail" :size="32" /><b class="ph-wg__acct">{{ w.opt || 'Latest mail' }}</b>
           <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the account" title="Pick the account" @pointerdown.stop @click="pickAccount(w)"><q-icon name="sym_o_settings" size="20px" /></button>
@@ -118,7 +126,7 @@
         </div>
       </div>
 
-      <!-- notes (Belle Notes): yellow paper; ▲ ▼ browse, + writes a new one, the bin deletes the one shown. Kept in this browser. -->
+      <!-- notes (Belle Notes): yellow paper; ▲ ▼ browse, + writes a new one, the bin deletes the one shown. Kept on the server. -->
       <div v-else-if="w.kind === 'notes'" class="ph-wg__notes">
         <textarea v-model="notes.list[notes.at]" class="ph-wg__paper" :readonly="editing" aria-label="Note" placeholder="Tap + to write a note." data-test="widget-note" @input="saveNotes" />
         <span class="ph-wg__notebar">
@@ -328,6 +336,8 @@ import { quiet, loadEvents, eventsOn, loadMail, mailAccounts, loadChats, loadCon
 import { ymd } from '../dates'
 import WeatherPlaceDialog from './WeatherPlaceDialog.vue'
 import { forecast, noPlace, weatherError, loadWeather, weatherIcon } from './weather'
+import { getPref, setPref } from '../prefs'
+import { BelleWidget } from '@etesian-design/shell'
 import { CELL, MARGIN, KINDS, loadWidgets, saveWidgets, gridSize, fits, freeSpot, type Widget, type WidgetKind } from './widgets'
 
 const props = defineProps<{ now: Date; area: { w: number; h: number }; editing: boolean }>()
@@ -453,7 +463,7 @@ const today = computed(() => eventsOn(cal.items, props.now))
 const has = (...k: WidgetKind[]) => list.some((w) => k.includes(w.kind))
 function refresh() {
   if (has('weather')) loadWeather()
-  for (const acct of new Set(list.filter((w) => w.kind === 'mail' || w.kind === 'mail-stack').map((w) => w.opt || ''))) {
+  for (const acct of new Set(list.filter((w) => w.kind.startsWith('mail')).map((w) => w.opt || ''))) {
     const m = mailBy[acct] || (mailBy[acct] = { items: [], unread: 0, error: '' })
     loadMail(20, acct).then((r) => { m.unread = r.unread; m.items = r.items; m.error = '' }, (e) => { m.error = quiet(e, 'Mail') })
   }
@@ -520,11 +530,11 @@ const initials = (n: string) => n.split(/\s+/).filter(Boolean).slice(0, 2).map((
 const TINTS = ['#0067BC', '#09A7CC', '#EF5500', '#62B700', '#8E44AD', '#D81B60']
 const tint = (n: string) => TINTS[[...n].reduce((a, c) => a + c.charCodeAt(0), 0) % TINTS.length]
 
-// notes, kept in this browser
-const NOTES_KEY = 'phecloud-desktop-notes'
+// notes, kept on the server with the rest of the desktop
+const NOTES_KEY = 'desktop.notes'
 const notes = reactive({ list: [''] as string[], at: 0 })
-try { const saved = JSON.parse(localStorage.getItem(NOTES_KEY) || 'null'); if (Array.isArray(saved) && saved.length) notes.list = saved.map(String) } catch (e) { /* none yet */ }
-function saveNotes() { try { localStorage.setItem(NOTES_KEY, JSON.stringify(notes.list)) } catch (e) { /* private mode */ } }
+try { const saved = JSON.parse(getPref(NOTES_KEY) || 'null'); if (Array.isArray(saved) && saved.length) notes.list = saved.map(String) } catch (e) { /* none yet */ }
+function saveNotes() { setPref(NOTES_KEY, JSON.stringify(notes.list)) }
 function addNote() { notes.list.push(''); notes.at = notes.list.length - 1; saveNotes() }
 function deleteNote() { notes.list.splice(notes.at, 1); if (!notes.list.length) notes.list.push(''); notes.at = Math.min(notes.at, notes.list.length - 1); saveNotes() }
 
@@ -568,6 +578,8 @@ const musicButtons = computed(() => [
 .ph-wg__w.is-dragging { z-index: 1; cursor: grabbing; opacity: 0.9; }
 .ph-wg__w:focus-visible { outline: 2px solid #fff; outline-offset: 4px; }
 /* the Belle panel: dark glass with a light top edge */
+.ph-wg__belle { position: relative; }
+.ph-wg__belleset { position: absolute; top: 6px; right: 6px; }
 .ph-wg__panel {
   height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; overflow: hidden;
   border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.15);

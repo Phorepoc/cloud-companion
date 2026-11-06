@@ -5,10 +5,11 @@
      and running sections, the recycle bin), overlapping windows that snap and fill the screen, the full-screen Overview (Events | the
      open windows | the sections) and Events. Cloud Companion brings the sections, its Events panel and its widgets; each page puts
      its title, views and actions in its window's header (useChrome). No Super or Ctrl+Alt shortcuts: the browser's system takes
-     them. The window arrangement, the dock and the layout choice are kept on this device. -->
+     them. The windows, the dock and the widgets are kept on the server (prefs.ts), so every browser shows the same desktop; the
+     layout choice (desktop or classic) stays with this device. -->
 <template>
   <div class="ph-desk" data-test="desktop">
-    <XShell ref="shell" :apps="apps" :name="brand.name" :menus="menus" storage-key="phecloud-shell" :events-count="unread || undefined"
+    <XShell v-if="ready" ref="shell" :apps="apps" :name="brand.name" :menus="menus" storage-key="phecloud-shell" :storage="shellStorage" :events-count="unread || undefined"
             dock-preview @menu="onMenu">
       <template #mark><BrandLogo :size="18" /></template>
       <template #indicators>
@@ -29,7 +30,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, defineComponent, h, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref, type Component } from 'vue'
 import { QLayout, QPageContainer } from 'quasar'
 import { useRoute, useRouter } from 'vue-router'
 import { XShell, type ShellApp, type ShellMenu } from '@etesian-design/shell'
@@ -45,6 +46,7 @@ import DesktopWidgets from './DesktopWidgets.vue'
 import { loadUnread } from './glance'
 import { getLayout, setLayout } from './layout'
 import { settingsPage, settingsPageIds } from '../settingsNav'
+import { loadPrefs, shellStorage } from '../prefs'
 
 const route = useRoute()
 const router = useRouter()
@@ -94,10 +96,15 @@ const unread = ref(0)
 async function checkUnread() { try { unread.value = (await loadUnread(0)).unread } catch { unread.value = 0 } }
 
 let clock: ReturnType<typeof setInterval> | undefined, mailTimer: ReturnType<typeof setInterval> | undefined
-onMounted(() => {
+// the desktop starts once its windows, dock and widgets are read from the server (offline: as new, and kept from here)
+const ready = ref(false)
+onMounted(async () => {
   clock = setInterval(() => { now.value = new Date() }, 15000)
   checkUnread()
   mailTimer = setInterval(checkUnread, 120000)
+  await loadPrefs().catch(() => { /* not reachable: start empty */ })
+  ready.value = true
+  await nextTick()
   const want = String(route.query.open || '')
   const sp = want.match(/^settings\/(\w+)$/)?.[1]
   if (sp && settingsPageIds.includes(sp)) { settingsPage.value = sp; open('settings') }

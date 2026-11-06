@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Desktop widgets (after the Etesian Belle widgets): what kinds there are, their size on the 90 px grid, and where they are.
-// The arrangement is kept on this device (localStorage), like the windows.
+// The arrangement is kept on the server (prefs.ts), like the windows, so every browser shows the same desktop.
 
-export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'clock-gear' | 'clock-lcd' | 'weather' | 'mail' | 'mail-stack' | 'agenda' | 'month' | 'today'
+import { getPref, setPref } from '../prefs'
+
+export type WidgetKind = 'clock-digital' | 'clock-analog' | 'clock-flip' | 'clock-word' | 'clock-gear' | 'clock-lcd' | 'weather' | 'mail' | 'mail-stack' | 'mail-light' | 'mail-stack-light' | 'agenda' | 'month' | 'today'
   | 'chats' | 'contacts' | 'contact' | 'notes' | 'shortcuts' | 'feeds' | 'web' | 'devices' | 'music' | 'music-large'
 
 /** A placed widget: its kind and its top-left grid cell. */
@@ -26,6 +28,8 @@ export const KINDS: Record<WidgetKind, WidgetInfo> = {
   weather: { label: 'Weather', group: 'Weather', w: 4, h: 2 },
   mail: { label: 'Mail', group: 'Mail', w: 4, h: 3 },
   'mail-stack': { label: 'Latest mail, one at a time', group: 'Mail', w: 4, h: 2 },
+  'mail-light': { label: 'Mail, light', group: 'Mail', w: 4, h: 3 },
+  'mail-stack-light': { label: 'Latest mail, light', group: 'Mail', w: 4, h: 2 },
   agenda: { label: 'Agenda', group: 'Calendar', w: 4, h: 3 },
   month: { label: 'Month', group: 'Calendar', w: 3, h: 3 },
   today: { label: 'Today', group: 'Calendar', w: 4, h: 1 },
@@ -41,7 +45,7 @@ export const KINDS: Record<WidgetKind, WidgetInfo> = {
   'music-large': { label: 'Music, large', group: 'Music', w: 4, h: 3 },
 }
 
-const KEY = 'phecloud-desktop-widgets'
+const KEY = 'desktop.widgets'
 /** Shown until the user changes anything: the time, unread mail and the day's calendar. */
 const DEFAULT: Widget[] = [
   { id: 'w1', kind: 'clock-digital', x: 0, y: 0 },
@@ -51,14 +55,14 @@ const DEFAULT: Widget[] = [
 
 export function loadWidgets(): Widget[] {
   try {
-    const saved = localStorage.getItem(KEY)
+    const saved = getPref(KEY)
     if (saved === null) return DEFAULT.map((w) => ({ ...w }))
     const list = JSON.parse(saved)
     return Array.isArray(list) ? list.filter((w: Widget) => w && w.id && w.kind in KINDS && Number.isInteger(w.x) && Number.isInteger(w.y)) : []
   } catch (e) { return [] }
 }
 export function saveWidgets(list: Widget[]) {
-  try { localStorage.setItem(KEY, JSON.stringify(list)) } catch (e) { /* private mode */ }
+  setPref(KEY, JSON.stringify(list))
 }
 
 /** How many cells fit in an area of w x h px. */
