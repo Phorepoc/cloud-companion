@@ -1,0 +1,2 @@
+npm --prefix web run check
+npm --prefix web/test run check

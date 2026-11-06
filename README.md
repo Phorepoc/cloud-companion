@@ -189,8 +189,7 @@ browser tests are in `web/test/` (TypeScript, run by Node directly with `--exper
 directory type-checks them), and `make -C client check` tests the phone-side code. GitHub Actions runs all of
 them except the Android tests, which need a Docker host with the `binder_linux` kernel module.
 
-Run `npm install` and `git config core.hooksPath .githooks` once after cloning: the hooks lint commit messages and run gofmt and the type checks
-before each commit, as CI does.
+`npm install` sets up the git hooks: commit messages are linted, and the web app and browser tests are type-checked before each commit.
 
 The server and its admin commands are in `cmd/phecloud`. The web app is in `web/`, the phone-side code in `client/`, and
 the extra containers in `deploy/`. [docs/status.md](docs/status.md) has what works and what's still open.
