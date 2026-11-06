@@ -64,6 +64,16 @@ func TestStore(t *testing.T) {
 	if _, err := s.List("esc"); err == nil {
 		t.Error("a symbolic link out of the root")
 	}
+	// a new file through it (an upload, a folder): its folder is checked
+	if _, err := s.Save("esc", "planted.txt", strings.NewReader("x")); err == nil {
+		t.Error("an upload through a link out of the root")
+	}
+	if err := s.Mkdir("esc/New"); err == nil {
+		t.Error("a folder through a link out of the root")
+	}
+	if _, err := os.Stat(filepath.Join(out, "planted.txt")); err == nil {
+		t.Error("a file was written outside the root")
+	}
 }
 
 func TestShares(t *testing.T) {

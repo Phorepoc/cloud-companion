@@ -29,7 +29,8 @@
       <q-icon name="sym_o_key" size="20px" aria-hidden="true" />
       Login <strong>{{ made.name }}</strong>, password <code data-test="sip-login-password">{{ made.password }}</code>, realm <code>{{ made.realm }}</code>.
       On an XMPP (Jabber) app the address is <code data-test="sip-login-jid">{{ made.name }}@{{ made.realm }}</code>, with this machine as
-      the server. Write the password down now: it is not shown again.
+      the server. The same login opens Files from a file manager (WebDAV, Files → Use from other apps). Write the password down
+      now: it is not shown again.
     </p>
 
     <h3 class="ph-h3">Rules</h3>

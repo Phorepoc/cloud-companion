@@ -47,3 +47,20 @@ pictures, with the `ticket` from the listing as `t`.
 Tests: `go test ./internal/webui` (a stand-in Immich and a photo folder through the API), `sh testdata/immich/test.sh` (a real
 Immich 3) and `sh web/test/photos.sh` (the real UI against a real Immich: adding it, marking a folder, the timeline, the viewer,
 albums, removing a photo folder).
+
+# Files in other apps (WebDAV)
+
+Cloud Companion is also a WebDAV server at `/dav/` on its web address (Files → *Use from other apps* shows it). File managers
+and phones open it like a network drive: Dolphin and Nautilus (`davs://`), Windows (map a network drive), macOS (Connect to
+Server), iOS Files, rclone, and the WebDAV apps of Symbian and the N9.
+
+Sign in with a phone login (Connections → Messaging → Phone logins): one login per device, the same one its SIP and XMPP apps
+use, and removing it shuts the device out of all three. Wrong passwords slow down, a second more for each in a row.
+
+Your own files can be read and changed there. Next to them, each account of another service (Nextcloud, WebDAV, Seafile,
+Immich albums) is a read-only folder: its files are streamed from where they live (seeking works), and can be copied into your
+own files. Uploads follow the same size limit as the Files section.
+
+Tests: `go test ./internal/webui` (a WebDAV session against the server, with an account's folder, writes refused there, and
+links out of the files folder refused) and `sh web/test/dav.sh` (a login made in the UI, then rclone, a real client: listing,
+reading, a byte range, writing, moving, deleting, a wrong password).

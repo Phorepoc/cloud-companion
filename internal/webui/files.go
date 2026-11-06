@@ -213,6 +213,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs *files.Store, p string
 
 func (f *filesAPI) routes(mux *http.ServeMux) {
 	f.photoRoutes(mux)
+	f.davRoutes(mux)
 	mux.HandleFunc("GET /phe/files", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := f.dev(w, r); !ok {
 			return

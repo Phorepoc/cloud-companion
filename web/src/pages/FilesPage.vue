@@ -8,6 +8,7 @@
     <div class="ph-head">
       <h1>Files</h1>
       <span v-if="!readOnly" class="ph-head__acts">
+        <q-btn v-if="!path" flat no-caps icon="sym_o_lan" label="Use from other apps" data-test="files-dav" @click="davOpen = true" />
         <q-btn flat no-caps icon="sym_o_create_new_folder" label="New folder" data-test="files-mkdir" @click="askFolder" />
         <q-btn unelevated no-caps color="primary" icon="sym_o_upload" label="Upload" :loading="uploading" data-test="files-upload" @click="picker?.click()" />
         <input ref="picker" type="file" multiple hidden data-test="files-input" @change="onPick">
@@ -69,6 +70,17 @@
     </template>
 
     <!-- name a new folder / rename -->
+    <q-dialog v-model="davOpen">
+      <q-card class="ph-dialog" data-test="files-dav-dialog">
+        <q-card-section><h2 class="text-h6 q-my-none">Use from other apps</h2>
+          <p>File managers and phones that speak WebDAV (Dolphin, Nautilus, Windows, iOS Files, Symbian and N9 apps) can open these
+            files at this address:</p>
+          <q-input :model-value="davURL" readonly outlined data-test="files-dav-url" @focus="($event.target as HTMLInputElement).select()" />
+          <p class="ph-small q-mt-sm">Sign in with a phone login (Connections → Messaging → Phone logins). Your own files can be changed
+            from there; the folders of your other services are read-only.</p></q-card-section>
+        <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /><q-btn unelevated color="primary" label="Copy address" @click="copy(davURL)" /></q-card-actions>
+      </q-card>
+    </q-dialog>
     <q-dialog v-model="naming.open">
       <q-card class="ph-dialog" data-test="files-name">
         <form @submit.prevent="saveName">
@@ -111,6 +123,8 @@ const error = ref('')
 const picker = ref<HTMLInputElement | null>(null)
 const crumbs = computed(() => { const out: { name: string; path: string }[] = []; let p = ''; for (const n of path.value.split('/').filter(Boolean)) { p = p ? p + '/' + n : n; out.push({ name: p === n ? mountName(n) : n, path: p }) } return out })
 // another service's folders (paths "~<account>/..."): read-only here for now
+const davOpen = ref(false)
+const davURL = location.origin + '/dav/'
 const readOnly = computed(() => path.value.startsWith('~'))
 const mounts = ref<Record<string, string>>({}) // "~<account>" -> its name, from the top listing
 const mountName = (top: string) => (top.startsWith('~') ? mounts.value[top] || 'another service' : top)

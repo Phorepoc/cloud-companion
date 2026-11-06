@@ -79,14 +79,20 @@ func (s *Store) abs(p string) (string, string, error) {
 		return "", "", err
 	}
 	a := filepath.Join(s.Dir, filepath.FromSlash(c))
-	// a symbolic link must not lead out of the root
-	if real, err := filepath.EvalSymlinks(a); err == nil {
-		root, _ := filepath.EvalSymlinks(s.Dir)
-		if root == "" {
-			root = s.Dir
+	// a symbolic link must not lead out of the root: checked on the nearest part of the path that exists (a new file's folder)
+	root, _ := filepath.EvalSymlinks(s.Dir)
+	if root == "" {
+		root = s.Dir
+	}
+	for at := a; ; at = filepath.Dir(at) {
+		if real, err := filepath.EvalSymlinks(at); err == nil {
+			if real != root && !strings.HasPrefix(real, root+string(filepath.Separator)) {
+				return "", "", ErrBadPath
+			}
+			break
 		}
-		if real != root && !strings.HasPrefix(real, root+string(filepath.Separator)) {
-			return "", "", ErrBadPath
+		if at == s.Dir || filepath.Dir(at) == at {
+			break
 		}
 	}
 	return c, a, nil
@@ -122,6 +128,12 @@ func entry(c string, fi fs.FileInfo) Entry {
 }
 
 // List returns a folder's entries, folders first, then by name.
+// Abs is the file's place on disk, for a server of another protocol (WebDAV): ErrBadPath when it would lead out of the root.
+func (s *Store) Abs(p string) (string, error) {
+	_, a, err := s.abs(p)
+	return a, err
+}
+
 func (s *Store) List(p string) ([]Entry, error) {
 	c, a, err := s.abs(p)
 	if err != nil {

@@ -151,7 +151,10 @@ Photos gathers your pictures in one timeline, newest first: your Immich library 
 Your files on Nextcloud, Seafile or any WebDAV server (a NAS, ownCloud, a hosting provider) show up in Files next to the ones kept
 on Cloud Companion, one folder per account. Add them in Connections; Nextcloud signs in with its own approval page, so your
 password never passes through here. They are read-only for now: open, play and download them on any of your devices, and change
-them where they live. [docs/files.md](docs/files.md) has the details.
+them where they live.
+
+Files also opens in file managers and phones that speak WebDAV (Dolphin, Nautilus, Windows, iOS Files, Symbian and N9 apps) at
+`/dav/` on this server, with a phone login. [docs/files.md](docs/files.md) has the details.
 
 ## Security
 
@@ -261,7 +264,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 [Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), [Seafile](https://www.seafile.com) (with
 [Redis](https://redis.io) beside it), [Immich](https://immich.app) (with [Valkey](https://valkey.io), and PostgreSQL with
 [VectorChord](https://github.com/tensorchord/VectorChord) and [pgvecto.rs](https://github.com/tensorchord/pgvecto.rs)), [curl](https://curl.se),
-and [slixmpp](https://codeberg.org/poezio/slixmpp).
+[rclone](https://rclone.org) and [slixmpp](https://codeberg.org/poezio/slixmpp).
 
 ## License
 
