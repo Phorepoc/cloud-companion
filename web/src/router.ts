@@ -19,6 +19,7 @@ const router = createRouter({
     { path: '/calendar', component: () => import('./pages/CalendarPage.vue') },
     { path: '/contacts', component: () => import('./pages/ContactsPage.vue') },
     { path: '/files', component: () => import('./pages/FilesPage.vue') },
+    { path: '/photos', component: () => import('./pages/PhotosPage.vue') },
     { path: '/music', component: () => import('./pages/MusicPage.vue') },
     { path: '/android', component: () => import('./pages/AndroidPage.vue') },
     { path: '/connections', component: () => import('./pages/ConnectionsPage.vue') },

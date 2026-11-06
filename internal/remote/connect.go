@@ -10,7 +10,7 @@ import (
 	"fmt"
 )
 
-// Cfg is a files account's configuration (Connections): kind "webdav" or "seafile". The password, app password or token is the
+// Cfg is a files account's configuration (Connections): kind "webdav", "seafile" or "immich". The password, app password or token is the
 // account's secret.
 type Cfg struct {
 	URL       string `json:"url"`
@@ -20,7 +20,7 @@ type Cfg struct {
 }
 
 // Kinds are the account kinds whose files this package reads.
-func Kinds(kind string) bool { return kind == "webdav" || kind == "seafile" }
+func Kinds(kind string) bool { return kind == "webdav" || kind == "seafile" || kind == "immich" }
 
 // Connect signs in to an account's files.
 func Connect(ctx context.Context, kind, cfgJSON, secret string) (Source, error) {
@@ -29,6 +29,8 @@ func Connect(ctx context.Context, kind, cfgJSON, secret string) (Source, error) 
 		return nil, errors.New("bad configuration")
 	}
 	switch {
+	case kind == "immich": // secret: an API key
+		return NewImmich(ctx, c.URL, secret, c.Insecure)
 	case kind == "seafile":
 		return NewSeafile(ctx, c.URL, c.User, secret, c.Insecure)
 	case kind == "webdav" && c.Nextcloud:

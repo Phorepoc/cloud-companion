@@ -1,4 +1,4 @@
-# Files from your other clouds
+# Files and photos from your other clouds
 
 Connections → Add has three kinds for files that live somewhere else:
 
@@ -28,3 +28,22 @@ paths begin with `~<account id>/`, and `POST /phe/files/ticket` gives a streamin
   streaming a byte range of a photo.
 - `sh web/test/remotefiles.sh`: the real UI against a real Nextcloud: *Sign in with Nextcloud*, approval in Nextcloud's own
   pages, Test, Add, then the read-only folder in Files and a photo opened from it.
+
+# Photos
+
+Photos shows your pictures and videos in one timeline, newest first, grouped by month, and as albums:
+
+- **Immich.** Connections → Add → *Photos: Immich*: your Immich's address and an API key (Immich → Account settings → API keys).
+  The timeline and albums come from Immich, with its thumbnails and previews; videos play in the version Immich made for browsers.
+  The albums also show in Files as folders, so devices that only know files can reach them.
+- **Photo folders.** In Files, a folder's menu has *Show in Photos* (for the owner). Photos and videos in it, and in the folders
+  in it (four deep, up to 5000), join the timeline by the time the file was last changed, and the folder is an album. A folder
+  can be on Cloud Companion or in another service's files. *Photo folders* in Photos lists them and removes them.
+
+Everything is read-only for now. Paired devices use the same API: `GET /phe/photos` (the timeline, in pages with `before`),
+`GET /phe/photos/albums`, `GET /phe/photos/album?src=&id=`, and `GET /phe/photos/img?t=&src=&id=&size=thumb|preview` for the
+pictures, with the `ticket` from the listing as `t`.
+
+Tests: `go test ./internal/webui` (a stand-in Immich and a photo folder through the API), `sh testdata/immich/test.sh` (a real
+Immich 3) and `sh web/test/photos.sh` (the real UI against a real Immich: adding it, marking a folder, the timeline, the viewer,
+albums, removing a photo folder).

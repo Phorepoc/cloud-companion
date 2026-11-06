@@ -143,6 +143,12 @@
             </details>
             <p class="ph-muted ph-small">Your Nextcloud files appear in Files as a folder named after this account, read-only for now.</p>
           </template>
+          <template v-else-if="f.kind === 'immich'">
+            <q-input v-model="f.url" outlined dense label="Immich address" hint="For example https://photos.example.org" data-test="f-url" />
+            <q-input v-model="f.secret" outlined dense type="password" label="API key" hint="Immich → Account settings → API keys → New API key" autocomplete="new-password" data-test="f-secret" />
+            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
+            <p class="ph-muted ph-small">Your timeline and albums appear in Photos; the albums also appear in Files as folders. Read-only for now.</p>
+          </template>
           <template v-else-if="f.kind === 'webdav' || f.kind === 'seafile'">
             <q-input v-model="f.url" outlined dense :label="f.kind === 'seafile' ? 'Seafile address' : 'WebDAV address'" :hint="f.kind === 'seafile' ? 'For example https://seafile.example.org' : 'The folder to show, e.g. https://nas.example.org/dav/'" data-test="f-url" />
             <q-input v-model="f.user" outlined dense :label="f.kind === 'seafile' ? 'Email address' : 'User'" autocomplete="off" data-test="f-user" />
@@ -274,13 +280,13 @@ const route = useRoute()
 const oauthKindOptions = computed(() => (oauthFor.value ? oauthFor.value.kinds : []).map((k) => ({ value: k, label: { mail: 'Mail', contacts: 'Contacts', calendar: 'Calendar' }[k] })))
 let timer: ReturnType<typeof setInterval> | undefined
 
-const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }, { label: 'Telegram', value: 'telegram' }, { label: 'Files: Nextcloud', value: 'ncfiles' }, { label: 'Files: WebDAV (a NAS, ownCloud, …)', value: 'webdav' }, { label: 'Files: Seafile', value: 'seafile' }]
+const kinds = [{ label: 'Mail (IMAP + SMTP)', value: 'imap' }, { label: 'Contacts (CardDAV)', value: 'carddav' }, { label: 'Calendar (CalDAV)', value: 'caldav' }, { label: 'Calendar link (ICS subscription)', value: 'ics' }, { label: 'SIP service (Asterisk, a provider)', value: 'sip' }, { label: 'Matrix', value: 'matrix' }, { label: 'XMPP (Jabber)', value: 'xmpp' }, { label: 'IRC', value: 'irc' }, { label: 'Nextcloud Talk', value: 'nctalk' }, { label: 'Signal', value: 'signal' }, { label: 'Telegram', value: 'telegram' }, { label: 'Files: Nextcloud', value: 'ncfiles' }, { label: 'Files: WebDAV (a NAS, ownCloud, …)', value: 'webdav' }, { label: 'Files: Seafile', value: 'seafile' }, { label: 'Photos: Immich', value: 'immich' }]
 const sipTransports = [{ label: 'UDP', value: 'udp' }, { label: 'TCP', value: 'tcp' }]
 const securities = [{ label: 'TLS (usually port 993 / 465)', value: 'tls' }, { label: 'STARTTLS (usually 143 / 587)', value: 'starttls' }, { label: 'None (this network only)', value: 'plain' }]
 const blank = () => ({ kind: 'imap', name: '', imapHost: '', imapPort: 993, imapTLS: 'tls', user: '', secret: '', smtpHost: '', smtpPort: 465, smtpTLS: 'tls', from: '', folders: 'INBOX', months: 3, url: '', pin: '', sipServer: '', sipDomain: '', sipTransport: 'udp', sipListen: ':5070', xmppServer: '', rooms: '', nick: '', insecure: false, apiId: 0, ircServer: '', channels: '', ircAll: false, ircServerPass: false })
 const f = reactive(blank())
 
-const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal', telegram: 'Telegram', webdav: 'Files (WebDAV)', seafile: 'Files (Seafile)' }
+const KINDS: Record<string, string> = { imap: 'Mail', carddav: 'Contacts', caldav: 'Calendar', ics: 'Calendar link', sip: 'SIP service', matrix: 'Matrix', xmpp: 'XMPP', irc: 'IRC', nctalk: 'Nextcloud Talk', signal: 'Signal', telegram: 'Telegram', webdav: 'Files (WebDAV)', seafile: 'Files (Seafile)', immich: 'Photos (Immich)' }
 const kindText = (k: string, provider = '') => (k === 'webdav' && provider === 'nextcloud' ? 'Files (Nextcloud)' : KINDS[k] || k)
 const STATUS: Record<ConnAccount['status'], string> = { new: 'Not synced yet', ok: 'Connected', error: 'Problem', syncing: 'Syncing' }
 const statusText = (a: ConnAccount) => STATUS[a.status] || a.status
@@ -312,6 +318,7 @@ function payload() {
   if (f.kind === 'telegram') return { kind: 'telegram', provider: 'generic', name: f.name, config: JSON.stringify({ api_id: Number(f.apiId) || 0, user_id: tg.userId }), secret: f.secret }
   if (f.kind === 'signal') return { kind: 'signal', provider: 'generic', name: f.name, config: JSON.stringify({ api: f.url.trim(), number: f.user.trim() }), secret: '' }
   if (f.kind === 'ncfiles') return { kind: 'webdav', provider: 'nextcloud', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim(), nextcloud: true, insecure: f.insecure }), secret: f.secret }
+  if (f.kind === 'immich') return { kind: 'immich', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), insecure: f.insecure }), secret: f.secret }
   if (f.kind === 'webdav' || f.kind === 'seafile') return { kind: f.kind, provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim(), insecure: f.insecure }), secret: f.secret }
   if (f.kind === 'nctalk') return { kind: 'nctalk', provider: 'generic', name: f.name, config: JSON.stringify({ url: f.url.trim(), user: f.user.trim() }), secret: f.secret }
   if (f.kind === 'irc') {

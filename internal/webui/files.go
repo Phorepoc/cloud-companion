@@ -76,6 +76,8 @@ func mountLabel(a store.Account) string {
 	switch {
 	case a.Kind == "seafile":
 		return "Seafile"
+	case a.Kind == "immich":
+		return "Immich"
 	case c.Nextcloud:
 		return "Nextcloud"
 	}
@@ -139,6 +141,7 @@ type filesAPI struct {
 	secret   func(store.Account) (string, error)
 	sources  map[string]openSource // by account id
 	ncLogins map[string]*ncLogin
+	ph       photosState
 }
 
 type openSource struct {
@@ -209,6 +212,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, fs *files.Store, p string
 }
 
 func (f *filesAPI) routes(mux *http.ServeMux) {
+	f.photoRoutes(mux)
 	mux.HandleFunc("GET /phe/files", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := f.dev(w, r); !ok {
 			return

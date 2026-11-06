@@ -145,6 +145,9 @@ a login per phone. [docs/messaging.md](docs/messaging.md) explains the rules and
 
 ## Your other clouds
 
+Photos gathers your pictures in one timeline, newest first: your Immich library (its albums too) and any folder you mark with
+*Show in Photos*, on Cloud Companion or in another cloud. Your Immich albums also appear in Files, so every device can reach them.
+
 Your files on Nextcloud, Seafile or any WebDAV server (a NAS, ownCloud, a hosting provider) show up in Files next to the ones kept
 on Cloud Companion, one folder per account. Add them in Connections; Nextcloud signs in with its own approval page, so your
 password never passes through here. They are read-only for now: open, play and download them on any of your devices, and change
@@ -256,7 +259,9 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 **The servers our tests run against**
 [Conduit](https://conduit.rs) (Matrix), [Prosody](https://prosody.im) (XMPP), [Ergo](https://ergo.chat) (IRC),
 [Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), [Seafile](https://www.seafile.com) (with
-[Redis](https://redis.io) beside it), [curl](https://curl.se), and [slixmpp](https://codeberg.org/poezio/slixmpp).
+[Redis](https://redis.io) beside it), [Immich](https://immich.app) (with [Valkey](https://valkey.io), and PostgreSQL with
+[VectorChord](https://github.com/tensorchord/VectorChord) and [pgvecto.rs](https://github.com/tensorchord/pgvecto.rs)), [curl](https://curl.se),
+and [slixmpp](https://codeberg.org/poezio/slixmpp).
 
 ## License
 

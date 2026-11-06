@@ -21,6 +21,7 @@ export const sections: Section[] = [
   { id: 'calendar', label: 'Calendar', icon: 'sym_o_calendar_month', color: '#EF5500', path: '/calendar', primary: true },
   { id: 'contacts', label: 'Contacts', icon: 'sym_o_contacts', color: '#007DC9', path: '/contacts' },
   { id: 'files', label: 'Files', icon: 'sym_o_folder', color: '#EA650A', path: '/files' },
+  { id: 'photos', label: 'Photos', icon: 'sym_o_photo_library', color: '#7A3FD0', path: '/photos' },
   { id: 'music', label: 'Music', icon: 'sym_o_music_note', color: '#E6007E', path: '/music' },
   { id: 'android', label: 'Android', icon: 'sym_o_smartphone', color: '#62B700', path: '/android', admin: true },
   { id: 'connections', label: 'Connections', icon: 'sym_o_sync_alt', color: '#347708', path: '/connections', admin: true },

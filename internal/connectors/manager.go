@@ -117,7 +117,7 @@ func (m *Manager) Test(ctx context.Context, kind, cfgJSON, secret string) (strin
 			return "", err
 		}
 		return nctalk.Test(ctx, c, secret)
-	case "webdav", "seafile":
+	case "webdav", "seafile", "immich":
 		return remote.Test(ctx, kind, cfgJSON, secret)
 	case "signal":
 		var c signal.Cfg

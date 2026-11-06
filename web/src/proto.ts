@@ -125,7 +125,7 @@ export interface PasskeyInfo { id: string; name: string; created: number; last_u
 
 /** GET /phe/connections: a connected account (internal/store/connectors.go Account). */
 export interface ConnAccount {
-  id: string; kind: 'imap' | 'carddav' | 'caldav' | 'ics' | 'sip' | 'matrix' | 'xmpp' | 'irc' | 'nctalk' | 'signal' | 'telegram' | 'webdav' | 'seafile'; provider: string; name: string
+  id: string; kind: 'imap' | 'carddav' | 'caldav' | 'ics' | 'sip' | 'matrix' | 'xmpp' | 'irc' | 'nctalk' | 'signal' | 'telegram' | 'webdav' | 'seafile' | 'immich'; provider: string; name: string
   config: string // JSON without secrets
   status: 'new' | 'ok' | 'error' | 'syncing'; last_sync: number; last_error: string; created: number
 }

@@ -38,11 +38,13 @@
             <span class="ph-small ph-muted"><template v-if="e.source">{{ e.source }}</template><template v-else>{{ e.dir ? 'Folder' : size(e.size) }} · {{ when(e.mod) }}</template><template v-if="sharedPaths.has(e.path)"> · Shared</template></span>
           </span>
         </button>
-        <q-btn v-if="!(e.dir && e.readonly)" flat round dense icon="sym_o_more_vert" :aria-label="'More for ' + e.name" :data-test="'file-more-' + e.name">
+        <q-btn v-if="!(e.dir && e.readonly) || state.admin" flat round dense icon="sym_o_more_vert" :aria-label="'More for ' + e.name" :data-test="'file-more-' + e.name">
           <q-menu auto-close>
             <q-list dense style="min-width: 180px">
               <q-item v-if="!e.dir" clickable @click="download(e)"><q-item-section avatar><q-icon name="sym_o_download" /></q-item-section><q-item-section>Download</q-item-section></q-item>
               <q-item v-if="!e.dir && !e.readonly" clickable :data-test="'file-share-' + e.name" @click="askShare(e)"><q-item-section avatar><q-icon name="sym_o_share" /></q-item-section><q-item-section>Share a link</q-item-section></q-item>
+              <q-item v-if="e.dir && state.admin" clickable :data-test="'file-photos-' + e.name" @click="togglePhotos(e)"><q-item-section avatar><q-icon name="sym_o_photo_library" /></q-item-section>
+                <q-item-section>{{ photoDirs.includes(e.path) ? 'Stop showing in Photos' : 'Show in Photos' }}</q-item-section></q-item>
               <q-item v-if="!e.readonly" clickable :data-test="'file-rename-' + e.name" @click="askRename(e)"><q-item-section avatar><q-icon name="sym_o_edit" /></q-item-section><q-item-section>Rename</q-item-section></q-item>
               <q-item v-if="!e.readonly" clickable class="text-negative" :data-test="'file-delete-' + e.name" @click="remove(e)"><q-item-section avatar><q-icon name="sym_o_delete" /></q-item-section><q-item-section>Delete</q-item-section></q-item>
             </q-list>
@@ -98,6 +100,8 @@ import EmptyState from '../components/EmptyState.vue'
 import { toast } from '../toast'
 import { deleteFile, fileURL, iconOf, listFiles, listShares, loadTracks, makeFolder, moveFile, shareFile, shareLink, size, unshare, uploadFiles, type FileEntry, type Share } from '../files'
 import { play } from '../music'
+import { state } from '../cloud'
+import { photoFolders, setPhotoFolders } from '../photos'
 
 const path = ref('')
 const entries = ref<FileEntry[]>([])
@@ -113,7 +117,18 @@ const mountName = (top: string) => (top.startsWith('~') ? mounts.value[top] || '
 const sharedPaths = computed(() => new Set(shares.value.map((s) => s.path)))
 const when = (iso: string) => { const d = new Date(iso); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString() }
 
+// folders the owner marked as photo folders (Photos shows what is in them)
+const photoDirs = ref<string[]>([])
+async function togglePhotos(e: FileEntry) {
+  try {
+    const on = !photoDirs.value.includes(e.path)
+    photoDirs.value = await setPhotoFolders(on ? [...photoDirs.value, e.path] : photoDirs.value.filter((p) => p !== e.path))
+    toast(on ? `${e.name} shows in Photos` : `${e.name} no longer shows in Photos`)
+  } catch (err) { error.value = (err as Error).message }
+}
+
 async function load() {
+  if (state.admin) photoFolders().then((l) => { photoDirs.value = l }).catch(() => {})
   loading.value = true
   error.value = ''
   try {
