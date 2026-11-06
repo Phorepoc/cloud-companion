@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// Connections → Add an account → XMPP against a throwaway Prosody (user cc@localhost, made by xmpp.sh): a wrong password fails the
+// Connections → Add an account → XMPP against the fake XMPP server (user cc@localhost, password pw-cc, internal/fakes/xmpp): a wrong password fails the
 // test, the right one passes, group chats need their service (room@conference.localhost), the account signs in (Connected) and shows up as a connection the Messaging rules can send to;
 // removed, it is gone from there.
 //   BASE=http://localhost:8080 CODE=<admin code> SERVER=<host of the XMPP server> OUT=/out node --experimental-strip-types xmpp.ts
