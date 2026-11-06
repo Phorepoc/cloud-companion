@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# Against the real outside services (Asterisk, a Matrix homeserver, Prosody, Ergo, Nextcloud, Immich, DLNA, signal-cli): run by hand
+# when one of them has a new version. CI does not run these: its browser suites use stand-ins (cmd/fakesvc), as the replies they
+# need do not change.
+name: Integration
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  services:
+    name: Chat and media connections against the real services
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - run: sh deploy/asterisk/test.sh
+      - run: sh testdata/matrix/test.sh
+      - run: sh testdata/xmpp/test.sh
+      - run: sh testdata/irc/test.sh
+      - run: sh testdata/nctalk/test.sh
+      - run: sh testdata/remote/test.sh
+      - run: sh testdata/immich/test.sh
+      - run: sh testdata/dlna/test.sh
+      - run: sh testdata/signal/test.sh

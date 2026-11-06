@@ -106,21 +106,6 @@ jobs:
           path: web/test/out/*.png
           if-no-files-found: ignore
 
-  services:
-    name: Chat connections against real services (Asterisk, a Matrix homeserver)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
-      - run: sh deploy/asterisk/test.sh
-      - run: sh testdata/matrix/test.sh
-      - run: sh testdata/xmpp/test.sh
-      - run: sh testdata/irc/test.sh
-      - run: sh testdata/nctalk/test.sh
-      - run: sh testdata/remote/test.sh
-      - run: sh testdata/immich/test.sh
-      - run: sh testdata/dlna/test.sh
-      - run: sh testdata/signal/test.sh
-
   databases:
     name: Go tests on PostgreSQL and MariaDB
     runs-on: ubuntu-latest
