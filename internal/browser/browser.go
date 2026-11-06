@@ -45,6 +45,9 @@ type Session interface {
 	// SetViewport sets the size of the window the page is shown in (device pixels at scale 100; the layout is width/scale css px wide). Before Open it only stores the size;
 	// after, the page is laid out again.
 	SetViewport(ctx context.Context, width, height int) error
+	// SetSite picks the site pages are asked for: "desktop", "mobile", or "" for the one that fits the window's width. A change
+	// reloads the open page, as the "Desktop site" switch of a phone browser does. Before Open it only stores the choice.
+	SetSite(ctx context.Context, site string) error
 	// TapScroll taps a point (content coordinates) inside an inner scroll layer, scrolling the box there first.
 	TapScroll(ctx context.Context, layer, x, y int) error
 	Close()

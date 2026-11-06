@@ -5,7 +5,7 @@
     <!-- the Etesian browser frame: Back, Forward, Reload, the address, the tab count (a picker of the pages) and More; on a wide window
          the tabs are a list on the left. Below 560 px the row moves to the bottom, within the thumb's reach. -->
     <XBrowserFrame class="ph-bf" :address="editing ? urlInput : state.page.url || urlInput" :secure="secure" :back="!!state.page.back" :forward="!!state.page.fwd"
-                   :loading="state.loading ? 60 : undefined" :tabs="tabs" :current="String(state.activeView)" :tabs-at="sideTabs ? 'side' : 'top'" :max="3"
+                   :loading="state.loading ? 60 : undefined" :tabs="tabs" :current="String(state.activeView)" :tabs-at="browserPrefs.tabsAt" :max="3"
                    data-test="browser-frame"
                    @go="(a: string) => { urlInput = a; go() }" @back="api.action('back')" @forward="api.action('forward')" @reload="api.action('reload')"
                    @pick="(v: string) => api.tab('switch', Number(v))" @close="(v: string) => api.tab('close', Number(v))" @add="newTab" @more="moreOpen = true">
@@ -22,8 +22,13 @@
                 <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
               </q-item-section>
             </q-item>
-            <q-item v-if="canFull" clickable v-close-popup :aria-pressed="String(phoneSize)" data-test="phone-size" @click="togglePhone">
-              <q-item-section>{{ phoneSize ? 'Use the whole window' : 'Phone size (360 x 640)' }}</q-item-section>
+            <q-item v-if="canFull" clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(desktopSite)" data-test="desktop-site" @click="toggleSite">
+              <q-item-section>Desktop site</q-item-section>
+              <q-item-section side><q-checkbox :model-value="desktopSite" dense tabindex="-1" /></q-item-section>
+            </q-item>
+            <q-item clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(browserPrefs.tabsAt === 'side')" data-test="tabs-side" @click="setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side')">
+              <q-item-section>Tabs on the side</q-item-section>
+              <q-item-section side><q-checkbox :model-value="browserPrefs.tabsAt === 'side'" dense tabindex="-1" /></q-item-section>
             </q-item>
           </q-list>
         </q-menu>
@@ -118,17 +123,15 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, type HTMLAttributes } from 'vue'
-import { state, api, connect, creds, openInNewTab } from '../cloud'
+import { state, api, connect, creds, openInNewTab, browserPrefs, setBrowserPref } from '../cloud'
 import type { Region, SessionInfo, TabInfo } from '../proto'
 import { HdStatusState } from '@etesian-design/vue'
 import { XBrowserFrame } from '@etesian-design/shell'
 /** a tab as the frame shows it (the BrowserTab of XBrowserTabs, not exported by name) */
 interface BrowserTab { id: string; title: string; icon?: string; address?: string; thumb?: string }
 import { Renderer } from '../renderer'
-import { useQuasar } from 'quasar'
 
 // on a phone-width screen the bar has room for the essentials only (pinch zooms, and the page already is phone sized)
-const $q = useQuasar()
 const stage = ref<HTMLElement | null>(null)
 const cv = ref<HTMLCanvasElement | null>(null)
 const ov = ref<HTMLInputElement | null>(null)
@@ -143,11 +146,16 @@ const selIndex = ref(0)
 let renderer: Renderer | null = null
 
 // ---- the size of the remote window ----
-// By default the cloud lays the page out at the size of this window (no phone-sized column, no padding); "Phone size" goes back to 360 x 640 and back again.
-// A resize reaches the cloud (debounced), which lays the page out again and sends tiles for the new size.
-const wantPhone = ref(localStorage.getItem('phecloud-browser-phone') === '1')
+// The cloud lays the page out at the size of this window, whatever it is; a resize reaches the cloud (debounced), which lays
+// the page out again and sends tiles for the new size. Only a server too old to resize keeps the 360 x 640 phone layout.
 const canFull = computed(() => state.features.includes('viewport'))
-const phoneSize = computed(() => wantPhone.value || !canFull.value)
+const phoneSize = computed(() => !canFull.value)
+// "Desktop site", as in a phone browser: on by itself in a wide window; a change reloads the page
+const desktopSite = computed(() => (browserPrefs.desktopSite ?? (state.viewport.w >= 600 ? 'desktop' : 'mobile')) === 'desktop')
+function toggleSite() {
+  setBrowserPref('desktopSite', desktopSite.value ? 'mobile' : 'desktop')
+  if (state.page.pid !== 0) api.viewport(state.viewport.w, state.viewport.h)
+}
 const vpStyle = computed(() => (phoneSize.value
   ? { width: '360px', height: '640px', maxWidth: '100%', maxHeight: '100%', position: 'relative' as const }
   : { width: state.viewport.w + 'px', height: state.viewport.h + 'px', position: 'absolute' as const, left: '0', top: '0' }))
@@ -167,11 +175,6 @@ function applySize(now = false) {
   if (now) send()
   else vpTimer = setTimeout(send, 250)
 }
-function togglePhone() {
-  wantPhone.value = !wantPhone.value
-  localStorage.setItem('phecloud-browser-phone', wantPhone.value ? '1' : '0')
-  nextTick(() => applySize(true))
-}
 watch(canFull, () => nextTick(() => applySize(true)))
 // the page's keyboard hint for the focused field (text, numeric, email…)
 const inputMode = computed(() => (state.focus.im || undefined) as HTMLAttributes['inputmode'])
@@ -190,9 +193,8 @@ function reply(ok: boolean) {
 watch(() => state.page.url, (u) => { if (!editing.value) urlInput.value = u })
 
 // the frame's tabs, the lock (https), a list on the left when the window is wide, and the ⋮ menu
-const tabs = computed<BrowserTab[]>(() => (state.tabs.length > 1 ? state.tabs : []).map((t) => ({ id: String(t.v), title: t.title || t.url || 'New tab', address: t.url })))
+const tabs = computed<BrowserTab[]>(() => state.tabs.map((t) => ({ id: String(t.v), title: t.title || t.url || 'New tab', address: t.url })))
 const secure = computed(() => !state.page.url || state.page.url.startsWith('https:'))
-const sideTabs = computed(() => $q.screen.width >= 1100 && state.tabs.length > 1)
 const moreOpen = ref(false)
 function newTab() { if (state.tabs.length < 3 && state.features.includes('tabs')) api.tab('new') }
 

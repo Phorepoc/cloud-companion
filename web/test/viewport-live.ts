@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 //
-// A look at a RUNNING server: the cloud browser and Android at full size, the phone-size toggle, the Android mode buttons, wide and narrow, light and dark.
+// A look at a RUNNING server: the cloud browser and Android at full size, the Desktop site switch, the Android mode buttons, wide and narrow, light and dark.
 // Pairs a throwaway admin browser named "viewport-live" (revoke it afterwards: `phecloud devices`, `phecloud revoke <id>`).
 //   BASE=https://host:9443 CODE=<admin code> OUT=/out node --experimental-strip-types viewport-live.ts
 import { chromium } from 'playwright'
@@ -51,13 +51,10 @@ await page.waitForFunction(() => window.__phe.state.page.pid > 0 && window.__phe
 console.log('browser: page laid out at', await page.evaluate(() => window.__phe.state.page.w), 'px wide (the window), stage', Math.round(st.width), 'x', Math.round(st.height))
 await page.waitForTimeout(1500)
 await shots('live-browser-wide')
-await menuItem('phone-size')
-await page.waitForFunction(() => window.__phe.state.page.w === 360, null, { timeout: 30000 })
-console.log('browser: phone size -> page 360 px wide')
-await page.waitForTimeout(1200)
-await shots('live-browser-phone-size')
-await menuItem('phone-size')
-await page.waitForFunction(() => window.__phe.state.page.w > 400, null, { timeout: 30000 })
+await menuItem('desktop-site')
+await page.waitForTimeout(3000)
+await shots('live-browser-mobile-site')
+await menuItem('desktop-site')
 // live window resize
 await page.setViewportSize({ width: 1100, height: 800 })
 await page.waitForFunction(() => window.__phe.state.page.w === window.__phe.state.viewport.w && window.__phe.state.viewport.w < 900, null, { timeout: 30000 })

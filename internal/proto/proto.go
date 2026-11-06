@@ -101,6 +101,7 @@ type Open struct {
 	Width  int     `cbor:"width"`
 	Height int     `cbor:"height,omitempty"` // 0 = 640
 	DPR    float64 `cbor:"dpr"`
+	Site   string  `cbor:"site,omitempty"` // "desktop" or "mobile": which site the page asks for; "" = by the window's width
 }
 
 // Navigate: URL, or Action = back | forward | reload.
@@ -408,6 +409,7 @@ type Viewport struct {
 	V      int    `cbor:"v,omitempty"`
 	Width  int    `cbor:"width"`
 	Height int    `cbor:"height"`
+	Site   string `cbor:"site,omitempty"` // as in Open; a change reloads the page
 }
 
 type Zoom struct {

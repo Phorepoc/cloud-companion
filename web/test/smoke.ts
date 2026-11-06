@@ -20,7 +20,7 @@ const QUICK = process.env.QUICK === '1'
 assert(CODE, 'CODE (a pairing code, preferably from `phecloud paircode --admin`) is required')
 
 const browser = await chromium.launch()
-const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 900, height: 900 }, ignoreHTTPSErrors: process.env.IGNORE_TLS === '1' })
+const ctx = await browser.newContext({ bypassCSP: true, viewport: { width: 360, height: 760 }, ignoreHTTPSErrors: process.env.IGNORE_TLS === '1' })
 const page = await ctx.newPage()
 
 // the browser frame (Etesian XBrowserFrame): the address field, Back, the ⋮ menu (new tab, other devices, zoom, phone size) and the tab
@@ -32,8 +32,7 @@ async function menuItem(id: string, p = page) { await more(p); await p.click(`[d
 async function picker(p = page) { if (!(await p.locator('.x-bf__picker').isVisible())) await p.click('.x-bf__count') }
 async function tabGo(n: number, p = page) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bf__shot`) }
 async function tabClose(n: number, p = page) { await picker(p); await p.click(`.x-bf__card:nth-child(${n}) .x-bt__x`); if (await p.locator('.x-bf__picker').isVisible()) await p.click('.x-bf__count') }
-// this test measures the phone layout (360 px wide pages: page heights, the 150% render); the browser's default is the whole window (test/desktop.ts covers that)
-await page.addInitScript(() => localStorage.setItem('phecloud-browser-phone', '1'))
+// this test measures the phone layout: a phone-wide window, so 360 px wide pages (page heights, the 150% render)
 const log: string[] = []
 page.on('console', (m) => log.push(m.type() + ': ' + m.text()))
 page.on('pageerror', (e) => log.push('pageerror: ' + e.message))
@@ -123,6 +122,8 @@ try {
   assert(z > 1 && z < 1.1, 'the leftover local zoom is 1.5625/1.5, got ' + z)
   await page.waitForTimeout(250)
   await page.screenshot({ path: OUT + '/web-zoomed.png' })
+  await page.keyboard.press('Escape') // the zoom buttons leave the menu open; on a phone-wide window it covers the page
+  await page.waitForSelector('[data-test=browser-more]', { state: 'hidden' })
   await tapRegion('Learn more')
   await waitTitle('Example Domains')
   await idle()
@@ -134,6 +135,7 @@ try {
   const box = await page.locator('[data-test=canvas]').boundingBox()
   assert(box, 'the canvas is laid out')
   await page.mouse.move(box.x + 180, box.y + 200)
+  
   await page.keyboard.down('Control')
   await page.mouse.wheel(0, -100)
   await page.keyboard.up('Control')
@@ -275,7 +277,8 @@ try {
   step('devices page lists ' + n + ' device(s)')
   await page.screenshot({ path: OUT + '/web-devices.png' })
 
-  // 9. settings: set a byte budget
+  // 9. settings: set a byte budget (in a wider window: the settings list beside the page)
+  await page.setViewportSize({ width: 900, height: 900 })
   await openApp(page, 'Settings'); await page.click('.x-sset__side .hd-list-item:has-text("Data use")')
   await page.click('[data-test=gray]')
   await page.click('[data-test=apply]')

@@ -69,9 +69,9 @@ export class PheClient {
     if (this.ws && this.ws.readyState === 1) this.ws.send(encode(frame))
   }
 
-  open(url: string, width = 360, height = 640) { this.send({ t: 'open', url, width, height }) }
+  open(url: string, width = 360, height = 640, site = '') { this.send({ t: 'open', url, width, height, site }) }
   /** The window the page is shown in has this size (css px): the cloud lays the page out at it. */
-  viewport(width: number, height: number) { this.send({ t: 'viewport', width, height }) }
+  viewport(width: number, height: number, site = '') { this.send({ t: 'viewport', width, height, site }) }
   navigate(url: string) { this.send({ t: 'navigate', url }) }
   action(a: string) { this.send({ t: 'navigate', action: a }) }
   tap(layer: number, x: number, y: number, sy: number) { this.send({ t: 'input', kind: 'tap', layer, x, y, sy }) }

@@ -40,9 +40,10 @@ type tab struct {
 	title  string
 	cache  map[tkey]tval
 	layers []browser.Layer
-	zoom   int  // render scale in percent
-	reset  bool // the next update re-renders the same page at another scale
-	vw, vh int  // the viewport size last asked for (0 = the 360 x 640 default)
+	zoom   int    // render scale in percent
+	reset  bool   // the next update re-renders the same page at another scale
+	vw, vh int    // the viewport size last asked for (0 = the 360 x 640 default)
+	site   string // the site asked for: "desktop", "mobile" or "" (by the width)
 	sent   string
 }
 
@@ -228,6 +229,10 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		if err := s.startBrowser(ctx, tb); err != nil {
 			return err
 		}
+		if err := tb.br.SetSite(ctx, o.Site); err != nil {
+			return err
+		}
+		tb.site = o.Site
 		if o.Height > 0 { // a window that is not phone sized: lay the page out at its size
 			w, h := clampViewport(o.Width, o.Height)
 			if err := tb.br.SetViewport(ctx, w, h); err != nil {
@@ -272,7 +277,23 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 			return err
 		}
 		w, h := clampViewport(vp.Width, vp.Height)
+		siteChanged := vp.Site != s.site
+		if siteChanged { // the "Desktop site" switch: every tab of this device, each reloaded, and this one sent again
+			progressive = true
+			for _, t := range s.tabs {
+				if t.br == nil {
+					continue
+				}
+				if err := t.br.SetSite(ctx, vp.Site); err != nil {
+					return err
+				}
+				t.site, t.reset = vp.Site, true
+			}
+		}
 		if w == s.vw && h == s.vh {
+			if siteChanged {
+				break
+			}
 			return nil
 		}
 		// every tab of this device is laid out for the window (the others are re-sent when they next update)

@@ -224,8 +224,8 @@ export async function forget() {
 }
 
 export const api = {
-  open: (u: string) => client && client.open(u, state.viewport.w, state.viewport.h),
-  viewport: (w: number, h: number) => client && client.viewport(w, h),
+  open: (u: string) => client && client.open(u, state.viewport.w, state.viewport.h, browserSite()),
+  viewport: (w: number, h: number) => client && client.viewport(w, h, browserSite()),
   navigate: (u: string) => client && client.navigate(u),
   action: (a: string) => client && client.action(a),
   tap: (l: number, x: number, y: number, sy: number) => client && client.tap(l, x, y, sy),
@@ -398,6 +398,17 @@ export function passkeyBlocker() {
   if (!window.isSecureContext) return 'This page is not secure (http). Passkeys need https, or the address localhost.'
   if (!window.PublicKeyCredential) return 'This browser does not support passkeys.'
   return ''
+}
+
+// the browser's "Desktop site" choice and where its tabs are, kept on this device (each device has its own screen)
+export const browserPrefs = reactive({
+  desktopSite: ((() => { try { return localStorage.getItem('phecloud-browser-site') } catch { return null } })() || null) as 'desktop' | 'mobile' | null,
+  tabsAt: ((() => { try { return localStorage.getItem('phecloud-browser-tabs') } catch { return null } })() || 'top') as 'top' | 'side',
+})
+const browserSite = () => browserPrefs.desktopSite ?? ''
+export function setBrowserPref<K extends keyof typeof browserPrefs>(k: K, v: (typeof browserPrefs)[K]) {
+  browserPrefs[k] = v
+  try { localStorage.setItem(k === 'tabsAt' ? 'phecloud-browser-tabs' : 'phecloud-browser-site', String(v ?? '')) } catch { /* private window */ }
 }
 
 // the Connections API (admin devices; internal/webui/connections.go)

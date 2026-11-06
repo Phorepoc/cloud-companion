@@ -34,9 +34,16 @@ const (
 	desktopUA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
 )
 
-// userAgent: sites get the phone browser for the phone layout (no height given) and narrow windows, the desktop one otherwise.
-// With the phone one, a wide window got sites' touch pages (Google opened its full-screen search on a tap in the box).
-func userAgent(width, height int) string {
+// userAgent: the site asked for ("desktop", "mobile"), else the phone browser for the phone layout (no height given) and narrow
+// windows and the desktop one otherwise. With the phone one, a wide window got sites' touch pages (Google opened its full-screen
+// search on a tap in the box).
+func userAgent(width, height int, site string) string {
+	switch site {
+	case "desktop":
+		return desktopUA
+	case "mobile":
+		return mobileUA
+	}
 	if height <= 0 || width < 600 {
 		return mobileUA
 	}
@@ -260,8 +267,9 @@ type cdpSession struct {
 	ns     *netState
 	box    *handlerBox
 	maxH   int
-	width  int // device width of the viewport (360 by default)
-	height int // device height of the viewport (640 by default)
+	width  int    // device width of the viewport (360 by default)
+	height int    // device height of the viewport (640 by default)
+	site   string // "desktop", "mobile" or "" (SetSite)
 	opened bool
 	cssW   int // layout width in css px: 360 / scale
 	pct    int // render scale in percent (0 = 100)
@@ -287,7 +295,7 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	s.opened = true
 	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
-		emulation.SetUserAgentOverride(userAgent(s.width, s.height)),
+		emulation.SetUserAgentOverride(userAgent(s.width, s.height, s.site)),
 		chromedp.ActionFunc(func(c context.Context) error {
 			w, h := s.cssView() // not "mobile": the layout is always exactly 360/scale px wide, whatever the viewport meta says
 			s.cssW = w
@@ -902,17 +910,30 @@ func (s *cdpSession) SetViewport(ctx context.Context, width, height int) error {
 	if width == s.width && height == s.height {
 		return nil
 	}
-	ua := userAgent(s.width, s.height)
+	ua := userAgent(s.width, s.height, s.site)
 	s.width, s.height = width, height
 	if !s.opened {
 		return nil
 	}
-	if nua := userAgent(width, height); nua != ua { // pages loaded from now on get the browser that fits the window
+	if nua := userAgent(width, height, s.site); nua != ua { // pages loaded from now on get the browser that fits the window
 		if err := s.run(ctx, 10*time.Second, emulation.SetUserAgentOverride(nua)); err != nil {
 			return err
 		}
 	}
 	if err := s.applyMetrics(ctx); err != nil {
+		return err
+	}
+	return s.settle(ctx)
+}
+
+func (s *cdpSession) SetSite(ctx context.Context, site string) error {
+	ua := userAgent(s.width, s.height, s.site)
+	s.site = site
+	nua := userAgent(s.width, s.height, site)
+	if !s.opened || nua == ua {
+		return nil
+	}
+	if err := s.run(ctx, 30*time.Second, emulation.SetUserAgentOverride(nua), chromedp.Reload()); err != nil {
 		return err
 	}
 	return s.settle(ctx)
