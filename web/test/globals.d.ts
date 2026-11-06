@@ -53,4 +53,11 @@ declare global {
     __audioMsg?: string
     __audioFrames?: number
   }
+
+  // the shape audit's helpers, put on the page by test/shapes.ts
+  interface Window {
+    __ALLOWED: string[]
+    __CARD: number
+    __one(el: HTMLElement): { name: string; kind: string; why: string; w: number; h: number } | null
+  }
 }

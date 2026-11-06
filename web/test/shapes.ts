@@ -6,7 +6,7 @@
 // squircles; never a pill or a rounded rectangle (the allowed exceptions are listed below). The same checks as etesian-design's
 // scripts/shape-audit.mjs, over this app's pages instead of the Storybook stories. Fails on any finding.
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types shapes.ts
-import { firefox } from 'playwright'
+import { firefox, type Page } from 'playwright'
 import assert from 'node:assert/strict'
 
 const BASE = process.env.BASE || 'http://127.0.0.1:8080'
@@ -23,9 +23,11 @@ const ALLOWED = ['q-toggle', 'hd-switch', 'q-radio', 'hd-radio', 'q-linear-progr
 // Large surfaces (cards, sheets, panels, hints, tiles) keep --hd-radius-card; scaled-down previews can make them look like pills.
 const CARD_RADIUS = 8;
 
-function one(el) {
-  const masked = (e) => { const m = (v) => v && v !== 'none'; return m(getComputedStyle(e).maskImage) || m(getComputedStyle(e, '::before').maskImage) || m(getComputedStyle(e, '::after').maskImage); };
-  const allowed = (e) => { for (let x = e; x && x !== document.body; x = x.parentElement) { const c = typeof x.className === 'string' ? x.className : ''; if (window.__ALLOWED.some((a) => c.includes(a))) return true; } return false; };
+interface Finding { name: string; kind: string; why: string; w: number; h: number }
+
+function one(el: HTMLElement): Finding | null {
+  const masked = (e: Element) => { const m = (v: string) => v && v !== 'none'; return m(getComputedStyle(e).maskImage) || m(getComputedStyle(e, '::before').maskImage) || m(getComputedStyle(e, '::after').maskImage); };
+  const allowed = (e: Element) => { for (let x: Element | null = e; x && x !== document.body; x = x.parentElement) { const c = typeof x.className === 'string' ? x.className : ''; if (window.__ALLOWED.some((a: string) => c.includes(a))) return true; } return false; };
   if (allowed(el) || masked(el)) return null;
   for (const pe of [null, '::before', '::after']) {
     const cs = getComputedStyle(el, pe); const rad = parseFloat(cs.borderTopLeftRadius) || 0;
@@ -40,16 +42,16 @@ function one(el) {
   return null;
 }
 function audit() {
-  const out = [];
-  const allowed = (el) => { for (let e = el; e && e !== document.body; e = e.parentElement) {
-    const c = typeof e.className === 'string' ? e.className : ''; if (window.__ALLOWED.some((a) => c.includes(a))) return true; } return false; };
-  const masked = (el) => { const m = (s) => s && s !== 'none';
+  const out: Finding[] = [];
+  const allowed = (el: Element) => { for (let e: Element | null = el; e && e !== document.body; e = e.parentElement) {
+    const c = typeof e.className === 'string' ? e.className : ''; if (window.__ALLOWED.some((a: string) => c.includes(a))) return true; } return false; };
+  const masked = (el: Element) => { const m = (s: string) => s && s !== 'none';
     const a = getComputedStyle(el), b = getComputedStyle(el, '::before'), c = getComputedStyle(el, '::after');
     return m(a.maskImage) || m(b.maskImage) || m(c.maskImage); };
-  const painted = (cs) => (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') || cs.backgroundImage !== 'none'
+  const painted = (cs: CSSStyleDeclaration) => (cs.backgroundColor !== 'rgba(0, 0, 0, 0)' && cs.backgroundColor !== 'transparent') || cs.backgroundImage !== 'none'
     || (parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none' && !/rgba\(.*, 0\)$|transparent/.test(cs.borderTopColor))
     || cs.boxShadow !== 'none';
-  for (const el of document.querySelectorAll('body *')) {
+  for (const el of document.querySelectorAll<HTMLElement>('body *')) {
     const r = el.getBoundingClientRect(); if (r.width < 6 || r.height < 6 || r.height > 64) continue;
     const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity === 0) continue;
     const rad = parseFloat(cs.borderTopLeftRadius) || 0;
@@ -71,8 +73,8 @@ function audit() {
 
 // Hover states: links, buttons and tabs often paint a highlight only under the pointer (2026-11-05: the site
 // header's links showed a rounded rectangle). Hover each one and audit it and its pseudo-elements then.
-async function hovers(p) {
-  const out = [];
+async function hovers(p: Page) {
+  const out: Finding[] = [];
   const n = await p.evaluate(() => { const els = [...document.querySelectorAll('a, button, [role="button"], [role="tab"], .q-tab, .q-item--clickable')]
     .filter((e) => { const r = e.getBoundingClientRect(); return r.width >= 6 && r.height >= 6 && r.height <= 64 && r.bottom > 0 && r.top < innerHeight; });
     els.forEach((e, i) => e.setAttribute('data-hv', String(i))); return Math.min(els.length, 60); });
@@ -80,7 +82,7 @@ async function hovers(p) {
     const ok = await p.hover(`[data-hv="${i}"]`, { timeout: 800, force: true }).then(() => true).catch(() => false);
     if (!ok) continue;
     await p.waitForTimeout(160);   // let hover transitions finish
-    const f = await p.evaluate((i) => { const el = document.querySelector(`[data-hv="${i}"]`); return el ? window.__one(el) : null; }, i).catch(() => null);
+    const f = await p.evaluate((i: number) => { const el = document.querySelector(`[data-hv="${i}"]`); return el ? window.__one(el as HTMLElement) : null; }, i).catch(() => null);
     if (f) out.push({ ...f, why: 'on hover: ' + f.why });
   }
   await p.mouse.move(0, 0);
