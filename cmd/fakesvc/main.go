@@ -18,13 +18,13 @@ import (
 
 	"github.com/phorepoc/cloud-companion/internal/fakes"
 	// each fake registers itself
-	_ "github.com/phorepoc/cloud-companion/internal/fakes/matrix"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/immich"
-	_ "github.com/phorepoc/cloud-companion/internal/fakes/nextcloud"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/irc"
-	_ "github.com/phorepoc/cloud-companion/internal/fakes/xmpp"
+	_ "github.com/phorepoc/cloud-companion/internal/fakes/matrix"
+	_ "github.com/phorepoc/cloud-companion/internal/fakes/nextcloud"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/signal"
 	_ "github.com/phorepoc/cloud-companion/internal/fakes/sip"
+	_ "github.com/phorepoc/cloud-companion/internal/fakes/xmpp"
 )
 
 func main() {

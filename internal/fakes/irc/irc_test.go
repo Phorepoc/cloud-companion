@@ -10,6 +10,7 @@ import (
 	"crypto/tls"
 	"strings"
 	"testing"
+	"time"
 
 	app "github.com/phorepoc/cloud-companion/internal/irc"
 )
@@ -35,16 +36,27 @@ func TestLogin(t *testing.T) {
 	}
 
 	// a nick in use: the client is told and takes another
-	held, err := tls.Dial("tcp", ln.Addr().String(), &tls.Config{InsecureSkipVerify: true})
-	if err != nil {
-		t.Fatal(err)
+	// (the server frees the nick of the client before when it sees that one go: try again for a moment, as a person would)
+	var held *tls.Conn
+	for i := 0; ; i++ {
+		c, err := tls.Dial("tcp", ln.Addr().String(), &tls.Config{InsecureSkipVerify: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		c.Write([]byte("NICK cc\r\nUSER cc s e :x\r\n"))
+		buf := make([]byte, 512)
+		n, _ := c.Read(buf)
+		if strings.Contains(string(buf[:n]), " 001 cc ") {
+			held = c
+			break
+		}
+		c.Close()
+		if i == 50 {
+			t.Fatalf("no welcome: %q", buf[:n])
+		}
+		time.Sleep(20 * time.Millisecond)
 	}
 	defer held.Close()
-	held.Write([]byte("NICK cc\r\nUSER cc s e :x\r\n"))
-	buf := make([]byte, 512)
-	if n, _ := held.Read(buf); !strings.Contains(string(buf[:n]), " 001 cc ") {
-		t.Fatalf("no welcome: %q", buf[:n])
-	}
 	if msg, err := app.Test(ctx, cfg, ""); err != nil || !strings.Contains(msg, "cc is taken") {
 		t.Fatalf("taken nick: %q %v", msg, err)
 	}
