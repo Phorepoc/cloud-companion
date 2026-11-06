@@ -6,14 +6,15 @@
      unless the server operator allows more. -->
 <template>
   <q-page class="ph-page">
-    <div class="ph-head">
+    <!-- in a window (or a host with a header) the title is a menu of the folders and the buttons sit in the header: useChrome below -->
+    <div v-if="!chrome.hosted" class="ph-head">
       <h1>Mail</h1>
       <div class="ph-actions">
         <q-btn flat round icon="sym_o_refresh" aria-label="Refresh" data-test="mail-refresh" @click="refresh" />
         <q-btn unelevated color="primary" icon="sym_o_edit" label="Write" data-test="mail-compose" @click="openCompose()" />
       </div>
     </div>
-    <q-select v-model="folder" :options="folderOptions" emit-value map-options outlined label="Folder" class="q-mb-md" data-test="mail-folder"
+    <q-select v-if="!chrome.hosted" v-model="folder" :options="folderOptions" emit-value map-options outlined label="Folder" class="q-mb-md" data-test="mail-folder"
               @update:model-value="loadList(true)" />
 
     <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
@@ -103,6 +104,7 @@ import type { MailAccount, MailBody, MailFolder, MailItem } from '../proto'
 interface Draft { rcpt: string; subject: string; body: string; replyTo: string; account: string }
 import { toast } from '../toast'
 import EmptyState from '../components/EmptyState.vue'
+import { useChrome } from '@etesian-design/shell'
 
 const folders = ref<MailFolder[]>([])
 const folder = ref('')
@@ -146,6 +148,17 @@ async function init() {
     error.value = /not set up/i.test((e as Error).message) ? 'The hub is not set up on this server, so there is no mail to show. See the hub guide to set it up.' : (e as Error).message
   }
 }
+// the header: the folders as the title's view menu, then Write and Refresh (most important first; the host folds the rest into ⋮)
+const folderName = (id: string) => folderOptions.value.find((f) => f.value === id)?.label ?? 'Mail'
+const chrome = useChrome(() => ({
+  title: 'Mail',
+  views: folderOptions.value.length ? folderOptions.value.map((f) => f.label) : undefined,
+  view: folder.value ? folderName(folder.value) : undefined,
+  tools: [{ icon: 'edit', label: 'Write' }, { icon: 'refresh', label: 'Refresh' }],
+}))
+chrome.on('tool', (l) => { if (l === 'Write') openCompose(); else if (l === 'Refresh') refresh() })
+chrome.on('view', (v) => { const f = folderOptions.value.find((o) => o.label === v); if (f && f.value !== folder.value) { folder.value = f.value; loadList(true) } })
+
 async function refresh() {
   try { folders.value = (await hubCall({ op: 'mail.folders' })).folders || folders.value } catch (e) { /* the list shows the error */ }
   await loadList(true)

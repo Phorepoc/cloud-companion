@@ -43,7 +43,11 @@ step('pair')
 await page.goto(BASE + '/#/pair')
 await page.fill('[data-test=code]', CODE)
 await page.click('[data-test=pair]')
-await page.waitForFunction(() => window.__phe && window.__phe.state.status === 'online', null, { timeout: 20000 })
+// polled with evaluate: Firefox's page policy (CSP) blocks waitForFunction's eval when the condition is not already true
+for (let i = 0; !(await page.evaluate(() => window.__phe?.state.status === 'online')); i++) {
+  assert(i < 100, 'online within 20 s')
+  await page.waitForTimeout(200)
+}
 
 step('enter the desktop from the top bar: the current section opens as a window and names the menu bar')
 await page.goto(BASE + '/#/settings')
@@ -64,6 +68,16 @@ await page.waitForSelector(win('mail'))
 assert.equal(await barApp(), 'Mail')
 const z = async (id: string) => Number(await page.locator(win(id)).evaluate((el) => getComputedStyle(el).zIndex))
 assert((await z('mail')) > (await z('settings')), 'the newest window is on top')
+
+step('Mail puts its title and actions in the window header (useChrome): no second title or toolbar inside')
+const acts = await page.locator(`${win('mail')} .x-win__actions button`).evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')))
+assert.deepEqual(acts, ['Write', 'Refresh'], `the header actions: ${acts}`)
+assert.equal(await page.locator(`${win('mail')} .x-win__body h1`).count(), 0, 'no page title inside the window')
+assert.equal(await page.locator(`${win('mail')} [data-test=mail-compose], ${win('mail')} [data-test=mail-folder]`).count(), 0, 'no toolbar or folder field inside')
+await page.click(`${win('mail')} .x-win__actions [aria-label=Write]`)
+await page.waitForSelector('[data-test=mail-compose-form]')
+await page.click('[data-test=mail-cancel]') // the composer is persistent: Escape does not drop a draft
+await page.locator('[data-test=mail-compose-form]').waitFor({ state: 'detached' })
 
 step('a floating window dragged over the dock covers it (regression 2026-11-06: windows always went under the dock)')
 const dock = await box('.x-shell-dock')
@@ -111,7 +125,7 @@ await page.click('.x-shell__clock')
 await page.waitForSelector('[data-test=events]')
 await page.screenshot({ path: `${OUT}/desktop-3-events.png` })
 await page.keyboard.press('Escape')
-await page.waitForFunction(() => !document.querySelector('[data-test=events]'))
+await page.locator('[data-test=events]').waitFor({ state: 'detached' })
 
 step('no Super or Ctrl+Alt shortcut is offered anywhere (they belong to the system in a browser)')
 for (const m of ['View', 'Window']) {
@@ -125,13 +139,13 @@ assert(!/Super|Ctrl\+Alt/.test((await page.content())), 'no Super or Ctrl+Alt in
 
 step('minimise from the window bar, restore from the dock')
 await page.click(`${win('contacts')} [aria-label=Minimise]`)
-await page.waitForFunction(() => !document.querySelector('.x-win[data-win=contacts]'))
+await page.locator('.x-win[data-win=contacts]').waitFor({ state: 'detached' })
 await dockBtn('Contacts').click()
 await page.waitForSelector(win('contacts'))
 
 step('close a window')
 await page.click(`${win('contacts')} [aria-label=Close]`)
-await page.waitForFunction(() => !document.querySelector('.x-win[data-win=contacts]'))
+await page.locator('.x-win[data-win=contacts]').waitFor({ state: 'detached' })
 
 step('the arrangement survives a reload')
 await page.reload()
@@ -141,7 +155,7 @@ await page.waitForSelector(win('settings'))
 step('back to the classic view from the menu bar')
 await page.getByRole('menuitem', { name: 'Cloud Companion', exact: true }).click()
 await page.getByRole('menu', { name: 'Cloud Companion' }).getByText('Classic view').click()
-await page.waitForFunction(() => !document.querySelector('[data-test=desktop]'))
+await page.locator('[data-test=desktop]').waitFor({ state: 'detached' })
 
 step('a small screen always gets the classic layout')
 await page.setViewportSize({ width: 800, height: 900 })
