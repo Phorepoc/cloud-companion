@@ -1,6 +1,6 @@
 # Host manager and board images
 
-Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page with the Wi-Fi step and setup hotspot, the install script and the Raspberry Pi image (`deploy/board`, `deploy/images/pi`). Not yet: updates, backups, remote access.
+Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page with the Wi-Fi step and setup hotspot, the install script and the Raspberry Pi image (`deploy/board`, `deploy/images/pi`). Not yet: updates, remote access.
 
 ## Why
 
@@ -81,6 +81,28 @@ setup" (NetworkManager, shared mode, the page at `10.42.0.1`; every DNS name poi
 network's sign-in page). After the setup code, the page lists the Wi-Fi networks it saw before the hotspot started; joining
 one closes the hotspot, and the page asks to move to that network and open `http://cloud.local`. A failed join reopens the
 hotspot with the reason. Setup itself needs the internet and refuses to start without it.
+
+## Backups
+
+Settings, Backups (owner only) turns on nightly backups of everything: every volume of the compose project (Cloud Companion's
+database and files, mail, chats, the features' data) and the manager's state (the features, their settings and secrets,
+the recovery passphrase). The engine is [restic](https://restic.net), run as a container (`restic/restic`), so nothing is
+installed on the board for it.
+
+- **Where:** a USB disk plugged into the board (any partition with ext4, exFAT, FAT, NTFS, Btrfs or XFS; mounted only for the
+  run, never formatted), an SFTP server (the board makes its own key and shows it to add to `authorized_keys`), S3-compatible
+  storage, or a restic REST server. A Windows or NAS share (SMB) is not offered yet.
+- **Encrypted** with the owner's backup password (at least 10 characters), kept on the board (root only) for the nightly
+  runs. Without it nobody can read the backups, which the page says.
+- **When:** once a day at a chosen time (03:30 by default, the board's time zone). The project's containers stop for the copy
+  (`docker stop`, a minute or two), so no database is copied mid-write, and start again however the copy went.
+- **Kept:** 7 daily, 4 weekly and 6 monthly backups (`restic forget --prune` after each run); on Sundays `restic check`.
+- **Restore:** on a fresh board, the setup page offers "Restore from a backup" next to setting up: the destination, the
+  password, then a backup from the list. The volumes are made again with their compose labels, the state and settings come
+  back, the features start, and the owner's devices work as before, without pairing. Backups go on to the same place.
+
+The API: `GET /v1/backup` (without secrets, plus the SFTP key), `PUT /v1/backup` (checks the destination, makes the restic
+repository there if it is new; a job), `POST /v1/backup/run` (a job), `GET /v1/backup/snapshots`, `GET /v1/backup/usb`.
 
 ## Recovery
 
@@ -193,4 +215,4 @@ release channel says which manager version each Cloud Companion version needs.
 
 ## Open questions
 
-- Backups off the board: a network share, or another Cloud Companion.
+- Backups to an SMB share, or to another Cloud Companion.

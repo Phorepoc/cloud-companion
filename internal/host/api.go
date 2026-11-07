@@ -40,6 +40,47 @@ func (m *Manager) Handler() http.Handler {
 		j, err := m.Disable(r.PathValue("id"))
 		jobReply(w, j, err)
 	})
+	// backups (backup.go): the destination without secrets, the last run, the SFTP key
+	mux.HandleFunc("GET /v1/backup", func(w http.ResponseWriter, r *http.Request) {
+		c := m.BackupConfig()
+		out := map[string]any{"on": c.On, "dest": c.Dest.Public(), "at": c.At, "last": c.Last, "hasPassword": c.Dest.Password != ""}
+		if k, err := m.SSHKey(); err == nil {
+			out["sshKey"] = k
+		}
+		writeJSON(w, http.StatusOK, out)
+	})
+	mux.HandleFunc("PUT /v1/backup", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			On   bool        `json:"on"`
+			Dest Destination `json:"dest"`
+			At   string      `json:"at"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		j, err := m.SetBackup(in.On, in.Dest, in.At)
+		if err == nil && j == nil {
+			writeJSON(w, http.StatusOK, map[string]any{})
+			return
+		}
+		jobReply(w, j, err)
+	})
+	mux.HandleFunc("POST /v1/backup/run", func(w http.ResponseWriter, r *http.Request) {
+		j, err := m.BackupNow()
+		jobReply(w, j, err)
+	})
+	mux.HandleFunc("GET /v1/backup/snapshots", func(w http.ResponseWriter, r *http.Request) {
+		snaps, err := m.Snapshots(r.Context(), m.BackupConfig().Dest)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"snapshots": snaps})
+	})
+	mux.HandleFunc("GET /v1/backup/usb", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"disks": m.USBDisks(r.Context())})
+	})
 	mux.HandleFunc("GET /v1/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		j := m.Job(r.PathValue("id"))
 		if j == nil {

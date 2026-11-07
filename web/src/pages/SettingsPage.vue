@@ -13,6 +13,7 @@
           <DevicesPage v-else-if="id === 'devices'" />
           <CataloguePage v-else-if="id === 'catalogue'" />
           <FeaturesPage v-else-if="id === 'features'" />
+          <BackupsPage v-else-if="id === 'backups'" />
           <DeviceSettings v-else :part="id" />
         </template>
       </XSettingsSplit>
@@ -32,6 +33,7 @@ const ConnectionsPage = defineAsyncComponent(() => import('./ConnectionsPage.vue
 const DevicesPage = defineAsyncComponent(() => import('./DevicesPage.vue'))
 const CataloguePage = defineAsyncComponent(() => import('./CataloguePage.vue'))
 const FeaturesPage = defineAsyncComponent(() => import('./FeaturesPage.vue'))
+const BackupsPage = defineAsyncComponent(() => import('./BackupsPage.vue'))
 
 const route = useRoute()
 const router = useRouter()

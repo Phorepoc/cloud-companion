@@ -65,6 +65,14 @@ func (h *hostAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /phe/host/features/{id}", func(w http.ResponseWriter, r *http.Request) {
 		h.passID(w, r, "DELETE", "/v1/features/")
 	})
+	// backups (internal/host/backup.go)
+	mux.HandleFunc("GET /phe/host/backup", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "GET", "/v1/backup") })
+	mux.HandleFunc("PUT /phe/host/backup", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "PUT", "/v1/backup") })
+	mux.HandleFunc("POST /phe/host/backup/run", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "POST", "/v1/backup/run") })
+	mux.HandleFunc("GET /phe/host/backup/snapshots", func(w http.ResponseWriter, r *http.Request) {
+		h.pass(w, r, "GET", "/v1/backup/snapshots")
+	})
+	mux.HandleFunc("GET /phe/host/backup/usb", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "GET", "/v1/backup/usb") })
 	mux.HandleFunc("GET /phe/host/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		q := ""
 		if r.URL.Query().Get("wait") == "1" {
@@ -95,7 +103,7 @@ func (h *hostAPI) pass(w http.ResponseWriter, r *http.Request, method, path stri
 		return
 	}
 	var body io.Reader
-	if method == "POST" {
+	if method == "POST" || method == "PUT" {
 		body = http.MaxBytesReader(w, r.Body, 64<<10)
 	}
 	res, err := h.do(r.Context(), method, path, body)

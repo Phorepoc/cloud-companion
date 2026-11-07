@@ -50,7 +50,10 @@ func main() {
 		log.Error("state", "err", err)
 		os.Exit(1)
 	}
-	m := &host.Manager{Cat: cat, Board: host.DetectBoard(), ComposeDir: *compose, StateDir: *stateDir, Run: host.ExecRunner{}}
+	hostExec := func(ctx context.Context, name string, args ...string) ([]byte, error) {
+		return exec.CommandContext(ctx, name, args...).CombinedOutput()
+	}
+	m := &host.Manager{Cat: cat, Board: host.DetectBoard(), ComposeDir: *compose, StateDir: *stateDir, Run: host.ExecRunner{}, Host: hostExec}
 	if err := m.Load(); err != nil {
 		log.Error("state", "err", err)
 		os.Exit(1)
@@ -77,15 +80,14 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	su := &host.Setup{M: m, Listen: *listen, CodeFile: *codeFile, Uptime: uptime, Window: 30 * time.Minute, Unhealthy: *recoverAfter,
-		HandOver: *handOver, Exec: func(ctx context.Context, name string, args ...string) ([]byte, error) {
-			return exec.CommandContext(ctx, name, args...).CombinedOutput()
-		}}
+		HandOver: *handOver, Exec: hostExec}
 	if _, err := exec.LookPath("nmcli"); err == nil && *wifi != "" {
 		su.Net, su.HotspotAt = &host.Network{Exec: su.Exec, Iface: *wifi, SSID: "Cloud setup"}, 90*time.Second
 	}
 	su.Start()
 	log.Info("setup page", "phase", su.Phase(), "listen", *listen)
 	go su.Run(ctx)
+	go m.Schedule(ctx)
 	srv := &http.Server{Handler: m.Handler()}
 	go func() { <-ctx.Done(); srv.Close() }()
 	log.Info("listening", "socket", *sock)

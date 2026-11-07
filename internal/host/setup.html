@@ -42,9 +42,10 @@
 
   <section id="sdWarn" class="card hide" role="note">
     <h2>Running from an SD card</h2>
-    <p class="muted">SD cards wear out under a server's constant writes, and they are slow. The board keeps its logs and swap in
-      memory to spare the card, but Cloud Companion's data is still written to it. For a board that lasts, put the image on a
-      USB SSD (a Raspberry Pi 4 or 5 starts from USB on its own, and a Pi 5 from an NVMe drive) and start from that.</p>
+    <p class="muted">For one person, a good card is fine: use a high-endurance card (sold for dash cams and security
+      cameras), which is made for constant writes. The board keeps its logs and swap in memory to spare it, and backups (in
+      Cloud Companion's settings) keep your data safe if the card fails. A USB SSD (a Raspberry Pi 4 or 5 starts from USB on its
+      own) is faster and lasts longer.</p>
   </section>
 
   <section id="locked" class="card hide">
@@ -72,6 +73,38 @@
       <b id="joinName2"></b> and open <a href="http://cloud.local/">http://cloud.local</a> to carry on.</p>
     <p class="muted">If the board cannot join, "Cloud setup" comes back in a minute with the reason.</p>
   </section>
+
+  <section id="choose" class="card hide">
+    <h2>New or restored?</h2>
+    <p class="muted">Set up a new Cloud Companion, or bring one back from its backup: everything (chats, mail, files, features
+      and your devices) returns as it was.</p>
+    <button type="button" id="pickNew">Set up a new one</button>
+    <button type="button" id="pickRestore" class="plain">Restore from a backup</button>
+  </section>
+
+  <form id="restore" class="card hide">
+    <h2>Restore from a backup</h2>
+    <label for="rKind">Where the backups are</label>
+    <select id="rKind">
+      <option value="usb">A USB disk plugged into this board</option>
+      <option value="sftp">An SFTP server (a NAS or another computer)</option>
+      <option value="s3">S3-compatible storage (Backblaze B2, Wasabi, MinIO…)</option>
+      <option value="rest">A restic REST server</option>
+    </select>
+    <div data-kind="usb"><label for="rDisk">USB disk</label><select id="rDisk"></select>
+      <label for="rUsbPath">Folder on the disk (empty: the top)</label><input id="rUsbPath" type="text"></div>
+    <div data-kind="sftp" class="hide"><label for="rSftp">user@host:/folder</label><input id="rSftp" type="text" autocapitalize="off" spellcheck="false">
+      <p class="muted">Add this board's key to the server's authorized_keys first: <code id="rKey"></code></p></div>
+    <div data-kind="s3 rest" class="hide"><label for="rUrl">Address</label><input id="rUrl" type="text" placeholder="https://s3.example.com/bucket/cloud" autocapitalize="off" spellcheck="false"></div>
+    <div data-kind="s3" class="hide"><label for="rKeyId">Access key ID</label><input id="rKeyId" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rSecret">Secret access key</label><input id="rSecret" type="password"></div>
+    <label for="rPass">Backup password</label><input id="rPass" type="password" autocomplete="off">
+    <button type="button" id="rFind">Find backups</button>
+    <div id="rSnapBox" class="hide"><label for="rSnap">Backup</label><select id="rSnap"></select>
+      <button type="submit" id="rStart">Restore</button></div>
+    <button type="button" id="rBack" class="plain">Back</button>
+    <p id="restoreErr" class="err" role="alert"></p>
+  </form>
 
   <form id="setup" class="hide">
     <section class="card">
@@ -117,13 +150,14 @@
 </main>
 <script>
 const $ = (id) => document.getElementById(id)
-const show = (...ids) => { for (const s of ['locked', 'network', 'joining', 'setup', 'working', 'done', 'recovery']) $(s).classList.toggle('hide', !ids.includes(s)) }
+const show = (...ids) => { for (const s of ['locked', 'network', 'joining', 'choose', 'restore', 'setup', 'working', 'done', 'recovery']) $(s).classList.toggle('hide', !ids.includes(s)) }
 async function call(method, path, body) {
   const r = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.error || 'The board did not accept that.')
   return j
 }
+let mode = '' // '', 'new', 'restore'
 let filled = false
 function fillSetup(st) {
   if (filled) return
@@ -195,6 +229,10 @@ async function refresh() {
   if (net && net.joining) { $('joinName').textContent = $('joinName2').textContent = net.joining; return show('joining') }
   if (net && !net.online) { fillWifi(net); $('netErr').textContent = net.error || ''; return show('network') }
   fillSetup(st)
+  if (st.sshKey) $('rKey').textContent = st.sshKey
+  if (st.job && st.job.kind === 'restore' && st.job.state === 'failed') { mode = 'restore'; $('restoreErr').textContent = 'Restoring failed: ' + (st.job.error || ''); return show('restore') }
+  if (mode === '' && !st.job) return show('choose')
+  if (mode === 'restore') return show('restore')
   if (st.job && st.job.state === 'failed') $('setupErr').textContent = 'Setting up failed: ' + (st.job.error || '') + '. Change the features and try again.'
   if (st.job && st.job.state === 'done') { $('workTitle').textContent = 'Starting Cloud Companion'; $('workLine').textContent = 'Waiting until it is ready…'; return show('working') }
   show('setup')
@@ -215,6 +253,40 @@ $('network').onsubmit = async (e) => {
   const r = document.querySelector('#wifiList input:checked')
   if (!r) return
   try { await call('POST', '/api/wifi', { ssid: r.value, password: r.dataset.secure ? $('wifiPass').value : '' }); $('wifiPass').value = ''; refresh() } catch (err) { $('netErr').textContent = err.message }
+}
+function rDest() {
+  const kind = $('rKind').value
+  return { kind, uuid: $('rDisk').value, path: kind === 'usb' ? $('rUsbPath').value : $('rSftp').value, url: $('rUrl').value,
+    keyId: $('rKeyId').value, secret: $('rSecret').value, password: $('rPass').value }
+}
+async function rKindChanged() {
+  const kind = $('rKind').value
+  for (const d of document.querySelectorAll('#restore [data-kind]')) d.classList.toggle('hide', !d.dataset.kind.split(' ').includes(kind))
+  $('rSnapBox').classList.add('hide')
+  if (kind === 'usb') {
+    try {
+      const j = await call('GET', '/api/restore/usb'); $('rDisk').textContent = ''
+      for (const d of j.disks || []) { const o = document.createElement('option'); o.value = d.uuid; o.textContent = [d.label || d.model || 'USB disk', d.size, d.fs].filter(Boolean).join(', '); $('rDisk').append(o) }
+      if (!(j.disks || []).length) $('restoreErr').textContent = 'No USB disk found: plug it in and pick USB again.'
+    } catch (err) { $('restoreErr').textContent = err.message }
+  }
+}
+$('pickNew').onclick = () => { mode = 'new'; refresh() }
+$('pickRestore').onclick = () => { mode = 'restore'; rKindChanged(); refresh() }
+$('rBack').onclick = () => { mode = ''; refresh() }
+$('rKind').onchange = rKindChanged
+$('rFind').onclick = async () => {
+  $('restoreErr').textContent = ''; $('rFind').disabled = true
+  try {
+    const j = await call('POST', '/api/restore/snapshots', { dest: rDest() }); $('rSnap').textContent = ''
+    for (const sn of j.snapshots || []) { const o = document.createElement('option'); o.value = sn.id; o.textContent = new Date(sn.time).toLocaleString() + ' (' + sn.id + ')'; $('rSnap').append(o) }
+    if (!(j.snapshots || []).length) throw new Error('There are no backups there.')
+    $('rSnapBox').classList.remove('hide')
+  } catch (err) { $('restoreErr').textContent = err.message } finally { $('rFind').disabled = false }
+}
+$('restore').onsubmit = async (e) => {
+  e.preventDefault(); $('restoreErr').textContent = ''
+  try { await call('POST', '/api/restore', { dest: rDest(), snapshot: $('rSnap').value }); mode = 'new'; $('workTitle').textContent = 'Restoring'; refresh() } catch (err) { $('restoreErr').textContent = err.message }
 }
 $('retry').onclick = async () => { $('recErr').textContent = ''; try { await call('POST', '/api/retry'); refresh() } catch (err) { $('recErr').textContent = err.message } }
 $('logs').onclick = async () => { try { const j = await call('GET', '/api/logs'); $('log').textContent = j.log || '(empty)'; $('log').classList.remove('hide') } catch (err) { $('recErr').textContent = err.message } }

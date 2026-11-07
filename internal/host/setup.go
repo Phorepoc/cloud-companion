@@ -61,6 +61,7 @@ type Setup struct {
 	doneAt    time.Time
 	srv       *http.Server
 	net       netState
+	restored  bool // set up from a backup: the owner and their devices are back, so no owner code to hand over
 	Now       func() time.Time
 }
 
@@ -238,7 +239,7 @@ func (s *Setup) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
-		phase, job, unlocked := s.phase, s.job, s.unlocked(r)
+		phase, job, unlocked, restored := s.phase, s.job, s.unlocked(r), s.restored
 		s.mu.Unlock()
 		out := map[string]any{"phase": phase, "unlocked": unlocked, "board": s.M.Board}
 		if phase == PhaseSetup {
@@ -253,6 +254,11 @@ func (s *Setup) Handler() http.Handler {
 				}
 			}
 			out["features"] = fs
+			if phase == PhaseSetup {
+				if k, err := s.M.SSHKey(); err == nil {
+					out["sshKey"] = k
+				}
+			}
 			if s.Net != nil && phase == PhaseSetup {
 				s.mu.Lock()
 				out["network"] = s.net
@@ -262,7 +268,8 @@ func (s *Setup) Handler() http.Handler {
 				out["job"] = job.Status()
 			}
 			if phase == PhaseDone {
-				out["open"] = s.ownerLink(r)
+				out["open"] = s.ownerLink(r, restored)
+				out["restored"] = restored
 			}
 		}
 		writeJSON(w, http.StatusOK, out)
@@ -358,6 +365,57 @@ func (s *Setup) Handler() http.Handler {
 		s.job = j
 		writeJSON(w, http.StatusAccepted, j.Status())
 	})
+	// a fresh board restored from a backup instead of set up
+	mux.HandleFunc("POST /api/restore/snapshots", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Dest Destination `json:"dest"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if !s.restoreAllowed(w, r) {
+			return
+		}
+		if err := in.Dest.check(); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		snaps, err := s.M.Snapshots(r.Context(), in.Dest)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"snapshots": snaps})
+	})
+	mux.HandleFunc("GET /api/restore/usb", func(w http.ResponseWriter, r *http.Request) {
+		if !s.restoreAllowed(w, r) {
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"disks": s.M.USBDisks(r.Context())})
+	})
+	mux.HandleFunc("POST /api/restore", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Dest     Destination `json:"dest"`
+			Snapshot string      `json:"snapshot"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&in); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if !s.restoreAllowed(w, r) {
+			return
+		}
+		j, err := s.M.Restore(in.Dest, in.Snapshot)
+		if err != nil {
+			writeError(w, http.StatusConflict, err)
+			return
+		}
+		s.mu.Lock()
+		s.job, s.restored = j, true
+		s.mu.Unlock()
+		writeJSON(w, http.StatusAccepted, j.Status())
+	})
 	mux.HandleFunc("POST /api/wifi", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			SSID     string `json:"ssid"`
@@ -423,6 +481,23 @@ func (s *Setup) Handler() http.Handler {
 	return mux
 }
 
+// restoreAllowed: setting up (not yet set up), unlocked, online, and no setup or restore running.
+func (s *Setup) restoreAllowed(w http.ResponseWriter, r *http.Request) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	switch {
+	case s.phase != PhaseSetup || !s.unlocked(r):
+		writeError(w, http.StatusForbidden, errors.New("not now"))
+	case s.Net != nil && !s.net.Online:
+		writeError(w, http.StatusConflict, errors.New("connect the board to the internet first"))
+	case s.job != nil && s.job.Status().State == "running":
+		writeError(w, http.StatusConflict, errors.New("already setting up"))
+	default:
+		return true
+	}
+	return false
+}
+
 func (s *Setup) recoveryUnlocked(w http.ResponseWriter, r *http.Request) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -448,13 +523,16 @@ func (s *Setup) unlocked(r *http.Request) bool {
 }
 
 // ownerLink is Cloud Companion's pairing page with the first owner's code, at the address the browser used for this page.
-func (s *Setup) ownerLink(r *http.Request) string {
+func (s *Setup) ownerLink(r *http.Request, restored bool) string {
 	host := r.Host
 	if h, _, err := net.SplitHostPort(host); err == nil {
 		host = h
 	}
 	if strings.Contains(host, ":") {
 		host = "[" + host + "]"
+	}
+	if restored {
+		return "http://" + host + ":8080/"
 	}
 	return "http://" + host + ":8080/#/pair?code=" + s.M.Value("core", "first-owner")
 }
