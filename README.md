@@ -263,6 +263,12 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 - The base systems under all of them: [Debian](https://www.debian.org), [Alpine Linux](https://alpinelinux.org), [Node.js](https://nodejs.org),
   [OpenSSL](https://www.openssl.org) and [fontTools](https://github.com/fonttools/fonttools)
 
+**The boards**
+[Raspberry Pi OS](https://www.raspberrypi.com/software/) and [pi-gen](https://github.com/RPi-Distro/pi-gen) for the board image,
+[Docker Engine](https://docs.docker.com/engine/) with [Compose](https://github.com/docker/compose), [NetworkManager](https://networkmanager.dev)
+with [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) for the setup hotspot, [Avahi](https://avahi.org) for `cloud.local`,
+[systemd](https://systemd.io), and [QEMU](https://www.qemu.org) with [binfmt](https://github.com/tonistiigi/binfmt) for building it on x86.
+
 **The servers our tests run against**
 [Conduit](https://conduit.rs) (Matrix), [Prosody](https://prosody.im) (XMPP), [Ergo](https://ergo.chat) (IRC),
 [Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), [Seafile](https://www.seafile.com) (with

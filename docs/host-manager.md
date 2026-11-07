@@ -1,6 +1,6 @@
 # Host manager and board images
 
-Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page. Not yet: network and storage steps, the setup hotspot, images, updates, backups, remote access.
+Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page with the Wi-Fi step and setup hotspot, the install script and the Raspberry Pi image (`deploy/board`, `deploy/images/pi`). Not yet: the storage step, updates, backups, remote access.
 
 ## Why
 
@@ -44,6 +44,28 @@ Cloud Companion never gets the Docker socket: a break-in to it must not mean roo
    features to start with, time zone. Then download and start, with progress per image and retry.
 6. When Cloud Companion is healthy, the setup UI sends the browser there (the owner is already signed in) and switches
    itself off.
+
+## Installing
+
+- **Raspberry Pi 4/5:** flash `cloud-companion-raspberry-pi-vX.Y.Z.img.xz` from the release page (Raspberry Pi Imager can add
+  Wi-Fi details). For a setup code, rename `cloud-setup.txt.example` on the card's boot partition to `cloud-setup.txt` and
+  change the code. The image has no login: the board is run from the setup page and Cloud Companion.
+- **Any Debian or Ubuntu machine (arm64, amd64):** `curl -fsSL https://github.com/phorepoc/cloud-companion/releases/latest/download/install.sh | sudo sh`,
+  then open `http://<machine>/`. Without `--board` it leaves the machine's name and network alone (no hotspot).
+
+`deploy/board/bundle.sh` makes the release's board files (the manager for both architectures, `cloud-board.tar.gz` with the
+compose files, `install.sh`, `SHA256SUMS.board`); `deploy/images/pi/build.sh` makes the image with `pi-gen` (pinned tag) and
+the same `install.sh --board`. The release workflow attaches both only when the release changed `cmd/phehost`,
+`internal/host`, `deploy/board`, `deploy/features`, `deploy/images` or the compose files; `install.sh` takes the newest
+release that has them. Cloud Companion's image is built for amd64 and arm64.
+
+### The setup hotspot
+
+On a board (`-wifi wlan0`), when there is no network 90 seconds after boot, the manager opens an open Wi-Fi called "Cloud
+setup" (NetworkManager, shared mode, the page at `10.42.0.1`; every DNS name points there, so phones offer it as the
+network's sign-in page). After the setup code, the page lists the Wi-Fi networks it saw before the hotspot started; joining
+one closes the hotspot, and the page asks to move to that network and open `http://cloud.local`. A failed join reopens the
+hotspot with the reason. Setup itself needs the internet and refuses to start without it.
 
 ## Recovery
 

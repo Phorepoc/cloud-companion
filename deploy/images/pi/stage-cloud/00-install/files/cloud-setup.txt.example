@@ -1,0 +1,3 @@
+# Cloud Companion: rename this file to cloud-setup.txt and change the code below to protect the setup page.
+# Without cloud-setup.txt, the first person to open http://cloud.local/ within 30 minutes of start-up sets the board up.
+code=change-me-to-something-only-you-know

@@ -62,10 +62,14 @@ jobs:
         include:
           - name: phecloud
             file: Dockerfile
+            platforms: linux/amd64,linux/arm64   # arm64: the Raspberry Pi boards (docs/host-manager.md)
           - name: phecloud-android-bridge
             file: cmd/pheandroid/Dockerfile
+            platforms: linux/amd64               # the Android feature needs an x86 machine
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130   # v3.7.0: the arm64 image's runtime stage
+        if: contains(matrix.platforms, 'arm64')
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f   # v3
       - name: Image name
         id: img
@@ -90,10 +94,79 @@ jobs:
         with:
           context: .
           file: ${{ matrix.file }}
-          platforms: linux/amd64
+          platforms: ${{ matrix.platforms }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
           secrets: github_packages_token=${{ secrets.GITHUB_TOKEN }}   # the Etesian design packages for the web app
+
+  # The board files (deploy/board/bundle.sh) and the Raspberry Pi image (deploy/images/pi), on the same release page, only when
+  # this release changed something of theirs: install.sh finds the newest release that has them.
+  board-changed:
+    needs: release
+    if: needs.release.outputs.version != ''
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+        with:
+          fetch-depth: 0
+      - name: Changes since the last release
+        id: diff
+        run: |
+          tag=v${{ needs.release.outputs.version }}
+          prev=$(git describe --tags --abbrev=0 "$tag^" 2>/dev/null || true)
+          if [ -z "$prev" ] || ! git diff --quiet "$prev" "$tag" -- cmd/phehost internal/host deploy/board deploy/features deploy/images 'docker-compose*.yml'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  board:
+    needs: [release, board-changed]
+    if: needs.board-changed.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff   # v5
+        with:
+          go-version-file: go.mod
+      - name: Board files
+        env:
+          GOFLAGS: -tags=goolm
+        run: sh deploy/board/bundle.sh out
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "v${{ needs.release.outputs.version }}" out/*
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+        with:
+          name: board
+          path: out/
+
+  pi-image:
+    needs: [release, board]
+    runs-on: ubuntu-24.04-arm   # native arm64: no emulation
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4
+        with:
+          name: board
+          path: board
+      - name: Image
+        run: sh deploy/images/pi/build.sh board
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd deploy/images/pi/deploy
+          for f in *.img.xz; do mv "$f" "cloud-companion-raspberry-pi-v${{ needs.release.outputs.version }}.img.xz"; done
+          sha256sum ./*.img.xz | sed "s|  ./|  |" > SHA256SUMS.image
+          gh release upload "v${{ needs.release.outputs.version }}" ./*.img.xz SHA256SUMS.image
