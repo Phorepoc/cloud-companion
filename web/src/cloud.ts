@@ -186,6 +186,12 @@ function reconnectSoon() {
   }, wait)
 }
 
+// At start: a paired device connects whatever page it opens on (a reload on Settings stayed offline), and keeps trying while
+// the server is not there.
+export function connectAtStart() {
+  if (creds.value) connect().catch(() => reconnectSoon())
+}
+
 // Pair with a code; stores the device key in IndexedDB.
 export async function pair(code: string, name: string) {
   state.status = 'connecting'

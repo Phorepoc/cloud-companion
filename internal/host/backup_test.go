@@ -233,7 +233,7 @@ func TestSnapshotsAndRestore(t *testing.T) {
 		t.Errorf("empty destination: %v", err)
 	}
 	d.password = "another password"
-	if _, err := m.Snapshots(context.Background(), dest); err == nil || err.Error() != "wrong backup password" {
+	if _, err := m.Snapshots(context.Background(), dest); err == nil || err.Error() != "that is not the backup password" {
 		t.Errorf("wrong password: %v", err)
 	}
 	d.password = dest.Password

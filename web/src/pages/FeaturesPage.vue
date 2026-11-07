@@ -50,7 +50,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { HdStatusState } from '@etesian-design/vue'
 import { state, apiCall } from '../cloud'
 
@@ -140,7 +140,8 @@ async function run(f: Feature, method: 'POST' | 'DELETE', settings?: Record<stri
   await load()
 }
 
-onMounted(() => { if (state.admin) load() })
+// the page can open before the connection says this device is the owner (a reload, a link): load once it does
+watch(() => state.admin, (a) => { if (a && available.value === null) load() }, { immediate: true })
 </script>
 
 <style scoped>

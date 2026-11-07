@@ -14,7 +14,7 @@ import './css/tokens.css'
 import './css/app.css'
 import App from './App.vue'
 import router from './router'
-import { loadCreds } from './cloud'
+import { connectAtStart, loadCreds } from './cloud'
 import { initTheme } from './theme'
 import { brand } from './brand'
 
@@ -22,5 +22,6 @@ document.title = brand.name
 loadCreds().then(() => {
   createApp(App).use(Quasar, { plugins: { Dark }, iconSet, config: { ripple: false } }).use(router).mount('#app')
   initTheme()
+  connectAtStart()
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {})
 })

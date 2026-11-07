@@ -305,11 +305,11 @@ func jsonPart(b []byte) []byte {
 func resticError(out string, err error) error {
 	switch {
 	case strings.Contains(out, "wrong password"):
-		return errors.New("wrong backup password")
+		return errors.New("that is not the backup password")
 	case strings.Contains(out, "Is there a repository at the following location?") || strings.Contains(out, "repository does not exist"):
 		return errors.New("there are no backups there")
 	case strings.Contains(out, "Permission denied") || strings.Contains(out, "permission denied"):
-		return errors.New("the destination refused the board: check its key or password")
+		return errors.New("the computer or service turned the board away. Check that the board's key is added there, or the password")
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	return fmt.Errorf("%v: %s", err, lines[len(lines)-1])

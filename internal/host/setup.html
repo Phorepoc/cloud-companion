@@ -84,23 +84,30 @@
 
   <form id="restore" class="card hide">
     <h2>Restore from a backup</h2>
-    <label for="rKind">Where the backups are</label>
-    <select id="rKind">
-      <option value="usb">A USB disk plugged into this board</option>
-      <option value="sftp">An SFTP server (a NAS or another computer)</option>
-      <option value="s3">S3-compatible storage (Backblaze B2, Wasabi, MinIO…)</option>
-      <option value="rest">A restic REST server</option>
-    </select>
-    <div data-kind="usb"><label for="rDisk">USB disk</label><select id="rDisk"></select>
-      <label for="rUsbPath">Folder on the disk (empty: the top)</label><input id="rUsbPath" type="text"></div>
-    <div data-kind="sftp" class="hide"><label for="rSftp">user@host:/folder</label><input id="rSftp" type="text" autocapitalize="off" spellcheck="false">
-      <p class="muted">Add this board's key to the server's authorized_keys first: <code id="rKey"></code></p></div>
-    <div data-kind="s3 rest" class="hide"><label for="rUrl">Address</label><input id="rUrl" type="text" placeholder="https://s3.example.com/bucket/cloud" autocapitalize="off" spellcheck="false"></div>
-    <div data-kind="s3" class="hide"><label for="rKeyId">Access key ID</label><input id="rKeyId" type="text" autocapitalize="off" spellcheck="false">
-      <label for="rSecret">Secret access key</label><input id="rSecret" type="password"></div>
+    <p class="muted">Where are the copies?</p>
+    <div id="rKinds" role="radiogroup" aria-label="Where the copies are">
+      <label class="feat"><input type="radio" name="rKind" value="usb" checked><div><b>A USB drive</b><small>Plug it into this board.</small></div></label>
+      <label class="feat"><input type="radio" name="rKind" value="sftp"><div><b>Another computer or a NAS</b><small>At home, reached over the network.</small></div></label>
+      <label class="feat"><input type="radio" name="rKind" value="s3"><div><b>Online storage</b><small>Backblaze B2, Wasabi or another S3 service.</small></div></label>
+      <label class="feat hide" id="rRestRow"><input type="radio" name="rKind" value="rest"><div><b>A restic server</b><small>For people who run one.</small></div></label>
+    </div>
+    <button type="button" id="rMore" class="plain">More choices</button>
+    <div data-kind="usb"><label for="rDisk">USB drive</label><select id="rDisk"></select></div>
+    <div data-kind="sftp" class="hide">
+      <label for="rHost">Its name or address</label><input id="rHost" type="text" placeholder="nas.local" autocapitalize="off" spellcheck="false">
+      <label for="rUser">Your user name on it</label><input id="rUser" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rFolder">Folder with the copies</label><input id="rFolder" type="text" value="cloud-backups" autocapitalize="off" spellcheck="false">
+      <p class="muted">This is a new board with its own key: add this line to <code>.ssh/authorized_keys</code> on that computer first
+        (a NAS usually has a place for "SSH keys" in its settings).</p><pre id="rKey"></pre></div>
+    <div data-kind="s3" class="hide">
+      <label for="rEndpoint">Service address</label><input id="rEndpoint" type="text" placeholder="s3.eu-central-003.backblazeb2.com" autocapitalize="off" spellcheck="false">
+      <label for="rBucket">Bucket name</label><input id="rBucket" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rKeyId">Key ID</label><input id="rKeyId" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rSecret">Secret key</label><input id="rSecret" type="password"></div>
+    <div data-kind="rest" class="hide"><label for="rUrl">Server address</label><input id="rUrl" type="text" placeholder="https://backup.example.com:8000/cloud" autocapitalize="off" spellcheck="false"></div>
     <label for="rPass">Backup password</label><input id="rPass" type="password" autocomplete="off">
-    <button type="button" id="rFind">Find backups</button>
-    <div id="rSnapBox" class="hide"><label for="rSnap">Backup</label><select id="rSnap"></select>
+    <button type="button" id="rFind">Find the copies</button>
+    <div id="rSnapBox" class="hide"><label for="rSnap">Which copy</label><select id="rSnap"></select>
       <button type="submit" id="rStart">Restore</button></div>
     <button type="button" id="rBack" class="plain">Back</button>
     <p id="restoreErr" class="err" role="alert"></p>
@@ -254,33 +261,39 @@ $('network').onsubmit = async (e) => {
   if (!r) return
   try { await call('POST', '/api/wifi', { ssid: r.value, password: r.dataset.secure ? $('wifiPass').value : '' }); $('wifiPass').value = ''; refresh() } catch (err) { $('netErr').textContent = err.message }
 }
+const rKind = () => document.querySelector('#rKinds input:checked').value
 function rDest() {
-  const kind = $('rKind').value
-  return { kind, uuid: $('rDisk').value, path: kind === 'usb' ? $('rUsbPath').value : $('rSftp').value, url: $('rUrl').value,
-    keyId: $('rKeyId').value, secret: $('rSecret').value, password: $('rPass').value }
+  const kind = rKind(), v = (id) => $(id).value.trim()
+  const d = { kind, password: $('rPass').value }
+  if (kind === 'usb') d.uuid = $('rDisk').value
+  if (kind === 'sftp') d.path = v('rUser') + '@' + v('rHost') + ':' + (v('rFolder') || 'cloud-backups')
+  if (kind === 's3') Object.assign(d, { url: 'https://' + v('rEndpoint').replace(/^https?:\/\//, '').replace(/\/$/, '') + '/' + v('rBucket'), keyId: v('rKeyId'), secret: $('rSecret').value })
+  if (kind === 'rest') d.url = v('rUrl')
+  return d
 }
 async function rKindChanged() {
-  const kind = $('rKind').value
+  const kind = rKind()
   for (const d of document.querySelectorAll('#restore [data-kind]')) d.classList.toggle('hide', !d.dataset.kind.split(' ').includes(kind))
   $('rSnapBox').classList.add('hide')
   if (kind === 'usb') {
     try {
       const j = await call('GET', '/api/restore/usb'); $('rDisk').textContent = ''
-      for (const d of j.disks || []) { const o = document.createElement('option'); o.value = d.uuid; o.textContent = [d.label || d.model || 'USB disk', d.size, d.fs].filter(Boolean).join(', '); $('rDisk').append(o) }
-      if (!(j.disks || []).length) $('restoreErr').textContent = 'No USB disk found: plug it in and pick USB again.'
+      for (const d of j.disks || []) { const o = document.createElement('option'); o.value = d.uuid; o.textContent = [d.label || d.model || 'USB drive', d.size].filter(Boolean).join(', '); $('rDisk').append(o) }
+      if (!(j.disks || []).length) $('restoreErr').textContent = 'No USB drive found: plug it in, then pick "A USB drive" again.'
     } catch (err) { $('restoreErr').textContent = err.message }
   }
 }
 $('pickNew').onclick = () => { mode = 'new'; refresh() }
 $('pickRestore').onclick = () => { mode = 'restore'; rKindChanged(); refresh() }
 $('rBack').onclick = () => { mode = ''; refresh() }
-$('rKind').onchange = rKindChanged
+for (const r of document.querySelectorAll('#rKinds input')) r.onchange = rKindChanged
+$('rMore').onclick = () => { $('rRestRow').classList.remove('hide'); $('rMore').classList.add('hide') }
 $('rFind').onclick = async () => {
   $('restoreErr').textContent = ''; $('rFind').disabled = true
   try {
     const j = await call('POST', '/api/restore/snapshots', { dest: rDest() }); $('rSnap').textContent = ''
-    for (const sn of j.snapshots || []) { const o = document.createElement('option'); o.value = sn.id; o.textContent = new Date(sn.time).toLocaleString() + ' (' + sn.id + ')'; $('rSnap').append(o) }
-    if (!(j.snapshots || []).length) throw new Error('There are no backups there.')
+    for (const sn of j.snapshots || []) { const o = document.createElement('option'); o.value = sn.id; o.textContent = new Date(sn.time).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }); $('rSnap').append(o) }
+    if (!(j.snapshots || []).length) throw new Error('There are no copies there.')
     $('rSnapBox').classList.remove('hide')
   } catch (err) { $('restoreErr').textContent = err.message } finally { $('rFind').disabled = false }
 }
