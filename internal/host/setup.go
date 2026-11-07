@@ -48,6 +48,8 @@ type Setup struct {
 	Window    time.Duration                                                          // without a code: setup is open this long after boot (30 min)
 	Unhealthy time.Duration                                                          // recovery after this long unhealthy (5 min)
 	HandOver  time.Duration                                                          // the done page stays this long (10 min)
+	Net       *Network                                                               // nil: the network is not the manager's (a plain server)
+	HotspotAt time.Duration                                                          // no network this long after boot: the setup hotspot (90 s)
 
 	mu        sync.Mutex
 	phase     string
@@ -58,6 +60,7 @@ type Setup struct {
 	badSince  time.Time
 	doneAt    time.Time
 	srv       *http.Server
+	net       netState
 	Now       func() time.Time
 }
 
@@ -87,8 +90,20 @@ func (s *Setup) Start() {
 	}
 }
 
+// netState is what the page shows of the network during setup.
+type netState struct {
+	Online  bool   `json:"online"`
+	Hotspot bool   `json:"hotspot"`
+	Joining string `json:"joining,omitempty"` // the Wi-Fi being joined
+	Error   string `json:"error,omitempty"`   // why the last join or hotspot failed
+	WiFi    []WiFi `json:"wifi,omitempty"`
+}
+
 // Tick looks at Cloud Companion's health and moves between the phases (every 15 s from Run; the tests call it).
 func (s *Setup) Tick(ctx context.Context) {
+	if s.Net != nil && s.Phase() == PhaseSetup {
+		s.tickNet(ctx)
+	}
 	h := s.M.Health(ctx)
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -115,6 +130,52 @@ func (s *Setup) Tick(ctx context.Context) {
 			s.phase, s.badSince = PhaseOff, time.Time{}
 		}
 	}
+}
+
+// tickNet keeps the network state for the page, and opens the setup hotspot when the board has been without a network for
+// HotspotAt after boot (and has Wi-Fi). A failed join opens it again.
+func (s *Setup) tickNet(ctx context.Context) {
+	s.mu.Lock()
+	joining := s.net.Joining != ""
+	s.mu.Unlock()
+	if joining {
+		return
+	}
+	online, hot := s.Net.Online(ctx), s.Net.Hotspot(ctx)
+	var errMsg string
+	if !online && !hot && s.Uptime() >= s.HotspotAt && s.Net.HasWiFi(ctx) {
+		if err := s.Net.StartHotspot(ctx); err != nil {
+			errMsg = err.Error()
+		} else {
+			hot = true
+		}
+	}
+	wifi := s.Net.Scan(ctx)
+	s.mu.Lock()
+	s.net.Online, s.net.Hotspot, s.net.WiFi = online, hot, wifi
+	if errMsg != "" {
+		s.net.Error = errMsg
+	}
+	s.mu.Unlock()
+}
+
+// join connects to a Wi-Fi network away from the request: the hotspot, and with it the browser's connection, goes first.
+func (s *Setup) join(ssid, password string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	time.Sleep(time.Second) // the answer reaches the browser before the hotspot goes
+	err := s.Net.Join(ctx, ssid, password)
+	if err != nil {
+		s.Net.StartHotspot(ctx)
+	}
+	s.mu.Lock()
+	s.net.Joining = ""
+	s.net.Error = ""
+	if err != nil {
+		s.net.Error = "Could not join " + ssid + ": " + err.Error()
+	}
+	s.mu.Unlock()
+	s.tickNet(ctx)
 }
 
 // Run serves the page while the phase needs it, until ctx ends.
@@ -192,6 +253,11 @@ func (s *Setup) Handler() http.Handler {
 				}
 			}
 			out["features"] = fs
+			if s.Net != nil && phase == PhaseSetup {
+				s.mu.Lock()
+				out["network"] = s.net
+				s.mu.Unlock()
+			}
 			if job != nil {
 				out["job"] = job.Status()
 			}
@@ -256,6 +322,10 @@ func (s *Setup) Handler() http.Handler {
 			writeError(w, http.StatusConflict, errors.New("already setting up"))
 			return
 		}
+		if s.Net != nil && !s.net.Online {
+			writeError(w, http.StatusConflict, errors.New("connect the board to the internet first"))
+			return
+		}
 		if len([]rune(in.Passphrase)) < 10 {
 			writeError(w, http.StatusBadRequest, errors.New("the recovery passphrase needs at least 10 characters"))
 			return
@@ -287,6 +357,40 @@ func (s *Setup) Handler() http.Handler {
 		}
 		s.job = j
 		writeJSON(w, http.StatusAccepted, j.Status())
+	})
+	mux.HandleFunc("POST /api/wifi", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			SSID     string `json:"ssid"`
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in); err != nil || in.SSID == "" {
+			writeError(w, http.StatusBadRequest, errors.New("pick a network"))
+			return
+		}
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.Net == nil || s.phase != PhaseSetup || !s.unlocked(r) {
+			writeError(w, http.StatusForbidden, errors.New("not now"))
+			return
+		}
+		if s.net.Joining != "" {
+			writeError(w, http.StatusConflict, errors.New("already joining "+s.net.Joining))
+			return
+		}
+		s.net.Joining, s.net.Error = in.SSID, ""
+		go s.join(in.SSID, in.Password)
+		writeJSON(w, http.StatusAccepted, map[string]any{})
+	})
+	// phones look for a sign-in page on the hotspot: every other address shows this page
+	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		hot := s.net.Hotspot
+		s.mu.Unlock()
+		if !hot {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "http://10.42.0.1/", http.StatusFound)
 	})
 	// recovery
 	mux.HandleFunc("POST /api/retry", func(w http.ResponseWriter, r *http.Request) {

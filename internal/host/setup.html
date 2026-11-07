@@ -50,6 +50,22 @@
     </form>
   </section>
 
+  <form id="network" class="card hide">
+    <h2>Internet</h2>
+    <p class="muted">The board needs the internet to download Cloud Companion. Plug in a network cable, or pick your Wi-Fi.</p>
+    <div id="wifiList" role="radiogroup" aria-label="Wi-Fi networks"></div>
+    <div id="passBox" class="hide"><label for="wifiPass">Wi-Fi password</label><input id="wifiPass" type="password" autocomplete="off"></div>
+    <button type="submit" id="join" disabled>Join</button>
+    <p id="netErr" class="err" role="alert"></p>
+  </form>
+
+  <section id="joining" class="card hide" role="status">
+    <h2>Joining <span id="joinName"></span></h2>
+    <p>The board is leaving its own "Cloud setup" Wi-Fi, so this page will stop answering. Put your phone or computer back on
+      <b id="joinName2"></b> and open <a href="http://cloud.local/">http://cloud.local</a> to carry on.</p>
+    <p class="muted">If the board cannot join, "Cloud setup" comes back in a minute with the reason.</p>
+  </section>
+
   <form id="setup" class="hide">
     <section class="card">
       <h2>Recovery passphrase</h2>
@@ -94,7 +110,7 @@
 </main>
 <script>
 const $ = (id) => document.getElementById(id)
-const show = (...ids) => { for (const s of ['locked', 'setup', 'working', 'done', 'recovery']) $(s).classList.toggle('hide', !ids.includes(s)) }
+const show = (...ids) => { for (const s of ['locked', 'network', 'joining', 'setup', 'working', 'done', 'recovery']) $(s).classList.toggle('hide', !ids.includes(s)) }
 async function call(method, path, body) {
   const r = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const j = await r.json().catch(() => ({}))
@@ -119,6 +135,23 @@ function fillSetup(st) {
   const here = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
   const zones = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [here])
   for (const z of zones.includes('UTC') ? zones : ['UTC', ...zones]) { const o = document.createElement('option'); o.value = o.textContent = z; o.selected = z === here; $('tz').append(o) }
+}
+let wifiShown = ''
+function fillWifi(net) {
+  const key = JSON.stringify(net.wifi || [])
+  if (key === wifiShown) return
+  wifiShown = key
+  const box = $('wifiList'), picked = box.querySelector('input:checked')?.value
+  box.textContent = ''
+  if (!(net.wifi || []).length) { const p = document.createElement('p'); p.className = 'muted'; p.textContent = 'No Wi-Fi networks found yet.'; box.append(p) }
+  for (const w of net.wifi || []) {
+    const row = document.createElement('label'); row.className = 'feat'
+    const r = document.createElement('input'); r.type = 'radio'; r.name = 'wifi'; r.value = w.ssid; r.dataset.secure = w.secure ? '1' : ''; r.checked = w.ssid === picked
+    r.onchange = () => { $('passBox').classList.toggle('hide', !r.dataset.secure); $('join').disabled = false }
+    const t = document.createElement('div'); const b = document.createElement('b'); b.textContent = w.ssid
+    const sm = document.createElement('small'); sm.textContent = (w.signal >= 66 ? 'Strong' : w.signal >= 33 ? 'Good' : 'Weak') + (w.secure ? ', password' : ', open')
+    t.append(b, sm); row.append(r, t); box.append(row)
+  }
 }
 function lastLine(job) {
   const l = [...(job?.log || [])].reverse().find((x) => x.trim() && !x.startsWith('docker '))
@@ -150,6 +183,9 @@ async function refresh() {
   }
   if (st.phase === 'done') { $('open').href = st.open; return show('done') }
   if (st.job && st.job.state === 'running') { $('workLine').textContent = lastLine(st.job); return show('working') }
+  const net = st.network
+  if (net && net.joining) { $('joinName').textContent = $('joinName2').textContent = net.joining; return show('joining') }
+  if (net && !net.online) { fillWifi(net); $('netErr').textContent = net.error || ''; return show('network') }
   fillSetup(st)
   if (st.job && st.job.state === 'failed') $('setupErr').textContent = 'Setting up failed: ' + (st.job.error || '') + '. Change the features and try again.'
   if (st.job && st.job.state === 'done') { $('workTitle').textContent = 'Starting Cloud Companion'; $('workLine').textContent = 'Waiting until it is ready…'; return show('working') }
@@ -165,6 +201,12 @@ $('setup').onsubmit = async (e) => {
   const features = [...document.querySelectorAll('#features input:checked')].map((c) => c.value)
   $('start').disabled = true
   try { await call('POST', '/api/setup', { passphrase: $('pass1').value, features, timeZone: $('tz').value }); refresh() } catch (err) { $('setupErr').textContent = err.message } finally { $('start').disabled = false }
+}
+$('network').onsubmit = async (e) => {
+  e.preventDefault(); $('netErr').textContent = ''
+  const r = document.querySelector('#wifiList input:checked')
+  if (!r) return
+  try { await call('POST', '/api/wifi', { ssid: r.value, password: r.dataset.secure ? $('wifiPass').value : '' }); $('wifiPass').value = ''; refresh() } catch (err) { $('netErr').textContent = err.message }
 }
 $('retry').onclick = async () => { $('recErr').textContent = ''; try { await call('POST', '/api/retry'); refresh() } catch (err) { $('recErr').textContent = err.message } }
 $('logs').onclick = async () => { try { const j = await call('GET', '/api/logs'); $('log').textContent = j.log || '(empty)'; $('log').classList.remove('hide') } catch (err) { $('recErr').textContent = err.message } }

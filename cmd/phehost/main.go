@@ -34,6 +34,7 @@ func main() {
 	codeFile := flag.String("setup-code", "/boot/firmware/cloud-setup.txt", "the setup code (a line code=...); without it setup is open for 30 minutes after boot")
 	handOver := flag.Duration("hand-over", 10*time.Minute, "how long the setup page stays to hand the owner over")
 	recoverAfter := flag.Duration("recover-after", 5*time.Minute, "how long Cloud Companion may be unhealthy before the recovery page")
+	wifi := flag.String("wifi", "", "the Wi-Fi for the setup hotspot (wlan0 on a board); empty: the network is left alone")
 	flag.Parse()
 	if *features == "" {
 		*features = *compose + "/deploy/features"
@@ -79,6 +80,9 @@ func main() {
 		HandOver: *handOver, Exec: func(ctx context.Context, name string, args ...string) ([]byte, error) {
 			return exec.CommandContext(ctx, name, args...).CombinedOutput()
 		}}
+	if _, err := exec.LookPath("nmcli"); err == nil && *wifi != "" {
+		su.Net, su.HotspotAt = &host.Network{Exec: su.Exec, Iface: *wifi, SSID: "Cloud setup"}, 90*time.Second
+	}
 	su.Start()
 	log.Info("setup page", "phase", su.Phase(), "listen", *listen)
 	go su.Run(ctx)

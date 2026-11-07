@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: Apache-2.0
+# The host manager (docs/host-manager.md): Cloud Companion's features, the setup and recovery page. Installed by install.sh.
+[Unit]
+Description=Cloud Companion host manager
+Wants=network-online.target docker.service
+After=docker.service NetworkManager.service
+
+[Service]
+ExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock
+RuntimeDirectory=phehost
+RuntimeDirectoryPreserve=yes
+StateDirectory=phehost
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
