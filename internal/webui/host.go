@@ -73,6 +73,10 @@ func (h *hostAPI) routes(mux *http.ServeMux) {
 		h.pass(w, r, "GET", "/v1/backup/snapshots")
 	})
 	mux.HandleFunc("GET /phe/host/backup/usb", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "GET", "/v1/backup/usb") })
+	mux.HandleFunc("GET /phe/host/update", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "GET", "/v1/update") })
+	mux.HandleFunc("PUT /phe/host/update", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "PUT", "/v1/update") })
+	mux.HandleFunc("POST /phe/host/update", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "POST", "/v1/update") })
+	mux.HandleFunc("POST /phe/host/update/check", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "POST", "/v1/update/check") })
 	mux.HandleFunc("GET /phe/host/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		q := ""
 		if r.URL.Query().Get("wait") == "1" {

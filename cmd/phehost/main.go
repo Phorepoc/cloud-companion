@@ -34,6 +34,8 @@ func main() {
 	codeFile := flag.String("setup-code", "/boot/firmware/cloud-setup.txt", "the setup code (a line code=...); without it setup is open for 30 minutes after boot")
 	handOver := flag.Duration("hand-over", 10*time.Minute, "how long the setup page stays to hand the owner over")
 	recoverAfter := flag.Duration("recover-after", 5*time.Minute, "how long Cloud Companion may be unhealthy before the recovery page")
+	releases := flag.String("releases", host.DefaultReleases, "where updates are looked for (GitHub's release list, HTTPS)")
+	binary := flag.String("binary", "", "this program's file, replaced by updates (/usr/local/bin/phehost on a board); empty: updates leave it")
 	wifi := flag.String("wifi", "", "the Wi-Fi for the setup hotspot (wlan0 on a board); empty: the network is left alone")
 	flag.Parse()
 	if *features == "" {
@@ -53,7 +55,8 @@ func main() {
 	hostExec := func(ctx context.Context, name string, args ...string) ([]byte, error) {
 		return exec.CommandContext(ctx, name, args...).CombinedOutput()
 	}
-	m := &host.Manager{Cat: cat, Board: host.DetectBoard(), ComposeDir: *compose, StateDir: *stateDir, Run: host.ExecRunner{}, Host: hostExec}
+	m := &host.Manager{Cat: cat, Board: host.DetectBoard(), ComposeDir: *compose, StateDir: *stateDir, Run: host.ExecRunner{}, Host: hostExec,
+		Releases: *releases, Binary: *binary, Restart: func() { log.Info("a new host manager is in place: handing over"); os.Exit(0) }}
 	if err := m.Load(); err != nil {
 		log.Error("state", "err", err)
 		os.Exit(1)

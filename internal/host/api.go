@@ -4,6 +4,7 @@
 package host
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Handler is the manager's API (/v1/), served on a Unix socket that only Cloud Companion's container can reach; Cloud Companion
@@ -81,6 +83,34 @@ func (m *Manager) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/backup/usb", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"disks": m.USBDisks(r.Context())})
 	})
+	// updates (update.go)
+	mux.HandleFunc("GET /v1/update", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, m.updateInfo())
+	})
+	mux.HandleFunc("POST /v1/update/check", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), time.Minute)
+		defer cancel()
+		m.CheckUpdate(ctx) // a failure is in the answer (error)
+		writeJSON(w, http.StatusOK, m.updateInfo())
+	})
+	mux.HandleFunc("PUT /v1/update", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			Auto bool `json:"auto"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&in); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		if err := m.SetAutoUpdate(in.Auto); err != nil {
+			writeError(w, http.StatusInternalServerError, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, m.updateInfo())
+	})
+	mux.HandleFunc("POST /v1/update", func(w http.ResponseWriter, r *http.Request) {
+		j, err := m.Update()
+		jobReply(w, j, err)
+	})
 	mux.HandleFunc("GET /v1/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		j := m.Job(r.PathValue("id"))
 		if j == nil {
@@ -97,6 +127,13 @@ func (m *Manager) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, j.Status())
 	})
 	return mux
+}
+
+// updateInfo is what the Updates page shows.
+func (m *Manager) updateInfo() map[string]any {
+	c := m.UpdateConfig()
+	return map[string]any{"version": m.Version(), "auto": c.Auto, "checked": c.Checked, "available": c.Available, "last": c.Last,
+		"error": c.Error, "at": m.BackupConfig().At, "backups": m.BackupConfig().On}
 }
 
 func jobReply(w http.ResponseWriter, j *Job, err error) {

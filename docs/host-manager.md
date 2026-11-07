@@ -28,7 +28,7 @@ run.
 | image | SD card | Raspberry Pi OS Lite 64-bit (Debian), Docker, the manager; nothing else. Built in CI with `pi-gen` |
 | manager | host, systemd service (Go) | the only thing that touches Docker and the OS: features, updates, health, backups; its own web UI for setup and recovery |
 | Cloud Companion | container | asks the manager through a local socket; shows Features and System pages to the owner |
-| features | containers | Cloud Companion's optional parts, each a manifest in a signed catalogue |
+| features | containers | Cloud Companion's optional parts, each a manifest in the catalogue (deploy/features), updated with the board files |
 
 Cloud Companion never gets the Docker socket: a break-in to it must not mean root on the board.
 
@@ -147,13 +147,24 @@ The first catalogue is what the compose profiles do today: core, database (SQLit
 
 ## Updates
 
-- **Release channel:** a signed index (one per channel: stable, beta) listing tested versions of Cloud Companion and every
-  feature, by image digest. The manager checks it daily.
-- **Containers:** pull, start the new version, health check, then remove the old; on a failed check, back to the old version
-  and the owner is told. Database migrations take a backup first.
-- **Host:** Debian security updates install automatically; updates that need a reboot wait for the owner's reboot window and
-  show in Cloud Companion. The manager updates itself through the channel too (a new binary, restart, rollback on failure).
-- **Owner choices:** automatic (default) or ask first, the reboot window, the channel.
+Updates come only from this project's GitHub releases, over HTTPS (`internal/host/update.go`). They are not signed: HTTPS
+already stops anyone on the way changing them, and a signing key kept as a GitHub secret would fall with the GitHub account
+anyway. What protects the boards is that account (two-factor login, branch protection, few people with write access).
+
+- **What a release carries:** images, every time; board files (the manager, the compose files, `deploy/`) and the Pi image
+  only when they changed. `bundle.sh` writes the release's `VERSION` into the board files.
+- **Looking:** once a day the manager reads the release list and keeps the newest release (and the newest board files up to
+  it) in `update.json`. Drafts, pre-releases and anything not newer than what runs are ignored: a board never goes back.
+- **Installing:** at the backup time (03:30 when backups are off), when *Install updates at night* is on (the default), or
+  with *Update now* in Settings, Updates:
+  1. a backup, when backups are on; if it fails nothing is changed;
+  2. new board files, when there are any: downloaded, checked against `SHA256SUMS.board` (a broken download is refused),
+     the current ones kept in `StateDir/previous`, the new ones unpacked over `/opt/cloud` (files written on the board stay);
+  3. the release's images (`PHECLOUD_VERSION` in `.env`), started with compose;
+  4. up to ten minutes for Cloud Companion to be healthy. If it is not, the previous files, manager and images come back and
+     the page says the update did not work and nothing was lost. The update is offered again.
+  A new manager takes over by the old one exiting; systemd starts the new one.
+- **The system:** Debian's security updates install by themselves (`unattended-upgrades`); the board never restarts on its own.
 
 ## Access from outside the home
 
@@ -203,15 +214,15 @@ Settings gets two owner-only pages:
 2. The Features and System pages in Cloud Companion.
 3. The setup and recovery UI.
 4. The Raspberry Pi 4/5 image (`pi-gen` in CI), first boot, the setup hotspot.
-5. The signed release channel and host updates.
+5. Updates from the GitHub releases, with rollback.
 6. Away from home: Tailscale and WireGuard in setup and System.
 7. Rock64, then the install script for other machines.
 
 ## Where it lives
 
 In this repository (`cmd/phehost`, `internal/host`, the images under `deploy/images`), released with Cloud Companion on the
-same release pages. A release carries a new manager binary and new board images only when something of theirs changed; the
-release channel says which manager version each Cloud Companion version needs.
+same release pages. A release carries a new manager binary and new board images only when something of theirs changed
+(Updates).
 
 ## Open questions
 

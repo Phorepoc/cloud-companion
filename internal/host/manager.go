@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,6 +53,13 @@ type Manager struct {
 	StateDir   string
 	Run        Runner
 	Host       func(ctx context.Context, name string, args ...string) ([]byte, error) // mount, lsblk (backups to a USB disk)
+
+	// updates (update.go)
+	Releases   string        // GitHub's release list; "" = DefaultReleases
+	HTTP       *http.Client  // nil = a plain one
+	Binary     string        // the manager's own program, replaced by an update; "" = never replaced (a checkout)
+	Restart    func()        // hands over to a new manager (exits: systemd starts it)
+	HealthWait time.Duration // how long a new release may take to be healthy; 0 = ten minutes
 
 	mu    sync.Mutex // the state and the compose project
 	jmu   sync.Mutex
@@ -386,9 +394,9 @@ func (m *Manager) envFile(s State, ids []string) []byte {
 			vars[k] = os.Expand(v, func(n string) string { return vars[n] })
 		}
 	}
-	// the release the board files came from (bundle.sh): its images, not the compose files' fallback
-	if v, err := os.ReadFile(filepath.Join(m.ComposeDir, "VERSION")); err == nil && strings.TrimSpace(string(v)) != "" {
-		vars["PHECLOUD_VERSION"] = strings.TrimSpace(string(v))
+	// the release the board runs (update.go): its images, not the compose files' fallback
+	if v := m.Version(); v != "" {
+		vars["PHECLOUD_VERSION"] = v
 	}
 	keys := make([]string, 0, len(vars))
 	for k := range vars {

@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# How Settings, Backups looks (backupsui.ts): Cloud Companion (phe-cloud:dev) with a real host manager beside it and no board;
+# How Settings, Backups (backupsui.ts) or another host manager page (UI_TEST=updatesui) looks: Cloud Companion (phe-cloud:dev) with a real host manager beside it and no board;
 # the manager's backup.json is written here to show the page's other states. (Docker; repo root)
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"; W=$(mktemp -d)
@@ -15,5 +15,6 @@ docker run -d --name phe-ui-host -v phe-ui-sock:/run/phehost -v "$W":/w -v "$ROO
 docker run -d --name phe-ui-cloud -v phe-ui-sock:/run/phehost -e PHECLOUD_FIRST_OWNER_CODE=$CODE phe-cloud:dev >/dev/null
 sleep 5
 docker run --rm --network container:phe-ui-cloud --ipc=host -v "$ROOT/web/test":/t -v "$OUT":/out -v "$W/state":/state -w /t -e HOME=/tmp \
-  -e BASE=http://127.0.0.1:8080 -e OUT=/out -e CODE=$CODE mcr.microsoft.com/playwright:v1.49.1-noble \
-  sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning backupsui.ts'
+  -e BASE=http://127.0.0.1:8080 -e OUT=/out -e CODE=$CODE \
+  -e UI_TEST="${UI_TEST:-backupsui}" mcr.microsoft.com/playwright:v1.49.1-noble \
+  sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning $UI_TEST.ts'

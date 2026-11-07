@@ -6,7 +6,7 @@ Wants=network-online.target docker.service
 After=docker.service NetworkManager.service
 
 [Service]
-ExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock
+ExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock -binary /usr/local/bin/phehost
 RuntimeDirectory=phehost
 RuntimeDirectoryPreserve=yes
 StateDirectory=phehost

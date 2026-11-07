@@ -83,6 +83,9 @@ if [ -n "$BOARD" ]; then
   # the containers' logs in the journal
   S=/opt/cloud/deploy/board/sd
   apt-get install -y -q --no-install-recommends systemd-zram-generator rsync >/dev/null
+  # Debian's security updates by themselves; never a restart on its own (docs/host-manager.md, Updates)
+  apt-get install -y -q --no-install-recommends unattended-upgrades >/dev/null
+  printf 'APT::Periodic::Update-Package-Lists "1";\nAPT::Periodic::Unattended-Upgrade "1";\n' > /etc/apt/apt.conf.d/20auto-upgrades
   install -m 0644 $S/zram-generator.conf /etc/systemd/zram-generator.conf
   for u in dphys-swapfile rpi-swap; do systemctl disable "$u" >/dev/null 2>&1 || true; done
   systemctl unmask tmp.mount >/dev/null 2>&1 || true
@@ -93,7 +96,7 @@ if [ -n "$BOARD" ]; then
   [ -e /etc/docker/daemon.json ] || { mkdir -p /etc/docker; install -m 0644 $S/docker-daemon.json /etc/docker/daemon.json; }
   systemctl enable cloud-ram-logs.service cloud-ram-logs-sync.timer >/dev/null 2>&1 || true
   mkdir -p /etc/systemd/system/phehost.service.d   # the setup hotspot: only on a board
-  printf '[Service]\nExecStart=\nExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock -wifi wlan0\n' \
+  printf '[Service]\nExecStart=\nExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock -binary /usr/local/bin/phehost -wifi wlan0\n' \
     > /etc/systemd/system/phehost.service.d/board.conf
 fi
 

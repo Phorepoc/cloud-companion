@@ -606,7 +606,8 @@ func (m *Manager) restore(ctx context.Context, d Destination, snapshot string, j
 	return nil
 }
 
-// Schedule runs the backup at its time each day until ctx ends (the board's time zone).
+// Schedule runs the night's work at the backup time each day until ctx ends (the board's time zone): an update when one is
+// waiting and automatic updates are on (it backs up first), else the backup. It looks for updates once a day.
 func (m *Manager) Schedule(ctx context.Context) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
@@ -616,10 +617,27 @@ func (m *Manager) Schedule(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-t.C:
+			if u := m.UpdateConfig(); m.SetUp() && now.Sub(u.Checked) > 24*time.Hour {
+				cctx, cancel := context.WithTimeout(ctx, time.Minute)
+				m.CheckUpdate(cctx)
+				cancel()
+			}
 			c := m.BackupConfig()
+			at := c.At
+			if at == "" {
+				at = "03:30"
+			}
 			day := now.Format("2006-01-02")
-			if c.On && now.Format("15:04") == c.At && last != day {
-				last = day
+			if now.Format("15:04") != at || last == day {
+				continue
+			}
+			last = day
+			if u := m.UpdateConfig(); u.Auto && u.Available != nil {
+				if _, err := m.Update(); err == nil {
+					continue
+				}
+			}
+			if c.On {
 				m.BackupNow()
 			}
 		}
