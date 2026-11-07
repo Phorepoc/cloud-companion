@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # SPDX-License-Identifier: Apache-2.0
 # The web app (Quasar, MIT) is built first and embedded into the Go binary.
-FROM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS web
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS web
 WORKDIR /web
 COPY web/package.json web/package-lock.json web/.npmrc ./
 # the Etesian design packages come from GitHub Packages: a read:packages token as a build secret (never kept in the image), e.g.
@@ -12,7 +12,9 @@ COPY web/ ./
 RUN apt-get update && apt-get install -y --no-install-recommends python3-fonttools python3-brotli && rm -rf /var/lib/apt/lists/* && python3 tools/subset-icons.py
 RUN npm run build
 
-FROM golang:1.26-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb AS build
+# built on the build machine for the target (arm64 for Raspberry Pi boards): Go cross-compiles, no emulation
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb AS build
+ARG TARGETARCH
 WORKDIR /src
 # goolm: Matrix encryption in pure Go (mautrix-go), so the binary needs no cgo or libolm
 ENV GOFLAGS=-tags=goolm CGO_ENABLED=0
@@ -20,13 +22,13 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /web/dist internal/webui/dist
-RUN go build -trimpath -o /out/phecloud ./cmd/phecloud \
- && go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
+RUN GOARCH=$TARGETARCH go build -trimpath -o /out/phecloud ./cmd/phecloud \
+ && GOARCH=$TARGETARCH go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
 
 # the browser suites' stand-ins for outside services (cmd/fakesvc): a test tool, never in the release image (built only by name, the
 # last stage below is the default)
 FROM build AS fakes
-RUN go build -trimpath -o /usr/local/bin/fakesvc ./cmd/fakesvc
+RUN GOARCH=$TARGETARCH go build -trimpath -o /usr/local/bin/fakesvc ./cmd/fakesvc
 ENTRYPOINT ["fakesvc"]
 
 # Chromium is an external runtime dependency (not vendored), pinned to one version.
