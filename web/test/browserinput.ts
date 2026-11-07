@@ -4,8 +4,10 @@
 // Playwright test (Firefox) of the browser's text fields, run against a live server:
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types browserinput.ts
 //
-// The page is a picture; tapping a text field on it puts a real field over it. That field must have the focus and show a caret, so
-// typing goes there, in the classic layout and in a desktop window.
+// The page is a picture; tapping a text field on it puts an invisible field over it that takes the keys. It must have the focus, so
+// typing reaches the page as key presses (in the classic layout and in a desktop window), and the page's own field shows the text:
+// nothing of ours drawn over it. A search box like Google's (a textarea that searches on Enter) gets every key as a real key press,
+// Enter included, and the page sees no marks or globals of ours.
 
 import { firefox, type Page } from 'playwright'
 import assert from 'node:assert/strict'
@@ -43,11 +45,27 @@ async function checkField(where: string) {
   })
   await page.screenshot({ path: `${OUT}/browserinput-${where}.png` })
   assert(f.focused, `${where}: the field has the focus`)
-  assert(f.w > 20 && f.h > 10 && f.onTop && f.opacity !== '0', `${where}: the field is shown on top (${JSON.stringify(f)})`)
-  assert(f.caret !== 'transparent' && !/rgba\(.*, 0\)/.test(f.caret), `${where}: the caret is visible (${f.caret})`)
+  assert(f.w > 20 && f.h > 10 && f.onTop, `${where}: the key field is over the page's field (${JSON.stringify(f)})`)
+  assert.equal(f.opacity, '0', `${where}: nothing of ours is drawn over the page's field`)
   await page.keyboard.type('abc')
   await until(page, () => window.__phe.state.focus.value === 'abc', `${where}: typing reaches the page`)
   console.log(where, 'ok')
+}
+
+async function checkKeys() {
+  await page.fill(ADDR, 'data:text/html,' + encodeURIComponent(readFileSync(new URL('./typing.html', import.meta.url), 'utf8')))
+  await page.press(ADDR, 'Enter')
+  await until(page, () => window.__phe.state.page.title === 'Typing' && !!window.__phe.regionClientPos(null, 'textarea'), 'the search page loads')
+  const pos = (await page.evaluate(() => window.__phe.regionClientPos(null, 'textarea')))!
+  await page.mouse.click(pos.x, pos.y)
+  await until(page, () => window.__phe.state.focus.kind === 'textarea', 'the search box has the focus')
+  await page.waitForSelector('[data-test=keyboard-overlay]')
+  await page.keyboard.type('weather athens', { delay: 30 })
+  await page.keyboard.press('Enter')
+  await until(page, () => window.__phe.state.page.title.startsWith('{'), 'Enter reaches the search box')
+  const r = JSON.parse(await page.evaluate(() => window.__phe.state.page.title))
+  assert.deepEqual(r, { q: 'weather athens', keys: 15, trusted: true, marks: 0, globals: [] }, 'every key is a real key press; the page sees nothing of ours')
+  console.log('keys ok')
 }
 
 await page.goto(BASE + '/#/pair')
@@ -58,6 +76,7 @@ await until(page, () => window.__phe?.state.status === 'online', 'online')
 await page.goto(BASE + '/#/browse')
 await page.waitForSelector(ADDR)
 await checkField('classic')
+await checkKeys()
 
 // the tabs: in the header in place of the title (no bar of their own), on the side when asked, and that choice kept
 const HT = '.x-cl__bar [role=tab]'

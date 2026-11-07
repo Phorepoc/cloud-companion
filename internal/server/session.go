@@ -50,6 +50,7 @@ type tab struct {
 // session is one device connection with up to proto.MaxTabs views. Requests are handled one at a time; the embedded *tab is
 // the view the current request is about.
 type session struct {
+	queued  func() int // frames read but not handled yet (typing ahead)
 	done    chan struct{}
 	dialogs map[int]chan dialogAnswer
 	dmu     sync.Mutex
@@ -358,6 +359,9 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		case "key":
 			if err := s.br.Key(ctx, in.Text); err != nil {
 				return err
+			}
+			if s.queued != nil && s.queued() > 0 { // typing: the page is shown again after the last key that is waiting
+				return nil
 			}
 		case "select":
 			if err := s.br.Select(ctx, in.ID, in.Index); err != nil {

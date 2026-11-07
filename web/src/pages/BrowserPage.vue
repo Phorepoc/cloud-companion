@@ -52,10 +52,11 @@
     <div ref="stage" class="ph-stage" data-test="stage">
       <div class="viewport" :style="vpStyle">
         <canvas ref="cv" data-test="canvas" class="ph-canvas" aria-label="Web page" />
-        <textarea v-if="overlayRect && state.focus.kind === 'textarea'" ref="ov" v-model="ovValue" class="overlay" :style="overlayRect"
-                  aria-label="Text field" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
-        <input v-else-if="overlayRect" ref="ov" v-model="ovValue" :type="inputType" class="overlay" :style="overlayRect"
-               aria-label="Text field" :inputmode="inputMode" data-test="keyboard-overlay" @input="onType" @keydown.enter="onEnter" />
+        <!-- the keys: an invisible field over the focused one takes the keyboard (and the phone's on-screen keyboard); every key goes
+             to the page as a key press and the page's own field shows the text -->
+        <input v-if="overlayRect" ref="ov" class="keys" :type="inputType === 'password' ? 'password' : 'text'" :style="overlayRect"
+               :inputmode="inputMode" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Text field" data-test="keyboard-overlay"
+               @keydown="onKey" @beforeinput="onBeforeInput" @input="onInput" @paste.prevent="onPaste" />
       </div>
     </div>
     <div v-if="state.page.trunc" class="ph-small ph-muted">The rest of this page is not shown. Open it on a larger screen to read on.</div>
@@ -139,7 +140,6 @@ const cv = ref<HTMLCanvasElement | null>(null)
 const ov = ref<HTMLInputElement | null>(null)
 const urlInput = ref(state.page.url)
 const editing = ref(false)
-const ovValue = ref('')
 const dlgText = ref('')
 const dlgPass = ref('')
 const selOpen = ref(false)
@@ -180,7 +180,6 @@ function applySize(now = false) {
 watch(canFull, () => nextTick(() => applySize(true)))
 // the page's keyboard hint for the focused field (text, numeric, email…)
 const inputMode = computed(() => (state.focus.im || undefined) as HTMLAttributes['inputmode'])
-let typeTimer: ReturnType<typeof setTimeout> | undefined
 
 const dlg = computed(() => state.dialogs[0] || null)
 const dlgTitle = computed(() => ({ alert: 'This page says', confirm: 'This page asks', prompt: 'This page asks', beforeunload: 'Leave this page?', auth: 'Sign in to continue', cert: 'This connection is not secure' })[dlg.value?.kind] || 'Message')
@@ -212,7 +211,7 @@ function go() {
   else api.navigate(u)
 }
 
-// the keyboard overlay: a real <input> over the focused field
+// the keys field: over the focused field, so the phone keeps the page in view when its keyboard opens
 const overlayRect = computed(() => {
   const f = state.focus
   if (f.kind !== 'text' && f.kind !== 'textarea') return null
@@ -223,23 +222,35 @@ const overlayRect = computed(() => {
   return { left: sr.x + 'px', top: sr.y + 'px', width: Math.max(sr.w, 60) + 'px', height: Math.max(sr.h, 24) + 'px' }
 })
 const inputType = computed(() => (state.focus.kind === 'text' && ['password', 'email', 'url', 'tel', 'number', 'search'].includes(state.focus.type) ? state.focus.type : 'text'))
-watch(() => [state.focus.kind, state.focus.id], async ([k]) => {
-  if (k === 'text' || k === 'textarea') {
-    ovValue.value = state.focus.value
-    await nextTick()
-    ov.value?.focus()
-  }
+// the field takes the keys again whenever the page has a text field focused (also after a tap on the page took them away)
+watch(() => [state.focus.kind, state.focus.id, state.focus.value, state.focus.start], async () => {
+  if (state.focus.kind !== 'text' && state.focus.kind !== 'textarea') return
+  await nextTick()
+  if (document.activeElement !== ov.value) ov.value?.focus({ preventScroll: true })
 })
-function onType() {
-  clearTimeout(typeTimer)
-  typeTimer = setTimeout(() => api.text(state.focus.id, ovValue.value, true), 120)
+const NAMED = ['Backspace', 'Enter', 'Tab', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape']
+function onKey(e: KeyboardEvent) {
+  if (e.isComposing || e.ctrlKey || e.metaKey) return // composing: beforeinput sends it; shortcuts (paste) stay the browser's
+  if (NAMED.includes(e.key) || [...e.key].length === 1) { e.preventDefault(); api.key(e.key) }
 }
-function onEnter(e: KeyboardEvent) {
-  if (state.focus.kind === 'textarea') return
+// on-screen keyboards send no usable key events: what they type arrives here
+function onBeforeInput(e: InputEvent) {
+  if (e.isComposing) return
   e.preventDefault()
-  clearTimeout(typeTimer)
-  api.text(state.focus.id, ovValue.value, true)
-  api.key('Enter')
+  if (e.inputType === 'insertText' && e.data) for (const ch of e.data) api.key(ch)
+  else if (e.inputType === 'deleteContentBackward') api.key('Backspace')
+  else if (e.inputType === 'deleteContentForward') api.key('Delete')
+  else if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') api.key('Enter')
+}
+// what still landed in the field (a finished composition) goes as keys too; the field stays empty
+function onInput() {
+  const el = ov.value
+  if (!el || !el.value) return
+  for (const ch of el.value) api.key(ch)
+  el.value = ''
+}
+function onPaste(e: ClipboardEvent) {
+  for (const ch of [...(e.clipboardData?.getData('text') || '')].slice(0, 2000)) api.key(ch === '\n' ? 'Enter' : ch)
 }
 
 const selOptions = computed(() => (selRegion.value ? (selRegion.value.opts || []).map((o, i) => ({ label: o.l || '(empty)', value: i })) : []))
@@ -321,7 +332,7 @@ onBeforeUnmount(() => clearInterval(poll))
 .ph-stage { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--ph-bg); }
 .ph-canvas { width: 100%; height: 100%; display: block; touch-action: none; background: #fff; }
 .is-phone .ph-canvas { border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); box-shadow: var(--ph-elev-1); }
-.overlay { position: absolute; box-sizing: border-box; font: inherit; font-size: var(--ph-text-body); color: #1a1d21; border: 2px solid var(--ph-focus); border-radius: var(--ph-r-control); padding: 2px 8px; background: #fff; }
+.keys { position: absolute; box-sizing: border-box; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; opacity: 0; font-size: 16px; }
 .ph-dialog { width: min(92vw, 420px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); }
 .ph-dialog-text { white-space: pre-wrap; margin: 0 0 var(--ph-s3); overflow-wrap: anywhere; }

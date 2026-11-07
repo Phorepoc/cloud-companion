@@ -128,6 +128,7 @@ func (s *Server) ServeConn(fio FrameIO, remote string) {
 		raw []byte
 	}
 	reqs := make(chan frameMsg, 16)
+	ses.queued = func() int { return len(reqs) }
 	go func() { // a dialog reply must be read while a request is blocked on the dialog, so reading is separate
 		defer close(reqs)
 		for {

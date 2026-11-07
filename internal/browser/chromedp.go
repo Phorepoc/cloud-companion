@@ -19,6 +19,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
@@ -50,6 +51,19 @@ func userAgent(width, height int, site string) string {
 	return desktopUA
 }
 
+// uaOverride sets the user agent with the client hints that match it (Sec-CH-UA-*, navigator.userAgentData): without them
+// Chrome sends no hints at all, which no real Chrome does. Desktop: the browser as it is (Linux). Phone: Android, like the string.
+func uaOverride(ua string) *emulation.SetUserAgentOverrideParams {
+	brands := []*emulation.UserAgentBrandVersion{{Brand: "Chromium", Version: "156"}, {Brand: "Not)A;Brand", Version: "24"}}
+	full := []*emulation.UserAgentBrandVersion{{Brand: "Chromium", Version: "156.0.0.0"}, {Brand: "Not)A;Brand", Version: "24.0.0.0"}}
+	md := &emulation.UserAgentMetadata{Brands: brands, FullVersionList: full, Platform: "Linux", Architecture: "x86", Bitness: "64"}
+	if ua == mobileUA {
+		md = &emulation.UserAgentMetadata{Brands: brands, FullVersionList: full, Platform: "Android", PlatformVersion: "13.0.0", Model: "Pixel 7", Mobile: true}
+		return emulation.SetUserAgentOverride(ua).WithPlatform("Linux armv8l").WithUserAgentMetadata(md)
+	}
+	return emulation.SetUserAgentOverride(ua).WithUserAgentMetadata(md)
+}
+
 const viewH = 640
 
 // CDP is the chromedp-based Factory: one headless Chromium; each Session is a tab in its own browser context
@@ -71,7 +85,26 @@ type tab struct {
 }
 
 func NewCDP(chromePath string, maxH, poolSize int) *CDP {
-	opts := append([]chromedp.ExecAllocatorOption{}, chromedp.DefaultExecAllocatorOptions[:]...)
+	// a full Chromium in a window on the container's virtual display (Xvfb): chromedp's defaults minus headless and
+	// enable-automation, so pages get the same browser a person runs at home
+	opts := []chromedp.ExecAllocatorOption{
+		chromedp.NoFirstRun,
+		chromedp.NoDefaultBrowserCheck,
+		chromedp.Flag("disable-background-networking", true),
+		chromedp.Flag("disable-background-timer-throttling", true),
+		chromedp.Flag("disable-backgrounding-occluded-windows", true),
+		chromedp.Flag("disable-renderer-backgrounding", true),
+		chromedp.Flag("disable-breakpad", true),
+		chromedp.Flag("disable-client-side-phishing-detection", true),
+		chromedp.Flag("disable-default-apps", true),
+		chromedp.Flag("disable-hang-monitor", true),
+		chromedp.Flag("disable-popup-blocking", true),
+		chromedp.Flag("disable-prompt-on-repost", true),
+		chromedp.Flag("disable-sync", true),
+		chromedp.Flag("metrics-recording-only", true),
+		chromedp.Flag("password-store", "basic"),
+		chromedp.Flag("use-mock-keychain", true),
+	}
 	opts = append(opts,
 		chromedp.NoSandbox,
 		chromedp.DisableGPU,
@@ -295,7 +328,7 @@ func (s *cdpSession) Open(ctx context.Context, url string, width int, dpr float6
 	s.opened = true
 	s.ns.touch()
 	err := s.run(ctx, 30*time.Second,
-		emulation.SetUserAgentOverride(userAgent(s.width, s.height, s.site)),
+		uaOverride(userAgent(s.width, s.height, s.site)),
 		chromedp.ActionFunc(func(c context.Context) error {
 			w, h := s.cssView() // not "mobile": the layout is always exactly 360/scale px wide, whatever the viewport meta says
 			s.cssW = w
@@ -337,7 +370,7 @@ func (s *cdpSession) settle(ctx context.Context) error {
 			return ctx.Err()
 		}
 	}
-	s.run(ctx, 5*time.Second, chromedp.Evaluate(frameJS, nil, func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) }))
+	s.run(ctx, 5*time.Second, s.eval(frameJS, nil, true))
 	if !s.inCert {
 		s.inCert = true
 		s.certFlow(ctx)
@@ -409,7 +442,7 @@ func (s *cdpSession) Tap(ctx context.Context, x, y, sy int) error {
 				return err
 			}
 			var act float64
-			if err := s.run(ctx, 5*time.Second, chromedp.Evaluate(`window.scrollY`, &act)); err != nil {
+			if err := s.run(ctx, 5*time.Second, s.eval(`window.scrollY`, &act, false)); err != nil {
 				return err
 			}
 			vy = y - int(act+0.5)
@@ -428,10 +461,10 @@ func (s *cdpSession) Tap(ctx context.Context, x, y, sy int) error {
 
 func (s *cdpSession) Text(ctx context.Context, id int, text string, submit, replace bool) error {
 	if id > 0 {
-		js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-id="%d"]');if(!e)return false;
+		js := fmt.Sprintf(`(()=>{const e=(window.__phe&&window.__phe.els.get(%d)?.deref());if(!e)return false;
 e.scrollIntoView({block:'center'});e.focus();if(%v&&e.select)e.select();return true})()`, id, replace)
 		var ok bool
-		if err := s.run(ctx, 10*time.Second, chromedp.Evaluate(js, &ok)); err != nil {
+		if err := s.run(ctx, 10*time.Second, s.eval(js, &ok, false)); err != nil {
 			return err
 		}
 		if !ok {
@@ -459,22 +492,30 @@ var keyNames = map[string]string{
 	"ArrowRight": kb.ArrowRight, "ArrowUp": kb.ArrowUp, "ArrowDown": kb.ArrowDown, "Escape": kb.Escape,
 }
 
+// Key presses one key in the focused element, as the keyboard does (key down, the character, key up): a named key, or one
+// character the person typed.
 func (s *cdpSession) Key(ctx context.Context, name string) error {
 	k, ok := keyNames[name]
+	if !ok && utf8.RuneCountInString(name) == 1 && name >= " " {
+		k, ok = name, true
+	}
 	if !ok {
 		return fmt.Errorf("unknown key %q", name)
 	}
 	if err := s.run(ctx, 10*time.Second, chromedp.KeyEvent(k)); err != nil {
 		return err
 	}
-	return s.settle(ctx)
+	if utf8.RuneCountInString(name) == 1 || name == "Backspace" || name == "Delete" || strings.HasPrefix(name, "Arrow") {
+		return nil // editing: the page is shown as it is now (suggestions catch up with the next keys)
+	}
+	return s.settle(ctx) // Enter, Tab, Escape can load a page or move on
 }
 
 func (s *cdpSession) Select(ctx context.Context, id, index int) error {
-	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-id="%d"]');if(!e||e.tagName!=='SELECT'||!e.options[%d])return false;
+	js := fmt.Sprintf(`(()=>{const e=(window.__phe&&window.__phe.els.get(%d)?.deref());if(!e||e.tagName!=='SELECT'||!e.options[%d])return false;
 e.selectedIndex=%d;e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));return true})()`, id, index, index)
 	var ok bool
-	if err := s.run(ctx, 10*time.Second, chromedp.Evaluate(js, &ok)); err != nil {
+	if err := s.run(ctx, 10*time.Second, s.eval(js, &ok, false)); err != nil {
 		return err
 	}
 	if !ok {
@@ -488,7 +529,7 @@ func (s *cdpSession) SetHandlers(h Handlers) { s.box.mu.Lock(); s.box.h = h; s.b
 
 func (s *cdpSession) ScrollTo(ctx context.Context, y int) error {
 	s.sy = y
-	return s.run(ctx, 5*time.Second, chromedp.Evaluate(fmt.Sprintf(`window.scrollTo(0,%d)`, y), nil))
+	return s.run(ctx, 5*time.Second, s.eval(fmt.Sprintf(`window.scrollTo(0,%d)`, y), nil, false))
 }
 
 // ---- snapshot ----
@@ -562,13 +603,14 @@ const lazyJS = `(async()=>{
  window.__pheLazy=location.href;
  return true;})()`
 
-// extractJS runs at scroll 0. It tags layer roots with data-phe-layer and every tap target with data-phe-id.
+// extractJS runs at scroll 0, in our isolated world: it numbers layer roots and tap targets in maps kept there (window.__phe of
+// that world), so the page sees no attributes or globals of ours.
 const extractJS = `(()=>{
  const out={layers:[],regions:[],title:document.title,url:location.href,
   h:Math.max(document.documentElement.scrollHeight,document.body?document.body.scrollHeight:0)};
- document.querySelectorAll('[data-phe-layer]').forEach(e=>e.removeAttribute('data-phe-layer'));
- let nid=window.__pheNext||1;
- const idOf=e=>{let v=e.getAttribute('data-phe-id');if(!v){v=String(nid++);e.setAttribute('data-phe-id',v);}return +v;};
+ const W=window.__phe||(window.__phe={ids:new WeakMap(),els:new Map(),next:1});
+ W.layer=new Map();W.layerOf=new WeakMap();
+ const idOf=e=>{let v=W.ids.get(e);if(!v){v=W.next++;W.ids.set(e,v);W.els.set(v,new WeakRef(e));}return v;};
  const vh=innerHeight,vw=innerWidth;
  const roots=[];
  const all=document.body?document.body.querySelectorAll('*'):[];
@@ -584,7 +626,7 @@ const extractJS = `(()=>{
    const rr=e.getBoundingClientRect();
    if(e.clientWidth<40||e.clientHeight<40||rr.left<0||rr.left>=vw||rr.top+scrollY>=100000)continue;
    const sid=out.layers.length+1,sx0=Math.round(rr.left),sy0=Math.round(rr.top+scrollY);
-   e.setAttribute('data-phe-layer',String(sid));
+   W.layer.set(sid,e);W.layerOf.set(e,sid);
    roots.push(e);
    out.layers.push({id:sid,kind:'scroll',x:sx0,y:sy0,w:Math.min(vw-sx0,e.clientWidth),h:e.clientHeight,z:0,
     cw:Math.min(e.scrollWidth,2048),ch:Math.min(e.scrollHeight,4096),sx:Math.round(e.scrollLeft),sy:Math.round(e.scrollTop)});
@@ -598,7 +640,7 @@ const extractJS = `(()=>{
   if(w<4||h<4)continue;
   const px=v=>{const n=parseFloat(v);return isNaN(n)?null:Math.round(n)};
   const id=out.layers.length+1;
-  e.setAttribute('data-phe-layer',String(id));
+  W.layer.set(id,e);W.layerOf.set(e,id);
   roots.push(e);
   out.layers.push({id,kind:cs.position,x,y,w,h,z:parseInt(cs.zIndex)||0,top:px(cs.top),bottom:px(cs.bottom)});
  }
@@ -610,9 +652,9 @@ const extractJS = `(()=>{
   if(cs.visibility==='hidden'||cs.display==='none')continue;
   const r=e.getBoundingClientRect();
   if(r.width<4||r.height<4)continue;
-  const lr=e.closest('[data-phe-layer]');
+  let lr=e;while(lr&&!W.layerOf.has(lr))lr=lr.parentElement;
   let layer=0,x=Math.round(r.left),y=Math.round(r.top);
-  if(lr){layer=+lr.getAttribute('data-phe-layer');const b=lr.getBoundingClientRect();x=Math.round(r.left-b.left);y=Math.round(r.top-b.top);
+  if(lr){layer=W.layerOf.get(lr);const b=lr.getBoundingClientRect();x=Math.round(r.left-b.left);y=Math.round(r.top-b.top);
    if(out.layers[layer-1]&&out.layers[layer-1].kind==='scroll'){x+=Math.round(lr.scrollLeft);y+=Math.round(lr.scrollTop);}}
   else if(r.left>=vw||r.right<=0)continue;
   const tag=e.tagName.toLowerCase();
@@ -638,12 +680,38 @@ const extractJS = `(()=>{
     out.focus={id:idOf(a),kind,type:tg==='input'?ty:'',value:ty==='password'?'':String(a.value!==undefined?a.value:(a.innerText||'')).slice(0,200),
      start:st===null?-1:st,end:en===null?-1:en,im:a.inputMode||'',enter:a.enterKeyHint||''};}
   }}
- window.__pheNext=nid;
  return JSON.stringify(out);})()`
 
-const hideCSS = `(()=>{let s=document.getElementById('phe-hide');if(!s){s=document.createElement('style');s.id='phe-hide';
- s.textContent='[data-phe-layer]{visibility:hidden!important}';document.head.appendChild(s);}return true})()`
-const unhideCSS = `(()=>{const s=document.getElementById('phe-hide');if(s)s.remove();return true})()`
+// hideJS / unhideJS hide the layer roots for the page shot, on their own inline style (put back exactly after)
+const hideJS = `(()=>{const W=window.__phe;if(!W||!W.layer)return true;
+ for(const e of W.layer.values()){e.__pheSt=[e.hasAttribute('style'),e.style.getPropertyValue('visibility'),e.style.getPropertyPriority('visibility')];
+  e.style.setProperty('visibility','hidden','important');}return true})()`
+const unhideJS = `(()=>{const W=window.__phe;if(!W||!W.layer)return true;
+ for(const e of W.layer.values()){const st=e.__pheSt;if(!st)continue;delete e.__pheSt;
+  if(st[1])e.style.setProperty('visibility',st[1],st[2]);else e.style.removeProperty('visibility');
+  if(!st[0]&&!e.getAttribute('style'))e.removeAttribute('style');}return true})()`
+
+// eval runs js in our own isolated world of the page's main frame ("phe"): it shares the DOM but not the page's
+// scripts, so nothing we keep there (ids, expandos) is visible to the page. The world lives as long as the document.
+func (s *cdpSession) eval(js string, out any, await bool) chromedp.Action {
+	return chromedp.ActionFunc(func(c context.Context) error {
+		ctxID, err := page.CreateIsolatedWorld(cdp.FrameID(chromedp.FromContext(c).Target.TargetID)).WithWorldName("phe").Do(c)
+		if err != nil {
+			return err
+		}
+		res, exc, err := runtime.Evaluate(js).WithContextID(ctxID).WithReturnByValue(true).WithAwaitPromise(await).Do(c)
+		if err != nil {
+			return err
+		}
+		if exc != nil {
+			return exc
+		}
+		if out == nil || res == nil || len(res.Value) == 0 {
+			return nil
+		}
+		return json.Unmarshal(res.Value, out)
+	})
+}
 
 func (s *cdpSession) shot(ctx context.Context, x, y, w, h int, beyond bool) (*image.RGBA, error) {
 	var buf []byte
@@ -674,16 +742,15 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 	// 1. trigger lazy loading (once per page), return to the top. The quick snapshot skips it: the full one follows.
 	if !quick {
 		var done bool
-		if err := s.run(ctx, 40*time.Second, chromedp.Evaluate(fmt.Sprintf(lazyJS, s.maxH*100/s.scalePct(), s.cssViewH(), s.cssViewH()), &done,
-			func(p *runtime.EvaluateParams) *runtime.EvaluateParams { return p.WithAwaitPromise(true) })); err != nil {
+		if err := s.run(ctx, 40*time.Second, s.eval(fmt.Sprintf(lazyJS, s.maxH*100/s.scalePct(), s.cssViewH(), s.cssViewH()), &done, true)); err != nil {
 			return nil, fmt.Errorf("lazy pass: %w", err)
 		}
 	} else {
-		s.run(ctx, 5*time.Second, chromedp.Evaluate(`window.scrollTo(0,0)`, nil))
+		s.run(ctx, 5*time.Second, s.eval(`window.scrollTo(0,0)`, nil, false))
 	}
 	// 2. extract layers + regions.
 	var js string
-	if err := s.run(ctx, 15*time.Second, chromedp.Evaluate(extractJS, &js)); err != nil {
+	if err := s.run(ctx, 15*time.Second, s.eval(extractJS, &js, false)); err != nil {
 		return nil, fmt.Errorf("extract: %w", err)
 	}
 	var info jsInfo
@@ -738,11 +805,11 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 	}
 	// 4. the page itself with the layers hidden.
 	if len(info.Layers) > 0 {
-		s.run(ctx, 5*time.Second, chromedp.Evaluate(hideCSS, nil))
+		s.run(ctx, 5*time.Second, s.eval(hideJS, nil, false))
 	}
 	img, err := s.shot(ctx, 0, 0, s.cssW, capH, true)
 	if len(info.Layers) > 0 {
-		s.run(ctx, 5*time.Second, chromedp.Evaluate(unhideCSS, nil))
+		s.run(ctx, 5*time.Second, s.eval(unhideJS, nil, false))
 	}
 	if err != nil {
 		return nil, fmt.Errorf("page: %w", err)
@@ -788,19 +855,19 @@ func (s *cdpSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error
 // shotScroll renders the whole content of an inner scroll box: the box is expanded for the shot (overflow visible, natural
 // height/width), captured at its document position, and restored. Falls back to the visible box.
 func (s *cdpSession) shotScroll(ctx context.Context, l jsLayer) (*image.RGBA, error) {
-	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-layer="%d"]');if(!e)return null;
+	js := fmt.Sprintf(`(()=>{const e=(window.__phe&&window.__phe.layer&&window.__phe.layer.get(%d));if(!e)return null;
  e.__pheStyle=e.getAttribute('style');
  e.style.setProperty('overflow','visible','important');
  if(e.scrollHeight>e.clientHeight){e.style.setProperty('height','auto','important');e.style.setProperty('max-height','none','important');}
  if(e.scrollWidth>e.clientWidth){e.style.setProperty('width',e.scrollWidth+'px','important');e.style.setProperty('max-width','none','important');}
  const r=e.getBoundingClientRect();return [Math.round(r.left),Math.round(r.top+scrollY),Math.round(r.width),Math.round(r.height)];})()`, l.ID)
 	var box []int
-	if err := s.run(ctx, 5*time.Second, chromedp.Evaluate(js, &box)); err != nil || len(box) != 4 {
+	if err := s.run(ctx, 5*time.Second, s.eval(js, &box, false)); err != nil || len(box) != 4 {
 		return s.shot(ctx, l.X, l.Y, l.W, l.H, false)
 	}
-	restore := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-layer="%d"]');if(!e)return false;
+	restore := fmt.Sprintf(`(()=>{const e=(window.__phe&&window.__phe.layer&&window.__phe.layer.get(%d));if(!e)return false;
  if(e.__pheStyle===null)e.removeAttribute('style');else e.setAttribute('style',e.__pheStyle);return true})()`, l.ID)
-	defer s.run(ctx, 5*time.Second, chromedp.Evaluate(restore, nil))
+	defer s.run(ctx, 5*time.Second, s.eval(restore, nil, false))
 	w, h := min(box[2], l.CW), min(box[3], l.CH)
 	if w < l.W || h < l.H { // expansion did not give the content (clipped by an ancestor): use the visible box
 		return s.shot(ctx, l.X, l.Y, l.W, l.H, false)
@@ -810,14 +877,14 @@ func (s *cdpSession) shotScroll(ctx context.Context, l jsLayer) (*image.RGBA, er
 
 // TapScroll taps a point (content coordinates of the scroll box) after scrolling the box so the point is visible.
 func (s *cdpSession) TapScroll(ctx context.Context, layer, x, y int) error {
-	js := fmt.Sprintf(`(()=>{const e=document.querySelector('[data-phe-layer="%d"]');if(!e)return null;
+	js := fmt.Sprintf(`(()=>{const e=(window.__phe&&window.__phe.layer&&window.__phe.layer.get(%d));if(!e)return null;
  const X=%d,Y=%d;
  e.scrollTo(Math.max(0,Math.min(X-e.clientWidth/2,e.scrollWidth-e.clientWidth)),Math.max(0,Math.min(Y-e.clientHeight/2,e.scrollHeight-e.clientHeight)));
  let b=e.getBoundingClientRect();
  if(b.top<0||b.bottom>innerHeight){window.scrollBy(0,b.top-40);b=e.getBoundingClientRect();}
  return [b.left+(X-e.scrollLeft),b.top+(Y-e.scrollTop)];})()`, layer, x, y)
 	var pt []float64
-	if err := s.run(ctx, 5*time.Second, chromedp.Evaluate(js, &pt)); err != nil || len(pt) != 2 {
+	if err := s.run(ctx, 5*time.Second, s.eval(js, &pt, false)); err != nil || len(pt) != 2 {
 		return fmt.Errorf("no scroll layer %d", layer)
 	}
 	if err := s.run(ctx, 15*time.Second, chromedp.MouseClickXY(pt[0], pt[1])); err != nil {
@@ -916,7 +983,7 @@ func (s *cdpSession) SetViewport(ctx context.Context, width, height int) error {
 		return nil
 	}
 	if nua := userAgent(width, height, s.site); nua != ua { // pages loaded from now on get the browser that fits the window
-		if err := s.run(ctx, 10*time.Second, emulation.SetUserAgentOverride(nua)); err != nil {
+		if err := s.run(ctx, 10*time.Second, uaOverride(nua)); err != nil {
 			return err
 		}
 	}
@@ -933,7 +1000,7 @@ func (s *cdpSession) SetSite(ctx context.Context, site string) error {
 	if !s.opened || nua == ua {
 		return nil
 	}
-	if err := s.run(ctx, 30*time.Second, emulation.SetUserAgentOverride(nua), chromedp.Reload()); err != nil {
+	if err := s.run(ctx, 30*time.Second, uaOverride(nua), chromedp.Reload()); err != nil {
 		return err
 	}
 	return s.settle(ctx)
