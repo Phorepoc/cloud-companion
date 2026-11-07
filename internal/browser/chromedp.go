@@ -84,7 +84,8 @@ type tab struct {
 	box    *handlerBox
 }
 
-func NewCDP(chromePath string, maxH, poolSize int) *CDP {
+// NewCDP starts the browser; it fails when the browser cannot start (no display, a broken install).
+func NewCDP(chromePath string, maxH, poolSize int) (*CDP, error) {
 	// a full Chromium in a window on the container's virtual display (Xvfb): chromedp's defaults minus headless and
 	// enable-automation, so pages get the same browser a person runs at home
 	opts := []chromedp.ExecAllocatorOption{
@@ -120,7 +121,11 @@ func NewCDP(chromePath string, maxH, poolSize int) *CDP {
 		maxH = 8192
 	}
 	rootCtx, rootCancel := chromedp.NewContext(ctx)
-	chromedp.Run(rootCtx) // start the browser process
+	if err := chromedp.Run(rootCtx); err != nil { // start the browser process
+		rootCancel()
+		cancel()
+		return nil, fmt.Errorf("starting the browser: %w", err)
+	}
 	c := &CDP{rootCtx: rootCtx, cancel: func() { rootCancel(); cancel() }, MaxH: maxH, pool: make(chan *tab, max(poolSize, 1)), boxes: map[target.ID]*handlerBox{}}
 	chromedp.ListenBrowser(rootCtx, func(ev any) {
 		if e, ok := ev.(*browser.EventDownloadWillBegin); ok {
@@ -137,7 +142,7 @@ func NewCDP(chromePath string, maxH, poolSize int) *CDP {
 	for i := 0; i < poolSize; i++ {
 		c.refill()
 	}
-	return c
+	return c, nil
 }
 
 type handlerBox struct {

@@ -40,5 +40,6 @@ ENV PHECLOUD_TLSDIR=/data PHECLOUD_DB=/data/phecloud.db PHECLOUD_CHROME=/usr/bin
 VOLUME /data
 EXPOSE 7400 8080
 ENV DISPLAY=:99
-ENTRYPOINT ["/bin/sh", "-c", "Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 & exec /usr/local/bin/phecloud \"$@\"", "phecloud"]
+# a restarted container keeps /tmp: the old display's lock goes first, and the browser starts once the display is there
+ENTRYPOINT ["/bin/sh", "-c", "rm -f /tmp/.X99-lock /tmp/.X11-unix/X99; Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 & for i in $(seq 100); do [ -e /tmp/.X11-unix/X99 ] && break; sleep 0.1; done; exec /usr/local/bin/phecloud \"$@\"", "phecloud"]
 CMD ["serve"]
