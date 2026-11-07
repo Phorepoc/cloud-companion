@@ -292,3 +292,14 @@ func TestRootStorage(t *testing.T) {
 		}
 	}
 }
+
+// A job that has not written anything yet still has a log the pages can read: [] in JSON, not null (a null blanked the
+// Backups page).
+func TestNewJobLogIsEmptyList(t *testing.T) {
+	m := &Manager{}
+	m.Load()
+	b, _ := json.Marshal(m.newJob("backup", "").Status())
+	if !strings.Contains(string(b), `"log":[]`) {
+		t.Errorf("%s", b)
+	}
+}

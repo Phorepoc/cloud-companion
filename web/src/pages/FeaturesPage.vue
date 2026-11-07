@@ -85,7 +85,7 @@ function canSwitch(f: Feature) {
 function jobText(j: Job) {
   if (j.state === 'failed') return 'Could not switch: ' + (j.error || 'the board did not say why') + '. Everything is as it was.'
   if (j.state === 'done') return ''
-  const last = [...j.log].reverse().find((l) => l.trim() && !l.startsWith('docker '))
+  const last = [...(j.log || [])].reverse().find((l) => l.trim() && !l.startsWith('docker '))
   return 'Working on it' + (last ? ': ' + last.trim() : '…')
 }
 

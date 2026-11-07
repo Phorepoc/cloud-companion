@@ -51,6 +51,7 @@ type Manager struct {
 	ComposeDir string // docker-compose.yml and the files the features name; the manager writes .env here
 	StateDir   string
 	Run        Runner
+	Host       func(ctx context.Context, name string, args ...string) ([]byte, error) // mount, lsblk (backups to a USB disk)
 
 	mu    sync.Mutex // the state and the compose project
 	jmu   sync.Mutex
@@ -485,7 +486,7 @@ type JobStatus struct {
 func (j *Job) Status() JobStatus {
 	j.mu.Lock()
 	defer j.mu.Unlock()
-	st := JobStatus{ID: j.ID, Kind: j.Kind, Feature: j.Feature, State: "running", Log: slices.Clone(j.lines)}
+	st := JobStatus{ID: j.ID, Kind: j.Kind, Feature: j.Feature, State: "running", Log: append([]string{}, j.lines...)} // [] not null: the pages spread it
 	if j.done {
 		st.State = "done"
 		if j.err != nil {
