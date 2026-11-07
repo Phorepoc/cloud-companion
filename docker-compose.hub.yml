@@ -24,7 +24,7 @@ services:
   zpush:
     profiles: ["hub"]
     build: ./deploy/hub/zpush
-    image: phe-zpush:dev
+    image: ghcr.io/phorepoc/phecloud-zpush:${PHECLOUD_VERSION:-v0.2.0}   # released; --build makes it from this checkout
     container_name: phe-zpush
     cpus: 1
     mem_limit: 512m
@@ -43,7 +43,7 @@ services:
   legacytls:
     profiles: ["hub-legacy"]
     build: ./deploy/hub/legacytls
-    image: phe-legacytls:dev
+    image: ghcr.io/phorepoc/phecloud-legacytls:${PHECLOUD_VERSION:-v0.2.0}
     container_name: phe-legacytls
     cpus: 0.5
     mem_limit: 128m

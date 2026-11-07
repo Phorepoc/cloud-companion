@@ -7,7 +7,7 @@ services:
   asterisk:
     profiles: ["asterisk"]
     build: deploy/asterisk
-    image: phecloud-asterisk:local
+    image: ghcr.io/phorepoc/phecloud-asterisk:${PHECLOUD_VERSION:-v0.2.0}
     container_name: phe-asterisk
     cpus: 1
     mem_limit: 512m
