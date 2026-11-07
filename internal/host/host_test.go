@@ -281,3 +281,14 @@ func toStrings(v any) []string {
 	}
 	return out
 }
+
+func TestRootStorage(t *testing.T) {
+	line := func(src string) string {
+		return "22 1 179:2 / / rw,noatime shared:1 - ext4 " + src + " rw\n25 22 0:5 / /dev rw shared:2 - devtmpfs udev rw\n"
+	}
+	for src, want := range map[string]string{"/dev/mmcblk0p2": "sd", "/dev/nvme0n1p2": "nvme", "/dev/sda2": "usb", "overlay": ""} {
+		if got := rootStorage(line(src)); got != want {
+			t.Errorf("%s: %q, want %q", src, got, want)
+		}
+	}
+}

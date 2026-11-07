@@ -93,5 +93,34 @@ func DetectBoard() Board {
 			}
 		}
 	}
+	if mi, err := os.ReadFile("/proc/self/mountinfo"); err == nil {
+		b.Storage = rootStorage(string(mi))
+	}
 	return b
+}
+
+// rootStorage is the kind of disk the system runs from, from /proc/self/mountinfo: "sd" (an SD card, which wears out under a
+// server's writes), "nvme", "usb" (or another disk), or "" when unknown.
+func rootStorage(mountinfo string) string {
+	for _, l := range strings.Split(mountinfo, "\n") {
+		f := strings.Fields(l)
+		if len(f) < 10 || f[4] != "/" {
+			continue
+		}
+		for i, x := range f {
+			if x == "-" && i+2 < len(f) {
+				src := f[i+2]
+				switch {
+				case strings.HasPrefix(src, "/dev/mmcblk"):
+					return "sd"
+				case strings.HasPrefix(src, "/dev/nvme"):
+					return "nvme"
+				case strings.HasPrefix(src, "/dev/sd"):
+					return "usb"
+				}
+				return ""
+			}
+		}
+	}
+	return ""
 }

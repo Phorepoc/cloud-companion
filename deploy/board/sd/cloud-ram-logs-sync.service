@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+[Unit]
+Description=Copy the logs in RAM to the SD card
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/cloud-ram-logs sync

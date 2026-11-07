@@ -40,6 +40,13 @@
   <h1 id="title">Cloud setup</h1>
   <p class="muted" id="board"></p>
 
+  <section id="sdWarn" class="card hide" role="note">
+    <h2>Running from an SD card</h2>
+    <p class="muted">SD cards wear out under a server's constant writes, and they are slow. The board keeps its logs and swap in
+      memory to spare the card, but Cloud Companion's data is still written to it. For a board that lasts, put the image on a
+      USB SSD (a Raspberry Pi 4 or 5 starts from USB on its own, and a Pi 5 from an NVMe drive) and start from that.</p>
+  </section>
+
   <section id="locked" class="card hide">
     <h2 id="lockTitle">Welcome</h2>
     <p id="lockText" class="muted"></p>
@@ -161,6 +168,7 @@ async function refresh() {
   let st
   try { st = await call('GET', '/api/state') } catch { return }
   const b = st.board || {}
+  $('sdWarn').classList.toggle('hide', b.storage !== 'sd' || st.phase === 'off')
   $('board').textContent = [b.model, b.memory ? Math.round(b.memory / 2 ** 30) + ' GB of memory' : ''].filter(Boolean).join(', ')
   if (st.phase === 'off') { $('title').textContent = 'Cloud setup'; show(); $('board').textContent = 'This page is off: Cloud Companion is running.'; return }
   if (st.phase === 'recovery') {

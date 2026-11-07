@@ -1,6 +1,6 @@
 # Host manager and board images
 
-Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page with the Wi-Fi step and setup hotspot, the install script and the Raspberry Pi image (`deploy/board`, `deploy/images/pi`). Not yet: the storage step, updates, backups, remote access.
+Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page with the Wi-Fi step and setup hotspot, the install script and the Raspberry Pi image (`deploy/board`, `deploy/images/pi`). Not yet: updates, backups, remote access.
 
 ## Why
 
@@ -40,7 +40,7 @@ Cloud Companion never gets the Docker socket: a break-in to it must not mean roo
 3. No network (no cable, no Wi-Fi details): the board opens its own Wi-Fi, "Cloud setup", with a page to pick a network.
 4. The manager's setup UI on port 80 asks for the setup code (from the boot partition; without one, the first visitor within
    30 minutes of boot may set up, and the window closes after).
-5. Steps: network, storage (USB SSD if present: recommended, SD cards wear out), owner name and a **recovery passphrase**,
+5. Steps: network, a **recovery passphrase** (and a warning when the board runs from an SD card),
    features to start with, time zone. Then download and start, with progress per image and retry.
 6. When Cloud Companion is healthy, the setup UI sends the browser there (the owner is already signed in) and switches
    itself off.
@@ -58,6 +58,21 @@ compose files, `install.sh`, `SHA256SUMS.board`); `deploy/images/pi/build.sh` ma
 the same `install.sh --board`. The release workflow attaches both only when the release changed `cmd/phehost`,
 `internal/host`, `deploy/board`, `deploy/features`, `deploy/images` or the compose files; `install.sh` takes the newest
 release that has them. Cloud Companion's image is built for amd64 and arm64.
+
+### SD cards
+
+Booting from a USB SSD (Raspberry Pi 4 and 5) or NVMe (Pi 5) is recommended: flash the same image onto it. SD cards wear
+out under a server's small constant writes, so the setup page warns when the board runs from one (`board.storage` in
+`/v1/system`: `sd`, `usb`, `nvme`). For boards that stay on a card, `install.sh --board` spares it:
+
+- swap is compressed memory (`systemd-zram-generator`, zstd, up to half the memory), not a file on the card; `/tmp` is in
+  memory;
+- `/var/log` is a 128 MB RAM disk (`cloud-ram-logs`), copied to the card every hour and at shutdown; only on an SD card
+  (`ALWAYS=1` in `/etc/default/cloud-ram-logs` for other disks, `SIZE` for its size; the hour is a timer drop-in);
+- the containers' logs go to the journal (Docker's `journald` driver; `docker logs` still works), capped at 48 MB.
+
+Cloud Companion's data (database, mail, files) is still written to the card; only booting from USB avoids that. Moving it to
+a USB disk plugged in later is left until someone needs it.
 
 ### The setup hotspot
 

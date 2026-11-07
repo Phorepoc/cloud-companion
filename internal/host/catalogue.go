@@ -51,9 +51,10 @@ type Setting struct {
 
 // Board is what the features are checked against.
 type Board struct {
-	Model  string `json:"model"`
-	Arch   string `json:"arch"`
-	Memory int64  `json:"memory"` // bytes
+	Model   string `json:"model"`
+	Arch    string `json:"arch"`
+	Memory  int64  `json:"memory"`            // bytes
+	Storage string `json:"storage,omitempty"` // what the system runs from: sd, nvme, usb (rootStorage)
 }
 
 type Catalogue struct {

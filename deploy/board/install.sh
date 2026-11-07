@@ -79,6 +79,19 @@ if [ -n "$BOARD" ]; then
   apt-get install -y -q --no-install-recommends network-manager >/dev/null
   mkdir -p /etc/NetworkManager/dnsmasq-shared.d
   install -m 0644 /opt/cloud/deploy/board/dnsmasq-cloud-setup.conf /etc/NetworkManager/dnsmasq-shared.d/cloud-setup.conf
+  # sparing the SD card: compressed swap in RAM, /tmp in RAM, logs in RAM (synced hourly; only when running from a card),
+  # the containers' logs in the journal
+  S=/opt/cloud/deploy/board/sd
+  apt-get install -y -q --no-install-recommends systemd-zram-generator rsync >/dev/null
+  install -m 0644 $S/zram-generator.conf /etc/systemd/zram-generator.conf
+  for u in dphys-swapfile rpi-swap; do systemctl disable "$u" >/dev/null 2>&1 || true; done
+  systemctl unmask tmp.mount >/dev/null 2>&1 || true
+  systemctl enable tmp.mount >/dev/null 2>&1 || true
+  install -m 0755 $S/ram-logs.sh /usr/local/sbin/cloud-ram-logs
+  install -m 0644 $S/cloud-ram-logs.service $S/cloud-ram-logs-sync.service $S/cloud-ram-logs-sync.timer /etc/systemd/system/
+  mkdir -p /etc/systemd/journald.conf.d && install -m 0644 $S/journald.conf /etc/systemd/journald.conf.d/cloud.conf
+  [ -e /etc/docker/daemon.json ] || { mkdir -p /etc/docker; install -m 0644 $S/docker-daemon.json /etc/docker/daemon.json; }
+  systemctl enable cloud-ram-logs.service cloud-ram-logs-sync.timer >/dev/null 2>&1 || true
   mkdir -p /etc/systemd/system/phehost.service.d   # the setup hotspot: only on a board
   printf '[Service]\nExecStart=\nExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock -wifi wlan0\n' \
     > /etc/systemd/system/phehost.service.d/board.conf

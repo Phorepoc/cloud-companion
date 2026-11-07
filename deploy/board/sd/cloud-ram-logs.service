@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: Apache-2.0
+# /var/log in RAM on an SD card (ram-logs.sh); copied back at shutdown
+[Unit]
+Description=Logs in RAM to spare the SD card
+DefaultDependencies=no
+After=local-fs.target
+Before=systemd-journald.service systemd-journal-flush.service rsyslog.service sysinit.target shutdown.target
+Conflicts=shutdown.target
+RequiresMountsFor=/var/log
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/cloud-ram-logs start
+ExecStop=/usr/local/sbin/cloud-ram-logs stop
+TimeoutStopSec=120
+
+[Install]
+WantedBy=sysinit.target
