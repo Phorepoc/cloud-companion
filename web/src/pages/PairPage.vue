@@ -61,13 +61,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { state, pair, authStatus, passkeysSupported, passkeyRegister, passkeyLogin, recoverLogin, passkeyBlocker } from '../cloud'
 import { brand } from '../brand'
 import BrandLogo from '../components/BrandLogo.vue'
 
 const router = useRouter()
-const code = ref('')
+// a board's setup page sends the first owner here with the code in the address (/pair?code=...)
+const q = useRoute().query.code
+const code = ref(typeof q === 'string' ? q : '')
 const name = ref('Web browser')
 const status = ref({ owner: false, passkeys: 0 })
 const blocker = passkeyBlocker()

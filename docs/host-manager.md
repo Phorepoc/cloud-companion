@@ -1,6 +1,6 @@
 # Host manager and board images
 
-Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`).
+Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`), the Features page, the setup and recovery page. Not yet: network and storage steps, the setup hotspot, images, updates, backups, remote access.
 
 ## Why
 

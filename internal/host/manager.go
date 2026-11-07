@@ -134,14 +134,20 @@ func (m *Manager) enabled(s State) []string {
 
 // Enable switches a feature on (and what it requires) with its settings; the work runs as a job.
 func (m *Manager) Enable(id string, values map[string]string) (*Job, error) {
-	f := m.Cat.Get(id)
-	if f == nil {
-		return nil, ErrNotFound
+	return m.Choose([]string{id}, map[string]map[string]string{id: values})
+}
+
+// Choose switches features on (and what they require) with their settings, in one change: the setup's choices.
+func (m *Manager) Choose(want []string, values map[string]map[string]string) (*Job, error) {
+	for _, id := range want {
+		if m.Cat.Get(id) == nil {
+			return nil, ErrNotFound
+		}
 	}
 	m.mu.Lock()
 	next := m.cloneState()
 	m.mu.Unlock()
-	ids, err := m.Cat.Closure(append(m.enabled(next), id))
+	ids, err := m.Cat.Closure(append(m.enabled(next), want...))
 	if err != nil {
 		return nil, err
 	}
@@ -158,27 +164,66 @@ func (m *Manager) Enable(id string, values map[string]string) (*Job, error) {
 		if next.Features[x] == nil {
 			next.Features[x] = map[string]string{}
 		}
-	}
-	vals := next.Features[id]
-	for _, s := range f.Settings {
-		if v, ok := values[s.Key]; ok && !s.Generate {
-			vals[s.Key] = v
-		}
-		if s.Generate && vals[s.Key] == "" {
-			vals[s.Key] = randomSecret()
-		}
-		if s.Required && vals[s.Key] == "" {
-			return nil, fmt.Errorf("%s: %s is required", f.Title, s.Label)
-		}
-	}
-	for _, x := range ids { // generated values of the features switched on with it
-		for _, s := range m.Cat.Get(x).Settings {
-			if s.Generate && next.Features[x][s.Key] == "" {
-				next.Features[x][s.Key] = randomSecret()
+		vals := next.Features[x]
+		for _, s := range g.Settings {
+			if v, ok := values[x][s.Key]; ok && !s.Generate {
+				vals[s.Key] = v
+			}
+			if s.Generate && vals[s.Key] == "" {
+				vals[s.Key] = randomSecret()
+			}
+			if s.Required && vals[s.Key] == "" {
+				return nil, fmt.Errorf("%s: %s is required", g.Title, s.Label)
 			}
 		}
 	}
-	return m.start("enable", id, next), nil
+	feature := ""
+	if len(want) == 1 {
+		feature = want[0]
+	}
+	return m.start("enable", feature, next), nil
+}
+
+// Value is a setting of a feature that is on ("" when there is none).
+func (m *Manager) Value(id, key string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.state.Features[id][key]
+}
+
+// SetUp says whether the board has been set up (features were chosen and saved).
+func (m *Manager) SetUp() bool {
+	_, err := os.Stat(filepath.Join(m.StateDir, "state.json"))
+	return err == nil
+}
+
+// Health is the state of Cloud Companion's container as Docker sees it: healthy, starting, unhealthy, running (no health
+// check), exited and the like when it is not running, or missing.
+func (m *Manager) Health(ctx context.Context) string {
+	var out bytes.Buffer
+	if err := m.Run.Run(ctx, m.ComposeDir, []string{"inspect", "-f", `{{if ne .State.Status "running"}}{{.State.Status}}{{else if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}`, "phe-cloud"}, &out); err != nil {
+		return "missing"
+	}
+	return strings.TrimSpace(out.String())
+}
+
+// Logs is the end of a container's log.
+func (m *Manager) Logs(ctx context.Context, container string, lines int) string {
+	var out bytes.Buffer
+	m.Run.Run(ctx, m.ComposeDir, []string{"logs", "--tail", strconv.Itoa(lines), container}, &out)
+	return out.String()
+}
+
+// Busy says whether a change is running.
+func (m *Manager) Busy() bool {
+	m.jmu.Lock()
+	defer m.jmu.Unlock()
+	for _, j := range m.jobs {
+		if j.Status().State == "running" {
+			return true
+		}
+	}
+	return false
 }
 
 // Disable switches a feature off; its data (volumes) stays.

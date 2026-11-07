@@ -23,8 +23,9 @@ type Feature struct {
 	ID        string            `yaml:"id" json:"id"`
 	Title     string            `yaml:"title" json:"title"`
 	About     string            `yaml:"about" json:"about"`
-	Core      bool              `yaml:"core" json:"core,omitempty"` // always on
-	Files     []string          `yaml:"files" json:"-"`             // compose files beside docker-compose.yml
+	Core      bool              `yaml:"core" json:"core,omitempty"`              // always on
+	Later     bool              `yaml:"after-setup" json:"afterSetup,omitempty"` // not offered in setup (needs the setup page's port 80)
+	Files     []string          `yaml:"files" json:"-"`                          // compose files beside docker-compose.yml
 	Profiles  []string          `yaml:"profiles" json:"-"`
 	Requires  []string          `yaml:"requires" json:"requires,omitempty"`
 	Conflicts []string          `yaml:"conflicts" json:"conflicts,omitempty"`

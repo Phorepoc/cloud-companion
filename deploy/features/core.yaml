@@ -6,3 +6,9 @@ about: "Your phone's companion server: the browser, chats, mail, files and every
 core: true
 files: [docker-compose.board.yml]
 needs: { memory: 1G }
+settings:
+  # the first owner's code: the setup page signs the owner in with it (once; ignored when there is an owner)
+  - { key: first-owner, label: First owner code, env: PHECLOUD_FIRST_OWNER_CODE, generate: true, secret: true }
+env:
+  # a board is reached from the home network (HTTPS: the feature, or away from home through the tunnel)
+  PHECLOUD_WEB_BIND: 0.0.0.0

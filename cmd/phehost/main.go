@@ -14,8 +14,13 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"strconv"
+	"strings"
 	"syscall"
+	"time"
+	_ "time/tzdata" // time zone names are checked without the system's database
 
 	"github.com/phorepoc/cloud-companion/internal/host"
 )
@@ -25,6 +30,10 @@ func main() {
 	features := flag.String("features", "", "the feature catalogue (default: <compose>/deploy/features)")
 	stateDir := flag.String("state", "/var/lib/phehost", "where the chosen features are kept")
 	sock := flag.String("socket", "/run/phehost/api.sock", "the API socket (mounted into Cloud Companion's container)")
+	listen := flag.String("listen", ":80", "the setup and recovery page, while it is needed")
+	codeFile := flag.String("setup-code", "/boot/firmware/cloud-setup.txt", "the setup code (a line code=...); without it setup is open for 30 minutes after boot")
+	handOver := flag.Duration("hand-over", 10*time.Minute, "how long the setup page stays to hand the owner over")
+	recoverAfter := flag.Duration("recover-after", 5*time.Minute, "how long Cloud Companion may be unhealthy before the recovery page")
 	flag.Parse()
 	if *features == "" {
 		*features = *compose + "/deploy/features"
@@ -55,15 +64,24 @@ func main() {
 	}
 	os.Chmod(*sock, 0o660) // the socket's group is the one Cloud Companion's container runs with
 
-	j := m.Apply() // the features as they were chosen
-	go func() {
-		<-j.Done()
-		st := j.Status()
-		log.Info("features applied", "state", st.State, "error", st.Error)
-	}()
+	if m.SetUp() {
+		j := m.Apply() // the features as they were chosen
+		go func() {
+			<-j.Done()
+			st := j.Status()
+			log.Info("features applied", "state", st.State, "error", st.Error)
+		}()
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	su := &host.Setup{M: m, Listen: *listen, CodeFile: *codeFile, Uptime: uptime, Window: 30 * time.Minute, Unhealthy: *recoverAfter,
+		HandOver: *handOver, Exec: func(ctx context.Context, name string, args ...string) ([]byte, error) {
+			return exec.CommandContext(ctx, name, args...).CombinedOutput()
+		}}
+	su.Start()
+	log.Info("setup page", "phase", su.Phase(), "listen", *listen)
+	go su.Run(ctx)
 	srv := &http.Server{Handler: m.Handler()}
 	go func() { <-ctx.Done(); srv.Close() }()
 	log.Info("listening", "socket", *sock)
@@ -71,4 +89,14 @@ func main() {
 		log.Error("serve", "err", err)
 		os.Exit(1)
 	}
+}
+
+// uptime is how long the board has been running (/proc/uptime).
+func uptime() time.Duration {
+	b, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		return 0
+	}
+	f, _ := strconv.ParseFloat(strings.Fields(string(b) + " 0")[0], 64)
+	return time.Duration(f * float64(time.Second))
 }
