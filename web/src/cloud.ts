@@ -166,9 +166,24 @@ async function finishConnect(w: WelcomeFrame) {
   state.error = ''
   const c = client!
   c.onframe = onFrame
-  c.onclose = () => { state.status = 'offline' }
+  c.onclose = () => { state.status = 'offline'; reconnectSoon() }
+  retry = 0
   if (state.settings.q !== 70 || state.settings.gray) c.settings(state.settings.q, state.settings.gray)
   window.__phe = Object.assign(window.__phe || {}, { state, forget })
+}
+
+// The server went away (restarted for a backup or an update, or the network dropped): connect again, after 1 s, then less
+// often up to every 30 s, until it answers. A device that was forgotten does not.
+let retry = 0
+let retryTimer: ReturnType<typeof setTimeout> | undefined
+function reconnectSoon() {
+  clearTimeout(retryTimer)
+  if (!creds.value) return
+  const wait = Math.min(30000, 1000 * 2 ** retry++)
+  retryTimer = setTimeout(() => {
+    if (state.status !== 'offline' || !creds.value) return
+    connect().catch(() => reconnectSoon())
+  }, wait)
 }
 
 // Pair with a code; stores the device key in IndexedDB.
