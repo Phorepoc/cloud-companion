@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+id: hub
+title: Mail, contacts and calendar
+about: "Your own mail server (Stalwart) with Exchange ActiveSync (Z-Push), so phones sync mail, contacts and calendar."
+profiles: [hub]
+needs: { memory: 512M }

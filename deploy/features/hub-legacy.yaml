@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+id: hub-legacy
+title: Old phones' mail sync
+about: "A TLS 1.0 listener for mail sync from phones whose own security cannot do TLS 1.2."
+profiles: [hub-legacy]
+requires: [hub]
+needs: { memory: 32M }

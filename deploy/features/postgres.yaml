@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+id: postgres
+title: PostgreSQL database
+about: "Keeps Cloud Companion's data in PostgreSQL instead of the built-in SQLite file. For many users or large mailboxes."
+files: [docker-compose.db.yml]
+profiles: [db-postgres]
+conflicts: [mariadb]
+needs: { memory: 256M }
+settings:
+  - { key: password, label: Database password, env: PHECLOUD_DB_PASSWORD, generate: true, secret: true }
+env:
+  PHECLOUD_DB: postgres://phecloud:${PHECLOUD_DB_PASSWORD}@postgres:5432/phecloud?sslmode=disable

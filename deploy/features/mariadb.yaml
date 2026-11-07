@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+id: mariadb
+title: MariaDB database
+about: "Keeps Cloud Companion's data in MariaDB instead of the built-in SQLite file."
+files: [docker-compose.db.yml]
+profiles: [db-mariadb]
+conflicts: [postgres]
+needs: { memory: 256M }
+settings:
+  - { key: password, label: Database password, env: PHECLOUD_DB_PASSWORD, generate: true, secret: true }
+env:
+  PHECLOUD_DB: mysql://phecloud:${PHECLOUD_DB_PASSWORD}@mariadb:3306/phecloud

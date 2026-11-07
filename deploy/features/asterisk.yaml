@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: Apache-2.0
+id: asterisk
+title: Phone calls (SIP)
+about: "A SIP service (Asterisk) for your phones' calls over the internet."
+profiles: [asterisk]
+needs: { memory: 128M }

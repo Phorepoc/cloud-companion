@@ -1,6 +1,6 @@
 # Host manager and board images
 
-Status: design, for review. Nothing here is built yet.
+Status: design, for review. Built: the manager's features (`cmd/phehost`, `internal/host`, `deploy/features`).
 
 ## Why
 
@@ -60,23 +60,28 @@ When Cloud Companion is healthy again, the UI switches off again. The owner can 
 
 ## Features
 
-A feature is a manifest in the catalogue (one YAML file each):
+A feature is a manifest in the catalogue (`deploy/features/*.yaml`, one file each). All features run in one compose project
+(`cloud`) from the compose files this repository already has: a feature names the profiles (and extra compose files) it switches
+on, so the compose files stay the one description of the containers:
 
 ```yaml
-id: messaging-signal
-title: Signal
-about: Send and receive Signal messages in Chats.
-needs: { memory: 300M, arch: [arm64, amd64] }
-requires: [core]                 # other features
-services:                        # rendered into a compose project per feature
-  signal:
-    image: bbernhard/signal-cli-rest-api@sha256:...   # always by digest
-    volumes: [signal-data:/home/.local/share/signal-cli]
-settings:                        # asked when switched on; passed to Cloud Companion
-  - { key: number, label: Phone number, type: phone }
-external:                        # "use mine": the address of the person's own service instead
-  - { key: url, label: Signal REST address }
+id: postgres
+title: PostgreSQL database
+about: "Keeps Cloud Companion's data in PostgreSQL instead of the built-in SQLite file."
+files: [docker-compose.db.yml]   # beside docker-compose.yml
+profiles: [db-postgres]
+conflicts: [mariadb]
+requires: []                     # other features, switched on with it
+needs: { memory: 256M }          # and arch: [amd64] where it only runs there
+settings:                        # asked when switched on (generate: made by the manager, never asked; secret: never shown back)
+  - { key: password, label: Database password, env: PHECLOUD_DB_PASSWORD, generate: true, secret: true }
+env:                             # more variables for the compose project, from the settings
+  PHECLOUD_DB: postgres://phecloud:${PHECLOUD_DB_PASSWORD}@postgres:5432/phecloud?sslmode=disable
 ```
+
+The manager writes the settings to the project's `.env` and runs `docker compose -p cloud -f ... --profile ... up -d --wait`;
+the containers of features switched off are removed (their volumes stay). A change that fails puts the previous state back.
+"Use mine" (a person's own service instead of ours) is a setting of Cloud Companion's, as today in Connections.
 
 The first catalogue is what the compose profiles do today: core, database (SQLite by default, Postgres), TLS proxy, hub
 (mail, contacts, calendar), SIP, Matrix/XMPP/IRC bridges, Signal, Telegram, files, the browser.

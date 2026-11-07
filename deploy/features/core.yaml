@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+# Cloud Companion itself: always on.
+id: core
+title: Cloud Companion
+about: "Your phone's companion server: the browser, chats, mail, files and everything in the app."
+core: true
+needs: { memory: 1G }

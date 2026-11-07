@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: Apache-2.0
+id: android
+title: Android apps
+about: "Runs Android apps on the server and shows them on your phone."
+files: [docker-compose.android.yml]
+profiles: [android]
+needs: { memory: 4G, arch: [amd64] }
+settings:
+  - { key: secret, label: Bridge secret, env: PHECLOUD_ANDROID_SECRET, generate: true, secret: true }
