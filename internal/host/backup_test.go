@@ -264,3 +264,15 @@ func TestSnapshotsAndRestore(t *testing.T) {
 		t.Error("restored over a board that is set up")
 	}
 }
+
+// A board runs the images of the release its files came from: VERSION (bundle.sh) reaches compose as PHECLOUD_VERSION.
+func TestEnvFileReleaseVersion(t *testing.T) {
+	m, _ := newBackupManager(t)
+	if strings.Contains(string(m.envFile(State{}, nil)), "PHECLOUD_VERSION") {
+		t.Error("a version without VERSION")
+	}
+	os.WriteFile(filepath.Join(m.ComposeDir, "VERSION"), []byte("v0.4.0\n"), 0o644)
+	if !strings.Contains(string(m.envFile(State{}, nil)), `PHECLOUD_VERSION="v0.4.0"`) {
+		t.Errorf("not passed on:\n%s", m.envFile(State{}, nil))
+	}
+}

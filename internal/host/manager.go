@@ -386,6 +386,10 @@ func (m *Manager) envFile(s State, ids []string) []byte {
 			vars[k] = os.Expand(v, func(n string) string { return vars[n] })
 		}
 	}
+	// the release the board files came from (bundle.sh): its images, not the compose files' fallback
+	if v, err := os.ReadFile(filepath.Join(m.ComposeDir, "VERSION")); err == nil && strings.TrimSpace(string(v)) != "" {
+		vars["PHECLOUD_VERSION"] = strings.TrimSpace(string(v))
+	}
 	keys := make([]string, 0, len(vars))
 	for k := range vars {
 		keys = append(keys, k)
