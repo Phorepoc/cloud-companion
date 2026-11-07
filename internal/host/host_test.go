@@ -78,7 +78,7 @@ func TestComposeArgs(t *testing.T) {
 	c := realCatalogue(t)
 	ids, _ := c.Closure([]string{"postgres", "signal"})
 	got := strings.Join(ComposeArgs(c, ids), " ")
-	want := "compose -p cloud -f docker-compose.yml -f docker-compose.db.yml --profile db-postgres --profile signal up -d --pull missing --remove-orphans --wait"
+	want := "compose -p cloud -f docker-compose.yml -f docker-compose.board.yml -f docker-compose.db.yml --profile db-postgres --profile signal up -d --pull missing --remove-orphans --wait"
 	if got != want {
 		t.Errorf("args\n got %s\nwant %s", got, want)
 	}

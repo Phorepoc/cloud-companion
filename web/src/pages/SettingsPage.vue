@@ -1,6 +1,6 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
-<!-- Settings: one place for this device and, for the owner, the server (Connections, Devices, Catalogue, Weather, Security). The Etesian
+<!-- Settings: one place for this device and, for the owner, the server (Connections, Devices, Features, Catalogue, Weather, Security). The Etesian
      Settings split (@etesian-design/shell XSettingsSplit): on a wide window or screen a side panel of grouped pages with search
      and the page beside it, as iPad and macOS settings; narrower, the list drills down and the page has Back. Each page has its address
      (/settings/connections); the old /connections, /devices and /catalogue open their page here. -->
@@ -12,6 +12,7 @@
           <ConnectionsPage v-if="id === 'connections'" />
           <DevicesPage v-else-if="id === 'devices'" />
           <CataloguePage v-else-if="id === 'catalogue'" />
+          <FeaturesPage v-else-if="id === 'features'" />
           <DeviceSettings v-else :part="id" />
         </template>
       </XSettingsSplit>
@@ -30,6 +31,7 @@ import DeviceSettings from '../components/settings/DeviceSettings.vue'
 const ConnectionsPage = defineAsyncComponent(() => import('./ConnectionsPage.vue'))
 const DevicesPage = defineAsyncComponent(() => import('./DevicesPage.vue'))
 const CataloguePage = defineAsyncComponent(() => import('./CataloguePage.vue'))
+const FeaturesPage = defineAsyncComponent(() => import('./FeaturesPage.vue'))
 
 const route = useRoute()
 const router = useRouter()

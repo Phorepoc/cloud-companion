@@ -18,6 +18,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
   { title: 'Your server', pages: [
     { id: 'connections', title: 'Connections', icon: 'split', color: '#347708', subtitle: 'Accounts and messaging', admin: true },
     { id: 'devices', title: 'Devices', icon: 'window', color: '#F77219', subtitle: 'Paired phones and browsers', admin: true },
+    { id: 'features', title: 'Features', icon: 'grid', color: '#7A3FB8', subtitle: 'Switch parts of the server on and off', admin: true },
     { id: 'catalogue', title: 'Catalogue', icon: 'bag', color: '#1C51AF', subtitle: 'Apps and services', admin: true },
     { id: 'weather', title: 'Weather', icon: 'location', color: '#0A9BD8', subtitle: 'The default place', admin: true },
     { id: 'security', title: 'Security', icon: 'lock', color: '#6A6A6A', subtitle: 'Passkeys, recovery code', admin: true },
