@@ -112,10 +112,12 @@ func main() {
 	case "serve":
 		maxH, _ := strconv.Atoi(env("PHECLOUD_MAX_PAGE_H", "8192"))
 		log := slog.Default()
-		br, err := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH, 2)
-		if err != nil {
-			log.Error("browser", "err", err)
-			os.Exit(1)
+		var br browser.Factory
+		if cdp, err := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH, 2); err != nil {
+			log.Error("browser unavailable; everything else runs", "err", err)
+			br = browser.Unavailable{Err: err}
+		} else {
+			br = cdp
 		}
 		defer br.Close()
 		// a virgin server prints a first-owner code (or adopts PHECLOUD_FIRST_OWNER_CODE) so the first owner can register without a second command

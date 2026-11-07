@@ -118,3 +118,10 @@ type Answer struct {
 	OK         bool
 	Text, Pass string
 }
+
+// Unavailable stands in when the browser cannot start (no display, a board without the memory, a broken install): every
+// session gets Err, and the rest of the server runs on.
+type Unavailable struct{ Err error }
+
+func (u Unavailable) New(context.Context) (Session, error) { return nil, u.Err }
+func (Unavailable) Close()                                 {}
