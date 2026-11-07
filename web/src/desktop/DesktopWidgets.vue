@@ -170,31 +170,9 @@
         <q-icon class="ph-wg__wxicon" :name="weatherIcon(forecast?.code ?? 3, forecast?.day ?? true)" size="76px" :aria-label="forecast?.description || 'Weather'" />
       </div>
 
-      <!-- gear clock (Belle, belle-ref11): a round dial in a lighter metal rim with twelve ticks, toothed metal gears turning behind the
-           hands, a thin white second hand, the day low on the left and the date at 3 o'clock in dark round bubbles -->
+      <!-- gear clock (Belle, belle-ref11): the library's dial, as on the phone -->
       <div v-else-if="w.kind === 'clock-gear'" class="ph-wg__gear" role="img" :aria-label="'Clock, ' + clock.text">
-        <svg viewBox="0 0 126 126" aria-hidden="true">
-          <defs>
-            <radialGradient id="ph-wg-gface" cx=".5" cy=".4" r=".6"><stop offset="0" stop-color="#3A3B3F" /><stop offset="1" stop-color="#121214" /></radialGradient>
-            <linearGradient id="ph-wg-grim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6A6B70" /><stop offset=".5" stop-color="#3A3B3F" /><stop offset="1" stop-color="#202124" /></linearGradient>
-            <linearGradient id="ph-wg-gmetal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55565B" /><stop offset="1" stop-color="#2A2B2F" /></linearGradient>
-          </defs>
-          <circle cx="63" cy="63" r="62" fill="url(#ph-wg-grim)" stroke="#050506" />
-          <circle cx="63" cy="63" r="53" fill="url(#ph-wg-gface)" stroke="#050506" stroke-width=".8" />
-          <g v-for="(g, i) in GEARS" :key="i" :transform="`rotate(${(i % 2 ? -1 : 1) * secDeg * (20 / g.r)} ${g.x} ${g.y})`" class="ph-wg__cog">
-            <path :d="g.d" fill="url(#ph-wg-gmetal)" stroke="#0E0E10" stroke-width=".5" />
-            <circle :cx="g.x" :cy="g.y" :r="g.r * 0.55" fill="#1A1B1E" />
-            <circle :cx="g.x" :cy="g.y" :r="g.r * 0.18" fill="#4A4B50" />
-          </g>
-          <line v-for="a in 12" :key="a" x1="63" y1="3.5" x2="63" :y2="a % 3 ? 7.5 : 9" stroke="#C8C9CD" stroke-width="1.4" stroke-linecap="round" :transform="`rotate(${a * 30} 63 63)`" />
-          <g class="ph-wg__hands">
-            <path d="M60.5 68 L60.6 25.5 Q63 24.2 65.4 25.5 L65.5 68 Z" fill="#fff" :transform="`rotate(${hourDeg} 63 63)`" />
-            <path d="M61.7 68 L61.75 12 Q63 11.2 64.25 12 L64.3 68 Z" fill="#fff" :transform="`rotate(${minDeg} 63 63)`" />
-          </g>
-          <line class="ph-wg__hand--s" x1="63" y1="76" x2="63" y2="12" stroke="#E6E6E8" stroke-width=".8" :transform="`rotate(${secDeg} 63 63)`" />
-          <circle cx="63" cy="63" r="5.5" fill="url(#ph-wg-grim)" stroke="#0E0E10" stroke-width=".6" /><circle cx="63" cy="63" r="1.6" fill="#D0D1D5" />
-        </svg>
-        <span class="ph-wg__gday">{{ tick.toLocaleDateString(undefined, { weekday: 'short' }) }}</span><span class="ph-wg__gdate">{{ tick.getDate() }}</span>
+        <BelleGearDial :h="tick.getHours()" :m="tick.getMinutes()" :s="tick.getSeconds()" :day="tick.toLocaleDateString(undefined, { weekday: 'short' })" :date="tick.getDate()" />
       </div>
 
       <!-- LCD clock (Belle, belle-ref10): green segment digits on black glass in a dark metal frame, the date beside -->
@@ -342,7 +320,7 @@ import { ymd } from '../dates'
 import WeatherPlaceDialog from './WeatherPlaceDialog.vue'
 import { forecast, noPlace, weatherError, loadWeather, weatherIcon } from './weather'
 import { getPref, setPref } from '../prefs'
-import { BelleWidget } from '@etesian-design/shell'
+import { BelleWidget, BelleGearDial } from '@etesian-design/shell'
 import { CELL, MARGIN, KINDS, loadWidgets, saveWidgets, gridSize, fits, freeSpot, type Widget, type WidgetKind } from './widgets'
 
 const props = defineProps<{ now: Date; area: { w: number; h: number }; editing: boolean }>()
@@ -444,17 +422,6 @@ function squircleRect(w: number, h: number, n: number, x = 0, y = 0): string {
   }
   return 'M' + pts.join('L') + 'Z'
 }
-/** A toothed gear at (x, y), radius r (the phone's gear dial draws the same). */
-function gearPath(x: number, y: number, r: number, teeth: number): string {
-  const pts: string[] = []
-  for (let i = 0; i < teeth * 4; i++) { // each tooth: two points out, two in
-    const a = (Math.PI * 2 * i) / (teeth * 4), rr = i % 4 < 2 ? r : r * 0.86
-    pts.push(`${(x + rr * Math.cos(a)).toFixed(2)} ${(y + rr * Math.sin(a)).toFixed(2)}`)
-  }
-  return 'M' + pts.join('L') + 'Z'
-}
-/** the gear clock's gears (a 126 grid, as on the phone): x, y, radius and teeth */
-const GEARS = [[83, 39, 26, 18], [39, 83, 24, 16], [63, 63, 22, 16], [87, 82, 14, 11]].map(([x, y, r, t]) => ({ x, y, r, d: gearPath(x, y, r, t) }))
 /** the 701's dial: n 2.9 face and bezel, the date window at 3 o'clock */
 const DIAL = { outer: squircleRect(126, 126, 2.9), inner: squircleRect(118, 118, 2.9, 4, 4), win: squircleRect(26, 26, 2.8, 79, 50) }
 
@@ -622,11 +589,6 @@ const musicButtons = computed(() => [
 .ph-wg__dialdate { font-family: var(--ph-font); }
 /* gear clock */
 .ph-wg__gear { position: relative; height: 100%; aspect-ratio: 1; margin: auto; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.4)); }
-.ph-wg__gear svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.ph-wg__gday, .ph-wg__gdate { position: absolute; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%;
-  background: radial-gradient(#1A1B1E, #0B0B0C); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); color: #D0D1D5; font-size: 13px; }
-.ph-wg__gday { left: 31%; top: 70%; width: 20%; height: 20%; }
-.ph-wg__gdate { left: 83%; top: 50%; width: 13%; height: 13%; }
 /* LCD clock */
 .ph-wg__lcd { width: fit-content; margin: auto; padding: 8px; border-radius: 14px; border: 1px solid #000; background: linear-gradient(#5A5B60, #2A2B2E 50%, #0E0E10); }
 .ph-wg__lcdglass { display: flex; align-items: center; padding: 10px 10px 10px 14px; border-radius: 8px; border: 1px solid #46474B; background: linear-gradient(#2A2B2E, #050506); color: #23B14D; font-family: ui-monospace, monospace; }
@@ -658,7 +620,7 @@ const musicButtons = computed(() => [
 .ph-wg__rssrow { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 14px; border: 0; border-bottom: 1px solid #DCDCDE; background: none; color: inherit; font: inherit; font-size: 15px; text-align: left; cursor: pointer; }
 .ph-wg__rssrow:hover { background: rgba(229, 98, 15, 0.08); }
 .ph-wg__rssdot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #E5620F; }
-.ph-wg__rssrow.is-read .ph-wg__rssdot { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; opacity: .5; }
+.ph-wg__rssrow.is-read .ph-wg__rssdot { visibility: hidden; } /* read: no dot at all, as on the phone */
 .ph-wg__rsst { display: flex; flex-direction: column; min-width: 0; }
 .ph-wg__rsst small { font-size: 12px; color: #666; }
 /* devices */

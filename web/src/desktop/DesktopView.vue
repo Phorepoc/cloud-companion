@@ -9,7 +9,7 @@
      layout choice (desktop or classic) stays with this device. -->
 <template>
   <div class="ph-desk" data-test="desktop">
-    <XShell v-if="ready" ref="shell" :apps="apps" :name="brand.name" :menus="menus" storage-key="phecloud-shell" :storage="shellStorage" :events-count="unread || undefined"
+    <XShell v-if="ready" ref="shell" :apps="apps" :name="brand.name" :menus="menus" storage-key="phecloud-shell" :storage="shellStorage" :events-count="unread || undefined" :bin="false"
             dock-preview @menu="onMenu">
       <template #mark><BrandLogo :size="18" /></template>
       <template #indicators>

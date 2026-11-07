@@ -108,6 +108,10 @@ await page.waitForSelector('.x-win[data-win=feeds] .x-fr__title')
 assert.equal(await page.textContent('.x-win[data-win=feeds] .x-fr__title'), 'Northern lights tonight')
 assert.deepEqual((popups as string[]).filter((u) => !u.includes('/map')), [], 'the widget opened no page')
 await page.screenshot({ path: `${OUT}/feeds-4-window.png` })
+// the post is read now: its dot in the widget is gone, not an empty ring
+const dot = page.locator('[data-test=widget-feed] .ph-wg__rssdot').first()
+for (let i = 0; i < 25 && (await dot.evaluate((e) => getComputedStyle(e).visibility)) !== 'hidden'; i++) await page.waitForTimeout(200)
+assert.equal(await dot.evaluate((e) => getComputedStyle(e).visibility), 'hidden', 'a read post has no dot in the widget')
 
 assert.deepEqual(errors, [], 'no page errors')
 step('ok')

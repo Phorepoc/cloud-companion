@@ -58,10 +58,10 @@ await page.waitForSelector(win('settings'))
 assert.equal(await barApp(), 'Settings')
 await page.screenshot({ path: `${OUT}/desktop-1-enter.png` })
 
-step('the dock: Overview first, the sections, the recycle bin last')
+step('the dock: Overview first, then the sections; no recycle bin (Cloud Companion has nothing to put in it)')
 const dockLabels = await page.locator('.x-shell-dock button').evaluateAll((bs) => bs.map((b) => b.getAttribute('aria-label')))
 assert.equal(dockLabels[0], 'Overview')
-assert.match(String(dockLabels.at(-1)), /bin/i, `the recycle bin ends the dock: ${dockLabels.join(', ')}`)
+assert(!dockLabels.some((l) => /bin/i.test(String(l))), `no recycle bin in the dock: ${dockLabels.join(', ')}`)
 
 step('open Mail from the dock: it comes to the front')
 await dockBtn('Mail').click()
