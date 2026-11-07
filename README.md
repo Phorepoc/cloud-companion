@@ -230,7 +230,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
   [brotli](https://github.com/andybalholm/brotli), [xxhash](https://github.com/cespare/xxhash), [easyjson](https://github.com/mailru/easyjson),
   [intern](https://github.com/josharian/intern), [msgp](https://github.com/tinylib/msgp) with [fwd](https://github.com/philhofer/fwd),
   [gjson](https://github.com/tidwall/gjson), [sjson](https://github.com/tidwall/sjson), [match](https://github.com/tidwall/match),
-  [pretty](https://github.com/tidwall/pretty), [mapstructure](https://github.com/go-viper/mapstructure),
+  [pretty](https://github.com/tidwall/pretty), [mapstructure](https://github.com/go-viper/mapstructure), [go-yaml](https://github.com/yaml/go-yaml),
   [google/uuid](https://github.com/google/uuid), [go-humanize](https://github.com/dustin/go-humanize),
   [backoff](https://github.com/cenkalti/backoff), [zerolog](https://github.com/rs/zerolog),
   [go-colorable](https://github.com/mattn/go-colorable), [go-isatty](https://github.com/mattn/go-isatty),
@@ -254,7 +254,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 - [Caddy](https://caddyserver.com), [Traefik](https://traefik.io), [PostgreSQL](https://www.postgresql.org), [MariaDB](https://mariadb.org),
   [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy), [nginx](https://nginx.org), [PHP](https://www.php.net),
   [Docker](https://www.docker.com)
-- [Chromium](https://www.chromium.org) as [chromedp/headless-shell](https://github.com/chromedp/docker-headless-shell), with the
+- [Chromium](https://www.chromium.org) as [Debian](https://www.debian.org) packages it, on [Xvfb](https://www.x.org), with the
   [Liberation](https://github.com/liberationfonts/liberation-fonts), [DejaVu](https://dejavu-fonts.github.io) and
   [Noto](https://notofonts.github.io) fonts
 - Android: [Redroid](https://github.com/remote-android/redroid-doc), the [Android Open Source Project](https://source.android.com)
