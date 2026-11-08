@@ -7,10 +7,9 @@
   <section class="ph-card ph-section" aria-labelledby="route-h" data-test="routing">
     <h2 id="route-h">Messaging</h2>
     <p class="ph-muted">
-      Phones whose chat app speaks SIP or XMPP (the N9, Symbian, softphones, Jabber apps) sign in with a login of their own and chat
-      through your connections. A message goes to the
-      first rule that matches its address; without a rule, a number goes out as SMS through your phones and a login goes to that device.
-      Answering a message always goes back the way it came.
+      Phones with a SIP or XMPP chat app (the N9, Symbian, softphones, Jabber apps) sign in with their own login and chat through your
+      connections. Each message goes to the first rule that matches its address. If no rule matches, phone numbers are sent as SMS
+      through your phones and logins go to that device. Replies always go back the way the message came.
     </p>
 
     <h3 class="ph-h3">Phone logins</h3>
@@ -20,17 +19,17 @@
         <q-btn flat no-caps color="negative" icon="sym_o_delete" :label="'Remove'" :aria-label="'Remove ' + l.name" data-test="sip-login-remove" @click="removeLogin(l.name)" />
       </li>
     </ul>
-    <p v-else class="ph-muted" data-test="no-sip-logins">No login yet.</p>
+    <p v-else class="ph-muted" data-test="no-sip-logins">No logins yet.</p>
     <div class="ph-row ph-row--start">
-      <q-input v-model="newLogin" dense outlined label="New login, e.g. n9" data-test="sip-login-name" @keyup.enter="addLogin" />
+      <q-input v-model="newLogin" dense outlined label="New login (for example n9)" data-test="sip-login-name" @keyup.enter="addLogin" />
       <q-btn unelevated color="primary" no-caps icon="sym_o_add" label="Add login" :disable="!newLogin.trim()" data-test="sip-login-add" @click="addLogin" />
     </div>
     <p v-if="made" class="ph-note" role="status" data-test="sip-login-made">
       <q-icon name="sym_o_key" size="20px" aria-hidden="true" />
       Login <strong>{{ made.name }}</strong>, password <code data-test="sip-login-password">{{ made.password }}</code>, realm <code>{{ made.realm }}</code>.
-      On an XMPP (Jabber) app the address is <code data-test="sip-login-jid">{{ made.name }}@{{ made.realm }}</code>, with this machine as
-      the server. The same login opens Files from a file manager (WebDAV, Files → Use from other apps). Write the password down
-      now: it is not shown again.
+      In an XMPP (Jabber) app, the address is <code data-test="sip-login-jid">{{ made.name }}@{{ made.realm }}</code> and the server is
+      this machine. The same login also opens Files in a file manager (WebDAV, see Files → Use from other apps). Write the password
+      down now. It won't be shown again.
     </p>
 
     <h3 class="ph-h3">Rules</h3>
@@ -44,11 +43,11 @@
         <q-btn flat color="negative" icon="sym_o_delete" :aria-label="'Remove rule ' + (i + 1)" data-test="route-remove" @click="routes.splice(i, 1)" />
       </li>
     </ol>
-    <p v-else class="ph-muted" data-test="no-routes">No rules: numbers go out as SMS, logins to that device.</p>
+    <p v-else class="ph-muted" data-test="no-routes">No rules. Phone numbers are sent as SMS and logins go to their device.</p>
     <q-btn outline color="primary" no-caps icon="sym_o_add" label="Add a rule" data-test="route-add" @click="routes.push({ kind: 'prefix', value: '', conn: conns[0]?.id || 'sms', opt: '' })" />
 
-    <h3 class="ph-h3">Who gets what arrives</h3>
-    <ul class="ph-list" aria-label="Who gets each connection's messages">
+    <h3 class="ph-h3">Who receives incoming messages</h3>
+    <ul class="ph-list" aria-label="Who receives each connection's messages">
       <li v-for="c in conns" :key="c.id" data-test="deliver-row">
         <div class="ph-grow"><strong>{{ c.label }}</strong></div>
         <q-select v-model="deliver[c.id]" dense outlined multiple emit-value map-options use-chips :options="loginOptions" label="Every login" class="ph-route__who" :data-test="'deliver-' + c.id" />

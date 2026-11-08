@@ -50,7 +50,7 @@ var userName = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,31}$`)
 // with the user name (after that the name stays).
 func (m *Manager) SetSSH(ctx context.Context, on bool, user, password string) (SSHState, error) {
 	if m.SSHUser == "" {
-		return SSHState{}, errors.New("remote login is switched on the board's own way on a server set up by hand")
+		return SSHState{}, errors.New("SSH can only be managed here on servers installed from a Cloud Companion image")
 	}
 	cur := m.SSH()
 	if !on {
@@ -66,21 +66,21 @@ func (m *Manager) SetSSH(ctx context.Context, on bool, user, password string) (S
 		return m.SSH(), errors.Join(errs...)
 	}
 	if password == "" && !cur.HasPassword {
-		return cur, errors.New("choose a password for remote login")
+		return cur, errors.New("Choose a password")
 	}
 	if password != "" && (len(password) < 10 || strings.ContainsAny(password, ":\n\r")) {
-		return cur, errors.New("the password needs 10 characters or more (and no colon)")
+		return cur, errors.New("The password must be at least 10 characters and can't contain a colon")
 	}
 	if !cur.HasPassword && user != "" && user != cur.User {
 		if !userName.MatchString(user) {
-			return cur, errors.New("the user name: small letters, digits, - and _, starting with a letter")
+			return cur, errors.New("Usernames can only use lowercase letters, numbers, - and _, and must start with a letter")
 		}
 		if _, err := m.host(ctx, "id", "-u", user); err == nil {
-			return cur, fmt.Errorf("the board already has a user %q: choose another name", user)
+			return cur, fmt.Errorf("The username %q is already taken. Choose another one", user)
 		}
 		// the account and its group take the new name; its home folder moves along
 		if out, err := m.host(ctx, "usermod", "-l", user, "-d", "/home/"+user, "-m", cur.User); err != nil {
-			return cur, fmt.Errorf("naming the user: %v: %s", err, strings.TrimSpace(string(out)))
+			return cur, fmt.Errorf("Couldn't set the username: %v: %s", err, strings.TrimSpace(string(out)))
 		}
 		m.host(ctx, "groupmod", "-n", user, cur.User)
 		cur.User = user
@@ -95,15 +95,15 @@ func (m *Manager) SetSSH(ctx context.Context, on bool, user, password string) (S
 		_, err := m.host(ctx, "sh", "-c", `chpasswd < "$0"`, tmp)
 		os.Remove(tmp)
 		if err != nil {
-			return cur, fmt.Errorf("setting the password: %w", err)
+			return cur, fmt.Errorf("Couldn't set the password: %w", err)
 		}
 	}
 	if out, err := m.host(ctx, "passwd", "-u", cur.User); err != nil {
-		return cur, fmt.Errorf("unlocking %s: %v: %s", cur.User, err, strings.TrimSpace(string(out)))
+		return cur, fmt.Errorf("Couldn't unlock %s: %v: %s", cur.User, err, strings.TrimSpace(string(out)))
 	}
 	if out, err := m.host(ctx, "systemctl", "enable", "--now", "ssh"); err != nil {
 		m.host(ctx, "passwd", "-l", cur.User)
-		return cur, fmt.Errorf("starting SSH: %v: %s", err, strings.TrimSpace(string(out)))
+		return cur, fmt.Errorf("Couldn't start SSH: %v: %s", err, strings.TrimSpace(string(out)))
 	}
 	cur.On, cur.HasPassword = true, true
 	if err := m.saveSSH(cur); err != nil {

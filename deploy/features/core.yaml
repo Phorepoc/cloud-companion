@@ -2,7 +2,7 @@
 # Cloud Companion itself: always on.
 id: core
 title: Cloud Companion
-about: "Your phone's companion server: the browser, chats, mail, files and everything in the app."
+about: "The main app: browser, chats, mail, files and everything else."
 core: true
 files: [docker-compose.board.yml]
 needs: { memory: 1G }

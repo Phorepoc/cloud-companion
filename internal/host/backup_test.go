@@ -229,11 +229,11 @@ func TestBackupSetupAndRun(t *testing.T) {
 func TestSnapshotsAndRestore(t *testing.T) {
 	m, d := newBackupManager(t)
 	dest := Destination{Kind: "rest", URL: "http://rest:8000/cloud", Password: "a long backup password"}
-	if _, err := m.Snapshots(context.Background(), dest); err == nil || err.Error() != "there are no backups there" {
+	if _, err := m.Snapshots(context.Background(), dest); err == nil || err.Error() != "No backups found at this location" {
 		t.Errorf("empty destination: %v", err)
 	}
 	d.password = "another password"
-	if _, err := m.Snapshots(context.Background(), dest); err == nil || err.Error() != "that is not the backup password" {
+	if _, err := m.Snapshots(context.Background(), dest); err == nil || err.Error() != "Wrong backup password" {
 		t.Errorf("wrong password: %v", err)
 	}
 	d.password = dest.Password

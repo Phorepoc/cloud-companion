@@ -6,39 +6,38 @@
 <template>
   <q-page class="ph-page ph-sys" data-test="system">
     <h1>System</h1>
-    <HdStatusState v-if="!state.admin" icon="lock" title="Only an admin device can see the system" text="Open this page on the first device you connected." />
-    <HdStatusState v-else-if="available === null" state="loading" title="Looking for the board" text="This takes a moment." />
-    <p v-else-if="!available" class="ph-muted" data-test="system-by-hand">This server was set up by hand: it is looked after with your
-      own login and tools.</p>
+    <HdStatusState v-if="!state.admin" icon="lock" title="Only admin devices can see this page" text="Open this page on an admin device." />
+    <HdStatusState v-else-if="available === null" state="loading" title="Connecting to the server" text="One moment…" />
+    <p v-else-if="!available" class="ph-muted" data-test="system-by-hand">This server wasn't installed from a Cloud Companion image.
+      Manage it with your own login and tools.</p>
     <template v-else>
       <section class="ph-card ph-sys__list" data-test="system-board">
-        <HdListItem title="Board" :subtitle="board.model || 'A computer (' + board.arch + ')'" />
+        <HdListItem title="Model" :subtitle="board.model || 'Unknown (' + board.arch + ')'" />
         <HdListItem title="Memory" :subtitle="memory" />
-        <HdListItem v-if="board.storage" title="Runs from" :subtitle="storageText" />
+        <HdListItem v-if="board.storage" title="Storage" :subtitle="storageText" />
       </section>
 
       <section v-if="ssh.available" class="ph-card ph-sys__list" data-test="system-ssh">
-        <HdListItem title="Remote login (SSH)" :subtitle="ssh.on ? 'On' : 'Off'" data-test="system-ssh-item">
+        <HdListItem title="SSH access" :subtitle="ssh.on ? 'On' : 'Off'" data-test="system-ssh-item">
           <template #trailing>
-            <HdSwitch :model-value="ssh.on || asking" :disabled="busy" aria-label="Remote login (SSH)" data-test="system-ssh-switch" @update:model-value="flip" />
+            <HdSwitch :model-value="ssh.on || asking" :disabled="busy" aria-label="SSH access" data-test="system-ssh-switch" @update:model-value="flip" />
           </template>
         </HdListItem>
         <form v-if="asking" class="ph-sys__ask" data-test="system-ssh-form" @submit.prevent="turnOn">
-          <p class="ph-muted">{{ ssh.hasPassword ? 'A new password for' : 'Choose a user name and a password for logging in. You need them each time; the board does not show the password again.' }}{{ ssh.hasPassword ? ' ' + ssh.user + '.' : '' }}</p>
-          <HdTextField v-if="!ssh.hasPassword" v-model="user" label="User name" helper="Small letters and digits, for example anna" autocomplete="off" data-test="system-ssh-user" />
-          <HdTextField v-model="pass1" type="password" autocomplete="new-password" label="Password (10 characters or more)" data-test="system-ssh-password" />
-          <HdTextField v-model="pass2" type="password" autocomplete="new-password" label="The same again" data-test="system-ssh-password2" />
+          <p class="ph-muted">{{ ssh.hasPassword ? 'Enter a new password for ' + ssh.user + '.' : 'Choose a username and password for SSH.' }}</p>
+          <HdTextField v-if="!ssh.hasPassword" v-model="user" label="Username" helper="Lowercase letters and numbers, for example anna." autocomplete="off" data-test="system-ssh-user" />
+          <HdTextField v-model="pass1" type="password" autocomplete="new-password" label="Password" helper="At least 10 characters." data-test="system-ssh-password" />
+          <HdTextField v-model="pass2" type="password" autocomplete="new-password" label="Confirm password" data-test="system-ssh-password2" />
           <div class="ph-sys__actions">
-            <HdButton type="submit" variant="accent" :disabled="busy" data-test="system-ssh-on">Turn on</HdButton>
+            <HdButton type="submit" variant="accent" :disabled="busy" data-test="system-ssh-on">{{ ssh.hasPassword ? 'Save' : 'Turn on' }}</HdButton>
             <HdButton variant="plain" :disabled="busy" @click="asking = false; error = ''">Cancel</HdButton>
           </div>
         </form>
         <div v-if="ssh.on" class="ph-sys__how" data-test="system-ssh-how">
-          <p>From a computer on the same network:</p>
+          <p>Connect from a computer on the same network:</p>
           <code>ssh {{ ssh.user }}@{{ hostName }}</code>
-          <p class="ph-muted">The password is the one you chose. Turn this off when you are done: anyone with the password can change
-            everything on the board.</p>
-          <button v-if="!asking" type="button" class="ph-sys__link" data-test="system-ssh-change" @click="asking = true">Change the password</button>
+          <p class="ph-muted">Turn SSH off when you're done. Anyone with the password has full control of this server.</p>
+          <button v-if="!asking" type="button" class="ph-sys__link" data-test="system-ssh-change" @click="asking = true">Change password</button>
         </div>
         <p v-if="error" class="ph-err" role="alert" data-test="system-error">{{ error }}</p>
       </section>
@@ -64,7 +63,7 @@ const pass2 = ref('')
 const hostName = location.hostname.endsWith('.local') ? location.hostname : 'cloud-companion.local'
 
 const memory = computed(() => (board.memory ? Math.round(board.memory / 2 ** 30) + ' GB' : 'Unknown'))
-const storageText = computed(() => ({ sd: 'A memory card', nvme: 'An NVMe drive', usb: 'A USB drive' } as Record<string, string>)[board.storage] || board.storage)
+const storageText = computed(() => ({ sd: 'Memory card', nvme: 'NVMe drive', usb: 'USB drive' } as Record<string, string>)[board.storage] || board.storage)
 
 function takeSSH(r: { available: boolean; ssh: Omit<SSH, 'available'> }) { Object.assign(ssh, { available: r.available }, r.ssh) }
 async function load() {
@@ -94,9 +93,9 @@ function flip(on: boolean) {
   else asking.value = true
 }
 function turnOn() {
-  if (!ssh.hasPassword && !/^[a-z][a-z0-9_-]{0,31}$/.test(user.value.trim())) { error.value = 'The user name: small letters and digits, starting with a letter.'; return }
-  if (pass1.value.length < 10) { error.value = 'The password needs 10 characters or more.'; return }
-  if (pass1.value !== pass2.value) { error.value = 'The two passwords are not the same.'; return }
+  if (!ssh.hasPassword && !/^[a-z][a-z0-9_-]{0,31}$/.test(user.value.trim())) { error.value = 'Usernames can only use lowercase letters, numbers, - and _, and must start with a letter.'; return }
+  if (pass1.value.length < 10) { error.value = 'The password must be at least 10 characters.'; return }
+  if (pass1.value !== pass2.value) { error.value = "The passwords don't match."; return }
   put(true, pass1.value, user.value.trim())
 }
 

@@ -6,24 +6,24 @@
 <template>
   <section class="ph-card ph-section" aria-labelledby="set-weather" data-test="weather-settings">
     <h2 id="set-weather">Weather</h2>
-    <p class="ph-muted">The weather on the desktop's Weather widget. Each device can pick its own place on the widget; the default place is for the rest.</p>
+    <p class="ph-muted">Settings for the Weather widget on the desktop. Each device can choose its own location. Otherwise, the default location below is used.</p>
     <template v-if="cfg">
       <q-option-group v-model="cfg.provider" :options="providers.map((p) => ({ label: p.name, value: p.id }))" color="primary" data-test="weather-provider" />
       <p class="ph-muted ph-small">{{ about }}</p>
       <q-btn-toggle v-model="cfg.units" no-caps unelevated toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
                     :options="[{ label: 'Celsius', value: 'c' }, { label: 'Fahrenheit', value: 'f' }]" data-test="weather-units" />
       <q-input v-if="needsKey" v-model="key" outlined dense type="password" autocomplete="off" class="q-mt-md" data-test="weather-key"
-               :label="hasKey ? 'API key (saved; type a new one to replace it)' : 'API key'" :hint="canKeepKeys ? '' : 'This server has no vault, so it cannot keep keys.'" />
-      <q-input v-if="cfg.provider === 'met-no'" v-model="cfg.contact" outlined dense class="q-mt-md" label="Contact (an e-mail or a site)" data-test="weather-contact"
-               hint="MET Norway asks who to contact about the requests." />
-      <q-expansion-item dense label="Own server" class="q-mt-sm" header-class="ph-small">
-        <q-input v-model="cfg.baseURL" outlined dense class="q-mt-sm" label="Weather address" placeholder="https://api.open-meteo.com" data-test="weather-base"
-                 hint="Leave empty for the source's own. For a self-hosted Open-Meteo, its address." />
-        <q-input v-if="cfg.provider !== 'openweathermap'" v-model="cfg.geoURL" outlined dense class="q-mt-sm" label="Place search address" placeholder="https://geocoding-api.open-meteo.com" />
+               :label="hasKey ? 'API key (saved, enter a new key to replace it)' : 'API key'" :hint="canKeepKeys ? '' : 'This server has no vault, so it can\'t store keys.'" />
+      <q-input v-if="cfg.provider === 'met-no'" v-model="cfg.contact" outlined dense class="q-mt-md" label="Contact (email or website)" data-test="weather-contact"
+               hint="MET Norway asks for a contact for API requests." />
+      <q-expansion-item dense label="Custom server" class="q-mt-sm" header-class="ph-small">
+        <q-input v-model="cfg.baseURL" outlined dense class="q-mt-sm" label="Weather API URL" placeholder="https://api.open-meteo.com" data-test="weather-base"
+                 hint="Leave empty to use the default. For a self-hosted Open-Meteo, enter its URL." />
+        <q-input v-if="cfg.provider !== 'openweathermap'" v-model="cfg.geoURL" outlined dense class="q-mt-sm" label="Geocoding API URL" placeholder="https://geocoding-api.open-meteo.com" />
       </q-expansion-item>
-      <h3 class="ph-h3">Default place</h3>
+      <h3 class="ph-h3">Default location</h3>
       <div class="ph-actions">
-        <span data-test="weather-default">{{ cfg.place ? cfg.place.name + (cfg.place.detail ? ', ' + cfg.place.detail : '') : 'None yet' }}</span>
+        <span data-test="weather-default">{{ cfg.place ? cfg.place.name + (cfg.place.detail ? ', ' + cfg.place.detail : '') : 'Not set' }}</span>
         <q-btn flat no-caps color="primary" label="Change" data-test="weather-default-change" @click="picking = true" />
       </div>
       <div v-if="picking">

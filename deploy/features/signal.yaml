@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 id: signal
 title: Signal
-about: "Send and receive Signal messages in Chats, as a linked device of your phone."
+about: "Send and receive Signal messages in Chats, linked to the Signal app on your phone."
 profiles: [signal]
 needs: { memory: 300M }

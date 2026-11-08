@@ -159,7 +159,7 @@ func (c *Catalogue) Closure(ids []string) ([]string, error) {
 // Fits says whether the board can run the feature, and if not, why (shown on the Features page).
 func (f *Feature) Fits(b Board) (bool, string) {
 	if len(f.Needs.Arch) > 0 && !slices.Contains(f.Needs.Arch, b.Arch) {
-		return false, "Not available for this board's processor"
+		return false, "Not available for this server's processor"
 	}
 	need, _ := ParseSize(f.Needs.Memory)
 	if b.Memory > 0 && need > b.Memory {

@@ -280,7 +280,7 @@ func (s *Setup) Handler() http.Handler {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if s.now().Before(s.lockUntil) {
-			writeError(w, http.StatusTooManyRequests, errors.New("too many tries: wait a few minutes"))
+			writeError(w, http.StatusTooManyRequests, errors.New("Too many attempts. Wait a few minutes and try again"))
 			return
 		}
 		ok := false
@@ -298,7 +298,7 @@ func (s *Setup) Handler() http.Handler {
 			if s.fails++; s.fails >= 10 {
 				s.fails, s.lockUntil = 0, s.now().Add(10*time.Minute)
 			}
-			writeError(w, http.StatusForbidden, errors.New("that is not it"))
+			writeError(w, http.StatusForbidden, errors.New("That's not right. Try again"))
 			return
 		}
 		s.fails = 0
@@ -322,23 +322,23 @@ func (s *Setup) Handler() http.Handler {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if s.phase != PhaseSetup || !s.unlocked(r) {
-			writeError(w, http.StatusForbidden, errors.New("not now"))
+			writeError(w, http.StatusForbidden, errors.New("Not available right now"))
 			return
 		}
 		if s.job != nil && s.job.Status().State == "running" {
-			writeError(w, http.StatusConflict, errors.New("already setting up"))
+			writeError(w, http.StatusConflict, errors.New("Setup is already running"))
 			return
 		}
 		if s.Net != nil && !s.net.Online {
-			writeError(w, http.StatusConflict, errors.New("connect the board to the internet first"))
+			writeError(w, http.StatusConflict, errors.New("Connect to the internet first"))
 			return
 		}
 		if len([]rune(in.Passphrase)) < 10 {
-			writeError(w, http.StatusBadRequest, errors.New("the recovery passphrase needs at least 10 characters"))
+			writeError(w, http.StatusBadRequest, errors.New("The recovery passphrase must be at least 10 characters"))
 			return
 		}
 		if in.TimeZone != "" && !validZone(in.TimeZone) {
-			writeError(w, http.StatusBadRequest, errors.New("unknown time zone"))
+			writeError(w, http.StatusBadRequest, errors.New("Unknown time zone"))
 			return
 		}
 		if err := s.savePassphrase(in.Passphrase); err != nil {
@@ -353,7 +353,7 @@ func (s *Setup) Handler() http.Handler {
 		}
 		for _, id := range in.Features {
 			if f := s.M.Cat.Get(id); f != nil && f.Later {
-				writeError(w, http.StatusBadRequest, fmt.Errorf("%s is switched on after setup, in Settings", f.Title))
+				writeError(w, http.StatusBadRequest, fmt.Errorf("%s can be turned on after setup, in Settings", f.Title))
 				return
 			}
 		}
@@ -422,13 +422,13 @@ func (s *Setup) Handler() http.Handler {
 			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in); err != nil || in.SSID == "" {
-			writeError(w, http.StatusBadRequest, errors.New("pick a network"))
+			writeError(w, http.StatusBadRequest, errors.New("Choose a network"))
 			return
 		}
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		if s.Net == nil || s.phase != PhaseSetup || !s.unlocked(r) {
-			writeError(w, http.StatusForbidden, errors.New("not now"))
+			writeError(w, http.StatusForbidden, errors.New("Not available right now"))
 			return
 		}
 		if s.net.Joining != "" {
@@ -487,11 +487,11 @@ func (s *Setup) restoreAllowed(w http.ResponseWriter, r *http.Request) bool {
 	defer s.mu.Unlock()
 	switch {
 	case s.phase != PhaseSetup || !s.unlocked(r):
-		writeError(w, http.StatusForbidden, errors.New("not now"))
+		writeError(w, http.StatusForbidden, errors.New("Not available right now"))
 	case s.Net != nil && !s.net.Online:
-		writeError(w, http.StatusConflict, errors.New("connect the board to the internet first"))
+		writeError(w, http.StatusConflict, errors.New("Connect to the internet first"))
 	case s.job != nil && s.job.Status().State == "running":
-		writeError(w, http.StatusConflict, errors.New("already setting up"))
+		writeError(w, http.StatusConflict, errors.New("Setup is already running"))
 	default:
 		return true
 	}
@@ -502,7 +502,7 @@ func (s *Setup) recoveryUnlocked(w http.ResponseWriter, r *http.Request) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.phase != PhaseRecovery || !s.unlocked(r) {
-		writeError(w, http.StatusForbidden, errors.New("not now"))
+		writeError(w, http.StatusForbidden, errors.New("Not available right now"))
 		return false
 	}
 	return true

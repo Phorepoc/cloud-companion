@@ -4,11 +4,11 @@
   <q-page class="ph-page">
     <h1>Connections</h1>
     <p class="ph-muted">
-      Connect the accounts you already have. Cloud Companion copies your mail, contacts and calendars from them into your own server and sends
-      mail through each account's own outgoing server. It does not host your mail.
+      Connect accounts you already have. Cloud Companion copies your mail, contacts and calendars to your server and sends mail through
+      each account's own outgoing server. It doesn't host your mail.
     </p>
 
-    <p v-if="!hubOn" class="ph-note" role="note" data-test="no-hub"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> The hub is not set up on this server, so accounts can be added and tested but nothing is copied yet.</p>
+    <p v-if="!hubOn" class="ph-note" role="note" data-test="no-hub"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> Mail, contacts and calendar isn't set up on this server. You can add and test accounts, but nothing will be copied yet.</p>
 
     <section class="ph-card ph-section" aria-labelledby="acc-h">
       <div class="ph-row">
@@ -19,7 +19,7 @@
         <q-btn v-for="p in providers" :key="p.id" outline color="primary" no-caps :icon="'sym_o_login'" :label="'Sign in with ' + p.label" :data-test="'oauth-' + p.id" @click="openOAuth(p)" />
       </div>
       <p v-if="oauthMsg" :class="oauthMsg.ok ? 'ph-ok' : 'ph-error'" role="status" data-test="oauth-result"><q-icon :name="oauthMsg.ok ? 'sym_o_check_circle' : 'sym_o_error'" size="20px" aria-hidden="true" /> {{ oauthMsg.text }}</p>
-      <p v-if="!accounts.length" class="ph-muted" data-test="no-accounts">No account connected yet.</p>
+      <p v-if="!accounts.length" class="ph-muted" data-test="no-accounts">No accounts connected yet.</p>
       <ul v-else class="ph-list" aria-label="Connected accounts">
         <li v-for="a in accounts" :key="a.id" data-test="account-row">
           <div class="ph-grow">
@@ -42,7 +42,7 @@
         <h2 id="dup-h">Duplicate contacts</h2>
         <q-btn outline color="primary" icon="sym_o_search" label="Look for duplicates" :loading="finding" data-test="find-dups" @click="findDups" />
       </div>
-      <p class="ph-muted">Entries that look like the same person (same number, same email, same name). Merging keeps one contact with everything from both; the sources stay linked to it.</p>
+      <p class="ph-muted">Contacts that look like the same person (same number, email or name). Merging keeps one contact with the details from both, still linked to their sources.</p>
       <p v-if="dups !== null && !dups.length" class="ph-muted" data-test="no-dups">No duplicates found.</p>
       <ul v-if="dups && dups.length" class="ph-list" aria-label="Possible duplicates">
         <li v-for="d in dups" :key="d.a + d.b" data-test="dup-row">
@@ -57,7 +57,7 @@
         </li>
       </ul>
       <p v-if="undoable" class="ph-note" role="status" data-test="undo-bar">
-        <q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Merged on {{ undoable.source }}. You can undo this for 10 minutes.
+        <q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Merged on {{ undoable.source }}. You can undo this within 10 minutes.
         <q-btn flat no-caps color="primary" label="Undo" data-test="devmerge-undo" @click="undoDevice" />
       </p>
       <p v-if="dupError" class="ph-error" role="alert" data-test="dup-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ dupError }}</p>
@@ -77,113 +77,113 @@
             <q-select v-model="f.imapTLS" :options="securities" emit-value map-options outlined dense label="Security" data-test="f-imap-tls" />
             <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" label="Password or app password" autocomplete="new-password" data-test="f-secret" />
-            <q-input v-model="f.pin" outlined dense label="Server certificate fingerprint (only for your own server)" hint="SHA-256, for a self-signed certificate such as Proton Mail Bridge. Leave empty otherwise: the Test button shows the fingerprint to paste." data-test="f-pin" />
+            <q-input v-model="f.pin" outlined dense label="Server certificate fingerprint (optional)" hint="SHA-256, only for self-signed certificates such as Proton Mail Bridge. Select Test to see the fingerprint to paste." data-test="f-pin" />
             <div class="ph-two">
               <q-input v-model="f.smtpHost" outlined dense label="Outgoing (SMTP) server" data-test="f-smtp-host" />
               <q-input v-model.number="f.smtpPort" outlined dense type="number" label="Port" data-test="f-smtp-port" />
             </div>
             <q-select v-model="f.smtpTLS" :options="securities" emit-value map-options outlined dense label="Outgoing security" data-test="f-smtp-tls" />
-            <q-input v-model="f.from" outlined dense label="Send as (address)" data-test="f-from" />
-            <q-input v-model="f.folders" outlined dense label="Folders to copy" hint="Comma separated. Default: INBOX" data-test="f-folders" />
-            <q-input v-model.number="f.months" outlined dense type="number" label="Months back" data-test="f-months" />
+            <q-input v-model="f.from" outlined dense label="Send as" data-test="f-from" />
+            <q-input v-model="f.folders" outlined dense label="Folders to copy" hint="Separate with commas. Default: INBOX" data-test="f-folders" />
+            <q-input v-model.number="f.months" outlined dense type="number" label="Months to copy" data-test="f-months" />
           </template>
           <template v-else-if="f.kind === 'matrix'">
             <q-input v-model="f.url" outlined dense label="Homeserver" hint="For example https://matrix.example.org" data-test="f-url" />
-            <q-input v-model="f.user" outlined dense label="User" hint="@you:example.org, or just your name on that homeserver" autocomplete="off" data-test="f-user" />
+            <q-input v-model="f.user" outlined dense label="User" hint="@you:example.org, or just your username" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" label="Password" autocomplete="new-password" data-test="f-secret" />
-            <p class="ph-muted ph-small">Cloud Companion signs in as a device of its own, encryption included. Your other Matrix apps may ask you to verify it.</p>
+            <p class="ph-muted ph-small">Cloud Companion signs in as its own device, with encryption. Your other Matrix apps may ask you to verify it.</p>
           </template>
           <template v-else-if="f.kind === 'xmpp'">
             <q-input v-model="f.user" outlined dense label="Address" hint="you@example.org" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" label="Password" autocomplete="new-password" data-test="f-secret" />
-            <q-input v-model="f.xmppServer" outlined dense label="Server (optional)" hint="host or host:port, only when it is not found from the address" data-test="f-xmpp-server" />
-            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
-            <q-input v-model="f.rooms" outlined dense label="Group chats (optional)" hint="Comma separated, e.g. team@conference.example.org" data-test="f-rooms" />
-            <q-input v-if="f.rooms.trim()" v-model="f.nick" outlined dense label="Your name in them (optional)" :hint="'Default: ' + (f.user.split('@')[0] || 'the first part of your address')" data-test="f-nick" />
-            <p class="ph-muted ph-small">Cloud Companion signs in as one more device of your account and stays online to receive your messages. A group chat reaches your devices as <code>#team</code>.</p>
+            <q-input v-model="f.xmppServer" outlined dense label="Server (optional)" hint="host or host:port. Only needed if it can't be found from the address." data-test="f-xmpp-server" />
+            <q-checkbox v-model="f.insecure" dense label="Accept certificates that can't be verified (for your own server)" data-test="f-insecure" />
+            <q-input v-model="f.rooms" outlined dense label="Group chats (optional)" hint="Separate with commas, for example team@conference.example.org" data-test="f-rooms" />
+            <q-input v-if="f.rooms.trim()" v-model="f.nick" outlined dense label="Nickname in group chats (optional)" :hint="'Default: ' + (f.user.split('@')[0] || 'the part of your address before @')" data-test="f-nick" />
+            <p class="ph-muted ph-small">Cloud Companion signs in as another device on your account and stays online to receive messages. Group chats appear on your devices as <code>#team</code>.</p>
           </template>
           <template v-else-if="f.kind === 'telegram'">
-            <p class="ph-muted ph-small">Telegram needs an API ID and hash of your own: <a href="https://my.telegram.org" target="_blank" rel="noopener">my.telegram.org</a> → API development tools. Cloud Companion then signs in as one more device of your account.</p>
+            <p class="ph-muted ph-small">Telegram needs your own API ID and hash. Get them at <a href="https://my.telegram.org" target="_blank" rel="noopener">my.telegram.org</a> → API development tools. Cloud Companion then signs in as another device on your account.</p>
             <q-input v-model.number="f.apiId" outlined dense type="number" label="API ID" data-test="f-tg-api-id" />
             <q-input v-model="f.secret" outlined dense type="password" label="API hash" autocomplete="off" data-test="f-secret" />
             <q-btn outline color="primary" no-caps icon="sym_o_qr_code_2" label="Sign in with a QR code" :disable="!f.apiId || !f.secret" :loading="tg.state === 'starting'" data-test="f-tg-signin" @click="tgStart" />
             <div v-if="tg.state === 'waiting' && tg.png" class="ph-qr" data-test="f-tg-qr">
               <img :src="'data:image/png;base64,' + tg.png" alt="QR code to sign Cloud Companion in to Telegram" width="220" height="220" />
-              <p class="ph-small">On your phone: Telegram → Settings → Devices → Link Desktop Device, and scan this. The code changes every 30 seconds.</p>
+              <p class="ph-small">On your phone, go to Telegram → Settings → Devices → Link Desktop Device and scan this code. It changes every 30 seconds.</p>
             </div>
             <div v-if="tg.state === 'password'" class="ph-row ph-row--start" data-test="f-tg-password-row">
               <q-input v-model="tg.password" outlined dense type="password" label="Two-step verification password" autocomplete="off" data-test="f-tg-password" @keyup.enter="tgPassword" />
               <q-btn unelevated color="primary" no-caps label="Continue" :disable="!tg.password" data-test="f-tg-password-send" @click="tgPassword" />
             </div>
-            <p v-if="tg.state === 'done'" class="ph-ok" role="status" data-test="f-tg-done"><q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Signed in as {{ tg.name }}. Test, then Add.</p>
+            <p v-if="tg.state === 'done'" class="ph-ok" role="status" data-test="f-tg-done"><q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Signed in as {{ tg.name }}. Select Test, then Add.</p>
             <p v-if="tg.error" class="ph-error ph-small" role="alert" data-test="f-tg-error">{{ tg.error }}</p>
-            <p class="ph-muted ph-small">Usernames, <code>u123</code> (people), <code>g123</code> and <code>c123</code> (groups) reach it with a rule such as <code>tg.</code> → this account.</p>
+            <p class="ph-muted ph-small">To message usernames, <code>u123</code> (people) or <code>g123</code> and <code>c123</code> (groups), add a rule such as <code>tg.</code> → this account.</p>
           </template>
           <template v-else-if="f.kind === 'signal'">
-            <p class="ph-muted ph-small">Signal needs signal-cli-rest-api next to Cloud Companion: <code>docker compose --profile signal up -d</code>. Link it once as a device of your Signal account, then give your number.</p>
+            <p class="ph-muted ph-small">Signal needs signal-cli-rest-api running alongside Cloud Companion (<code>docker compose --profile signal up -d</code>). Link it once as a device on your Signal account, then enter your number.</p>
             <q-input v-model="f.url" outlined dense label="signal-cli-rest-api" hint="With the compose profile: http://signal-cli:8080" data-test="f-url" />
             <q-btn outline color="primary" no-caps icon="sym_o_qr_code_2" label="Link this device" :loading="busy === 'link'" data-test="f-signal-link" @click="signalLink" />
             <div v-if="qr" class="ph-qr" data-test="f-signal-qr">
               <img :src="'data:image/png;base64,' + qr" alt="QR code to link Cloud Companion" width="220" height="220" />
-              <p class="ph-small">On your phone: Signal → Settings → Linked devices → Link a new device, and scan this. Then Test.</p>
+              <p class="ph-small">On your phone, go to Signal → Settings → Linked devices → Link a new device and scan this code. Then select Test.</p>
             </div>
-            <q-input v-model="f.user" outlined dense label="Your number" hint="With the country code, e.g. +306912345678" autocomplete="off" data-test="f-user" />
-            <p class="ph-muted ph-small">Numbers go out as SMS unless a rule sends them here: add a rule such as <code>sig.</code> → this account and write to <code>sig.+30…</code>.</p>
+            <q-input v-model="f.user" outlined dense label="Your number" hint="Include the country code, for example +306912345678" autocomplete="off" data-test="f-user" />
+            <p class="ph-muted ph-small">Numbers are sent as SMS unless a rule sends them here. Add a rule such as <code>sig.</code> → this account, then write to <code>sig.+30…</code>.</p>
           </template>
           <template v-else-if="f.kind === 'ncfiles'">
             <q-input v-model="f.url" outlined dense label="Nextcloud address" hint="For example https://cloud.example.org" data-test="f-url" />
-            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
+            <q-checkbox v-model="f.insecure" dense label="Accept certificates that can't be verified (for your own server)" data-test="f-insecure" />
             <q-btn outline color="primary" no-caps icon="sym_o_login" label="Sign in with Nextcloud" :disable="!f.url.trim()" :loading="nc.state === 'starting'" data-test="f-nc-signin" @click="ncStart" />
-            <p v-if="nc.state === 'waiting'" class="ph-small" role="status" data-test="f-nc-waiting">Approve Cloud Companion in the Nextcloud tab that opened. <a :href="nc.login" target="_blank" rel="noopener">Open it again</a></p>
-            <p v-if="nc.state === 'done'" class="ph-ok" role="status" data-test="f-nc-done"><q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Signed in as {{ f.user }}. Test, then Add.</p>
+            <p v-if="nc.state === 'waiting'" class="ph-small" role="status" data-test="f-nc-waiting">Approve Cloud Companion in the Nextcloud tab that opened. <a :href="nc.login" target="_blank" rel="noopener">Reopen the tab</a></p>
+            <p v-if="nc.state === 'done'" class="ph-ok" role="status" data-test="f-nc-done"><q-icon name="sym_o_check_circle" size="20px" aria-hidden="true" /> Signed in as {{ f.user }}. Select Test, then Add.</p>
             <p v-if="nc.error" class="ph-error ph-small" role="alert" data-test="f-nc-error">{{ nc.error }}</p>
             <details class="ph-small"><summary>Or use an app password</summary>
               <q-input v-model="f.user" outlined dense label="User" autocomplete="off" data-test="f-user" />
               <q-input v-model="f.secret" outlined dense type="password" label="App password" hint="Nextcloud → Settings → Security → Create new app password" autocomplete="new-password" data-test="f-secret" />
             </details>
-            <p class="ph-muted ph-small">Your Nextcloud files appear in Files as a folder named after this account, read-only for now.</p>
+            <p class="ph-muted ph-small">Your Nextcloud files appear in Files as a read-only folder named after this account.</p>
           </template>
           <template v-else-if="f.kind === 'immich'">
             <q-input v-model="f.url" outlined dense label="Immich address" hint="For example https://photos.example.org" data-test="f-url" />
             <q-input v-model="f.secret" outlined dense type="password" label="API key" hint="Immich → Account settings → API keys → New API key" autocomplete="new-password" data-test="f-secret" />
-            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
-            <p class="ph-muted ph-small">Your timeline and albums appear in Photos; the albums also appear in Files as folders. Read-only for now.</p>
+            <q-checkbox v-model="f.insecure" dense label="Accept certificates that can't be verified (for your own server)" data-test="f-insecure" />
+            <p class="ph-muted ph-small">Your timeline and albums appear in Photos, and your albums also appear as folders in Files. Read-only for now.</p>
           </template>
           <template v-else-if="f.kind === 'webdav' || f.kind === 'seafile'">
-            <q-input v-model="f.url" outlined dense :label="f.kind === 'seafile' ? 'Seafile address' : 'WebDAV address'" :hint="f.kind === 'seafile' ? 'For example https://seafile.example.org' : 'The folder to show, e.g. https://nas.example.org/dav/'" data-test="f-url" />
+            <q-input v-model="f.url" outlined dense :label="f.kind === 'seafile' ? 'Seafile address' : 'WebDAV address'" :hint="f.kind === 'seafile' ? 'For example https://seafile.example.org' : 'The folder to show, for example https://nas.example.org/dav/'" data-test="f-url" />
             <q-input v-model="f.user" outlined dense :label="f.kind === 'seafile' ? 'Email address' : 'User'" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" :label="f.kind === 'seafile' ? 'Password or API token' : 'Password'" :hint="f.kind === 'seafile' ? 'With two-step login: Seafile → Settings → Web API Auth Token' : ''" autocomplete="new-password" data-test="f-secret" />
-            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
-            <p class="ph-muted ph-small">{{ f.kind === 'seafile' ? 'Your libraries' : 'These files' }} appear in Files as a folder named after this account, read-only for now.</p>
+            <q-checkbox v-model="f.insecure" dense label="Accept certificates that can't be verified (for your own server)" data-test="f-insecure" />
+            <p class="ph-muted ph-small">{{ f.kind === 'seafile' ? 'Your libraries' : 'These files' }} appear in Files as a read-only folder named after this account.</p>
           </template>
           <template v-else-if="f.kind === 'nctalk'">
             <q-input v-model="f.url" outlined dense label="Nextcloud address" hint="For example https://cloud.example.org" data-test="f-url" />
             <q-input v-model="f.user" outlined dense label="User" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" label="App password" hint="Nextcloud → Settings → Security → Create new app password" autocomplete="new-password" data-test="f-secret" />
-            <p class="ph-muted ph-small">Cloud Companion looks at your Talk conversations every few seconds and passes new messages on.</p>
+            <p class="ph-muted ph-small">Cloud Companion checks your Talk conversations every few seconds and forwards new messages.</p>
           </template>
           <template v-else-if="f.kind === 'irc'">
-            <q-input v-model="f.ircServer" outlined dense label="Server" hint="For example irc.libera.chat (TLS, port 6697), or host:port" data-test="f-irc-server" />
+            <q-input v-model="f.ircServer" outlined dense label="Server" hint="For example irc.libera.chat (TLS on port 6697), or host:port" data-test="f-irc-server" />
             <q-input v-model="f.user" outlined dense label="Nick" autocomplete="off" data-test="f-user" />
-            <q-input v-model="f.secret" outlined dense type="password" label="Password (optional)" hint="Your account's (SASL); empty without an account" autocomplete="new-password" data-test="f-secret" />
-            <q-input v-model="f.channels" outlined dense label="Channels" hint="Comma separated, e.g. #team, #ops" data-test="f-channels" />
-            <q-checkbox v-model="f.ircAll" dense label="Pass on every channel line, not only those that name you" data-test="f-irc-all" />
-            <q-checkbox v-model="f.insecure" dense label="Accept a certificate that cannot be checked (a server of your own)" data-test="f-insecure" />
-            <q-checkbox v-model="f.ircServerPass" dense label="The password is the server's (a bouncer such as ZNC)" data-test="f-irc-server-pass" />
-            <p class="ph-muted ph-small">Cloud Companion stays connected with your nick, so people can write to you while your phone is away.</p>
+            <q-input v-model="f.secret" outlined dense type="password" label="Password (optional)" hint="Your account password (SASL). Leave empty if you don't have one." autocomplete="new-password" data-test="f-secret" />
+            <q-input v-model="f.channels" outlined dense label="Channels" hint="Separate with commas, for example #team, #ops" data-test="f-channels" />
+            <q-checkbox v-model="f.ircAll" dense label="Forward every channel message, not just ones that mention you" data-test="f-irc-all" />
+            <q-checkbox v-model="f.insecure" dense label="Accept certificates that can't be verified (for your own server)" data-test="f-insecure" />
+            <q-checkbox v-model="f.ircServerPass" dense label="The password is for the server (a bouncer such as ZNC)" data-test="f-irc-server-pass" />
+            <p class="ph-muted ph-small">Cloud Companion stays connected with your nick, so people can reach you while your phone is offline.</p>
           </template>
           <template v-else-if="f.kind === 'sip'">
-            <q-input v-model="f.sipServer" outlined dense label="Server" hint="host or host:port; with the asterisk profile: asterisk" data-test="f-sip-server" />
+            <q-input v-model="f.sipServer" outlined dense label="Server" hint="host or host:port. With the asterisk profile: asterisk" data-test="f-sip-server" />
             <q-input v-model="f.user" outlined dense label="User name" autocomplete="off" data-test="f-user" />
             <q-input v-model="f.secret" outlined dense type="password" label="Password" autocomplete="new-password" data-test="f-secret" />
-            <q-input v-model="f.sipDomain" outlined dense label="SIP domain (optional)" hint="Only when addresses there are not @ the server's name" data-test="f-sip-domain" />
+            <q-input v-model="f.sipDomain" outlined dense label="SIP domain (optional)" hint="Only needed if addresses don't end in @ the server's name" data-test="f-sip-domain" />
             <div class="ph-two">
               <q-select v-model="f.sipTransport" :options="sipTransports" emit-value map-options outlined dense label="Transport" data-test="f-sip-transport" />
-              <q-input v-model="f.sipListen" outlined dense label="Messages arrive on" hint="Cloud Companion's address for this service" data-test="f-sip-listen" />
+              <q-input v-model="f.sipListen" outlined dense label="Listen address" hint="Where Cloud Companion receives messages for this account" data-test="f-sip-listen" />
             </div>
           </template>
           <template v-else-if="f.kind === 'ics'">
-            <q-input v-model="f.url" outlined dense label="Calendar link (https:// or webcal://)" hint="A read-only calendar feed, for example a Proton calendar share link" data-test="f-url" />
+            <q-input v-model="f.url" outlined dense label="Calendar link (https:// or webcal://)" hint="A read-only calendar feed, such as a Proton Calendar share link" data-test="f-url" />
           </template>
           <template v-else>
             <q-input v-model="f.url" outlined dense :label="f.kind === 'carddav' ? 'Address book URL' : 'Calendar URL'" data-test="f-url" />
@@ -206,10 +206,10 @@
       <q-card class="ph-dialog" data-test="oauth-dialog">
         <q-card-section class="ph-form">
           <h2 class="ph-h3">Sign in with {{ oauthFor && oauthFor.label }}</h2>
-          <p class="ph-muted">You will be sent to {{ oauthFor && oauthFor.label }} to allow access. Cloud Companion never sees your password and keeps only a revocable token on your server.</p>
+          <p class="ph-muted">You'll be taken to {{ oauthFor && oauthFor.label }} to allow access. Cloud Companion never sees your password. It only keeps a token on your server, which you can revoke.</p>
           <q-input v-model="oauthName" outlined dense label="Name" hint="For example: Personal Gmail" data-test="oauth-name" />
           <q-option-group v-model="oauthKinds" type="checkbox" :options="oauthKindOptions" data-test="oauth-kinds" />
-          <p v-if="oauthFor && oauthFor.id === 'microsoft'" class="ph-muted ph-small">Outlook contacts and calendar are read through Microsoft Graph (read-only: Contacts.Read, Calendars.Read).</p>
+          <p v-if="oauthFor && oauthFor.id === 'microsoft'" class="ph-muted ph-small">Outlook contacts and calendars are read-only, through Microsoft Graph (Contacts.Read, Calendars.Read).</p>
           <p v-if="oauthError" class="ph-error" role="alert" data-test="oauth-error">{{ oauthError }}</p>
         </q-card-section>
         <q-card-actions align="right">
@@ -223,12 +223,12 @@
       <q-card class="ph-dialog" data-test="devmerge-dialog">
         <q-card-section>
           <h2 class="ph-h3">Merge on {{ devPreview && devSource }}?</h2>
-          <p class="ph-muted">This changes the contact list on that account itself. Exactly this will happen:</p>
+          <p class="ph-muted">This changes the contacts on that account itself. Here's exactly what will happen:</p>
           <ul class="ph-changes" data-test="devmerge-changes"><li v-for="(c, i) in (devPreview ? devPreview.changes : [])" :key="i">{{ c }}</li></ul>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps label="Cancel" @click="devPreview = null" />
-          <q-btn unelevated color="primary" label="Merge on the account" data-test="devmerge-confirm" @click="applyDevice" />
+          <q-btn unelevated color="primary" label="Merge" data-test="devmerge-confirm" @click="applyDevice" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -237,8 +237,8 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this account?</h2>
-          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk', 'signal', 'telegram'].includes(askRemove.kind)">{{ askRemove.name }} will no longer pass messages; rules that send to it stop working until you change them.</p>
-          <p v-else>{{ askRemove && askRemove.name }} will no longer be copied. What was already copied stays on your server.</p>
+          <p v-if="askRemove && ['sip', 'matrix', 'xmpp', 'irc', 'nctalk', 'signal', 'telegram'].includes(askRemove.kind)">{{ askRemove.name }} will stop forwarding messages. Rules that use it will stop working until you change them.</p>
+          <p v-else>{{ askRemove && askRemove.name }} will no longer be synced. Anything already copied stays on your server.</p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps label="Cancel" @click="askRemove = null" />
@@ -441,8 +441,8 @@ onMounted(async () => {
   load()
   timer = setInterval(load, 10000)
   try { providers.value = (await apiCall('GET', '/phe/oauth/providers')).providers } catch (e) { providers.value = [] }
-  if (route.query.oauth === 'ok') oauthMsg.value = { ok: true, text: 'Signed in. The new accounts are syncing.' }
-  else if (route.query.oauth === 'error') oauthMsg.value = { ok: false, text: String(route.query.msg || 'The sign-in did not complete.') }
+  if (route.query.oauth === 'ok') oauthMsg.value = { ok: true, text: 'Signed in. Your new accounts are syncing.' }
+  else if (route.query.oauth === 'error') oauthMsg.value = { ok: false, text: String(route.query.msg || 'Sign-in didn\'t finish.') }
 })
 onBeforeUnmount(() => { clearInterval(timer); tgReset(); ncReset() })
 watch(adding, (open) => { if (!open) { tgReset(); ncReset() } }) // a closed dialog stops asking about its sign-in

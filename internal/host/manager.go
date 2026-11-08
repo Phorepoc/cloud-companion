@@ -169,7 +169,7 @@ func (m *Manager) Choose(want []string, values map[string]map[string]string) (*J
 		}
 		for _, c := range g.Conflicts {
 			if slices.Contains(ids, c) {
-				return nil, fmt.Errorf("%s cannot run together with %s", g.Title, m.Cat.Get(c).Title)
+				return nil, fmt.Errorf("%s can't run at the same time as %s", g.Title, m.Cat.Get(c).Title)
 			}
 		}
 		if next.Features[x] == nil {
@@ -252,7 +252,7 @@ func (m *Manager) Disable(id string) (*Job, error) {
 	on, _ := m.Cat.Closure(m.enabled(next))
 	for _, o := range on {
 		if o != id && slices.Contains(m.Cat.Get(o).Requires, id) && next.Features[o] != nil {
-			return nil, fmt.Errorf("%s needs %s: switch it off first", m.Cat.Get(o).Title, f.Title)
+			return nil, fmt.Errorf("%s needs %s. Turn it off first", m.Cat.Get(o).Title, f.Title)
 		}
 	}
 	delete(next.Features, id)

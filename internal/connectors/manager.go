@@ -287,7 +287,7 @@ func (m *Manager) sync(ctx context.Context, a store.Account) (string, error) {
 		return sipsvc.Test(ctx, c, pass)
 	}
 	if m.Hub == nil {
-		return "", errors.New("the hub is not configured")
+		return "", errors.New("Mail, contacts and calendar isn't set up on this server")
 	}
 	pass, err := m.secret(a)
 	if err != nil {

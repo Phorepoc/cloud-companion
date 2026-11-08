@@ -216,7 +216,7 @@ func TestUpdateGoesBackWhenUnhealthy(t *testing.T) {
 	m, d, restarts := newUpdateManager(t, g)
 	d.broken = "v0.4.0"
 	st := runUpdate(t, m)
-	if st.State != "failed" || !strings.Contains(st.Error, "went back to v0.3.0") {
+	if st.State != "failed" || !strings.Contains(st.Error, "v0.3.0 was restored") {
 		t.Fatalf("%+v", st)
 	}
 	if read(t, filepath.Join(m.ComposeDir, "docker-compose.yml")) != "old compose" || read(t, m.Binary) != "old manager" || m.Version() != "v0.3.0" {
@@ -238,7 +238,7 @@ func TestUpdateRefusesDamagedDownload(t *testing.T) {
 	g.release("v0.4.0", "", "new compose", "new manager", true)
 	m, d, restarts := newUpdateManager(t, g)
 	st := runUpdate(t, m)
-	if st.State != "failed" || !strings.Contains(st.Error, "did not download whole") {
+	if st.State != "failed" || !strings.Contains(st.Error, "didn't download correctly") {
 		t.Fatalf("%+v", st)
 	}
 	if read(t, m.Binary) != "old manager" || restarts.Load() != 0 || len(d.calls) != 0 {

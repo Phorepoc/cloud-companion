@@ -37,15 +37,14 @@
 </head>
 <body>
 <main>
-  <h1 id="title">Cloud setup</h1>
+  <h1 id="title">Cloud Companion setup</h1>
   <p class="muted" id="board"></p>
 
   <section id="sdWarn" class="card hide" role="note">
     <h2>Running from an SD card</h2>
-    <p class="muted">For one person, a good card is fine: use a high-endurance card (sold for dash cams and security
-      cameras), which is made for constant writes. The board keeps its logs and swap in memory to spare it, and backups (in
-      Cloud Companion's settings) keep your data safe if the card fails. A USB SSD (a Raspberry Pi 4 or 5 starts from USB on its
-      own) is faster and lasts longer.</p>
+    <p class="muted">That's fine for one person if you use a high-endurance card (the kind sold for dash cams and security
+      cameras). Logs and swap are kept in memory to reduce wear, and backups in Cloud Companion's settings protect your data if
+      the card fails. A USB SSD is faster and lasts longer, and a Raspberry Pi 4 or 5 can start from one directly.</p>
   </section>
 
   <section id="locked" class="card hide">
@@ -60,7 +59,7 @@
 
   <form id="network" class="card hide">
     <h2>Internet</h2>
-    <p class="muted">The board needs the internet to download Cloud Companion. Plug in a network cable, or pick your Wi-Fi.</p>
+    <p class="muted">Cloud Companion needs an internet connection to download. Plug in a network cable or choose your Wi-Fi network.</p>
     <div id="wifiList" role="radiogroup" aria-label="Wi-Fi networks"></div>
     <div id="passBox" class="hide"><label for="wifiPass">Wi-Fi password</label><input id="wifiPass" type="password" autocomplete="off"></div>
     <button type="submit" id="join" disabled>Join</button>
@@ -69,45 +68,45 @@
 
   <section id="joining" class="card hide" role="status">
     <h2>Joining <span id="joinName"></span></h2>
-    <p>The board is leaving its own "Cloud setup" Wi-Fi, so this page will stop answering. Put your phone or computer back on
-      <b id="joinName2"></b> and open <a href="http://cloud-companion.local/">http://cloud-companion.local</a> to carry on.</p>
-    <p class="muted">If the board cannot join, "Cloud setup" comes back in a minute with the reason.</p>
+    <p>The “Cloud setup” Wi-Fi network is turning off, so this page will stop responding. Reconnect your phone or computer to
+      <b id="joinName2"></b>, then go to <a href="http://cloud-companion.local/">http://cloud-companion.local</a> to continue.</p>
+    <p class="muted">If it can't connect, the “Cloud setup” network comes back within a minute and shows what went wrong.</p>
   </section>
 
   <section id="choose" class="card hide">
-    <h2>New or restored?</h2>
-    <p class="muted">Set up a new Cloud Companion, or bring one back from its backup: everything (chats, mail, files, features
-      and your devices) returns as it was.</p>
-    <button type="button" id="pickNew">Set up a new one</button>
+    <h2>New setup or restore?</h2>
+    <p class="muted">Set up a new Cloud Companion, or restore one from a backup. Restoring brings back everything: chats, mail,
+      files, features and your devices.</p>
+    <button type="button" id="pickNew">New setup</button>
     <button type="button" id="pickRestore" class="plain">Restore from a backup</button>
   </section>
 
   <form id="restore" class="card hide">
     <h2>Restore from a backup</h2>
-    <p class="muted">Where are the copies?</p>
-    <div id="rKinds" role="radiogroup" aria-label="Where the copies are">
-      <label class="feat"><input type="radio" name="rKind" value="usb" checked><div><b>A USB drive</b><small>Plug it into this board.</small></div></label>
-      <label class="feat"><input type="radio" name="rKind" value="sftp"><div><b>Another computer or a NAS</b><small>At home, reached over the network.</small></div></label>
-      <label class="feat"><input type="radio" name="rKind" value="s3"><div><b>Online storage</b><small>Backblaze B2, Wasabi or another S3 service.</small></div></label>
-      <label class="feat hide" id="rRestRow"><input type="radio" name="rKind" value="rest"><div><b>A restic server</b><small>For people who run one.</small></div></label>
+    <p class="muted">Where is your backup?</p>
+    <div id="rKinds" role="radiogroup" aria-label="Backup location">
+      <label class="feat"><input type="radio" name="rKind" value="usb" checked><div><b>USB drive</b><small>Plug it into this device.</small></div></label>
+      <label class="feat"><input type="radio" name="rKind" value="sftp"><div><b>Computer or NAS</b><small>Another computer on your home network.</small></div></label>
+      <label class="feat"><input type="radio" name="rKind" value="s3"><div><b>Cloud storage</b><small>Backblaze B2, Wasabi or any S3-compatible service.</small></div></label>
+      <label class="feat hide" id="rRestRow"><input type="radio" name="rKind" value="rest"><div><b>restic REST server</b><small>If you already run one.</small></div></label>
     </div>
-    <button type="button" id="rMore" class="plain">More choices</button>
+    <button type="button" id="rMore" class="plain">Show more options</button>
     <div data-kind="usb"><label for="rDisk">USB drive</label><select id="rDisk"></select></div>
     <div data-kind="sftp" class="hide">
-      <label for="rHost">Its name or address</label><input id="rHost" type="text" placeholder="nas.local" autocapitalize="off" spellcheck="false">
-      <label for="rUser">Your user name on it</label><input id="rUser" type="text" autocapitalize="off" spellcheck="false">
-      <label for="rFolder">Folder with the copies</label><input id="rFolder" type="text" value="cloud-backups" autocapitalize="off" spellcheck="false">
-      <p class="muted">This is a new board with its own key: add this line to <code>.ssh/authorized_keys</code> on that computer first
-        (a NAS usually has a place for "SSH keys" in its settings).</p><pre id="rKey"></pre></div>
+      <label for="rHost">Hostname or IP address</label><input id="rHost" type="text" placeholder="nas.local" autocapitalize="off" spellcheck="false">
+      <label for="rUser">Username</label><input id="rUser" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rFolder">Folder</label><input id="rFolder" type="text" value="cloud-backups" autocapitalize="off" spellcheck="false">
+      <p class="muted">This device has a new key. First add it to <code>~/.ssh/authorized_keys</code> on that computer. On a NAS,
+        look for SSH keys in its settings.</p><pre id="rKey"></pre></div>
     <div data-kind="s3" class="hide">
-      <label for="rEndpoint">Service address</label><input id="rEndpoint" type="text" placeholder="s3.eu-central-003.backblazeb2.com" autocapitalize="off" spellcheck="false">
-      <label for="rBucket">Bucket name</label><input id="rBucket" type="text" autocapitalize="off" spellcheck="false">
-      <label for="rKeyId">Key ID</label><input id="rKeyId" type="text" autocapitalize="off" spellcheck="false">
-      <label for="rSecret">Secret key</label><input id="rSecret" type="password"></div>
-    <div data-kind="rest" class="hide"><label for="rUrl">Server address</label><input id="rUrl" type="text" placeholder="https://backup.example.com:8000/cloud" autocapitalize="off" spellcheck="false"></div>
+      <label for="rEndpoint">Endpoint</label><input id="rEndpoint" type="text" placeholder="s3.eu-central-003.backblazeb2.com" autocapitalize="off" spellcheck="false">
+      <label for="rBucket">Bucket</label><input id="rBucket" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rKeyId">Access key ID</label><input id="rKeyId" type="text" autocapitalize="off" spellcheck="false">
+      <label for="rSecret">Secret access key</label><input id="rSecret" type="password"></div>
+    <div data-kind="rest" class="hide"><label for="rUrl">Server URL</label><input id="rUrl" type="text" placeholder="https://backup.example.com:8000/cloud" autocapitalize="off" spellcheck="false"></div>
     <label for="rPass">Backup password</label><input id="rPass" type="password" autocomplete="off">
-    <button type="button" id="rFind">Find the copies</button>
-    <div id="rSnapBox" class="hide"><label for="rSnap">Which copy</label><select id="rSnap"></select>
+    <button type="button" id="rFind">Find backups</button>
+    <div id="rSnapBox" class="hide"><label for="rSnap">Backup to restore</label><select id="rSnap"></select>
       <button type="submit" id="rStart">Restore</button></div>
     <button type="button" id="rBack" class="plain">Back</button>
     <p id="restoreErr" class="err" role="alert"></p>
@@ -116,13 +115,13 @@
   <form id="setup" class="hide">
     <section class="card">
       <h2>Recovery passphrase</h2>
-      <p class="muted">If Cloud Companion ever stops working, this page comes back and asks for it. Keep it somewhere safe: nobody can reset it.</p>
+      <p class="muted">If Cloud Companion ever stops working, this page will ask for this passphrase. Keep it somewhere safe. It can't be reset.</p>
       <label for="pass1">Passphrase (at least 10 characters)</label><input id="pass1" type="password" autocomplete="new-password">
-      <label for="pass2">The same again</label><input id="pass2" type="password" autocomplete="new-password">
+      <label for="pass2">Confirm passphrase</label><input id="pass2" type="password" autocomplete="new-password">
     </section>
     <section class="card">
       <h2>Features</h2>
-      <p class="muted">Cloud Companion itself is always on. Pick what else to start with; you can change it later in Settings, Features.</p>
+      <p class="muted">Cloud Companion is always on. Choose what else to install. You can change this later in Settings → Features.</p>
       <div id="features"></div>
     </section>
     <section class="card">
@@ -135,22 +134,22 @@
 
   <section id="working" class="card hide" role="status">
     <h2 id="workTitle">Setting up</h2>
-    <p class="muted">Downloading and starting. This can take a while on the first start.</p>
+    <p class="muted">Downloading and starting. This can take a while the first time.</p>
     <p id="workLine"></p>
   </section>
 
   <section id="done" class="card hide">
     <h2 class="ok">Ready</h2>
-    <p>Cloud Companion is running. Open it to finish: your browser becomes its owner.</p>
+    <p>Cloud Companion is running. Open it to finish setup. This browser becomes its owner.</p>
     <a id="open" class="button" href="#">Open Cloud Companion</a>
   </section>
 
   <section id="recovery" class="card hide">
-    <h2>Cloud Companion is not running</h2>
-    <p class="muted">It has not been healthy for a while. Try starting it again; if that does not help, the log may say why.</p>
+    <h2>Cloud Companion isn't responding</h2>
+    <p class="muted">It hasn't been working for a while. Try starting it again. If that doesn't help, check the log.</p>
     <button type="button" id="retry">Start again</button>
-    <button type="button" id="logs" class="plain">Show the log</button>
-    <button type="button" id="reboot" class="plain">Restart the board</button>
+    <button type="button" id="logs" class="plain">Show log</button>
+    <button type="button" id="reboot" class="plain">Restart device</button>
     <p id="recErr" class="err" role="alert"></p>
     <pre id="log" class="hide"></pre>
   </section>
@@ -161,7 +160,7 @@ const show = (...ids) => { for (const s of ['locked', 'network', 'joining', 'cho
 async function call(method, path, body) {
   const r = await fetch(path, { method, headers: body ? { 'Content-Type': 'application/json' } : {}, body: body ? JSON.stringify(body) : undefined })
   const j = await r.json().catch(() => ({}))
-  if (!r.ok) throw new Error(j.error || 'The board did not accept that.')
+  if (!r.ok) throw new Error(j.error || 'Something went wrong.')
   return j
 }
 let mode = '' // '', 'new', 'restore'
@@ -177,7 +176,7 @@ function fillSetup(st) {
     cb.type = 'checkbox'; cb.value = f.id; cb.disabled = !f.fits; cb.dataset.test = 'setup-feature-' + f.id
     const t = document.createElement('div')
     const b = document.createElement('b'); b.textContent = f.title
-    const s = document.createElement('small'); s.textContent = f.fits ? f.about : (f.why || 'Not available on this board')
+    const s = document.createElement('small'); s.textContent = f.fits ? f.about : (f.why || 'Not available on this device')
     t.append(b, s); row.append(cb, t); box.append(row)
   }
   const here = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
@@ -211,23 +210,23 @@ async function refresh() {
   const b = st.board || {}
   $('sdWarn').classList.toggle('hide', b.storage !== 'sd' || st.phase === 'off')
   $('board').textContent = [b.model, b.memory ? Math.round(b.memory / 2 ** 30) + ' GB of memory' : ''].filter(Boolean).join(', ')
-  if (st.phase === 'off') { $('title').textContent = 'Cloud setup'; show(); $('board').textContent = 'This page is off: Cloud Companion is running.'; return }
+  if (st.phase === 'off') { $('title').textContent = 'Cloud Companion setup'; show(); $('board').textContent = 'Setup is finished and Cloud Companion is running.'; return }
   if (st.phase === 'recovery') {
     $('title').textContent = 'Recovery'
     if (!st.unlocked) {
-      $('lockTitle').textContent = 'Recovery'; $('lockText').textContent = 'Enter the recovery passphrase chosen at setup.'
+      $('lockTitle').textContent = 'Recovery'; $('lockText').textContent = 'Enter the recovery passphrase you chose during setup.'
       $('secretLabel').textContent = 'Recovery passphrase'; $('secret').type = 'password'; $('secretBox').classList.remove('hide')
       return show('locked')
     }
     if (st.job && st.job.state === 'running') { $('workTitle').textContent = 'Starting again'; $('workLine').textContent = lastLine(st.job); return show('working') }
-    if (st.job && st.job.state === 'failed') $('recErr').textContent = 'Starting again failed: ' + (st.job.error || '')
+    if (st.job && st.job.state === 'failed') $('recErr').textContent = 'Couldn\'t start it: ' + (st.job.error || '')
     return show('recovery')
   }
   if (!st.unlocked) {
     $('lockTitle').textContent = 'Welcome'
-    if (st.needsCode) { $('lockText').textContent = 'Enter the setup code from the cloud-setup.txt file on the card.'; $('secretBox').classList.remove('hide') }
-    else if (st.windowOpen) { $('lockText').textContent = 'Set up this board as your Cloud Companion. The first person to continue sets it up.'; $('secretBox').classList.add('hide') }
-    else { $('lockText').textContent = 'Setup is closed: it is open for 30 minutes after the board starts. Restart the board, or put a cloud-setup.txt with a line code=... on the card.'; $('secretBox').classList.add('hide'); $('unlockBtn').classList.add('hide') }
+    if (st.needsCode) { $('lockText').textContent = 'Enter the setup code from the cloud-setup.txt file on the memory card.'; $('secretBox').classList.remove('hide') }
+    else if (st.windowOpen) { $('lockText').textContent = 'Set up Cloud Companion on this device. The first person to continue becomes the owner.'; $('secretBox').classList.add('hide') }
+    else { $('lockText').textContent = 'Setup is only open for 30 minutes after the device starts. Restart it, or add a cloud-setup.txt file with a line code=... to the memory card.'; $('secretBox').classList.add('hide'); $('unlockBtn').classList.add('hide') }
     return show('locked')
   }
   if (st.phase === 'done') { $('open').href = st.open; return show('done') }
@@ -237,11 +236,11 @@ async function refresh() {
   if (net && !net.online) { fillWifi(net); $('netErr').textContent = net.error || ''; return show('network') }
   fillSetup(st)
   if (st.sshKey) $('rKey').textContent = st.sshKey
-  if (st.job && st.job.kind === 'restore' && st.job.state === 'failed') { mode = 'restore'; $('restoreErr').textContent = 'Restoring failed: ' + (st.job.error || ''); return show('restore') }
+  if (st.job && st.job.kind === 'restore' && st.job.state === 'failed') { mode = 'restore'; $('restoreErr').textContent = 'Restore failed: ' + (st.job.error || ''); return show('restore') }
   if (mode === '' && !st.job) return show('choose')
   if (mode === 'restore') return show('restore')
-  if (st.job && st.job.state === 'failed') $('setupErr').textContent = 'Setting up failed: ' + (st.job.error || '') + '. Change the features and try again.'
-  if (st.job && st.job.state === 'done') { $('workTitle').textContent = 'Starting Cloud Companion'; $('workLine').textContent = 'Waiting until it is ready…'; return show('working') }
+  if (st.job && st.job.state === 'failed') $('setupErr').textContent = 'Setup failed: ' + (st.job.error || '') + '. Change the features and try again.'
+  if (st.job && st.job.state === 'done') { $('workTitle').textContent = 'Starting Cloud Companion'; $('workLine').textContent = 'Waiting for it to be ready…'; return show('working') }
   show('setup')
 }
 $('unlockForm').onsubmit = async (e) => {
@@ -250,7 +249,7 @@ $('unlockForm').onsubmit = async (e) => {
 }
 $('setup').onsubmit = async (e) => {
   e.preventDefault(); $('setupErr').textContent = ''
-  if ($('pass1').value !== $('pass2').value) { $('setupErr').textContent = 'The two passphrases differ.'; return }
+  if ($('pass1').value !== $('pass2').value) { $('setupErr').textContent = 'The passphrases don\'t match.'; return }
   const features = [...document.querySelectorAll('#features input:checked')].map((c) => c.value)
   $('start').disabled = true
   try { await call('POST', '/api/setup', { passphrase: $('pass1').value, features, timeZone: $('tz').value }); refresh() } catch (err) { $('setupErr').textContent = err.message } finally { $('start').disabled = false }
@@ -279,7 +278,7 @@ async function rKindChanged() {
     try {
       const j = await call('GET', '/api/restore/usb'); $('rDisk').textContent = ''
       for (const d of j.disks || []) { const o = document.createElement('option'); o.value = d.uuid; o.textContent = [d.label || d.model || 'USB drive', d.size].filter(Boolean).join(', '); $('rDisk').append(o) }
-      if (!(j.disks || []).length) $('restoreErr').textContent = 'No USB drive found: plug it in, then pick "A USB drive" again.'
+      if (!(j.disks || []).length) $('restoreErr').textContent = 'No USB drive found. Plug one in, then select USB drive again.'
     } catch (err) { $('restoreErr').textContent = err.message }
   }
 }
@@ -293,7 +292,7 @@ $('rFind').onclick = async () => {
   try {
     const j = await call('POST', '/api/restore/snapshots', { dest: rDest() }); $('rSnap').textContent = ''
     for (const sn of j.snapshots || []) { const o = document.createElement('option'); o.value = sn.id; o.textContent = new Date(sn.time).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' }); $('rSnap').append(o) }
-    if (!(j.snapshots || []).length) throw new Error('There are no copies there.')
+    if (!(j.snapshots || []).length) throw new Error('No backups found at this location.')
     $('rSnapBox').classList.remove('hide')
   } catch (err) { $('restoreErr').textContent = err.message } finally { $('rFind').disabled = false }
 }
@@ -303,7 +302,7 @@ $('restore').onsubmit = async (e) => {
 }
 $('retry').onclick = async () => { $('recErr').textContent = ''; try { await call('POST', '/api/retry'); refresh() } catch (err) { $('recErr').textContent = err.message } }
 $('logs').onclick = async () => { try { const j = await call('GET', '/api/logs'); $('log').textContent = j.log || '(empty)'; $('log').classList.remove('hide') } catch (err) { $('recErr').textContent = err.message } }
-$('reboot').onclick = async () => { if (!confirm('Restart the board now?')) return; try { await call('POST', '/api/reboot'); $('recErr').textContent = 'Restarting. Reload this page in a few minutes.' } catch (err) { $('recErr').textContent = err.message } }
+$('reboot').onclick = async () => { if (!confirm('Restart the device now?')) return; try { await call('POST', '/api/reboot'); $('recErr').textContent = 'Restarting. Reload this page in a few minutes.' } catch (err) { $('recErr').textContent = err.message } }
 refresh()
 setInterval(refresh, 2000)
 </script>

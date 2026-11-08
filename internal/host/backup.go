@@ -75,34 +75,34 @@ var (
 // check says what is wrong with a destination, in words for the page.
 func (d Destination) check() error {
 	if len(d.Password) < 10 {
-		return errors.New("the backup password needs at least 10 characters")
+		return errors.New("The backup password must be at least 10 characters")
 	}
 	switch d.Kind {
 	case "usb":
 		if !uuidRe.MatchString(d.UUID) {
-			return errors.New("pick a USB disk")
+			return errors.New("Select a USB drive")
 		}
 		if strings.Contains(d.Path, "..") {
-			return errors.New("bad folder")
+			return errors.New("That folder name isn't allowed")
 		}
 	case "dir":
 		if !filepath.IsAbs(d.Path) || strings.Contains(d.Path, "..") {
-			return errors.New("the folder must be a full path")
+			return errors.New("The folder must be a full path, such as /mnt/backups")
 		}
 	case "sftp":
 		if !sftpPath.MatchString(d.Path) {
-			return errors.New("SFTP needs user@host:/folder")
+			return errors.New("Enter the hostname, username and folder")
 		}
 	case "s3":
 		if !strings.HasPrefix(d.URL, "https://") && !strings.HasPrefix(d.URL, "http://") || d.KeyID == "" || d.Secret == "" {
-			return errors.New("S3 needs the bucket's address and an access key")
+			return errors.New("Enter the endpoint, bucket and access key")
 		}
 	case "rest":
 		if !strings.HasPrefix(d.URL, "https://") && !strings.HasPrefix(d.URL, "http://") {
-			return errors.New("the REST server needs its address")
+			return errors.New("Enter the server URL")
 		}
 	default:
-		return errors.New("pick where the backups go")
+		return errors.New("Choose where to save backups")
 	}
 	return nil
 }
@@ -230,7 +230,7 @@ func (m *Manager) mountUSB(ctx context.Context, uuid, dir string) error {
 	}
 	m.host(ctx, "umount", dir) // left over from a run that was cut short
 	if out, err := m.host(ctx, "mount", "UUID="+uuid, dir); err != nil {
-		return fmt.Errorf("the USB disk is not there or cannot be mounted: %s", strings.TrimSpace(string(out)))
+		return fmt.Errorf("The USB drive isn't connected or can't be read: %s", strings.TrimSpace(string(out)))
 	}
 	return nil
 }
@@ -305,11 +305,11 @@ func jsonPart(b []byte) []byte {
 func resticError(out string, err error) error {
 	switch {
 	case strings.Contains(out, "wrong password"):
-		return errors.New("that is not the backup password")
+		return errors.New("Wrong backup password")
 	case strings.Contains(out, "Is there a repository at the following location?") || strings.Contains(out, "repository does not exist"):
-		return errors.New("there are no backups there")
+		return errors.New("No backups found at this location")
 	case strings.Contains(out, "Permission denied") || strings.Contains(out, "permission denied"):
-		return errors.New("the computer or service turned the board away. Check that the board's key is added there, or the password")
+		return errors.New("Access denied. Check that this server's key was added there, and that the password is right")
 	}
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	return fmt.Errorf("%v: %s", err, lines[len(lines)-1])
@@ -333,7 +333,7 @@ func (m *Manager) SetBackup(on bool, d Destination, at string) (*Job, error) {
 		return nil, err
 	}
 	if !atTime.MatchString(at) {
-		return nil, errors.New("pick a time like 03:30")
+		return nil, errors.New("Enter a time such as 03:30")
 	}
 	j := m.newJob("backup-setup", "")
 	go func() {
@@ -342,7 +342,7 @@ func (m *Manager) SetBackup(on bool, d Destination, at string) (*Job, error) {
 		var out bytes.Buffer
 		err := m.restic(ctx, d, nil, io.MultiWriter(&out, j), "cat", "config")
 		if err != nil && strings.Contains(out.String(), "wrong password") {
-			err = errors.New("there are backups there with another password")
+			err = errors.New("This location already has backups with a different password")
 		} else if err != nil {
 			fmt.Fprintln(j, "no backups there yet: starting them")
 			out.Reset()
@@ -374,7 +374,7 @@ type volumeInfo struct {
 func (m *Manager) BackupNow() (*Job, error) {
 	c := m.BackupConfig()
 	if !c.On {
-		return nil, errors.New("backups are off")
+		return nil, errors.New("Backups are off")
 	}
 	j := m.newJob("backup", "")
 	go func() {
@@ -525,7 +525,7 @@ func (m *Manager) writeStage(stage string, vols []volumeInfo) error {
 // compose project's settings; then it starts the features as they were. Only on a board that is not set up.
 func (m *Manager) Restore(d Destination, snapshot string) (*Job, error) {
 	if m.SetUp() {
-		return nil, errors.New("this board is set up already")
+		return nil, errors.New("This server is already set up")
 	}
 	if err := d.check(); err != nil {
 		return nil, err
@@ -534,7 +534,7 @@ func (m *Manager) Restore(d Destination, snapshot string) (*Job, error) {
 		snapshot = "latest"
 	}
 	if snapshot != "latest" && !regexp.MustCompile(`^[0-9a-f]{8,64}$`).MatchString(snapshot) {
-		return nil, errors.New("bad snapshot")
+		return nil, errors.New("Choose a backup to restore")
 	}
 	j := m.newJob("restore", "")
 	go func() {

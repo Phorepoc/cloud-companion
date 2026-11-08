@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 id: tls
 title: HTTPS
-about: "Serves the web app over HTTPS (Caddy) on ports 80 and 443."
+about: "Serves Cloud Companion over HTTPS (Caddy) on ports 80 and 443."
 profiles: [tls]
 needs: { memory: 64M }
 after-setup: true   # ports 80 and 443: the setup page has port 80 until setup is done

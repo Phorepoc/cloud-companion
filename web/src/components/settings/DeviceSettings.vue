@@ -6,13 +6,13 @@
 
     <section v-if="part === 'appearance'" class="ph-card ph-section" aria-labelledby="set-appearance">
       <h2 id="set-appearance">Appearance</h2>
-      <p class="ph-muted">Choose how the app looks. "Match system" follows your device's light or dark setting.</p>
+      <p class="ph-muted">Choose how the app looks. Match system follows your device's light or dark setting.</p>
       <q-btn-toggle v-model="choice" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
                     :options="[{ label: 'Match system', value: 'system', icon: 'sym_o_contrast' }, { label: 'Light', value: 'light', icon: 'sym_o_light_mode' }, { label: 'Dark', value: 'dark', icon: 'sym_o_dark_mode' }]"
                     data-test="theme" @update:model-value="applyTheme" />
       <template v-if="$q.screen.width >= DESKTOP_MIN_WIDTH">
         <h3 id="set-layout">Layout</h3>
-        <p class="ph-muted">Classic shows one section at a time. Desktop opens the sections as windows side by side, as on a computer. Used on screens at least {{ DESKTOP_MIN_WIDTH }} px wide.</p>
+        <p class="ph-muted">Classic shows one section at a time. Desktop opens sections as windows side by side, like a computer. Available on screens at least {{ DESKTOP_MIN_WIDTH }} px wide.</p>
         <q-btn-toggle v-model="layout" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
                       :options="[{ label: 'Classic', value: 'classic', icon: 'sym_o_web' }, { label: 'Desktop', value: 'desktop', icon: 'sym_o_desktop_windows' }]"
                       aria-labelledby="set-layout" data-test="layout" @update:model-value="applyLayout" />
@@ -21,7 +21,7 @@
 
     <section v-if="part === 'data'" class="ph-card ph-section" aria-labelledby="set-data">
       <h2 id="set-data">Data use</h2>
-      <p class="ph-muted">Lower picture quality and grayscale send fewer bytes. Text always stays sharp. This applies to this device only.</p>
+      <p class="ph-muted">Lower picture quality and grayscale use less data. Text always stays sharp. This only applies to this device.</p>
       <div id="q-label" class="ph-small">Picture quality: {{ q }}</div>
       <q-slider v-model="q" :min="10" :max="95" :step="5" label color="primary" aria-labelledby="q-label" data-test="quality" />
       <q-toggle v-model="gray" label="Grayscale pictures" data-test="gray" />
@@ -39,7 +39,7 @@
       <h2 id="set-security">Security</h2>
       <p v-if="blocker" class="ph-note" role="note" data-test="passkey-blocker"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> {{ blocker }}</p>
       <h3 class="ph-h3">Passkeys</h3>
-      <p v-if="!keys.length" class="ph-muted" data-test="no-passkeys">No passkey yet. Add one to sign in to this app without a pairing code.</p>
+      <p v-if="!keys.length" class="ph-muted" data-test="no-passkeys">No passkeys yet. Add one to sign in without a pairing code.</p>
       <ul v-else class="ph-keys" aria-label="Your passkeys">
         <li v-for="k in keys" :key="k.id" data-test="passkey-row">
           <div>
@@ -54,9 +54,9 @@
         <q-btn outline color="primary" icon="sym_o_passkey" label="Add a passkey" :disable="!!blocker" :loading="busy === 'add'" data-test="passkey-add" @click="addKey" />
       </div>
       <h3 class="ph-h3">Recovery code</h3>
-      <p class="ph-muted">The recovery code signs you in if you lose your passkeys. For safety the server only keeps a fingerprint of it, so it cannot be shown again: make a new one (the old one stops working) and save it.</p>
+      <p class="ph-muted">Use the recovery code to sign in if you lose your passkeys. For security, the server only stores a fingerprint of it, so it can't be shown again. If you've lost it, create a new one. The old one will stop working.</p>
       <div class="ph-actions">
-        <q-btn outline color="primary" icon="sym_o_autorenew" label="Make a new recovery code" :disable="!owner" :loading="busy === 'rec'" data-test="recovery-regen" @click="regen" />
+        <q-btn outline color="primary" icon="sym_o_autorenew" label="Create a new recovery code" :disable="!owner" :loading="busy === 'rec'" data-test="recovery-regen" @click="regen" />
       </div>
       <p v-if="error" class="ph-error" role="alert" data-test="security-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</p>
     </section>
@@ -65,7 +65,7 @@
       <q-card class="ph-dialog" data-test="remove-dialog">
         <q-card-section>
           <h2 class="ph-h3">Remove this passkey?</h2>
-          <p>{{ askRemove && (askRemove.name || 'Passkey') }} will no longer sign in. Browsers already signed in stay signed in.</p>
+          <p>{{ askRemove && (askRemove.name || 'This passkey') }} will no longer work for signing in. Browsers that are already signed in stay signed in.</p>
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps label="Cancel" @click="askRemove = null" />
@@ -78,11 +78,11 @@
       <q-card class="ph-dialog" data-test="recovery-dialog">
         <q-card-section>
           <h2 class="ph-h3">Save your recovery code</h2>
-          <p>It is shown once. The previous recovery code no longer works.</p>
+          <p>This is the only time it's shown. Your previous recovery code no longer works.</p>
           <p class="ph-code" data-test="recovery-shown">{{ shownCode }}</p>
         </q-card-section>
         <q-card-actions align="right">
-          <q-btn unelevated color="primary" label="I saved it" data-test="recovery-saved" @click="recDialog = false; shownCode = ''" />
+          <q-btn unelevated color="primary" label="I've saved it" data-test="recovery-saved" @click="recDialog = false; shownCode = ''" />
         </q-card-actions>
       </q-card>
     </q-dialog>

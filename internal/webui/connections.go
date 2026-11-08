@@ -121,7 +121,7 @@ func (c *conns) routes(mux *http.ServeMux) {
 			return
 		}
 		if c.hub == nil {
-			bad(w, 503, "the hub is not configured")
+			bad(w, 503, "Mail, contacts and calendar isn't set up on this server")
 			return
 		}
 		cs, err := c.hub.Contacts()

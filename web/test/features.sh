@@ -9,6 +9,8 @@ trap 'docker rm -f -v phe-board >/dev/null 2>&1; rm -rf "$W"' EXIT
 docker run --rm -v "$ROOT":/src -v "$W":/out -w /src -e CGO_ENABLED=0 -e GOFLAGS="-tags=goolm -buildvcs=false" \
   golang:1.26-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb go build -o /out/phehost ./cmd/phehost
 mkdir -p "$W/cloud/deploy" "$W/state"
+# a board that has been set up (the setup page's job, setup.sh): only Cloud Companion on
+echo '{"features":{"core":{}}}' > "$W/state/state.json"
 cp docker-compose*.yml "$W/cloud/" && cp -r deploy/features deploy/Caddyfile* deploy/hub deploy/asterisk "$W/cloud/deploy/"
 docker save phe-cloud:dev -o "$W/phecloud.tar"
 docker run -d --name phe-board --privileged -e DOCKER_TLS_CERTDIR= -v "$W":/t docker:27-dind >/dev/null
@@ -27,7 +29,7 @@ docker run --rm --network container:phe-board --ipc=host -v "$ROOT/web/test":/t 
   sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning features.ts' &
 P=$!
 for i in $(seq 1 900); do [ -e "$OUT/features-on-done" ] && break; kill -0 $P 2>/dev/null || break; sleep 1; done
-[ -e "$OUT/features-on-done" ] || { wait $P; fail "switching on failed"; }
+[ -e "$OUT/features-on-done" ] || { wait $P || true; fail "switching on failed"; }
 B docker ps --format '{{.Names}}' | grep -qx phe-signal-cli || fail "Signal's container is not running"
 touch "$OUT/features-checked"
 wait $P || fail "switching off failed"

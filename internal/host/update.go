@@ -176,7 +176,7 @@ func (m *Manager) CheckUpdate(ctx context.Context) (UpdateConfig, error) {
 	avail, board, err := m.latest(ctx, m.Version(), m.BoardVersion())
 	c.Error = ""
 	if err != nil {
-		c.Error = "Could not reach GitHub: " + err.Error()
+		c.Error = "Couldn't reach GitHub (" + err.Error() + ")"
 	} else {
 		c.Available, c.Board = avail, board
 	}
@@ -266,7 +266,7 @@ func (m *Manager) SetAutoUpdate(on bool) error {
 }
 
 // ErrUpToDate: there is nothing to install.
-var ErrUpToDate = errors.New("this board is up to date")
+var ErrUpToDate = errors.New("Cloud Companion is up to date")
 
 // Update installs the release found by the last check, as a job.
 func (m *Manager) Update() (*Job, error) {
@@ -275,7 +275,7 @@ func (m *Manager) Update() (*Job, error) {
 		return nil, ErrUpToDate
 	}
 	if !m.SetUp() {
-		return nil, errors.New("set the board up first")
+		return nil, errors.New("Finish setup first")
 	}
 	j := m.newJob("update", "")
 	go func() {
@@ -317,7 +317,7 @@ func (m *Manager) update(c UpdateConfig, j *Job) (restart bool, err error) {
 		if err != nil {
 			b.Last.Error = err.Error()
 			m.saveBackup(b)
-			return false, fmt.Errorf("the backup before the update did not work, so nothing was changed: %w", err)
+			return false, fmt.Errorf("The backup before the update failed, so nothing was changed: %w", err)
 		}
 		m.saveBackup(b)
 	}
@@ -361,7 +361,7 @@ func (m *Manager) update(c UpdateConfig, j *Job) (restart bool, err error) {
 		if newBoard {
 			restart = true // the old manager is back in place: run it
 		}
-		return restart, fmt.Errorf("the update to %s did not start, so the board went back to %s: %w", to, from, err)
+		return restart, fmt.Errorf("Version %s didn't start, so %s was restored: %w", to, from, err)
 	}
 	fmt.Fprintf(j, "Cloud Companion %s is running\n", to)
 	return newBoard, nil
@@ -410,7 +410,7 @@ func (m *Manager) download(ctx context.Context, a *ReleaseAssets, j *Job) (strin
 	for _, f := range []string{"SHA256SUMS.board", "cloud-board.tar.gz", bin} {
 		u := a.URLs[f]
 		if u == "" {
-			return dir, fmt.Errorf("the release %s has no %s", a.Version, f)
+			return dir, fmt.Errorf("Release %s is missing %s", a.Version, f)
 		}
 		res, err := m.get(ctx, u)
 		if err != nil {
@@ -440,7 +440,7 @@ func (m *Manager) download(ctx context.Context, a *ReleaseAssets, j *Job) (strin
 	for _, f := range []string{"cloud-board.tar.gz", bin} {
 		got, err := fileSHA256(filepath.Join(dir, f))
 		if err != nil || want[f] == "" || got != want[f] {
-			return dir, fmt.Errorf("%s did not download whole: try again later", f)
+			return dir, fmt.Errorf("%s didn't download correctly. Try again later", f)
 		}
 	}
 	fmt.Fprintln(j, "board files checked")

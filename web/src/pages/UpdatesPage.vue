@@ -6,10 +6,10 @@
 <template>
   <q-page class="ph-page ph-up" data-test="updates">
     <h1>Updates</h1>
-    <HdStatusState v-if="!state.admin" icon="lock" title="Only an admin device can update the server" text="Open this page on the first device you connected." />
-    <HdStatusState v-else-if="available === null" state="loading" title="Looking for the board" text="This takes a moment." />
-    <p v-else-if="!available" class="ph-muted" data-test="updates-by-hand">This server was set up by hand: update it with
-      <code>git pull</code> and <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>
+    <HdStatusState v-if="!state.admin" icon="lock" title="Only admin devices can install updates" text="Open this page on an admin device." />
+    <HdStatusState v-else-if="available === null" state="loading" title="Connecting to the server" text="One moment…" />
+    <p v-else-if="!available" class="ph-muted" data-test="updates-by-hand">This server wasn't installed from a Cloud Companion image.
+      Update it with <code>git pull</code> and <code>docker compose pull &amp;&amp; docker compose up -d</code>.</p>
     <template v-else>
       <section class="ph-up__hero" :class="'ph-up__hero--' + health" role="status" data-test="updates-status">
         <div class="ph-up__mark" aria-hidden="true">{{ health === 'new' ? '↓' : health === 'ok' ? '✓' : '!' }}</div>
@@ -19,23 +19,23 @@
           <p v-if="jobLine" class="ph-up__job" :class="{ 'ph-err': job?.state === 'failed' }" data-test="updates-job">{{ jobLine }}</p>
           <div class="ph-up__actions">
             <HdButton v-if="info.available" variant="accent" :disabled="running" data-test="updates-now" @click="updateNow">Update now</HdButton>
-            <HdButton variant="plain" :disabled="running || checking" data-test="updates-check" @click="check">{{ checking ? 'Looking…' : 'Look for updates' }}</HdButton>
+            <HdButton variant="plain" :disabled="running || checking" data-test="updates-check" @click="check">{{ checking ? 'Checking…' : 'Check for updates' }}</HdButton>
           </div>
         </div>
       </section>
 
       <section v-if="info.available?.notes" class="ph-card ph-up__notes" data-test="updates-notes">
-        <h2>What is new in {{ info.available.version }}</h2>
+        <h2>What's new in {{ info.available.version }}</h2>
         <p>{{ info.available.notes }}</p>
       </section>
 
       <section class="ph-card ph-up__list">
-        <HdListItem title="Install updates at night" :subtitle="autoText" data-test="updates-auto">
-          <template #trailing><HdSwitch :model-value="info.auto" aria-label="Install updates at night" @update:model-value="setAuto" /></template>
+        <HdListItem title="Automatic updates" :subtitle="autoText" data-test="updates-auto">
+          <template #trailing><HdSwitch :model-value="info.auto" aria-label="Automatic updates" @update:model-value="setAuto" /></template>
         </HdListItem>
-        <HdListItem title="This board runs" :subtitle="info.version ? 'Cloud Companion ' + info.version : 'A version built here'" data-test="updates-version" />
+        <HdListItem title="Version" :subtitle="info.version ? 'Cloud Companion ' + info.version : 'Development build'" data-test="updates-version" />
         <HdListItem v-if="info.last?.ok" title="Last update" :subtitle="lastText" data-test="updates-last" />
-        <p v-else-if="info.last" class="ph-up__failed" data-test="updates-last"><b>The last update did not work.</b> {{ lastText }}</p>
+        <p v-else-if="info.last" class="ph-up__failed" data-test="updates-last"><b>The last update failed.</b> {{ lastText }}</p>
       </section>
       <p v-if="error" class="ph-err" role="alert" data-test="updates-error">{{ error }}</p>
     </template>
@@ -60,37 +60,37 @@ const checking = ref(false)
 const running = computed(() => job.value?.state === 'running')
 
 const health = computed(() => (info.available ? 'new' : info.last && !info.last.ok ? 'bad' : info.error ? 'bad' : 'ok'))
-const heroTitle = computed(() => (info.available ? `Version ${info.available.version} is ready` : info.error ? 'Could not look for updates' : 'Up to date'))
+const heroTitle = computed(() => (info.available ? `Version ${info.available.version} is available` : info.error ? "Couldn't check for updates" : 'Cloud Companion is up to date'))
 function when(iso?: string) {
   if (!iso || iso.startsWith('0001')) return ''
   const t = new Date(iso)
-  return t.toLocaleDateString([], { day: 'numeric', month: 'long' }) + ' at ' + t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  return 'on ' + t.toLocaleDateString([], { day: 'numeric', month: 'long' }) + ' at ' + t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 const night = computed(() => info.at || '03:30')
 const heroText = computed(() => {
   if (info.available) {
-    const how = info.auto ? `It goes in tonight at ${night.value}` : 'Install it when it suits you'
-    return `${how}${info.backups ? ', right after a backup' : ''}. Cloud Companion is away for a few minutes while it starts again. If anything goes wrong, the board goes back to how it was.`
+    const how = info.auto ? `It will be installed tonight at ${night.value}${info.backups ? ', after the backup' : ''}.` : 'Install it whenever suits you.'
+    return `${how} Cloud Companion will be unavailable for a few minutes while it restarts. If something goes wrong, the previous version is restored automatically.`
   }
-  if (info.error) return info.error + '. The board tries again tomorrow.'
+  if (info.error) return info.error + '. It will try again tomorrow.'
   const c = when(info.checked)
-  return c ? `Last looked on ${c}.` : 'The board looks once a day.'
+  return c ? `Last checked ${c}.` : 'Updates are checked once a day.'
 })
-const autoText = computed(() => (info.auto ? `At ${night.value}${info.backups ? ', after the backup' : ''}` : 'Off: you install them here'))
+const autoText = computed(() => (info.auto ? `Installed at ${night.value}${info.backups ? ', after the backup' : ''}` : 'Off. Install updates from this page.'))
 const lastText = computed(() => {
   const l = info.last
   if (!l) return ''
-  if (l.ok) return `${l.from || 'An older version'} to ${l.to}, ${when(l.at)}`
-  return `On ${when(l.at)} ${l.to} did not start, so the board went back to ${l.from}. Nothing was lost.` + (info.available ? ' It tries again tonight, or now if you like.' : '')
+  if (l.ok) return `${l.from || 'Earlier version'} → ${l.to}, ${when(l.at)}`
+  return `Version ${l.to} didn't start ${when(l.at)}, so ${l.from} was restored. No data was lost.` + (info.available ? (info.auto ? ' It will try again tonight.' : ' You can try again now.') : '')
 })
 const jobLine = computed(() => {
   const j = job.value
   if (!j || j.state === 'done') return ''
-  if (j.state === 'failed') return j.error || 'It did not work.'
+  if (j.state === 'failed') return j.error || 'Something went wrong.'
   const log = (j.log || []).join('\n')
-  if (/starting Cloud Companion v/.test(log)) return 'Starting the new version. This page comes back by itself…'
+  if (/starting Cloud Companion v/.test(log)) return 'Starting the new version. This page will reconnect automatically…'
   if (/board files/.test(log)) return 'Downloading…'
-  if (/backing up/.test(log)) return 'Backing up first. Cloud Companion is paused for a minute or two…'
+  if (/backing up/.test(log)) return 'Backing up first… Cloud Companion is paused for a minute or two.'
   return 'Updating…'
 })
 

@@ -7,10 +7,10 @@
 <template>
   <q-page class="ph-page ph-bk" data-test="backups">
     <h1>Backups</h1>
-    <HdStatusState v-if="!state.admin" icon="lock" title="Only an admin device can change backups" text="Open this page on the first device you connected." />
-    <HdStatusState v-else-if="available === null" state="loading" title="Looking for the board" text="This takes a moment." />
-    <p v-else-if="!available" class="ph-muted" data-test="backups-by-hand">This server was set up by hand: back up its Docker volumes with
-      your own tools. On a board set up from a Cloud Companion image, backups are set up here.</p>
+    <HdStatusState v-if="!state.admin" icon="lock" title="Only admin devices can change backups" text="Open this page on an admin device." />
+    <HdStatusState v-else-if="available === null" state="loading" title="Connecting to the server" text="One moment…" />
+    <p v-else-if="!available" class="ph-muted" data-test="backups-by-hand">This server wasn't installed from a Cloud Companion image, so
+      backups can't be managed here. Back up its Docker volumes with your own tools.</p>
     <template v-else>
       <section class="ph-bk__hero" :class="'ph-bk__hero--' + health" role="status" data-test="backups-status">
         <div class="ph-bk__mark" aria-hidden="true">{{ health === 'ok' ? '✓' : '!' }}</div>
@@ -25,14 +25,14 @@
       <!-- turning on, or changing where they go: three questions -->
       <form v-if="!on || editing" class="ph-bk__steps" data-test="backups-form" @submit.prevent="save">
         <section class="ph-card ph-bk__step">
-          <h2><span class="ph-bk__num">1</span> Where should the copies go?</h2>
-          <div class="ph-bk__choices" role="radiogroup" aria-label="Where the copies go">
+          <h2><span class="ph-bk__num">1</span> Choose where to save backups</h2>
+          <div class="ph-bk__choices" role="radiogroup" aria-label="Backup location">
             <label v-for="c in shownKinds" :key="c.value" class="ph-bk__choice" :class="{ 'ph-bk__choice--on': kind === c.value }" :data-test="'backups-kind-' + c.value">
               <HdRadioButton v-model="kind" :value="c.value" name="bk-kind" />
               <span><b>{{ c.title }}</b><small>{{ c.text }}</small></span>
             </label>
           </div>
-          <button v-if="!moreKinds" type="button" class="ph-bk__more" data-test="backups-more" @click="moreKinds = true">More choices</button>
+          <button v-if="!moreKinds" type="button" class="ph-bk__more" data-test="backups-more" @click="moreKinds = true">Show more options</button>
         </section>
 
         <section class="ph-card ph-bk__step">
@@ -44,41 +44,41 @@
                 <span><b>{{ d.label || d.model || 'USB drive' }}</b><small>{{ d.size }}</small></span>
               </label>
             </div>
-            <p v-else class="ph-muted">No USB drive found. Plug one into the board (any USB stick or disk; nothing on it is deleted), then look
-              again.</p>
-            <HdButton variant="plain" size="small" @click="loadDisks">Look again</HdButton>
+            <p v-else class="ph-muted">No USB drive found. Plug one into the server and select Refresh. Nothing on the drive is
+              deleted.</p>
+            <HdButton variant="plain" size="small" @click="loadDisks">Refresh</HdButton>
           </template>
           <template v-else-if="kind === 'sftp'">
-            <HdTextField v-model="sftp.host" label="Its name or address" placeholder="nas.local" autocomplete="off" data-test="backups-sftp-host" />
-            <HdTextField v-model="sftp.user" label="Your user name on it" autocomplete="off" data-test="backups-sftp-user" />
-            <HdTextField v-model="sftp.folder" label="Folder for the copies" helper="Made if it is not there." data-test="backups-sftp-folder" />
+            <HdTextField v-model="sftp.host" label="Hostname or IP address" placeholder="nas.local" autocomplete="off" data-test="backups-sftp-host" />
+            <HdTextField v-model="sftp.user" label="Username" autocomplete="off" data-test="backups-sftp-user" />
+            <HdTextField v-model="sftp.folder" label="Folder" helper="Created if it doesn't exist." data-test="backups-sftp-folder" />
             <div class="ph-bk__key">
-              <p><b>Let the board in.</b> On that computer, add this line to the file <code>.ssh/authorized_keys</code> in your user's home folder
-                (a NAS usually has a place for "SSH keys" in its settings):</p>
+              <p><b>Allow this server to connect.</b> Add this key to <code>~/.ssh/authorized_keys</code> on that computer. On a NAS, look
+                for SSH keys in its settings.</p>
               <code data-test="backups-key">{{ sshKey }}</code>
-              <HdButton variant="plain" size="small" @click="copyKey">{{ copied ? 'Copied' : 'Copy' }}</HdButton>
+              <HdButton variant="plain" size="small" @click="copyKey">{{ copied ? 'Copied' : 'Copy key' }}</HdButton>
             </div>
           </template>
           <template v-else-if="kind === 's3'">
-            <HdTextField v-model="s3.endpoint" label="Service address" placeholder="s3.eu-central-003.backblazeb2.com" autocomplete="off"
-                         helper="Your storage provider shows it with the bucket." data-test="backups-s3-endpoint" />
-            <HdTextField v-model="s3.bucket" label="Bucket name" autocomplete="off" data-test="backups-s3-bucket" />
-            <HdTextField v-model="s3.keyId" label="Key ID" autocomplete="off" data-test="backups-s3-key" />
-            <HdTextField v-model="s3.secret" label="Secret key" type="password" autocomplete="off" :helper="editing ? 'Empty: keep the one saved.' : ''" data-test="backups-s3-secret" />
+            <HdTextField v-model="s3.endpoint" label="Endpoint" placeholder="s3.eu-central-003.backblazeb2.com" autocomplete="off"
+                         helper="Your storage provider shows this next to the bucket." data-test="backups-s3-endpoint" />
+            <HdTextField v-model="s3.bucket" label="Bucket" autocomplete="off" data-test="backups-s3-bucket" />
+            <HdTextField v-model="s3.keyId" label="Access key ID" autocomplete="off" data-test="backups-s3-key" />
+            <HdTextField v-model="s3.secret" label="Secret access key" type="password" autocomplete="off" :helper="editing ? 'Leave empty to keep the current key.' : ''" data-test="backups-s3-secret" />
           </template>
           <template v-else>
-            <HdTextField v-model="rest" label="Server address" placeholder="https://backup.example.com:8000/cloud" autocomplete="off"
-                         helper="A restic REST server; put its user and password in the address if it has them." data-test="backups-url" />
+            <HdTextField v-model="rest" label="Server URL" placeholder="https://backup.example.com:8000/cloud" autocomplete="off"
+                         helper="If the server needs a username and password, include them in the URL." data-test="backups-url" />
           </template>
         </section>
 
         <section class="ph-card ph-bk__step">
-          <h2><span class="ph-bk__num">3</span> {{ editing ? 'Backup password' : 'Choose a backup password' }}</h2>
-          <p class="ph-muted">The copies are locked with it. Write it down somewhere safe, away from the board: without it nobody, not even
-            you, can open them.</p>
-          <HdTextField v-model="pass1" type="password" autocomplete="new-password" :label="editing ? 'Password (empty: keep it)' : 'Password (10 characters or more)'"
-                       data-test="backups-password" />
-          <HdTextField v-model="pass2" type="password" autocomplete="new-password" label="The same again" data-test="backups-password2" />
+          <h2><span class="ph-bk__num">3</span> {{ editing ? 'Backup password' : 'Set a backup password' }}</h2>
+          <p class="ph-muted">Backups are encrypted with this password. Keep it somewhere safe. Without it, nobody can restore your data,
+            not even you.</p>
+          <HdTextField v-model="pass1" type="password" autocomplete="new-password" label="Password"
+                       :helper="editing ? 'Leave empty to keep the current password.' : 'At least 10 characters.'" data-test="backups-password" />
+          <HdTextField v-model="pass2" type="password" autocomplete="new-password" label="Confirm password" data-test="backups-password2" />
         </section>
 
         <p v-if="error" class="ph-err" role="alert" data-test="backups-error">{{ error }}</p>
@@ -90,14 +90,13 @@
 
       <!-- on: what is set, in a short list -->
       <section v-else class="ph-card ph-bk__list" data-test="backups-settings">
-        <HdListItem title="Where" :subtitle="whereText" drilldown clickable data-test="backups-where" @click="startEdit" />
-        <HdListItem title="When" :subtitle="'Every night at ' + at" drilldown clickable data-test="backups-when" @click="editTime = !editTime" />
+        <HdListItem title="Location" :subtitle="whereText" drilldown clickable data-test="backups-where" @click="startEdit" />
+        <HdListItem title="Schedule" :subtitle="'Every night at ' + at" drilldown clickable data-test="backups-when" @click="editTime = !editTime" />
         <div v-if="editTime" class="ph-bk__time">
-          <HdTextField v-model="atInput" type="time" label="Time" data-test="backups-at" />
+          <HdTextField v-model="atInput" type="time" label="Backup time" data-test="backups-at" />
           <HdButton variant="accent" size="small" :disabled="running" @click="saveTime">Save</HdButton>
         </div>
-        <p class="ph-bk__restore"><b>Getting it back.</b> Set up a new board and choose “Restore from a backup”: everything comes back as it
-          was.</p>
+        <p class="ph-bk__restore"><b>Restoring</b><br>To restore your data, set up a new server and choose “Restore from a backup”.</p>
         <div class="ph-bk__off">
           <HdButton variant="negative" size="small" :disabled="running" data-test="backups-off" @click="confirmOff = true">Turn off backups</HdButton>
         </div>
@@ -108,10 +107,10 @@
         <q-card class="ph-dialog">
           <q-card-section>
             <h2>Turn off backups?</h2>
-            <p>The copies made so far stay where they are, but new ones stop. If the board fails, anything after today is lost.</p>
+            <p>Existing backups are kept, but no new ones will be made.</p>
           </q-card-section>
           <q-card-actions align="right">
-            <HdButton variant="plain" @click="confirmOff = false">Keep them on</HdButton>
+            <HdButton variant="plain" @click="confirmOff = false">Keep on</HdButton>
             <HdButton variant="negative" data-test="backups-off-confirm" @click="turnOff">Turn off</HdButton>
           </q-card-actions>
         </q-card>
@@ -131,10 +130,10 @@ interface Job { id: string; kind: string; state: 'running' | 'done' | 'failed'; 
 interface Disk { uuid: string; label?: string; size: string; fs: string; model?: string }
 
 const KINDS = [
-  { value: 'usb', title: 'A USB drive', text: 'Plugged into the board. The easiest.' },
-  { value: 'sftp', title: 'Another computer or a NAS', text: 'At home, reached over the network.' },
-  { value: 's3', title: 'Online storage', text: 'Backblaze B2, Wasabi or another S3 service: safe even if something happens to the house.' },
-  { value: 'rest', title: 'A restic server', text: 'For people who run one.' },
+  { value: 'usb', title: 'USB drive', text: 'Plugged into this server. The simplest option.' },
+  { value: 'sftp', title: 'Computer or NAS', text: 'Another computer on your home network.' },
+  { value: 's3', title: 'Cloud storage', text: 'Backblaze B2, Wasabi or any S3-compatible service. Your data stays safe even if something happens at home.' },
+  { value: 'rest', title: 'restic REST server', text: 'If you already run one.' },
 ]
 const available = ref<boolean | null>(null)
 const on = ref(false)
@@ -162,48 +161,44 @@ const rest = ref('')
 const pass1 = ref('')
 const pass2 = ref('')
 const shownKinds = computed(() => KINDS.filter((k) => k.value !== 'rest' || moreKinds.value || kind.value === 'rest'))
-const stepTwoTitle = computed(() => ({ usb: 'Which USB drive?', sftp: 'Which computer?', s3: 'Which storage?', rest: 'Which server?' } as Record<string, string>)[kind.value])
+const stepTwoTitle = computed(() => ({ usb: 'Choose a USB drive', sftp: 'Computer details', s3: 'Cloud storage details', rest: 'Server details' } as Record<string, string>)[kind.value])
 
 const health = computed(() => (!on.value ? 'off' : last.value && !last.value.ok ? 'bad' : last.value ? 'ok' : 'wait'))
-const heroTitle = computed(() => ({ off: 'Not backed up', bad: 'The last backup failed', ok: 'Your data is safe', wait: 'Backups are on' } as Record<string, string>)[health.value])
+const heroTitle = computed(() => ({ off: 'Backups are off', bad: 'The last backup failed', ok: 'Your data is backed up', wait: 'Backups are on' } as Record<string, string>)[health.value])
 const whereText = computed(() => {
   const d = saved.value
   if (!d) return ''
   if (d.kind === 'usb') {
     const disk = disks.value.find((x) => x.uuid === d.uuid)
-    return disk ? `USB drive ${disk.label || disk.model || ''} (${disk.size})`.replace('  ', ' ') : 'A USB drive'
+    return disk ? `USB drive ${disk.label || disk.model || ''} (${disk.size})`.replace('  ', ' ') : 'USB drive'
   }
-  if (d.kind === 'sftp') return 'Computer ' + (d.path || '').replace(/^[^@]*@/, '').replace(/:.*/, '')
-  if (d.kind === 's3') return 'Online storage, ' + (d.url || '').replace(/^https?:\/\//, '')
-  return 'Restic server'
+  if (d.kind === 'sftp') return (d.path || '').replace(/^[^@]*@/, '').replace(/:.*/, '')
+  if (d.kind === 's3') return (d.url || '').replace(/^https?:\/\//, '')
+  return 'restic REST server'
 })
 function when(iso: string) {
   const t = new Date(iso), now = new Date()
   const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime()
   const diff = Math.round((day(now) - day(t)) / 864e5)
   const hm = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  if (diff === 0) return t.getHours() < 6 && now.getHours() >= 6 ? `last night at ${hm}` : `today at ${hm}`
-  if (diff === 1) return t.getHours() >= 18 ? `last night at ${hm}` : `yesterday at ${hm}`
+  if (diff === 0) return `today at ${hm}`
+  if (diff === 1) return `yesterday at ${hm}`
   return t.toLocaleDateString([], { day: 'numeric', month: 'long' }) + ` at ${hm}`
 }
 const heroText = computed(() => {
-  if (!on.value) return 'Everything is only on this board. If its card or disk fails, it is gone. Turn on backups to keep a copy somewhere else, every night.'
+  if (!on.value) return 'Your data is only stored on this server. If its memory card or disk fails, everything is lost. Turn on backups to save a copy somewhere else every night.'
   const l = last.value
-  if (l && !l.ok) {
-    const w = when(l.at)
-    return `${w.charAt(0).toUpperCase() + w.slice(1)} the copy did not go through: ${l.error || 'no reason given'}. Then press Back up now.`
-  }
-  const where = whereText.value.charAt(0).toLowerCase() + whereText.value.slice(1)
-  return `A copy goes to ${where} every night at ${at.value}.` + (l ? ` Last copy ${when(l.at)}.` : ' The first one is tonight, or now if you like.')
+  if (l && !l.ok) return `Backup failed ${when(l.at)}: ${l.error || 'no reason given'}. Fix the problem, then select Back up now.`
+  return `Backups run every night at ${at.value}.` + (l ? ` Last backup ${when(l.at)}.` : ' The first backup runs tonight, or you can back up now.')
 })
 const jobLine = computed(() => {
   const j = job.value
   if (!j || j.state === 'done') return ''
-  if (j.state === 'failed') return j.error || 'It did not work.'
+  if (j.state === 'failed') return j.error || 'Something went wrong.'
   const log = j.log || []
   const paused = log.some((l) => /stopping Cloud Companion/.test(l)) && !log.some((l) => /starting Cloud Companion again/.test(l))
-  if (j.kind === 'backup') return paused ? 'Backing up. Cloud Companion is paused for a minute or two…' : 'Backing up…'
-  return 'Checking the place…'
+  if (j.kind === 'backup') return paused ? 'Backing up… Cloud Companion is paused for a minute or two.' : 'Backing up…'
+  return 'Checking the backup location…'
 })
 
 async function loadDisks() {
@@ -237,14 +232,14 @@ function dest() {
   if (kind.value === 'rest') d.url = rest.value.trim()
   return d
 }
-// what a person would get wrong, said before the board is asked
+// mistakes caught on the page, before the server is asked
 function problem() {
-  if (kind.value === 'usb' && !usb.value) return 'Plug in a USB drive and pick it.'
-  if (kind.value === 'sftp' && (!sftp.host.trim() || !sftp.user.trim())) return 'Fill in the computer and your user name on it.'
-  if (kind.value === 's3' && (!s3.endpoint.trim() || !s3.bucket.trim() || !s3.keyId.trim() || (!s3.secret && !editing.value))) return 'Fill in all four storage details.'
-  if (kind.value === 'rest' && !rest.value.trim()) return 'Fill in the server address.'
-  if (!(editing.value && !pass1.value) && pass1.value.length < 10) return 'The password needs 10 characters or more.'
-  if (pass1.value !== pass2.value) return 'The two passwords are not the same.'
+  if (kind.value === 'usb' && !usb.value) return 'Plug in a USB drive and select it.'
+  if (kind.value === 'sftp' && (!sftp.host.trim() || !sftp.user.trim())) return 'Enter the hostname and your username.'
+  if (kind.value === 's3' && (!s3.endpoint.trim() || !s3.bucket.trim() || !s3.keyId.trim() || (!s3.secret && !editing.value))) return 'Fill in all four fields.'
+  if (kind.value === 'rest' && !rest.value.trim()) return 'Enter the server URL.'
+  if (!(editing.value && !pass1.value) && pass1.value.length < 10) return 'The password must be at least 10 characters.'
+  if (pass1.value !== pass2.value) return "The passwords don't match."
   return ''
 }
 

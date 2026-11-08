@@ -76,7 +76,7 @@ step('IMAP account added')
 // no hub: a sync reports it plainly, the account shows a problem
 await page.locator('[data-test=account-sync]').first().click()
 await page.waitForSelector('[data-test=conn-error]')
-assert.match((await page.textContent('[data-test=conn-error]')) ?? '', /hub is not configured/)
+assert.match((await page.textContent('[data-test=conn-error]')) ?? '', /isn't set up on this server/)
 await page.waitForFunction(() => /Problem/.test((document.querySelector('[data-test=account-status]')?.textContent ?? '')))
 await shots('3-accounts')
 step('sync without a hub reports the problem on the account')

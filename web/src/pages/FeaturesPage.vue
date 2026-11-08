@@ -6,11 +6,11 @@
 <template>
   <q-page class="ph-page ph-feat" data-test="features">
     <h1>Features</h1>
-    <HdStatusState v-if="!state.admin" icon="lock" title="Only an admin device can change features" text="Open this page on the first device you connected." />
-    <HdStatusState v-else-if="available === null" state="loading" title="Looking for the board" text="This takes a moment." />
+    <HdStatusState v-if="!state.admin" icon="lock" title="Only admin devices can change features" text="Open this page on an admin device." />
+    <HdStatusState v-else-if="available === null" state="loading" title="Connecting to the server" text="One moment…" />
     <template v-else-if="!available">
-      <p class="ph-muted" data-test="features-by-hand">This server was set up by hand, so its features are chosen in its compose files (see the README, "Optional
-        services"). On a board set up from a Cloud Companion image they are switched on and off here.</p>
+      <p class="ph-muted" data-test="features-by-hand">This server wasn't installed from a Cloud Companion image, so its features are set in
+        its compose files. See “Optional services” in the README.</p>
     </template>
     <template v-else>
       <p class="ph-muted" data-test="features-board">{{ boardText }}</p>
@@ -25,7 +25,7 @@
               {{ jobText(jobs[f.id]) }}
             </div>
           </div>
-          <q-toggle :model-value="f.on" :disable="!canSwitch(f)" :aria-label="(f.on ? 'Switch off ' : 'Switch on ') + f.title"
+          <q-toggle :model-value="f.on" :disable="!canSwitch(f)" :aria-label="(f.on ? 'Turn off ' : 'Turn on ') + f.title"
                     :data-test="'feature-switch-' + f.id" @update:model-value="(v: boolean) => flip(f, v)" />
         </li>
       </ul>
@@ -41,7 +41,7 @@
           </q-card-section>
           <q-card-actions align="right">
             <q-btn flat no-caps label="Cancel" @click="asking = false" />
-            <q-btn unelevated no-caps color="primary" label="Switch on" type="submit" data-test="feature-settings-ok" />
+            <q-btn unelevated no-caps color="primary" label="Turn on" type="submit" data-test="feature-settings-ok" />
           </q-card-actions>
         </form>
       </q-card>
@@ -68,25 +68,25 @@ const busy = computed(() => Object.values(jobs).some((j) => j.state === 'running
 
 const boardText = computed(() => {
   const b = board.value
-  const mem = b.memory ? ` with ${Math.round(b.memory / 2 ** 30)} GB of memory` : ''
-  return `${b.model || 'This server'}${mem}. Switching a feature on downloads and starts it; switching it off stops it and keeps its data.`
+  const mem = b.memory ? `, ${Math.round(b.memory / 2 ** 30)} GB memory` : ''
+  return `${b.model || 'This server'}${mem}. Turning on a feature downloads and starts it. Turning it off stops it but keeps its data.`
 })
 
 const titleOf = (id: string) => features.value.find((f) => f.id === id)?.title || id
 function note(f: Feature) {
   if (f.core) return 'Always on'
-  if (!f.fits) return f.why || 'Not available on this board'
-  if (f.on && f.requiredBy?.length) return 'Needed by ' + f.requiredBy.map(titleOf).join(', ')
+  if (!f.fits) return f.why || 'Not available on this server'
+  if (f.on && f.requiredBy?.length) return 'Required by ' + f.requiredBy.map(titleOf).join(', ')
   return ''
 }
 function canSwitch(f: Feature) {
   return !busy.value && !f.core && (f.on ? !f.requiredBy?.length : f.fits)
 }
 function jobText(j: Job) {
-  if (j.state === 'failed') return 'Could not switch: ' + (j.error || 'the board did not say why') + '. Everything is as it was.'
+  if (j.state === 'failed') return "Couldn't change this feature: " + (j.error || 'unknown error') + '. Nothing was changed.'
   if (j.state === 'done') return ''
   const last = [...(j.log || [])].reverse().find((l) => l.trim() && !l.startsWith('docker '))
-  return 'Working on it' + (last ? ': ' + last.trim() : '…')
+  return 'Working…' + (last ? ' ' + last.trim() : '')
 }
 
 async function load() {
@@ -125,19 +125,31 @@ function confirmSettings() {
   if (askFor.value) run(askFor.value, 'POST', { ...values })
 }
 
+// switching a feature can restart Cloud Companion, this page's server included: the job is followed through that gap
 async function run(f: Feature, method: 'POST' | 'DELETE', settings?: Record<string, string>) {
   try {
     let j: Job = await apiCall(method, '/phe/host/features/' + f.id, method === 'POST' ? { settings } : undefined)
     jobs[f.id] = j
+    let away = 0
     while (j.state === 'running') {
       await new Promise((r) => setTimeout(r, 1000))
-      j = await apiCall('GET', '/phe/host/jobs/' + j.id)
+      try {
+        j = await apiCall('GET', '/phe/host/jobs/' + j.id)
+        away = 0
+      } catch (e) {
+        if (++away > 600) throw e // ten minutes without an answer
+        continue
+      }
       jobs[f.id] = j
     }
   } catch (e) {
     jobs[f.id] = { id: '', state: 'failed', error: (e as Error).message, log: [] }
   }
-  await load()
+  for (let i = 0; i < 60; i++) { // the list again, once the server answers
+    await load()
+    if (!loadError.value) break
+    await new Promise((r) => setTimeout(r, 1000))
+  }
 }
 
 // the page can open before the connection says this device is the owner (a reload, a link): load once it does
