@@ -6,12 +6,14 @@ package webui
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -34,15 +36,12 @@ func (d *fakeDevice) call(t *testing.T, method, path string, body any) (int, map
 	} else {
 		rd = bytes.NewReader(nil)
 	}
-	u := path
-	if i := indexByte(path, '?'); i >= 0 {
-		u = path[:i]
-	}
 	req, _ := http.NewRequest(method, d.srv.URL+path, rd)
-	ts := fmt.Sprint(time.Now().Unix())
-	m := hmac.New(sha256.New, d.key)
-	m.Write([]byte(d.id + "." + ts + "." + method + " " + u))
-	req.Header.Set("X-Phe-Auth", d.id+"."+ts+"."+hex.EncodeToString(m.Sum(nil)))
+	var raw []byte
+	if body != nil {
+		raw, _ = json.Marshal(body)
+	}
+	req.Header.Set("X-Phe-Auth", signV2(d.id, d.key, method, req.URL, raw))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -52,6 +51,27 @@ func (d *fakeDevice) call(t *testing.T, method, path string, body any) (int, map
 	var out map[string]any
 	json.NewDecoder(resp.Body).Decode(&out)
 	return resp.StatusCode, out
+}
+
+// signV2 is the web app's X-Phe-Auth header (auth.go): good once, for this address with its query and this body (nil: an
+// empty one; "u" as the body hash is for uploads, see signV2Upload).
+func signV2(id string, key []byte, method string, u *url.URL, body []byte) string {
+	h := sha256.Sum256(body)
+	return signV2Hash(id, key, method, u, hex.EncodeToString(h[:]))
+}
+
+func signV2Hash(id string, key []byte, method string, u *url.URL, bodyHash string) string {
+	ts := fmt.Sprint(time.Now().Unix())
+	nonce := make([]byte, 12)
+	rand.Read(nonce)
+	n := hex.EncodeToString(nonce)
+	target := u.EscapedPath()
+	if u.RawQuery != "" {
+		target += "?" + u.RawQuery
+	}
+	m := hmac.New(sha256.New, key)
+	m.Write([]byte("v2." + id + "." + ts + "." + n + "." + bodyHash + "." + method + " " + target))
+	return "v2." + id + "." + ts + "." + n + "." + bodyHash + "." + hex.EncodeToString(m.Sum(nil))
 }
 
 func indexByte(s string, c byte) int {

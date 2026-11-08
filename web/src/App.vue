@@ -75,6 +75,8 @@ function openApp(id: string) {
 
 // music sent from another device ("Play on") starts here
 watch(() => !!creds.value, (on) => { if (on) listenForRemote(loadTracks) }, { immediate: true })
+// signed out from another device (cloud.ts removed()): back to pairing
+watch(() => !!creds.value, (on, was) => { if (was && !on && route.path !== '/pair') router.replace('/pair') })
 </script>
 
 <style scoped>

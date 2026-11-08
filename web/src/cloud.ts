@@ -149,6 +149,7 @@ function onFrame(f: ServerFrame) {
       state.adminError = ''
       break
     case 'error':
+      if (f.msg === REVOKED) { removed(); break }
       state.error = f.msg
       state.loading = false
       if (/admin only/.test(f.msg)) state.adminError = f.msg
@@ -228,10 +229,22 @@ export async function connect() {
     } catch (e) {
       state.status = 'offline'
       state.error = (e as Error).message
+      if (state.error === REVOKED) { removed(); return } // retrying would only count as failed sign-ins against this address
       throw e
     }
   })().finally(() => { connecting = null })
   return connecting
+}
+
+// The server's answer to a device it removed (internal/proto ErrRevoked), at sign-in or while connected.
+const REVOKED = 'unknown or revoked device'
+
+// This device was removed from the server (signed out from another device): its key is useless, so it is forgotten and the app
+// goes back to pairing (App.vue), saying why.
+function removed() {
+  clearTimeout(retryTimer)
+  state.error = 'This browser was signed out from another device. Pair it again to keep using it.' // before the pairing page opens
+  forget()
 }
 
 export async function forget() {
@@ -370,18 +383,25 @@ export async function recoverLogin(code: string, name: string) {
 }
 
 // ---- Settings -> Security: calls signed with this browser's device key (an admin device) ----
-async function signed(method: string, path: string, body?: unknown) {
+// The X-Phe-Auth header (v2, internal/webui/auth.go): good for this one request, its address with the query, and its body
+// (the text sent, or "u" for a multipart upload). A header seen on the network cannot be sent again.
+async function signed(method: string, target: string, body: string | 'u' = '') {
   if (!creds.value || !crypto.subtle) throw new Error('This needs a secure page (https or localhost) and a signed-in browser.')
+  const hex = (b: ArrayBuffer) => Array.from(new Uint8Array(b), (x) => x.toString(16).padStart(2, '0')).join('')
   const ts = String(Math.floor(Date.now() / 1000))
+  const nonce = hex(crypto.getRandomValues(new Uint8Array(12)).buffer)
+  const bh = body === 'u' ? 'u' : hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body)))
   const k = await crypto.subtle.importKey('raw', creds.value.key as BufferSource, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
-  const sig = new Uint8Array(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(`${creds.value.dev}.${ts}.${method} ${path.split('?')[0]}`)))
-  const hdr = { 'X-Phe-Auth': `${creds.value.dev}.${ts}.${Array.from(sig, (b) => b.toString(16).padStart(2, '0')).join('')}` }
-  return { headers: hdr, body }
+  const u = new URL(target, location.href) // as fetch will send it: the browser escapes some characters itself (an apostrophe in a query)
+  const msg = `v2.${creds.value.dev}.${ts}.${nonce}.${bh}.${method} ${u.pathname}${u.search}`
+  const sig = hex(await crypto.subtle.sign('HMAC', k, new TextEncoder().encode(msg)))
+  return { headers: { 'X-Phe-Auth': `v2.${creds.value.dev}.${ts}.${nonce}.${bh}.${sig}` } }
 }
 
 async function signedJSON(method: string, path: string, body?: unknown): Promise<any> {
-  const s = await signed(method, path)
-  const r = await fetch(path, { method, headers: { ...s.headers, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  const text = body === undefined ? '' : JSON.stringify(body)
+  const s = await signed(method, path, text)
+  const r = await fetch(path, { method, headers: { ...s.headers, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : text })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
   return j
@@ -395,7 +415,7 @@ export const recoveryRegenerate = () => signedJSON('POST', '/passkey/recovery', 
 
 // add a passkey while signed in as an admin: no pairing code
 export async function passkeyAdd(name: string) {
-  let s = await signed('POST', '/passkey/register/begin')
+  let s = await signed('POST', '/passkey/register/begin', '{}')
   let r = await fetch('/passkey/register/begin', { method: 'POST', headers: { ...s.headers, 'Content-Type': 'application/json' }, body: '{}' })
   let j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
@@ -405,9 +425,10 @@ export async function passkeyAdd(name: string) {
   ;(pk.excludeCredentials || []).forEach((c: { id: string | ArrayBuffer }) => { c.id = b64u.dec(c.id as string) })
   const cred = await navigator.credentials.create({ publicKey: pk })
   if (!cred) throw new Error('No passkey was made.')
-  const path = '/passkey/register/finish'
-  s = await signed('POST', path)
-  r = await fetch(`${path}?sid=${j.sid}&name=${encodeURIComponent(name)}`, { method: 'POST', headers: { ...s.headers, 'Content-Type': 'application/json' }, body: JSON.stringify(credJSON(cred as PublicKeyCredential)) })
+  const path = `/passkey/register/finish?sid=${j.sid}&name=${encodeURIComponent(name)}`
+  const text = JSON.stringify(credJSON(cred as PublicKeyCredential))
+  s = await signed('POST', path, text)
+  r = await fetch(path, { method: 'POST', headers: { ...s.headers, 'Content-Type': 'application/json' }, body: text })
   const f = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(f.error || 'The server did not accept that.')
   return f.recovery || ''
@@ -438,7 +459,7 @@ export const apiCall = (method: string, path: string, body?: unknown) => signedJ
 
 // a signed multipart upload (the Catalogue page: installation files; internal/webui/catalogue.go)
 export async function apiUpload(path: string, form: FormData) {
-  const s = await signed('POST', path)
+  const s = await signed('POST', path, 'u')
   const r = await fetch(path, { method: 'POST', headers: s.headers, body: form })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.error || 'The server did not accept that.')

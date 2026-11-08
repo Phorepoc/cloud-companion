@@ -203,7 +203,11 @@ func (s *session) dispatch(ctx context.Context, t string, raw []byte) error {
 		if err := proto.Decode(raw, &r); err != nil {
 			return err
 		}
-		return s.srv.Store.Revoke(r.ID)
+		if err := s.srv.Store.Revoke(r.ID); err != nil {
+			return err
+		}
+		s.srv.kick(r.ID)
+		return nil
 	case proto.TPing:
 		return s.c.send(proto.Header{T: proto.TPong})
 	case proto.TSessions:

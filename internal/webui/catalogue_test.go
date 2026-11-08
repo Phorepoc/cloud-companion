@@ -5,11 +5,9 @@ package webui
 
 import (
 	"bytes"
-	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
@@ -61,10 +59,7 @@ func (e *catEnv) upload(cat string, fields map[string]string, name string, data 
 	fw.Write(data)
 	mw.Close()
 	req, _ := http.NewRequest("POST", e.srv.URL+"/phe/catalogue/upload", &buf)
-	ts := fmt.Sprint(time.Now().Unix())
-	h := hmac.New(sha256.New, e.admin.key)
-	h.Write([]byte(e.admin.id + "." + ts + ".POST /phe/catalogue/upload"))
-	req.Header.Set("X-Phe-Auth", e.admin.id+"."+ts+"."+hex.EncodeToString(h.Sum(nil)))
+	req.Header.Set("X-Phe-Auth", signV2Hash(e.admin.id, e.admin.key, "POST", req.URL, "u"))
 	req.Header.Set("Content-Type", mw.FormDataContentType())
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

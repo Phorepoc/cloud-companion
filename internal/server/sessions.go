@@ -32,6 +32,23 @@ func (s *Server) register(ses *session) {
 	s.reg.live[ses.sid] = ses
 }
 
+// kick disconnects every live session of a device that was just revoked: a signed-in phone that was lost must not keep working
+// until it happens to reconnect. It is told why first, so the app can say so and forget its key.
+func (s *Server) kick(dev string) {
+	s.reg.mu.Lock()
+	var out []*session
+	for _, ses := range s.reg.live {
+		if ses.dev == dev {
+			out = append(out, ses)
+		}
+	}
+	s.reg.mu.Unlock()
+	for _, ses := range out {
+		ses.c.send(proto.Error{T: proto.TError, Msg: proto.ErrRevoked})
+		ses.c.io.Close()
+	}
+}
+
 func (s *Server) unregister(ses *session) {
 	s.reg.mu.Lock()
 	delete(s.reg.live, ses.sid)
@@ -43,6 +60,9 @@ func (s *Server) sessionList(self *session) []proto.SessionInfo {
 	defer s.reg.mu.Unlock()
 	var out []proto.SessionInfo
 	for sid, ses := range s.reg.live {
+		if !mayReach(self, ses) {
+			continue
+		}
 		ses.pubMu.Lock()
 		tabs := append([]proto.TabInfo(nil), ses.pub...)
 		ses.pubMu.Unlock()
@@ -56,6 +76,11 @@ func (s *Server) sessionList(self *session) []proto.SessionInfo {
 	return out
 }
 
+// mayReach says whether a device may see and drive another session's tabs: an admin device may reach every device (they are all
+// its owner's), any other device only its own other windows. A guest's phone must not see, nor open pages in, the owner's
+// browser, which carries the owner's signed-in sites.
+func mayReach(from, to *session) bool { return from.admin || from.dev == to.dev }
+
 // remote runs an action on another session's tabs: close a view, or open a new tab with a URL.
 func (s *session) remote(raw []byte) error {
 	var r proto.Remote
@@ -65,7 +90,7 @@ func (s *session) remote(raw []byte) error {
 	s.srv.reg.mu.Lock()
 	target := s.srv.reg.live[r.SID]
 	s.srv.reg.mu.Unlock()
-	if target == nil {
+	if target == nil || !mayReach(s, target) {
 		return errors.New("that device is no longer connected")
 	}
 	var op func(ctx context.Context) error

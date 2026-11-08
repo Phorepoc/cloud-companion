@@ -35,7 +35,7 @@ fi
 
 # two devices at once: the "tabs on your devices" list (Browser section)
 echo "== tabs across devices"
-CA=$(docker exec phe-cloud phecloud paircode 2>/dev/null); CB=$(docker exec phe-cloud phecloud paircode 2>/dev/null)
+CA=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null); CB=$(docker exec phe-cloud phecloud paircode 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://phecloud:8080 -e CODES="$CA,$CB" -e OUT=/out \
     mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning multi.ts'

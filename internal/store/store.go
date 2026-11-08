@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/phorepoc/cloud-companion/internal/proto"
 )
 
 type Store struct {
@@ -120,7 +122,7 @@ func (s *Store) Pair(code, name string) (id string, key []byte, admin bool, err 
 	return id, key, admin, tx.Commit()
 }
 
-var ErrUnknown = errors.New("unknown or revoked device")
+var ErrUnknown = errors.New(proto.ErrRevoked)
 
 // Key returns the device key and whether the device is an admin (may list and revoke devices).
 func (s *Store) Key(id string) ([]byte, bool, error) {

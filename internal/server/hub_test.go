@@ -237,7 +237,7 @@ func TestSanitizeHTML(t *testing.T) {
 
 func TestOtherDevicesTabs(t *testing.T) {
 	s := &Server{}
-	a := &session{srv: s, dev: "dev-a", devName: "Laptop", ops: make(chan func(ctx context.Context) error, 4), c: &conn{io: &fakeIO{}}, log: slog.Default()}
+	a := &session{srv: s, dev: "dev-a", devName: "Laptop", admin: true, ops: make(chan func(ctx context.Context) error, 4), c: &conn{io: &fakeIO{}}, log: slog.Default()}
 	b := &session{srv: s, dev: "dev-b", devName: "Phone", ops: make(chan func(ctx context.Context) error, 4), c: &conn{io: &fakeIO{}}, log: slog.Default()}
 	s.register(a)
 	s.register(b)

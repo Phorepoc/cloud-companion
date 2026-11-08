@@ -84,6 +84,17 @@ try {
   await A.page.click(`[data-test^=dev-open-${phoneSid}-]`)
   await A.page.waitForFunction(() => window.__phe.state.page.title === 'Example Domain' && window.__phe.state.tabs.length === 1, null, { timeout: 30000 })
   step('Open here: the Phone tab opened in a tab of the Laptop')
+
+  // signing out the Phone from the Laptop cuts it off at once: it lands on pairing, told why, and does not keep retrying
+  const phoneDev = await B.page.evaluate(() => window.__phe.state.dev)
+  await A.page.goto(BASE + '/#/settings/devices')
+  A.page.once('dialog', (d) => d.accept())
+  await A.page.click(`[data-test=revoke-${phoneDev}]`)
+  await B.page.waitForFunction(() => location.hash.startsWith('#/pair'), null, { timeout: 10000 })
+  assert.match(await B.page.textContent('[data-test=pair-error]') || '', /signed out from another device/)
+  assert.equal(await B.page.evaluate(() => window.__phe.state.status), 'offline')
+  await B.page.screenshot({ path: `${OUT}/multi-signed-out.png` })
+  step('signed out from the Laptop: the Phone is cut off and back on pairing, told why')
   console.log('MULTI PASS')
 } catch (e) {
   console.error('MULTI FAIL:', (e as Error).message)

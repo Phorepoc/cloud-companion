@@ -61,7 +61,8 @@ type Setup struct {
 	doneAt    time.Time
 	srv       *http.Server
 	net       netState
-	restored  bool // set up from a backup: the owner and their devices are back, so no owner code to hand over
+	owner     string // the token of the browser that ran setup or restore: the only one handed the owner's link at the end
+	restored  bool   // set up from a backup: the owner and their devices are back, so no owner code to hand over
 	Now       func() time.Time
 }
 
@@ -239,7 +240,7 @@ func (s *Setup) Handler() http.Handler {
 	})
 	mux.HandleFunc("GET /api/state", func(w http.ResponseWriter, r *http.Request) {
 		s.mu.Lock()
-		phase, job, unlocked, restored := s.phase, s.job, s.unlocked(r), s.restored
+		phase, job, unlocked, restored, owner := s.phase, s.job, s.unlocked(r), s.restored, s.isOwner(r)
 		s.mu.Unlock()
 		out := map[string]any{"phase": phase, "unlocked": unlocked, "board": s.M.Board}
 		if phase == PhaseSetup {
@@ -267,7 +268,7 @@ func (s *Setup) Handler() http.Handler {
 			if job != nil {
 				out["job"] = job.Status()
 			}
-			if phase == PhaseDone {
+			if phase == PhaseDone && owner {
 				out["open"] = s.ownerLink(r, restored)
 				out["restored"] = restored
 			}
@@ -285,7 +286,7 @@ func (s *Setup) Handler() http.Handler {
 		}
 		ok := false
 		switch s.phase {
-		case PhaseSetup, PhaseDone:
+		case PhaseSetup: // once set up, nobody new gets in: the owner's link is for the browser that ran it
 			if c := s.setupCode(); c != "" {
 				ok = subtle.ConstantTimeCompare([]byte(strings.TrimSpace(in.Secret)), []byte(c)) == 1
 			} else {
@@ -341,6 +342,7 @@ func (s *Setup) Handler() http.Handler {
 			writeError(w, http.StatusBadRequest, errors.New("Unknown time zone"))
 			return
 		}
+		s.owner = token(r)
 		if err := s.savePassphrase(in.Passphrase); err != nil {
 			writeError(w, http.StatusInternalServerError, err)
 			return
@@ -412,7 +414,7 @@ func (s *Setup) Handler() http.Handler {
 			return
 		}
 		s.mu.Lock()
-		s.job, s.restored = j, true
+		s.job, s.restored, s.owner = j, true, token(r)
 		s.mu.Unlock()
 		writeJSON(w, http.StatusAccepted, j.Status())
 	})
@@ -506,6 +508,24 @@ func (s *Setup) recoveryUnlocked(w http.ResponseWriter, r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+func token(r *http.Request) string {
+	if c, err := r.Cookie("phehost"); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
+// isOwner: the request comes from the browser that ran setup or restore, still within its token's time. s.mu is held.
+func (s *Setup) isOwner(r *http.Request) bool {
+	t := token(r)
+	return t != "" && t == s.owner && s.unlockedAt(t, 2*time.Hour)
+}
+
+func (s *Setup) unlockedAt(tok string, ttl time.Duration) bool {
+	at, ok := s.tokens[tok]
+	return ok && s.now().Sub(at) < ttl
 }
 
 // unlocked: the request carries a token from /api/unlock (setup: 2 hours; recovery: 30 minutes). s.mu is held.

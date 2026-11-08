@@ -18,11 +18,14 @@ package webui
 // PHECLOUD_RP_ORIGINS (comma separated) override what is derived from the request.
 
 import (
+	"bytes"
+	"context"
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -61,10 +64,11 @@ type auth struct {
 	mu   sync.Mutex
 	sess map[string]*pending
 	fail map[string][]time.Time
+	used map[string]time.Time // v2 signatures seen in the last two minutes: each is good for one request
 }
 
 func newAuth(st *store.Store) *auth {
-	return &auth{st: st, sess: map[string]*pending{}, fail: map[string][]time.Time{}}
+	return &auth{st: st, sess: map[string]*pending{}, fail: map[string][]time.Time{}, used: map[string]time.Time{}}
 }
 
 func (a *auth) wa(r *http.Request) (*webauthn.WebAuthn, error) {
@@ -95,9 +99,15 @@ func (a *auth) keep(p *pending) string {
 			delete(a.sess, k)
 		}
 	}
+	if len(a.sess) >= maxPending { // anyone may start a sign-in: the waiting ones are capped, not left to fill the memory
+		return ""
+	}
 	a.sess[sid] = p
 	return sid
 }
+
+// maxPending is how many passkey sign-ins may wait at once (each lasts 5 minutes).
+const maxPending = 1000
 
 func (a *auth) take(sid string) *pending {
 	a.mu.Lock()
@@ -121,8 +131,31 @@ func (a *auth) limited(r *http.Request) bool {
 			keep = append(keep, t)
 		}
 	}
-	a.fail[ip] = keep
+	if len(keep) == 0 {
+		delete(a.fail, ip) // addresses that stop trying are not kept for ever
+	} else {
+		a.fail[ip] = keep
+	}
 	return len(keep) >= 8
+}
+
+// starts: at most 20 passkey sign-ins started per client address per minute (each one is kept for 5 minutes)
+func (a *auth) starts(r *http.Request) bool {
+	key := "start " + infoOf(r).ClientIP
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var keep []time.Time
+	for _, t := range a.fail[key] {
+		if time.Since(t) < time.Minute {
+			keep = append(keep, t)
+		}
+	}
+	if len(keep) >= 20 {
+		a.fail[key] = keep
+		return false
+	}
+	a.fail[key] = append(keep, time.Now())
+	return true
 }
 
 func (a *auth) failed(r *http.Request) {
@@ -132,33 +165,125 @@ func (a *auth) failed(r *http.Request) {
 	a.mu.Unlock()
 }
 
-// adminDevice checks the X-Phe-Auth header: "<dev>.<unix ts>.<hex HMAC-SHA256(device key, dev.ts.METHOD path)>" of an admin device, at most a
-// minute old. The key never leaves the browser; the signature binds the request line.
+// adminDevice checks that the request is signed (v2, see signedDevice) by an admin device.
 func (a *auth) adminDevice(r *http.Request) bool {
-	_, admin, ok := a.signedDevice(r)
-	return ok && admin
+	_, admin, v2, ok := a.signed(r)
+	return ok && admin && v2
 }
 
 // signedDevice verifies the X-Phe-Auth header of any paired device and returns its id and whether it is an admin.
+//
+// v2 (the web app): "v2.<dev>.<unix ts>.<nonce>.<body>.<hex HMAC-SHA256(device key, v2.dev.ts.nonce.body.METHOD path?query)>",
+// body being the hex SHA-256 of the request body, or "u" for a multipart upload (not read twice). It is good once, within a
+// minute: a header seen on the network cannot be sent again, nor with another body or query. Admin routes take only v2.
+//
+// v1 (the phones, for their own routes): "<dev>.<unix ts>.<hex HMAC-SHA256(device key, dev.ts.METHOD path)>", within a minute.
 func (a *auth) signedDevice(r *http.Request) (id string, admin, ok bool) {
+	id, admin, _, ok = a.signed(r)
+	return id, admin, ok
+}
+
+type bodyKey struct{}
+
+// keepSignedBody keeps a copy of the body of a v2-signed request (up to 1 MiB) before any handler reads it, so the signature
+// check sees the body whether a handler checks first and reads after, or reads first.
+func keepSignedBody(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := strings.Split(r.Header.Get("X-Phe-Auth"), "."); len(p) == 6 && p[0] == "v2" && p[4] != "u" {
+			b, err := io.ReadAll(io.LimitReader(r.Body, 1<<20+1))
+			r.Body.Close()
+			if err != nil || len(b) > 1<<20 {
+				bad(w, 413, "The request is too large.")
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(b))
+			r = r.WithContext(context.WithValue(r.Context(), bodyKey{}, b))
+		}
+		h.ServeHTTP(w, r)
+	})
+}
+
+func (a *auth) signed(r *http.Request) (id string, admin, v2, ok bool) {
 	parts := strings.Split(r.Header.Get("X-Phe-Auth"), ".")
-	if len(parts) != 3 {
-		return "", false, false
+	v2 = len(parts) == 6 && parts[0] == "v2"
+	if !v2 && len(parts) != 3 {
+		return "", false, false, false
+	}
+	if v2 {
+		parts = parts[1:]
 	}
 	ts, err := strconv.ParseInt(parts[1], 10, 64)
 	if err != nil || time.Since(time.Unix(ts, 0)).Abs() > time.Minute {
-		return "", false, false
+		return "", false, false, false
 	}
 	key, adm, err := a.st.Key(parts[0])
 	if err != nil {
-		return "", false, false
+		return "", false, false, false
 	}
 	m := hmac.New(sha256.New, key)
-	m.Write([]byte(parts[0] + "." + parts[1] + "." + r.Method + " " + r.URL.Path))
-	if !hmac.Equal([]byte(hex.EncodeToString(m.Sum(nil))), []byte(parts[2])) {
-		return "", false, false
+	if !v2 {
+		m.Write([]byte(parts[0] + "." + parts[1] + "." + r.Method + " " + r.URL.Path))
+	} else {
+		nonce, body := parts[2], parts[3]
+		if len(nonce) < 16 || len(nonce) > 64 {
+			return "", false, false, false
+		}
+		if body == "u" {
+			if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+				return "", false, false, false
+			}
+		} else {
+			b, kept := r.Context().Value(bodyKey{}).([]byte)
+			if !kept { // not through Handler (a test): read it here, for the handler to read again
+				var err error
+				if b, err = io.ReadAll(io.LimitReader(r.Body, 1<<20+1)); err != nil || len(b) > 1<<20 {
+					return "", false, false, false
+				}
+				r.Body.Close()
+				r.Body = io.NopCloser(bytes.NewReader(b))
+			}
+			h := sha256.Sum256(b)
+			if !hmac.Equal([]byte(hex.EncodeToString(h[:])), []byte(body)) {
+				return "", false, false, false
+			}
+		}
+		target := r.URL.EscapedPath()
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		m.Write([]byte("v2." + parts[0] + "." + parts[1] + "." + nonce + "." + body + "." + r.Method + " " + target))
 	}
-	return parts[0], adm, true
+	sig := parts[len(parts)-1]
+	if !hmac.Equal([]byte(hex.EncodeToString(m.Sum(nil))), []byte(sig)) {
+		return "", false, false, false
+	}
+	if v2 && !a.once(sig) {
+		return "", false, false, false
+	}
+	return parts[0], adm, v2, true
+}
+
+// once records a v2 signature and says whether it was new. Signatures older than two minutes are past their timestamp check
+// anyway and are dropped; the map is capped so a flood of valid requests cannot grow it without end.
+func (a *auth) once(sig string) bool {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := time.Now()
+	if _, seen := a.used[sig]; seen {
+		return false
+	}
+	if len(a.used)%1024 == 1023 || len(a.used) >= 100000 {
+		for k, t := range a.used {
+			if now.Sub(t) > 2*time.Minute {
+				delete(a.used, k)
+			}
+		}
+		if len(a.used)%1024 == 1023 || len(a.used) >= 100000 {
+			return false
+		}
+	}
+	a.used[sig] = now
+	return true
 }
 
 func reply(w http.ResponseWriter, code int, v any) {
@@ -231,7 +356,12 @@ func (a *auth) routes(mux *http.ServeMux) {
 			bad(w, 500, err.Error())
 			return
 		}
-		reply(w, 200, map[string]any{"sid": a.keep(&pending{data: data, handle: o.handle, code: code, authed: authed}), "options": opts})
+		sid := a.keep(&pending{data: data, handle: o.handle, code: code, authed: authed})
+		if sid == "" {
+			bad(w, 503, "Too many sign-ins at once. Try again in a few minutes.")
+			return
+		}
+		reply(w, 200, map[string]any{"sid": sid, "options": opts})
 	})
 	mux.HandleFunc("/passkey/register/finish", func(w http.ResponseWriter, r *http.Request) {
 		p := a.take(r.URL.Query().Get("sid"))
@@ -304,6 +434,10 @@ func (a *auth) routes(mux *http.ServeMux) {
 		reply(w, 200, map[string]any{"recovery": code})
 	})
 	mux.HandleFunc("/passkey/login/begin", func(w http.ResponseWriter, r *http.Request) {
+		if !a.starts(r) {
+			bad(w, 429, "Too many sign-in attempts. Wait a minute and try again.")
+			return
+		}
 		h, err := a.st.OwnerHandle()
 		if err != nil {
 			bad(w, 404, "no passkey has been registered yet")
@@ -319,7 +453,12 @@ func (a *auth) routes(mux *http.ServeMux) {
 			bad(w, 500, err.Error())
 			return
 		}
-		reply(w, 200, map[string]any{"sid": a.keep(&pending{data: data, handle: h}), "options": opts})
+		sid := a.keep(&pending{data: data, handle: h})
+		if sid == "" {
+			bad(w, 503, "Too many sign-ins at once. Try again in a few minutes.")
+			return
+		}
+		reply(w, 200, map[string]any{"sid": sid, "options": opts})
 	})
 	mux.HandleFunc("/passkey/login/finish", func(w http.ResponseWriter, r *http.Request) {
 		p := a.take(r.URL.Query().Get("sid"))

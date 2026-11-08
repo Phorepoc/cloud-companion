@@ -94,7 +94,7 @@ func getState(t *testing.T, c *http.Client, srv *httptest.Server) map[string]any
 
 func TestSetupFlow(t *testing.T) {
 	s, d, ck, srv := newSetup(t, "PINE-APPLE-42")
-	owner, stranger := newClient(), newClient()
+	owner, stranger, bystander := newClient(), newClient(), newClient()
 
 	st := getState(t, owner, srv)
 	if st["phase"] != PhaseSetup || st["unlocked"] != false || st["needsCode"] != true || st["features"] != nil {
@@ -107,6 +107,9 @@ func TestSetupFlow(t *testing.T) {
 		t.Error("a wrong code unlocked")
 	}
 	if post(t, owner, srv, "/api/unlock", `{"secret":"PINE-APPLE-42"}`) != 200 {
+		t.Fatal("the right code did not unlock")
+	}
+	if post(t, bystander, srv, "/api/unlock", `{"secret":"PINE-APPLE-42"}`) != 200 { // someone else with the card's code
 		t.Fatal("the right code did not unlock")
 	}
 	st = getState(t, owner, srv)
@@ -147,6 +150,12 @@ func TestSetupFlow(t *testing.T) {
 	}
 	if getState(t, stranger, srv)["open"] != nil {
 		t.Error("the owner's link was shown to someone without the code")
+	}
+	if getState(t, bystander, srv)["open"] != nil {
+		t.Error("the owner's link was shown to a browser that did not run setup")
+	}
+	if post(t, stranger, srv, "/api/unlock", `{"secret":"PINE-APPLE-42"}`) != 403 || getState(t, stranger, srv)["open"] != nil {
+		t.Error("the page unlocked for someone new once setup was done")
 	}
 	ck.add(11 * time.Minute)
 	s.Tick(context.Background())

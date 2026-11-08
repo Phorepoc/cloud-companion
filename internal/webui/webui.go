@@ -122,7 +122,7 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 		c.SetReadLimit(1 << 20)
 		s.ServeConn(&wsIO{c: c, ctx: r.Context()}, in.ClientIP)
 	})
-	return securityHeaders(trust.withInfo(mux))
+	return securityHeaders(trust.withInfo(keepSignedBody(mux)))
 }
 
 // securityHeaders adds the headers every response of the web app should carry: no content sniffing, no framing, no referrer leaks, a content policy that only allows what the app

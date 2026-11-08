@@ -4,7 +4,7 @@
 # the owner switches Signal on and off in the web app; the containers are checked in between (Docker, privileged; repo root)
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"; W=$(mktemp -d)
-trap 'docker rm -f -v phe-board >/dev/null 2>&1; rm -rf "$W"' EXIT
+trap 'docker rm -f -v phe-board >/dev/null 2>&1; docker run --rm -v "$W":/w alpine:3.22 sh -c "rm -rf /w/* /w/.[!.]*" >/dev/null 2>&1; rm -rf "$W"' EXIT
 [ -n "${PHE_UP:-}" ] || docker build -q -t phe-cloud:dev . >/dev/null
 docker run --rm -v "$ROOT":/src -v "$W":/out -w /src -e CGO_ENABLED=0 -e GOFLAGS="-tags=goolm -buildvcs=false" \
   golang:1.26-bookworm@sha256:23ce71337b726608afb1bc00986e630a05034a87a87ea1fc2cd1ae5cf33387eb go build -o /out/phehost ./cmd/phehost

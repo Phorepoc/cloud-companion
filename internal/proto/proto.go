@@ -361,6 +361,10 @@ func TypeOf(b []byte) (string, error) {
 // MaxTabs is the per-device cap on views (tabs).
 const MaxTabs = 3
 
+// ErrRevoked is the error a device gets when it was removed from the server, at sign-in or while connected: the app forgets
+// its key and goes back to pairing on it.
+const ErrRevoked = "unknown or revoked device"
+
 // ZoomLadder lists the render scales in percent. Each divides 360 exactly (layout width 360/scale css px), so a tile row stays
 // 360 device pixels wide.
 var ZoomLadder = []int{100, 125, 150, 200, 250, 300}
