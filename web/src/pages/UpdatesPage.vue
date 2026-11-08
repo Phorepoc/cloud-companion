@@ -50,7 +50,7 @@ import { state, apiCall } from '../cloud'
 interface Release { version: string; notes?: string }
 interface Run { at: string; from: string; to: string; ok: boolean; error?: string }
 interface Info { version: string; auto: boolean; checked?: string; available?: Release | null; last?: Run | null; error?: string; at?: string; backups?: boolean }
-interface Job { id: string; state: 'running' | 'done' | 'failed'; error?: string; log: string[] | null }
+interface Job { id: string; kind?: string; state: 'running' | 'done' | 'failed'; error?: string; log: string[] | null }
 
 const available = ref<boolean | null>(null)
 const info = reactive<Info>({ version: '', auto: true })
@@ -72,15 +72,15 @@ const heroText = computed(() => {
     const how = info.auto ? `It will be installed tonight at ${night.value}${info.backups ? ', after the backup' : ''}.` : 'Install it whenever suits you.'
     return `${how} Cloud Companion will be unavailable for a few minutes while it restarts. If something goes wrong, the previous version is restored automatically.`
   }
-  if (info.error) return info.error + '. It will try again tomorrow.'
+  if (info.error) return `The last check didn't get an answer (${info.error.replace(/^Couldn't reach GitHub \((.*)\)$/, '$1')}). Cloud Companion checks again tomorrow, or you can check now.`
   const c = when(info.checked)
   return c ? `Last checked ${c}.` : 'Updates are checked once a day.'
 })
-const autoText = computed(() => (info.auto ? `Installed at ${night.value}${info.backups ? ', after the backup' : ''}` : 'Off. Install updates from this page.'))
+const autoText = computed(() => (info.auto ? `New versions install at ${night.value}${info.backups ? ', after the backup' : ''}` : 'Off. Install updates from this page.'))
 const lastText = computed(() => {
   const l = info.last
   if (!l) return ''
-  if (l.ok) return `${l.from || 'Earlier version'} → ${l.to}, ${when(l.at)}`
+  if (l.ok) return `Updated from ${l.from || 'an earlier version'} to ${l.to} ${when(l.at)}`
   return `Version ${l.to} didn't start ${when(l.at)}, so ${l.from} was restored. No data was lost.` + (info.available ? (info.auto ? ' It will try again tonight.' : ' You can try again now.') : '')
 })
 const jobLine = computed(() => {
@@ -99,7 +99,12 @@ async function load() {
   try {
     const h = await apiCall('GET', '/phe/host')
     available.value = !!h.available
-    if (h.available) take(await apiCall('GET', '/phe/host/update'))
+    if (h.available) {
+      take(await apiCall('GET', '/phe/host/update'))
+      // opened (or reloaded) while an update is being installed: follow it, rather than offering "Update now" again
+      const run = ((await apiCall('GET', '/phe/host/jobs')).jobs as Job[] || []).find((j) => j.kind === 'update')
+      if (run && !job.value) follow(run)
+    }
   } catch (e) {
     error.value = (e as Error).message
     if (available.value === null) available.value = false
@@ -117,8 +122,10 @@ async function setAuto(on: boolean) {
 // an update restarts Cloud Companion and maybe the manager: the job is followed through that gap, then the page reloads its state
 async function updateNow() {
   error.value = ''
+  try { await follow(await apiCall('POST', '/phe/host/update')) } catch (e) { error.value = (e as Error).message }
+}
+async function follow(j: Job) {
   try {
-    let j: Job = await apiCall('POST', '/phe/host/update')
     job.value = j
     let away = 0
     while (j.state === 'running') {

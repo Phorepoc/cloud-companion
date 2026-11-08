@@ -171,7 +171,7 @@ func (c *Client) SaveContact(ct proto.Contact) (proto.Contact, error) {
 		return ct, err
 	}
 	if st == 412 {
-		return ct, errors.New("this contact was changed somewhere else; reload and try again")
+		return ct, errors.New("This contact was changed on another device, so this edit wasn't saved. The newer version is shown now")
 	}
 	if st != 201 && st != 204 && st != 200 {
 		return ct, fmt.Errorf("hub: HTTP %d", st)
@@ -196,7 +196,7 @@ func (c *Client) Delete(kind, href, etag string) error {
 		return err
 	}
 	if st == 412 {
-		return errors.New("this item was changed somewhere else; reload and try again")
+		return errors.New("This was changed on another device, so it wasn't deleted. The newer version is shown now")
 	}
 	if st != 204 && st != 200 {
 		return fmt.Errorf("hub: HTTP %d", st)
@@ -273,7 +273,7 @@ func (c *Client) SaveEvent(e proto.Event) (proto.Event, error) {
 		return e, err
 	}
 	if st == 412 {
-		return e, errors.New("this event was changed somewhere else; reload and try again")
+		return e, errors.New("This event was changed on another device, so this edit wasn't saved. The newer version is shown now")
 	}
 	if st != 201 && st != 204 && st != 200 {
 		return e, fmt.Errorf("hub: HTTP %d", st)

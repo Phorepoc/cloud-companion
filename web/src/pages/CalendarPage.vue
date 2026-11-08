@@ -121,7 +121,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useQuasar } from 'quasar'
-import { hubCall } from '../cloud'
+import { hubCall, NO_HUB } from '../cloud'
 import { toast } from '../toast'
 import { ymd, toDate, addDays, toFields, fromFields, monthLabel, dayLabel, timeLabel, gridDays, browserZone, type EventFields } from '../dates'
 import type { CalendarEvent } from '../proto'
@@ -129,6 +129,7 @@ import type { CalendarEvent } from '../proto'
 /** The edit form: the event's text fields and its start and end as date and time inputs. */
 interface EventForm extends EventFields { href?: string; etag?: string; title: string; location: string; notes: string }
 import { HdStatusState } from '@etesian-design/vue'
+import { latest } from '../latest'
 import { useChrome } from '@etesian-design/shell'
 
 const $q = useQuasar()
@@ -154,17 +155,20 @@ const dows = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 try { view.value = localStorage.getItem('phecloud-cal-view') || 'month' } catch (e) { /* ignore */ }
 watch(view, (v) => { try { localStorage.setItem('phecloud-cal-view', v) } catch (e) { /* ignore */ } })
 
+const monthLoad = latest()
 async function load() {
+  const t = monthLoad.take()
   loading.value = true
   error.value = ''
   try {
     // the grid shows days of the neighbouring months too: ask for the whole grid
     const days = gridDays(month.value)
-    events.value = (await hubCall({ op: 'events.list', from: ymd(days[0]), to: ymd(addDays(days[41], 1)) })).events || []
+    const r = (await hubCall({ op: 'events.list', from: ymd(days[0]), to: ymd(addDays(days[41], 1)) })).events || []
+    if (monthLoad.is(t)) events.value = r // › tapped again meanwhile: that month's events, not this one's
   } catch (e) {
-    error.value = /not set up/i.test((e as Error).message) ? 'The hub is not set up on this server, so there are no events to show. See the hub guide to set it up.' : (e as Error).message
+    if (monthLoad.is(t)) error.value = /not set up/i.test((e as Error).message) ? NO_HUB : (e as Error).message
   } finally {
-    loading.value = false
+    if (monthLoad.is(t)) loading.value = false
   }
 }
 const shift = (n: number) => { month.value = new Date(month.value.getFullYear(), month.value.getMonth() + n, 1); selected.value = ymd(month.value); load() }
@@ -181,9 +185,11 @@ function daysOf(e: CalendarEvent) {
   for (let d = new Date(s.getFullYear(), s.getMonth(), s.getDate()); d <= last && out.length < 60; d = addDays(d, 1)) out.push(ymd(d))
   return out.length ? out : [ymd(s)]
 }
+// the events by start, sorted once for the grid and the list
+const sorted = computed(() => [...events.value].sort((a, b) => startOf(a).getTime() - startOf(b).getTime()))
 const byDay = computed(() => {
   const m: Record<string, CalendarEvent[]> = {}
-  for (const e of [...events.value].sort((a, b) => startOf(a).getTime() - startOf(b).getTime())) for (const k of daysOf(e)) (m[k] = m[k] || []).push(e)
+  for (const e of sorted.value) for (const k of daysOf(e)) (m[k] = m[k] || []).push(e)
   return m
 })
 const weeks = computed(() => { const d = gridDays(month.value); return [0, 1, 2, 3, 4, 5].map((i) => d.slice(i * 7, i * 7 + 7)) })
@@ -194,7 +200,7 @@ const groups = computed(() => {
   const m0 = month.value
   const m1 = new Date(m0.getFullYear(), m0.getMonth() + 1, 1)
   const byStart = new Map()
-  for (const e of [...events.value].sort((a, b) => startOf(a).getTime() - startOf(b).getTime())) {
+  for (const e of sorted.value) {
     let d = startOf(e)
     if (d < m0) d = m0
     if (d >= m1) continue
@@ -240,6 +246,7 @@ async function save() {
     await load()
   } catch (e) {
     formError.value = (e as Error).message
+    if (/another device/.test(formError.value)) load() // the newer version, so the next edit starts from it
   } finally {
     saving.value = false
   }
@@ -249,7 +256,8 @@ function remove(e: CalendarEvent) {
   viewOpen.value = false
   events.value = events.value.filter((x) => x.href !== e.href)
   toast('Event deleted', {
-    undo: () => { events.value = [...events.value, e] },
+    resume: ['hub.call', { op: 'events.delete', href: e.href, etag: e.etag }],
+    undo: () => load(), // from the server: the month may have changed or been reloaded since
     onExpire: async () => {
       try { await hubCall({ op: 'events.delete', href: e.href, etag: e.etag }) } catch (err) { error.value = (err as Error).message; await load() }
     },

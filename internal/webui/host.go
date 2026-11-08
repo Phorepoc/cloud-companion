@@ -11,6 +11,7 @@ package webui
 //	GET    /phe/host/features        -> the manager's /v1/features
 //	POST   /phe/host/features/{id}   {settings} -> a job
 //	DELETE /phe/host/features/{id}   -> a job
+//	GET    /phe/host/jobs            -> the jobs still running (a page opened during one follows it)
 //	GET    /phe/host/jobs/{id}       -> the job (?wait=1: when it has ended)
 
 import (
@@ -80,6 +81,7 @@ func (h *hostAPI) routes(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /phe/host/update", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "PUT", "/v1/update") })
 	mux.HandleFunc("POST /phe/host/update", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "POST", "/v1/update") })
 	mux.HandleFunc("POST /phe/host/update/check", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "POST", "/v1/update/check") })
+	mux.HandleFunc("GET /phe/host/jobs", func(w http.ResponseWriter, r *http.Request) { h.pass(w, r, "GET", "/v1/jobs") })
 	mux.HandleFunc("GET /phe/host/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		q := ""
 		if r.URL.Query().Get("wait") == "1" {

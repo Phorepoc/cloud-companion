@@ -54,8 +54,10 @@ type Setup struct {
 	mu        sync.Mutex
 	phase     string
 	tokens    map[string]time.Time
-	fails     int
-	lockUntil time.Time
+	fails     map[string]int       // wrong codes, per address: ten lock that address out for 10 minutes, not everyone
+	lockUntil map[string]time.Time // per address
+	allFails  int                  // from every address together: 100 lock everyone out (guessing from many addresses)
+	allLock   time.Time
 	job       *Job
 	badSince  time.Time
 	doneAt    time.Time
@@ -85,6 +87,7 @@ func (s *Setup) Start() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tokens = map[string]time.Time{}
+	s.fails, s.lockUntil = map[string]int{}, map[string]time.Time{}
 	if s.M.SetUp() {
 		s.phase = PhaseOff
 	} else {
@@ -280,7 +283,8 @@ func (s *Setup) Handler() http.Handler {
 		json.NewDecoder(http.MaxBytesReader(w, r.Body, 4096)).Decode(&in)
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		if s.now().Before(s.lockUntil) {
+		from := clientAddr(r)
+		if s.now().Before(s.lockUntil[from]) || s.now().Before(s.allLock) {
 			writeError(w, http.StatusTooManyRequests, errors.New("Too many attempts. Wait a few minutes and try again"))
 			return
 		}
@@ -296,16 +300,25 @@ func (s *Setup) Handler() http.Handler {
 			ok = s.checkPassphrase(in.Secret)
 		}
 		if !ok {
-			if s.fails++; s.fails >= 10 {
-				s.fails, s.lockUntil = 0, s.now().Add(10*time.Minute)
+			if s.fails[from]++; s.fails[from] >= 10 {
+				delete(s.fails, from)
+				s.lockUntil[from] = s.now().Add(10 * time.Minute)
+			}
+			if s.allFails++; s.allFails >= 100 {
+				s.allFails, s.allLock = 0, s.now().Add(10*time.Minute)
 			}
 			writeError(w, http.StatusForbidden, errors.New("That's not right. Try again"))
 			return
 		}
-		s.fails = 0
+		delete(s.fails, from)
 		b := make([]byte, 24)
 		rand.Read(b)
 		tok := hex.EncodeToString(b)
+		for t, at := range s.tokens { // none lives longer than 2 hours: the old ones are only memory
+			if s.now().Sub(at) > 2*time.Hour {
+				delete(s.tokens, t)
+			}
+		}
 		s.tokens[tok] = s.now()
 		http.SetCookie(w, &http.Cookie{Name: "phehost", Value: tok, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode})
 		writeJSON(w, http.StatusOK, map[string]any{})
@@ -376,7 +389,7 @@ func (s *Setup) Handler() http.Handler {
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
-		if !s.restoreAllowed(w, r) {
+		if !s.mayRestore(w, r) {
 			return
 		}
 		if err := in.Dest.check(); err != nil {
@@ -391,7 +404,7 @@ func (s *Setup) Handler() http.Handler {
 		writeJSON(w, http.StatusOK, map[string]any{"snapshots": snaps})
 	})
 	mux.HandleFunc("GET /api/restore/usb", func(w http.ResponseWriter, r *http.Request) {
-		if !s.restoreAllowed(w, r) {
+		if !s.mayRestore(w, r) {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"disks": s.M.USBDisks(r.Context())})
@@ -405,6 +418,9 @@ func (s *Setup) Handler() http.Handler {
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
+		// checked and started under one lock: two taps, or a restore and a setup from two browsers, can't both start
+		s.mu.Lock()
+		defer s.mu.Unlock()
 		if !s.restoreAllowed(w, r) {
 			return
 		}
@@ -413,9 +429,7 @@ func (s *Setup) Handler() http.Handler {
 			writeError(w, http.StatusConflict, err)
 			return
 		}
-		s.mu.Lock()
 		s.job, s.restored, s.owner = j, true, token(r)
-		s.mu.Unlock()
 		writeJSON(w, http.StatusAccepted, j.Status())
 	})
 	mux.HandleFunc("POST /api/wifi", func(w http.ResponseWriter, r *http.Request) {
@@ -484,9 +498,15 @@ func (s *Setup) Handler() http.Handler {
 }
 
 // restoreAllowed: setting up (not yet set up), unlocked, online, and no setup or restore running.
-func (s *Setup) restoreAllowed(w http.ResponseWriter, r *http.Request) bool {
+// mayRestore is restoreAllowed for the questions asked before a restore (the backups there, the USB drives).
+func (s *Setup) mayRestore(w http.ResponseWriter, r *http.Request) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.restoreAllowed(w, r)
+}
+
+// restoreAllowed runs with s.mu held.
+func (s *Setup) restoreAllowed(w http.ResponseWriter, r *http.Request) bool {
 	switch {
 	case s.phase != PhaseSetup || !s.unlocked(r):
 		writeError(w, http.StatusForbidden, errors.New("Not available right now"))
@@ -526,6 +546,14 @@ func (s *Setup) isOwner(r *http.Request) bool {
 func (s *Setup) unlockedAt(tok string, ttl time.Duration) bool {
 	at, ok := s.tokens[tok]
 	return ok && s.now().Sub(at) < ttl
+}
+
+// clientAddr is the address a request came from, without its port.
+func clientAddr(r *http.Request) string {
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return h
+	}
+	return r.RemoteAddr
 }
 
 // unlocked: the request carries a token from /api/unlock (setup: 2 hours; recovery: 30 minutes). s.mu is held.

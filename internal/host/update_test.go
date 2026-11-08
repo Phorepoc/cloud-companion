@@ -283,3 +283,30 @@ func TestUpdateFileWritersDoNotUndoEachOther(t *testing.T) {
 		t.Errorf("the release in use went back to %q", c.Images)
 	}
 }
+
+// the hand-over to the new manager happens before anything waiting for the lock can start: a backup or a feature change that
+// started in those seconds was cut off by the restart
+func TestHandOverBeforeTheNextJob(t *testing.T) {
+	g := newFakeGitHub(t)
+	g.release("v0.4.0", "", "new compose", "new manager", false)
+	m, _, _ := newUpdateManager(t, g)
+	held := make(chan bool, 1)
+	m.Restart = func() {
+		free := m.mu.TryLock()
+		if free {
+			m.mu.Unlock()
+		}
+		held <- !free
+	}
+	if st := runUpdate(t, m); st.State != "done" {
+		t.Fatalf("%+v", st)
+	}
+	select {
+	case h := <-held:
+		if !h {
+			t.Error("the lock was free during the hand-over")
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("no hand-over")
+	}
+}

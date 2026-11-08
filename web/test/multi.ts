@@ -88,8 +88,8 @@ try {
   // signing out the Phone from the Laptop cuts it off at once: it lands on pairing, told why, and does not keep retrying
   const phoneDev = await B.page.evaluate(() => window.__phe.state.dev)
   await A.page.goto(BASE + '/#/settings/devices')
-  A.page.once('dialog', (d) => d.accept())
   await A.page.click(`[data-test=revoke-${phoneDev}]`)
+  await A.page.click('[data-test=devices-confirm-ok]') // the app's own dialog, not the browser's
   await B.page.waitForFunction(() => location.hash.startsWith('#/pair'), null, { timeout: 10000 })
   assert.match(await B.page.textContent('[data-test=pair-error]') || '', /signed out from another device/)
   assert.equal(await B.page.evaluate(() => window.__phe.state.status), 'offline')

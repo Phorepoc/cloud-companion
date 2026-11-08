@@ -52,6 +52,9 @@ func (m *Manager) SetSSH(ctx context.Context, on bool, user, password string) (S
 	if m.SSHUser == "" {
 		return SSHState{}, errors.New("SSH can only be managed here on servers installed from a Cloud Companion image")
 	}
+	// two browsers changing it at once could both rename the account, or set each other's password
+	m.smu.Lock()
+	defer m.smu.Unlock()
 	cur := m.SSH()
 	if !on {
 		var errs []error
@@ -66,10 +69,10 @@ func (m *Manager) SetSSH(ctx context.Context, on bool, user, password string) (S
 		return m.SSH(), errors.Join(errs...)
 	}
 	if password == "" && !cur.HasPassword {
-		return cur, errors.New("Choose a password")
+		return cur, errors.New("Choose a password.")
 	}
 	if password != "" && (len(password) < 10 || strings.ContainsAny(password, ":\n\r")) {
-		return cur, errors.New("The password must be at least 10 characters and can't contain a colon")
+		return cur, errors.New("The password must be at least 10 characters, on one line, without a colon.")
 	}
 	if !cur.HasPassword && user != "" && user != cur.User {
 		if !userName.MatchString(user) {
@@ -88,11 +91,18 @@ func (m *Manager) SetSSH(ctx context.Context, on bool, user, password string) (S
 	}
 	if password != "" {
 		// chpasswd reads "user:password" from a file only root can read: the password never shows in a process list
-		tmp := filepath.Join(m.StateDir, ".chpasswd")
-		if err := os.WriteFile(tmp, []byte(cur.User+":"+password+"\n"), 0o600); err != nil {
+		f, err := os.CreateTemp(m.StateDir, ".chpasswd-*") // its own file (0600): two changes can't swap passwords
+		if err != nil {
 			return cur, err
 		}
-		_, err := m.host(ctx, "sh", "-c", `chpasswd < "$0"`, tmp)
+		tmp := f.Name()
+		_, err = f.WriteString(cur.User + ":" + password + "\n")
+		if cerr := f.Close(); err == nil {
+			err = cerr
+		}
+		if err == nil {
+			_, err = m.host(ctx, "sh", "-c", `chpasswd < "$0"`, tmp)
+		}
 		os.Remove(tmp)
 		if err != nil {
 			return cur, fmt.Errorf("Couldn't set the password: %w", err)

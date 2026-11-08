@@ -50,8 +50,8 @@
             <strong>{{ d.name_a }}</strong> and <strong>{{ d.name_b }}</strong>
             <div class="ph-muted ph-small">{{ d.reason }}</div>
           </div>
-          <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_a)" data-test="dup-keep-a" @click="merge(d, d.a, d.b)" />
-          <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_b)" data-test="dup-keep-b" @click="merge(d, d.b, d.a)" />
+          <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_a)" :loading="merging === d.a + d.b" :disable="!!merging" data-test="dup-keep-a" @click="merge(d, d.a, d.b)" />
+          <q-btn flat no-caps color="primary" :label="'Keep ' + short(d.name_b)" :disable="!!merging" data-test="dup-keep-b" @click="merge(d, d.b, d.a)" />
           <q-btn v-if="d.same_source" flat no-caps color="warning" icon="sym_o_merge" :label="'Merge on ' + d.source_name + '…'" data-test="dup-device-merge" @click="previewDevice(d)" />
           <q-btn flat no-caps label="Not the same" data-test="dup-dismiss" @click="dismiss(d)" />
         </li>
@@ -196,8 +196,8 @@
         </q-card-section>
         <q-card-actions align="right">
           <q-btn flat no-caps label="Cancel" @click="adding = false" />
-          <q-btn outline color="primary" label="Test" :loading="busy === 'test'" data-test="f-test" @click="doTest" />
-          <q-btn unelevated color="primary" label="Add" :loading="busy === 'add'" data-test="f-add" @click="doAdd" />
+          <q-btn outline color="primary" label="Test" :loading="busy === 'test'" :disable="!!busy && busy !== 'test'" data-test="f-test" @click="doTest" />
+          <q-btn unelevated color="primary" label="Add" :loading="busy === 'add'" :disable="!!busy && busy !== 'add'" data-test="f-add" @click="doAdd" />
         </q-card-actions>
       </q-card>
     </q-dialog>
@@ -375,14 +375,17 @@ async function tgPassword() {
   try { await apiCall('POST', '/phe/telegram/login/password', { id: tg.id, password: tg.password }); tg.password = ''; tg.error = '' } catch (e) { tg.error = (e as Error).message }
 }
 async function signalLink() {
+  if (busy.value) return // one at a time: Add while Test still runs, or a double tap
   busy.value = 'link'; testResult.value = null; qr.value = ''
   try { qr.value = (await apiCall('POST', '/phe/signal/link', { api: f.url.trim() })).png } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
 }
 async function doTest() {
+  if (busy.value) return // one at a time: Add while Test still runs, or a double tap
   busy.value = 'test'; testResult.value = null
   try { testResult.value = await apiCall('POST', '/phe/connections/test', payload()) } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
 }
 async function doAdd() {
+  if (busy.value) return // one at a time: Add while Test still runs, or a double tap
   busy.value = 'add'; testResult.value = null
   try { await apiCall('POST', '/phe/connections', payload()); adding.value = false; await load() } catch (e) { testResult.value = { ok: false, detail: (e as Error).message } } finally { busy.value = '' }
 }
@@ -401,9 +404,12 @@ async function findDups() {
   finding.value = true; dupError.value = ''
   try { dups.value = (await apiCall('GET', '/phe/duplicates')).suggestions } catch (e) { dupError.value = (e as Error).message } finally { finding.value = false }
 }
+const merging = ref('')
 async function merge(d: DupSuggestion, keep: string, drop: string) {
+  if (merging.value) return // a double tap merged twice: the second found nothing and showed an error after a merge that worked
+  merging.value = d.a + d.b
   dupError.value = ''
-  try { await apiCall('POST', '/phe/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = (e as Error).message }
+  try { await apiCall('POST', '/phe/duplicates/merge', { keep, drop }); await findDups() } catch (e) { dupError.value = (e as Error).message } finally { merging.value = '' }
 }
 function openOAuth(p: OAuthProvider) { oauthFor.value = p; oauthName.value = ''; oauthKinds.value = ['mail']; oauthError.value = '' }
 async function startOAuth() {

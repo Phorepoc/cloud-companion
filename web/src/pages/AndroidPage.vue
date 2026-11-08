@@ -36,9 +36,9 @@
           <h2 class="ph-h3">Install apps</h2>
           <p class="ph-muted">Apps run on your server and keep running when you close this page. Only apps that include x86_64 code install.</p>
           <input ref="file" type="file" accept=".apk,application/vnd.android.package-archive" hidden data-test="android-apk" @change="pickApk" />
-          <q-btn outline color="primary" no-caps icon="sym_o_upload_file" label="Install an APK file" @click="file?.click()" />
+          <q-btn outline color="primary" no-caps icon="sym_o_upload_file" label="Install an APK file" :loading="installing" :disable="installing" data-test="android-apk-pick" @click="file?.click()" />
           <q-input v-model="pkg" outlined dense label="F-Droid package name" hint="For example org.fossify.notes" autocomplete="off" data-test="android-pkg" @keyup.enter="fdroid" />
-          <q-btn unelevated color="primary" no-caps icon="sym_o_download" label="Install from F-Droid" :disable="!pkg.trim()" data-test="android-fdroid" @click="fdroid" />
+          <q-btn unelevated color="primary" no-caps icon="sym_o_download" label="Install from F-Droid" :loading="installing" :disable="!pkg.trim() || installing" data-test="android-fdroid" @click="fdroid" />
           <p class="ph-small" aria-live="polite" data-test="android-install-note">{{ note }}</p>
         </q-card-section>
         <q-card-actions align="right"><q-btn flat no-caps label="Close" @click="installOpen = false" /></q-card-actions>
@@ -122,6 +122,7 @@ const statsText = computed(() => {
 })
 
 async function connect() {
+  if (busy.value) return
   busy.value = true; problem.value = ''; note.value = ''
   try {
     const j = await apiCall('GET', '/phe/android/ticket') // a fresh two-minute ticket, from this signed-in device
@@ -133,8 +134,15 @@ async function connect() {
   } catch (e) { problem.value = (e as Error).message } finally { busy.value = false; loaded.value = true }
 }
 function toggleSound() { sound.value = !sound.value; stream.value.setSound(sound.value) }
-async function pickApk(e: Event) { const input = e.target as HTMLInputElement; const f = input.files?.[0]; if (f) await stream.value.installApk(f); input.value = '' }
-async function fdroid() { if (pkg.value.trim()) await stream.value.installFdroid(pkg.value.trim()) }
+// one install at a time: a double tap installed twice, and a large APK gave no sign that anything was happening
+const installing = ref(false)
+async function install(run: () => Promise<boolean>) {
+  if (installing.value) return
+  installing.value = true
+  try { await run() } finally { installing.value = false }
+}
+async function pickApk(e: Event) { const input = e.target as HTMLInputElement; const f = input.files?.[0]; if (f) await install(() => stream.value.installApk(f)); input.value = '' }
+async function fdroid() { const id = pkg.value.trim(); if (id) await install(() => stream.value.installFdroid(id)) }
 
 let ro: ResizeObserver | null = null
 function measure() { const r = stage.value?.getBoundingClientRect(); if (r) stageSize.value = { w: Math.floor(r.width), h: Math.floor(r.height) } }

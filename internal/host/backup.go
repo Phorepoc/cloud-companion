@@ -57,6 +57,7 @@ type BackupRun struct {
 	OK       bool      `json:"ok"`
 	Error    string    `json:"error,omitempty"`
 	Snapshot string    `json:"snapshot,omitempty"`
+	Warning  string    `json:"warning,omitempty"` // saved, but the weekly check of the older backups found a problem
 }
 
 // Snapshot is one backup in the destination.
@@ -71,6 +72,17 @@ var (
 	sftpPath = regexp.MustCompile(`^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+(:[0-9]+)?:/?[^\s]*$`)
 	uuidRe   = regexp.MustCompile(`^[A-Za-z0-9-]{4,64}$`)
 )
+
+// sftpRepo is restic's name for an SFTP folder. With a port ("user@host:2222:/backups") restic needs its URL form, in which the
+// path after the host's slash is relative to the login's home and a second slash makes it absolute; "sftp:user@host:2222:/x"
+// would be read as the folder "2222:/x" on port 22.
+func sftpRepo(p string) string {
+	m := regexp.MustCompile(`^([^@]+@[^:]+):([0-9]+):(.*)$`).FindStringSubmatch(p)
+	if m == nil {
+		return "sftp:" + p
+	}
+	return "sftp://" + m[1] + ":" + m[2] + "/" + m[3]
+}
 
 // check says what is wrong with a destination, in words for the page.
 func (d Destination) check() error {
@@ -202,7 +214,7 @@ func (m *Manager) restic(ctx context.Context, d Destination, mounts []string, ou
 			return err
 		}
 		run = append(run, "-v", filepath.Join(m.StateDir, "ssh")+":/root/.ssh")
-		env = append(env, "RESTIC_REPOSITORY=sftp:"+d.Path)
+		env = append(env, "RESTIC_REPOSITORY="+sftpRepo(d.Path))
 	case "s3":
 		run = append(run, "-e", "AWS_ACCESS_KEY_ID", "-e", "AWS_SECRET_ACCESS_KEY")
 		env = append(env, "RESTIC_REPOSITORY=s3:"+d.URL, "AWS_ACCESS_KEY_ID="+d.KeyID, "AWS_SECRET_ACCESS_KEY="+d.Secret)
@@ -285,6 +297,11 @@ func (m *Manager) USBDisks(ctx context.Context) []USBDisk {
 
 // Snapshots lists the backups at the destination, newest first.
 func (m *Manager) Snapshots(ctx context.Context, d Destination) ([]Snapshot, error) {
+	if d.Kind == "usb" && m.busy() { // listing mounts the drive afresh, under a backup or restore that is using it
+		return nil, ErrBackingUp
+	}
+	ctx, cancel := context.WithTimeout(ctx, time.Minute) // an unreachable computer or a slow cloud store: an answer, not a spinner
+	defer cancel()
 	var out bytes.Buffer
 	if err := m.restic(ctx, d, nil, &out, "snapshots", "--json", "--tag", "cloud"); err != nil {
 		return nil, resticError(out.String(), err)
@@ -347,14 +364,17 @@ func (m *Manager) SetBackup(on bool, d Destination, at string) (*Job, error) {
 	if !atTime.MatchString(at) {
 		return nil, errors.New("Enter a time such as 03:30")
 	}
-	j := m.newJob("backup-setup", "")
+	j, err := m.soleJob("backup-setup") // two saves at once both ran "init"; one during a backup unmounted its drive
+	if err != nil {
+		return nil, err
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		var out bytes.Buffer
 		err := m.restic(ctx, d, nil, io.MultiWriter(&out, j), "cat", "config")
 		if err != nil && strings.Contains(out.String(), "wrong password") {
-			err = errors.New("This location already has backups with a different password")
+			err = errors.New("This location already has backups made with another password. Enter the password they were made with")
 		} else if err != nil {
 			fmt.Fprintln(j, "no backups there yet: starting them")
 			out.Reset()
@@ -397,9 +417,9 @@ func (m *Manager) BackupNow() (*Job, error) {
 		defer m.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
 		defer cancel()
-		snap, err := m.backup(ctx, c.Dest, j)
+		snap, warn, err := m.backup(ctx, c.Dest, j)
 		c := m.BackupConfig()
-		c.Last = &BackupRun{At: time.Now().UTC(), OK: err == nil, Snapshot: snap}
+		c.Last = &BackupRun{At: time.Now().UTC(), OK: err == nil, Snapshot: snap, Warning: warn}
 		if err != nil {
 			c.Last.Error = err.Error()
 		}
@@ -409,14 +429,18 @@ func (m *Manager) BackupNow() (*Job, error) {
 	return j, nil
 }
 
-func (m *Manager) backup(ctx context.Context, d Destination, j *Job) (string, error) {
+// checkDay says whether a backup also checks the older ones (on Sundays; tests choose).
+var checkDay = func() bool { return time.Now().Weekday() == time.Sunday }
+
+// backup makes one backup, and returns its id and the weekly check's finding (a warning): the new backup is saved all the same, so it is not a failure.
+func (m *Manager) backup(ctx context.Context, d Destination, j *Job) (string, string, error) {
 	vols, err := m.volumes(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	stage := filepath.Join(m.StateDir, stageDir)
 	if err := m.writeStage(stage, vols); err != nil {
-		return "", err
+		return "", "", err
 	}
 	mounts := []string{"-v", stage + ":/data/host:ro"}
 	for _, v := range vols {
@@ -424,12 +448,12 @@ func (m *Manager) backup(ctx context.Context, d Destination, j *Job) (string, er
 	}
 	running, err := m.containers(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	if len(running) > 0 {
 		fmt.Fprintln(j, "stopping Cloud Companion for the backup")
 		if err := m.Run.Run(ctx, m.ComposeDir, append([]string{"stop", "--time", "60"}, running...), j); err != nil {
-			return "", fmt.Errorf("stopping: %w", err)
+			return "", "", fmt.Errorf("stopping: %w", err)
 		}
 		defer func() { // when the backup failed; otherwise they started again below
 			if len(running) > 0 {
@@ -440,7 +464,7 @@ func (m *Manager) backup(ctx context.Context, d Destination, j *Job) (string, er
 	}
 	var out bytes.Buffer
 	if err := m.restic(ctx, d, mounts, io.MultiWriter(&out, j), "backup", "--tag", "cloud", "--host", "cloud", "--json", "/data"); err != nil {
-		return "", resticError(out.String(), err)
+		return "", "", resticError(out.String(), err)
 	}
 	snap := ""
 	for _, l := range strings.Split(out.String(), "\n") {
@@ -465,13 +489,13 @@ func (m *Manager) backup(ctx context.Context, d Destination, j *Job) (string, er
 	if err := m.restic(ctx, d, nil, io.MultiWriter(&out, j), "forget", "--tag", "cloud", "--keep-daily", "7", "--keep-weekly", "4", "--keep-monthly", "6", "--prune"); err != nil {
 		fmt.Fprintf(j, "clearing old backups failed (the new one is kept): %v\n", resticError(out.String(), err))
 	}
-	if time.Now().Weekday() == time.Sunday {
+	if checkDay() {
 		out.Reset()
 		if err := m.restic(ctx, d, nil, io.MultiWriter(&out, j), "check"); err != nil {
-			return snap, fmt.Errorf("the weekly check of the backups failed: %w", resticError(out.String(), err))
+			return snap, "Your backup was saved, but the weekly check of the older backups found a problem: " + resticError(out.String(), err).Error(), nil
 		}
 	}
-	return snap, nil
+	return snap, "", nil
 }
 
 // volumes lists the compose project's volumes with their labels.
@@ -626,6 +650,27 @@ func (m *Manager) restore(ctx context.Context, d Destination, snapshot string, j
 
 // Schedule runs the night's work at the backup time each day until ctx ends (the board's time zone): an update when one is
 // waiting and automatic updates are on (it backs up first), else the backup. It looks for updates once a day.
+// localtimeFile is where the board keeps its time zone (timedatectl makes it a link into the zone database).
+var localtimeFile = "/etc/localtime"
+
+// boardZone is the board's time zone as it is now. Go reads the zone once, when the process starts: setup sets it later, so
+// "03:30" was half past three in UTC until the next restart.
+func boardZone() *time.Location {
+	if dst, err := os.Readlink(localtimeFile); err == nil {
+		if _, name, ok := strings.Cut(dst, "zoneinfo/"); ok {
+			if loc, err := time.LoadLocation(name); err == nil {
+				return loc
+			}
+		}
+	}
+	if b, err := os.ReadFile(localtimeFile); err == nil {
+		if loc, err := time.LoadLocationFromTZData("Local", b); err == nil {
+			return loc
+		}
+	}
+	return time.Local
+}
+
 func (m *Manager) Schedule(ctx context.Context) {
 	t := time.NewTicker(30 * time.Second)
 	defer t.Stop()
@@ -635,6 +680,7 @@ func (m *Manager) Schedule(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case now := <-t.C:
+			now = now.In(boardZone()) // the zone chosen in setup, which this process did not have when it started
 			if u := m.UpdateConfig(); m.SetUp() && now.Sub(u.Checked) > 24*time.Hour {
 				cctx, cancel := context.WithTimeout(ctx, time.Minute)
 				m.CheckUpdate(cctx)

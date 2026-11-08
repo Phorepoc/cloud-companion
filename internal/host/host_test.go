@@ -17,6 +17,7 @@ import (
 	"sync"
 	"testing"
 	"testing/fstest"
+	"time"
 )
 
 func realCatalogue(t *testing.T) *Catalogue {
@@ -334,5 +335,20 @@ func TestChangesCloseTogetherBothStand(t *testing.T) {
 		if m.Value(id, "") == "" && !slices.Contains(m.enabled(m.cloneState()), id) {
 			t.Errorf("%s was undone by the other change", id)
 		}
+	}
+}
+
+// finished jobs are dropped an hour after they ended (their logs were kept for ever); running and recent ones stay
+func TestOldJobsAreDropped(t *testing.T) {
+	m := &Manager{jobs: map[string]*Job{}}
+	old, recent, running := m.addJob("feature", "a"), m.addJob("feature", "b"), m.addJob("feature", "c")
+	old.finish(nil)
+	recent.finish(nil)
+	old.mu.Lock()
+	old.ended = time.Now().Add(-2 * time.Hour)
+	old.mu.Unlock()
+	m.addJob("feature", "d")
+	if m.Job(old.ID) != nil || m.Job(recent.ID) == nil || m.Job(running.ID) == nil {
+		t.Errorf("kept: old %v, recent %v, running %v", m.Job(old.ID) != nil, m.Job(recent.ID) != nil, m.Job(running.ID) != nil)
 	}
 }

@@ -67,6 +67,7 @@ type Manager struct {
 	mu    sync.Mutex // the state and the compose project
 	jmu   sync.Mutex
 	umu   sync.Mutex // update.json (editUpdate)
+	smu   sync.Mutex // remote login (SetSSH): one change at a time
 	jobs  map[string]*Job
 	state State
 }
@@ -455,6 +456,7 @@ type Job struct {
 	lines []string
 	part  string
 	done  bool
+	ended time.Time
 	err   error
 	ch    chan struct{} // closed when done
 }
@@ -471,6 +473,11 @@ func (m *Manager) addJob(kind, feature string) *Job {
 	b := make([]byte, 6)
 	rand.Read(b)
 	j := &Job{ID: hex.EncodeToString(b), Kind: kind, Feature: feature, ch: make(chan struct{})}
+	for id, o := range m.jobs { // a page asks for a job's end within seconds: an hour later nobody does, and its log is only memory
+		if o.endedBefore(time.Now().Add(-jobKeep)) {
+			delete(m.jobs, id)
+		}
+	}
 	m.jobs[j.ID] = j
 	return j
 }
@@ -478,16 +485,30 @@ func (m *Manager) addJob(kind, feature string) *Job {
 // soleJob starts an update, a backup or a restore unless one of them is running already (an update backs up first, so they exclude each other
 // too): a second "Update now", from another browser or after coming back to the page, would back up and download again, and
 // overwrite the copies kept for going back.
+var exclusive = map[string]bool{"update": true, "backup": true, "restore": true, "backup-setup": true}
+
+// busy says whether an update, a backup, a restore or a backup set-up is running.
+func (m *Manager) busy() bool {
+	for _, j := range m.Running() {
+		if exclusive[j.Kind] {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *Manager) soleJob(kind string) (*Job, error) {
 	m.jmu.Lock()
 	defer m.jmu.Unlock()
 	for _, j := range m.jobs {
-		if (j.Kind == "update" || j.Kind == "backup" || j.Kind == "restore") && !j.isDone() {
+		if exclusive[j.Kind] && !j.isDone() {
 			switch j.Kind {
 			case "update":
 				return nil, ErrUpdating
 			case "restore":
 				return nil, ErrRestoring
+			case "backup-setup":
+				return nil, ErrCheckingBackup
 			}
 			return nil, ErrBackingUp
 		}
@@ -497,10 +518,25 @@ func (m *Manager) soleJob(kind string) (*Job, error) {
 
 // ErrUpdating, ErrBackingUp and ErrRestoring: one of them is running, so another one waits until it is done.
 var (
-	ErrUpdating  = errors.New("An update is already being installed. Wait until it's done")
-	ErrBackingUp = errors.New("A backup is already running. Wait until it's done")
-	ErrRestoring = errors.New("A restore is already running. Wait until it's done")
+	ErrUpdating       = errors.New("An update is already being installed. Wait until it's done")
+	ErrBackingUp      = errors.New("A backup is already running. Wait until it's done")
+	ErrRestoring      = errors.New("A restore is already running. Wait until it's done")
+	ErrCheckingBackup = errors.New("The backup location is being checked. Wait until it's done")
 )
+
+// Running lists the jobs that have not ended, so a page opened (or reloaded) during an update, a backup or a feature change can
+// follow it again instead of offering to start another.
+func (m *Manager) Running() []*Job {
+	m.jmu.Lock()
+	defer m.jmu.Unlock()
+	var out []*Job
+	for _, j := range m.jobs {
+		if !j.isDone() {
+			out = append(out, j)
+		}
+	}
+	return out
+}
 
 func (j *Job) isDone() bool {
 	j.mu.Lock()
@@ -530,12 +566,20 @@ func (j *Job) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+const jobKeep = time.Hour
+
+func (j *Job) endedBefore(t time.Time) bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.done && j.ended.Before(t)
+}
+
 func (j *Job) finish(err error) {
 	j.mu.Lock()
 	if j.part != "" {
 		j.lines, j.part = append(j.lines, j.part), ""
 	}
-	j.done, j.err = true, err
+	j.done, j.err, j.ended = true, err, time.Now()
 	j.mu.Unlock()
 	close(j.ch)
 }

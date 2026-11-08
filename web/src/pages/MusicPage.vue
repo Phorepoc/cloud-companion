@@ -139,11 +139,13 @@ async function load() {
   try { tracks.value = await loadTracks() } catch (e) { error.value = (e as Error).message } finally { loading.value = false }
 }
 
+// the song playing, as one value: the list redraws when the song changes, not on every tick of the player's position
+const nowPath = computed(() => current()?.path)
 const SongList = defineComponent({
   props: { list: { type: Array as () => Track[], required: true } },
   setup(p) {
     return () => h('ul', { class: 'ph-list ph-card', 'data-test': 'music-songs' }, p.list.map((t, i) =>
-      h('li', { key: t.path }, h('button', { type: 'button', class: ['ph-row', { 'is-now': current()?.path === t.path }], 'data-test': 'song-' + t.title, onClick: () => play(p.list, i) }, [
+      h('li', { key: t.path }, h('button', { type: 'button', class: ['ph-row', { 'is-now': nowPath.value === t.path }], 'data-test': 'song-' + t.title, onClick: () => play(p.list, i) }, [
         h('span', { class: 'ph-n ph-muted' }, t.n ? String(t.n) : '·'),
         h('span', { class: 'ph-row-main' }, [h('span', { class: 'ph-row-title' }, t.title), h('span', { class: 'ph-small ph-muted' }, t.artist + ' · ' + t.album)]),
       ]))))

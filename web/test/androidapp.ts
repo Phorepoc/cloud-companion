@@ -130,6 +130,10 @@ await tool(page, 'Sound off')
 await tool(page, 'Sound on') // the action is named for what it shows: it now reads Sound on
 await tool(page, 'Install apps'); await page.waitForSelector('[data-test=android-install-dialog]')
 await page.setInputFiles('[data-test=android-apk]', '/t/markor.apk')
+// while it installs, neither install button takes a second tap
+await page.waitForFunction(() => /Installing/.test(document.querySelector('[data-test=android-install-note]')?.textContent ?? ''), null, { timeout: 10000 })
+assert(await page.locator('[data-test=android-apk-pick]').isDisabled(), 'Install an APK file waits')
+assert(await page.locator('[data-test=android-fdroid]').isDisabled(), 'Install from F-Droid waits')
 await page.waitForFunction(() => /installed|failed/.test((document.querySelector('[data-test=android-install-note]')?.textContent ?? '')), null, { timeout: 120000 })
 const inst = (await page.textContent('[data-test=android-install-note]')) ?? ''
 console.log('install through the app:', inst.trim())

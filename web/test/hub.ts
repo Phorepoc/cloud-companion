@@ -91,6 +91,36 @@ try {
   step('contact edited; the phone number and the note survived the round trip')
   await page.keyboard.press('Escape')
 
+  // another device saves the contact while this one has it open for editing: this edit is refused in plain words, and the
+  // newer version is loaded
+  await page.locator('[data-test^=contact-row-]', { hasText: NAME }).click()
+  await page.click('[data-test=contact-edit]')
+  await page.evaluate(async (n) => {
+    const { contacts } = await window.__phe.hubCall({ op: 'contacts.list' })
+    const c = contacts.find((x: { name: string }) => x.name.includes(n))
+    await window.__phe.hubCall({ op: 'contacts.save', contact: { ...c, org: 'Changed elsewhere' } })
+  }, NAME)
+  await page.fill('[data-test=contact-org]', 'Changed here')
+  await page.click('[data-test=contact-save]')
+  await page.waitForFunction(() => /changed on another device/.test(document.querySelector('[data-test=contact-form], .q-dialog')?.textContent || ''))
+  await page.keyboard.press('Escape')
+  await page.waitForSelector('text=Changed elsewhere')
+  step('an edit of a contact changed on another device: refused in plain words, the newer version shown')
+  await go('devices'); await go('contacts'); await page.waitForSelector(`text=${NAME} Tester`)
+
+  // initials of a name that starts with an emoji or another character outside the basic plane: whole, not half a character
+  await tool(page, 'New contact')
+  await page.fill('[data-test=contact-given]', '\u{1F33B}Sun' + stamp)
+  await page.click('[data-test=contact-save]')
+  const av = page.locator('[data-test^=contact-row-]', { hasText: 'Sun' + stamp }).locator('.ph-avatar')
+  await av.waitFor()
+  assert.equal(await av.textContent(), '\u{1F33B}', 'the initial is the whole emoji')
+  await page.evaluate(async (n) => {
+    const { contacts } = await window.__phe.hubCall({ op: 'contacts.list' })
+    for (const c of contacts.filter((x: { name: string }) => x.name.includes(n))) await window.__phe.hubCall({ op: 'contacts.delete', href: c.href, etag: c.etag })
+  }, 'Sun' + stamp)
+  step('initials keep an emoji whole')
+
   // delete with Undo: the contact comes back; delete again and let the toast run out: it is gone on the server
   await page.locator('[data-test^=contact-row-]', { hasText: NAME }).click()
   await page.click('[data-test=contact-delete]')
@@ -100,13 +130,15 @@ try {
   step('delete then Undo: the contact is still there')
   await page.locator('[data-test^=contact-row-]', { hasText: NAME }).click()
   await page.click('[data-test=contact-delete]')
-  await page.waitForTimeout(5500)
+  await page.waitForTimeout(300)
+  await page.reload() // mid-toast: the delete still happens, once the app is back
+  await page.waitForTimeout(5000)
   await go('devices')
   await go('contacts')
   await page.waitForTimeout(1500)
   assert.equal(await page.locator('[data-test^=contact-row-]', { hasText: NAME }).count(), 0, 'deleted on the server')
   assert.equal(await page.locator('[data-test^=contact-row-]').count(), before)
-  step('delete and let the toast run out: gone on the server')
+  step('delete, and reload while the toast is up: still gone on the server')
 
   // ---- calendar ----
   await go('calendar')
@@ -197,8 +229,9 @@ try {
   await page.waitForSelector(`text=pw-test ${stamp}`)
   step('app password created (shown once), listed in Devices')
   await shots('devices-apppw')
-  page.once('dialog', (d) => d.accept())
   await page.locator('[data-test^=apppw-row-]', { hasText: `pw-test ${stamp}` }).locator('[data-test^=apppw-revoke-]').click()
+  assert.match((await page.textContent('[data-test=devices-confirm]')) ?? '', /can no longer read your mail/, 'asked in the app, not the browser')
+  await page.click('[data-test=devices-confirm-ok]')
   await page.waitForFunction((n) => !(document.body.textContent ?? '').includes(n), `pw-test ${stamp}`, { timeout: 10000 })
   step('app password switched off: the row is gone')
 
@@ -252,6 +285,13 @@ try {
     await go('mail')
     await page.waitForSelector('.x-cl__actions [aria-label="Write"]') // the page's actions sit in the frame's bar
     await page.click('.x-cl__actions [aria-label="Write"]')
+    await page.fill('[data-test=mail-subject]', SUBJ)
+    await page.click('[data-test=mail-send]')
+    await page.waitForFunction(() => /Enter who the message is to/.test(document.querySelector('[data-test=mail-compose-form]')?.textContent || ''))
+    await page.fill('[data-test=mail-to]', 'not an address')
+    await page.click('[data-test=mail-send]')
+    await page.waitForFunction(() => /isn't an email address/.test(document.querySelector('[data-test=mail-compose-form]')?.textContent || ''))
+    step('no recipient, or one that is not an address: said before anything is sent')
     await page.fill('[data-test=mail-to]', 'someone@elsewhere.example')
     await page.fill('[data-test=mail-subject]', SUBJ)
     await page.fill('[data-test=mail-body]', 'Hello from the test.')

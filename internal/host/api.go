@@ -98,6 +98,11 @@ func (m *Manager) Handler() http.Handler {
 			return
 		}
 		s, err := m.SetSSH(r.Context(), in.On, in.User, in.Password)
+		if err != nil && !in.On && !s.On {
+			// switched off, but locking the account or stopping the service failed: the page shows Off and says what went wrong
+			writeJSON(w, http.StatusOK, map[string]any{"available": true, "ssh": s, "warning": "Remote login is off, but something didn't stop cleanly: " + err.Error()})
+			return
+		}
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err)
 			return
@@ -131,6 +136,13 @@ func (m *Manager) Handler() http.Handler {
 	mux.HandleFunc("POST /v1/update", func(w http.ResponseWriter, r *http.Request) {
 		j, err := m.Update()
 		jobReply(w, j, err)
+	})
+	mux.HandleFunc("GET /v1/jobs", func(w http.ResponseWriter, r *http.Request) {
+		out := []JobStatus{}
+		for _, j := range m.Running() {
+			out = append(out, j.Status())
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"jobs": out})
 	})
 	mux.HandleFunc("GET /v1/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
 		j := m.Job(r.PathValue("id"))

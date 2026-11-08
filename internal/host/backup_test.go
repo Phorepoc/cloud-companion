@@ -14,16 +14,18 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 // resticDocker is a fake Docker with two running containers and two volumes, and a restic that answers from its own state.
 type resticDocker struct {
-	mu       sync.Mutex
-	calls    [][]string
-	envs     [][]string
-	failRun  bool
-	password string // the repository's; "" = none there yet
-	volumes  map[string]map[string]string
+	mu        sync.Mutex
+	calls     [][]string
+	envs      [][]string
+	failRun   bool
+	failCheck bool
+	password  string // the repository's; "" = none there yet
+	volumes   map[string]map[string]string
 }
 
 func (d *resticDocker) Run(ctx context.Context, dir string, args []string, out io.Writer) error {
@@ -83,6 +85,11 @@ func (d *resticDocker) RunEnv(ctx context.Context, dir string, env, args []strin
 			return errors.New("exit status 1")
 		}
 		io.WriteString(out, `{"message_type":"status","percent_done":0.5}`+"\n"+`{"message_type":"summary","snapshot_id":"4f2a9c1e77aa"}`+"\n")
+	case "check":
+		if d.failCheck {
+			io.WriteString(out, "Fatal: pack 3f2a: not referenced in any index\n")
+			return errors.New("exit status 1")
+		}
 	case "snapshots":
 		io.WriteString(out, `[{"short_id":"11111111","time":"2026-11-06T03:30:00Z","hostname":"cloud"},{"short_id":"4f2a9c1e","time":"2026-11-07T03:30:00Z","hostname":"cloud"}]`)
 	case "dump":
@@ -330,6 +337,9 @@ func TestOneBackupOrUpdateAtATime(t *testing.T) {
 	if _, err := m.Update(); !errors.Is(err, ErrBackingUp) {
 		t.Errorf("an update during a backup: %v", err)
 	}
+	if r := m.Running(); len(r) != 1 || r[0].ID != first.ID {
+		t.Errorf("running jobs during the backup: %v (a reloaded page follows this one)", r)
+	}
 	m.mu.Unlock()
 	<-first.Done()
 	again, err := m.BackupNow()
@@ -337,7 +347,88 @@ func TestOneBackupOrUpdateAtATime(t *testing.T) {
 		t.Fatalf("after the first was done: %v", err)
 	}
 	<-again.Done()
+	if r := m.Running(); len(r) != 0 {
+		t.Errorf("running jobs after both ended: %d", len(r))
+	}
 	if first.ID == again.ID || len(first.ID) < 8 {
 		t.Errorf("job ids: %q %q", first.ID, again.ID)
+	}
+}
+
+// SFTP with a port: restic's URL form, or restic would look for the folder "2222:/backups" on port 22
+func TestSFTPWithAPort(t *testing.T) {
+	for in, want := range map[string]string{
+		"anna@nas.local:/srv/backups":      "sftp:anna@nas.local:/srv/backups",
+		"anna@nas.local:cloud-backups":     "sftp:anna@nas.local:cloud-backups",
+		"anna@nas.local:2222:/srv/backups": "sftp://anna@nas.local:2222//srv/backups",
+		"anna@nas.local:2222:cloud":        "sftp://anna@nas.local:2222/cloud",
+	} {
+		if got := sftpRepo(in); got != want {
+			t.Errorf("%s: %s, want %s", in, got, want)
+		}
+	}
+}
+
+// the weekly check of the older backups finds a problem: the new backup was still saved, so the page says that, not "failed"
+func TestFailedWeeklyCheckIsNotAFailedBackup(t *testing.T) {
+	m, d := newBackupManager(t)
+	j, err := m.SetBackup(true, Destination{Kind: "rest", URL: "http://rest:8000/cloud", Password: "a long backup password"}, "03:30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-j.Done()
+	was := checkDay
+	checkDay = func() bool { return true }
+	defer func() { checkDay = was }()
+	d.failCheck = true
+	b, err := m.BackupNow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-b.Done()
+	l := m.BackupConfig().Last
+	if l == nil || !l.OK || l.Snapshot == "" || !strings.Contains(l.Warning, "Your backup was saved") || b.Status().State != "done" {
+		t.Fatalf("last run: %+v, job %s", l, b.Status().State)
+	}
+}
+
+// saving the location while a backup runs: refused, not a second "init" racing the first (that showed a failure that wasn't)
+func TestBackupSetUpWaitsForABackup(t *testing.T) {
+	m, _ := newBackupManager(t)
+	j, err := m.SetBackup(true, Destination{Kind: "rest", URL: "http://rest:8000/cloud", Password: "a long backup password"}, "03:30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-j.Done()
+	m.mu.Lock()
+	run, err := m.BackupNow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.SetBackup(true, Destination{Kind: "rest", URL: "http://rest:8000/cloud"}, "04:00"); !errors.Is(err, ErrBackingUp) {
+		t.Errorf("saving during a backup: %v", err)
+	}
+	if _, err := m.Snapshots(context.Background(), Destination{Kind: "usb", UUID: "1234-ABCD", Password: "a long backup password"}); !errors.Is(err, ErrBackingUp) {
+		t.Errorf("listing a USB drive during a backup: %v", err)
+	}
+	m.mu.Unlock()
+	<-run.Done()
+}
+
+// the nightly time is the board's time zone as set in setup, not the one the manager started with
+func TestScheduleUsesTheBoardsZoneNow(t *testing.T) {
+	was := localtimeFile
+	defer func() { localtimeFile = was }()
+	link := filepath.Join(t.TempDir(), "localtime")
+	if err := os.Symlink("/usr/share/zoneinfo/Europe/Berlin", link); err != nil {
+		t.Fatal(err)
+	}
+	localtimeFile = link
+	if z := boardZone(); z.String() != "Europe/Berlin" {
+		t.Fatalf("zone: %s", z)
+	}
+	at := time.Date(2026, 11, 8, 2, 30, 0, 0, time.UTC).In(boardZone())
+	if at.Format("15:04") != "03:30" {
+		t.Errorf("02:30 UTC in Berlin: %s", at.Format("15:04"))
 	}
 }

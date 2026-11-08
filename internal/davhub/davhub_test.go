@@ -4,6 +4,8 @@
 package davhub
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -54,5 +56,22 @@ func TestICalAllDayAndNew(t *testing.T) {
 	o := parseICal(out)
 	if !o.ev.AllDay || o.ev.Start != "2026-12-25" || o.ev.Title != "Holiday" {
 		t.Fatalf("re-parsed %+v", o.ev)
+	}
+}
+
+// an edit made from an older copy (another device saved in between): the hub refuses it, and the message says so in plain words
+func TestEditOfAChangedContactSaysSo(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.Write([]byte("BEGIN:VCARD\r\nVERSION:3.0\r\nUID:u1\r\nFN:Ann\r\nEND:VCARD\r\n"))
+			return
+		}
+		w.WriteHeader(http.StatusPreconditionFailed)
+	}))
+	defer srv.Close()
+	c := &Client{URL: srv.URL, Owner: "owner@hub.test", Pass: "x", HTTP: srv.Client()}
+	_, err := c.SaveContact(proto.Contact{Href: c.base("card") + "u1.vcf", ETag: `"old"`, Name: "Ann B"})
+	if err == nil || !strings.Contains(err.Error(), "changed on another device") {
+		t.Fatalf("a stale edit: %v", err)
 	}
 }

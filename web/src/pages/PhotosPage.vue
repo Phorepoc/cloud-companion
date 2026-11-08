@@ -58,6 +58,7 @@
       <div class="ph-viewer" data-test="photos-viewer">
         <div class="ph-viewer__bar">
           <span class="ph-viewer__name">{{ current?.name }}<span class="ph-viewer__when"> · {{ current ? new Date(current.taken).toLocaleString() : '' }}</span></span>
+          <span class="ph-viewer__edge" aria-live="polite" data-test="photos-edge">{{ edge }}</span>
           <q-btn flat round icon="sym_o_download" aria-label="Download" :href="current ? photoURL(current, '') : undefined" :download="current?.name" data-test="photos-download" />
           <q-btn flat round icon="sym_o_close" aria-label="Close" v-close-popup data-test="photos-close" />
         </div>
@@ -90,6 +91,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
+import { latest } from '../latest'
 import { state } from '../cloud'
 import { hasThumb, loadAlbum, loadAlbums, loadTimeline, photoFolders, photoURL, setPhotoFolders, type Photo, type PhotoAlbum } from '../photos'
 
@@ -99,10 +101,11 @@ const items = ref<Photo[]>([]), albums = ref<PhotoAlbum[]>([])
 const more = ref(false), loading = ref(false), error = ref('')
 const sentinel = ref<HTMLElement | null>(null)
 
+const monthFmt = new Intl.DateTimeFormat([], { month: 'long', year: 'numeric' }) // one formatter for every photo, not one each
 const groups = computed(() => {
   const out: { title: string; items: Photo[] }[] = []
   for (const p of items.value) {
-    const title = new Date(p.taken).toLocaleDateString([], { month: 'long', year: 'numeric' })
+    const title = monthFmt.format(new Date(p.taken))
     if (out.at(-1)?.title !== title) out.push({ title, items: [] })
     out.at(-1)!.items.push(p)
   }
@@ -110,18 +113,22 @@ const groups = computed(() => {
 })
 
 async function fetchPage(before = '') { return album.value ? loadAlbum(album.value, before) : loadTimeline(before) }
+// a reload (another tab or album) makes what is still on its way out of date: its photos never join the new list
+const gridLoad = latest()
 async function reload() {
+  const t = gridLoad.take()
   loading.value = true; error.value = ''
   try {
-    if (tab.value === 'albums' && !album.value) albums.value = await loadAlbums()
-    else { const j = await fetchPage(); items.value = j.items; more.value = j.more }
-  } catch (e) { error.value = (e as Error).message } finally { loading.value = false }
+    if (tab.value === 'albums' && !album.value) { const a = await loadAlbums(); if (gridLoad.is(t)) albums.value = a }
+    else { const j = await fetchPage(); if (gridLoad.is(t)) { items.value = j.items; more.value = j.more } }
+  } catch (e) { if (gridLoad.is(t)) error.value = (e as Error).message } finally { if (gridLoad.is(t)) loading.value = false }
 }
 async function loadMore() {
   if (loading.value || !more.value) return
+  const t = gridLoad.now()
   loading.value = true
-  try { const j = await fetchPage(items.value.at(-1)?.taken); items.value.push(...j.items); more.value = j.more }
-  catch (e) { error.value = (e as Error).message } finally { loading.value = false }
+  try { const j = await fetchPage(items.value.at(-1)?.taken); if (gridLoad.is(t)) { items.value.push(...j.items); more.value = j.more } }
+  catch (e) { if (gridLoad.is(t)) error.value = (e as Error).message } finally { if (gridLoad.is(t)) loading.value = false }
 }
 function openAlbum(a: PhotoAlbum) { album.value = a; items.value = []; reload() }
 function closeAlbum() { album.value = null; items.value = []; reload() }
@@ -150,12 +157,19 @@ const viewer = reactive({ open: false, i: 0 })
 const current = computed(() => (viewer.open ? items.value[viewer.i] : undefined))
 function view(i: number) { viewer.i = i; viewer.open = true }
 // the arrow keys go through the photos while the viewer is open
-const onKey = (e: KeyboardEvent) => { if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1) }
+const onKey = (e: KeyboardEvent) => {
+  const t = e.target as HTMLElement | null
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return // arrows typed in a field move the cursor
+  if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1)
+}
 watch(() => viewer.open, (open) => (open ? window.addEventListener('keydown', onKey) : window.removeEventListener('keydown', onKey)))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+const edge = ref('') // said for a moment when there is nothing further that way
+let edgeTimer: ReturnType<typeof setTimeout> | undefined
 function step(d: number) {
   const i = viewer.i + d
   if (i >= 0 && i < items.value.length) viewer.i = i
+  else if (!(d > 0 && more.value)) { edge.value = d > 0 ? 'This is the oldest photo.' : 'This is the newest photo.'; clearTimeout(edgeTimer); edgeTimer = setTimeout(() => (edge.value = ''), 2000) }
   if (i >= items.value.length - 3) loadMore()
 }
 
@@ -194,4 +208,5 @@ async function removeFolder(p: string) {
 .ph-viewer__nav.is-next { right: 8px; }
 .ph-list { list-style: none; padding: 0; margin: 0; }
 .ph-frow { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s2); padding: 6px 0; border-bottom: 1px solid var(--ph-divider); }
+.ph-viewer__edge { margin-left: auto; margin-right: var(--ph-s3); font-size: var(--ph-text-small); opacity: .85; }
 </style>

@@ -54,7 +54,7 @@ step('the review proposes both pairs with their reasons')
 
 // keep Dora: the other contact is merged into her
 const dora = page.locator('[data-test=dup-row]', { hasText: 'Dora Fischer' })
-await dora.getByRole('button', { name: /Keep Dora/ }).click()
+await dora.getByRole('button', { name: /Keep Dora/ }).dblclick() // a double tap merges once, and shows no error after it worked
 await page.waitForFunction(() => ![...document.querySelectorAll('[data-test=dup-row]')].some((r) => /Dora/.test(r.textContent ?? '')))
 let cs = await list()
 const names = cs.map((c) => c.name)
@@ -62,6 +62,7 @@ assert(!names.includes('D. Fischer') && names.includes('Dora Fischer'), names.jo
 const d = cs.find((c) => c.name === 'Dora Fischer')
 assert(d, 'Dora Fischer is kept')
 assert.equal(d.phones?.length, 1, 'the same number is not repeated')
+assert.equal(await page.locator('[role=alert]').count(), 0, 'no error after a double tap')
 step('"Keep" merged the pair on the hub (one contact left, number kept once)')
 
 // "Not the same" hides the other pair and it stays hidden

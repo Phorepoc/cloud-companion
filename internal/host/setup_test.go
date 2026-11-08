@@ -6,6 +6,8 @@ package host
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -235,5 +237,83 @@ func TestSetupStartsOffWhenSetUp(t *testing.T) {
 	s.Start()
 	if s.Phase() != PhaseOff {
 		t.Errorf("a set up board starts in %s", s.Phase())
+	}
+}
+
+// stuckRunner never finishes a command until it is let go: a restore that is still running
+type stuckRunner struct{ release chan struct{} }
+
+func (r stuckRunner) Run(ctx context.Context, dir string, args []string, out io.Writer) error {
+	<-r.release
+	return errors.New("stopped")
+}
+
+func (r stuckRunner) RunEnv(ctx context.Context, dir string, env, args []string, out io.Writer) error {
+	return r.Run(ctx, dir, args, out)
+}
+
+// a restore and a setup from two browsers (or two taps on Restore): only the first starts
+func TestRestoreAndSetupDoNotBothStart(t *testing.T) {
+	s, _, _, srv := newSetup(t, "PINE-APPLE-42")
+	a, b := newClient(), newClient()
+	for _, c := range []*http.Client{a, b} {
+		if post(t, c, srv, "/api/unlock", `{"secret":"PINE-APPLE-42"}`) != 200 {
+			t.Fatal("unlock")
+		}
+	}
+	stuck := stuckRunner{make(chan struct{})}
+	s.M.Run = stuck
+	defer func() { close(stuck.release); time.Sleep(200 * time.Millisecond) }() // let the restore end before the folder goes
+	dest := `{"dest":{"kind":"rest","url":"http://rest:8000/cloud","password":"a long backup password"}}`
+	if code := post(t, a, srv, "/api/restore", dest); code != 202 {
+		t.Fatalf("restore: %d", code)
+	}
+	if code := post(t, b, srv, "/api/restore", dest); code != 409 {
+		t.Errorf("a second restore: %d", code)
+	}
+	if code := post(t, b, srv, "/api/setup", `{"passphrase":"correct horse battery","features":[]}`); code != 409 {
+		t.Errorf("a setup during the restore: %d", code)
+	}
+}
+
+// someone on the network guessing wrong codes locks out their own address, not the owner's browser
+func TestLockoutIsPerAddress(t *testing.T) {
+	s, _, _, _ := newSetup(t, "PINE-APPLE-42")
+	h := s.Handler()
+	try := func(from, secret string) int {
+		r := httptest.NewRequest("POST", "/api/unlock", strings.NewReader(`{"secret":"`+secret+`"}`))
+		r.RemoteAddr = from + ":40000"
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w.Code
+	}
+	for i := 0; i < 10; i++ {
+		try("192.168.1.66", "guess")
+	}
+	if code := try("192.168.1.66", "PINE-APPLE-42"); code != 429 {
+		t.Errorf("the guesser after 10 wrong codes: %d", code)
+	}
+	if code := try("192.168.1.20", "PINE-APPLE-42"); code != 200 {
+		t.Errorf("the owner, from another address: %d", code)
+	}
+	for i := 0; i < 100; i++ { // guesses spread over many addresses: everyone waits
+		try(fmt.Sprintf("10.0.%d.%d", i/200, i%200+1), "guess")
+	}
+	if code := try("192.168.1.21", "PINE-APPLE-42"); code != 429 {
+		t.Errorf("after 100 wrong codes from many addresses: %d", code)
+	}
+}
+
+// sign-ins to the setup page older than their 2 hours are dropped when the next one is made
+func TestOldSetupTokensAreDropped(t *testing.T) {
+	s, _, ck, srv := newSetup(t, "PINE-APPLE-42")
+	post(t, newClient(), srv, "/api/unlock", `{"secret":"PINE-APPLE-42"}`)
+	ck.add(3 * time.Hour)
+	post(t, newClient(), srv, "/api/unlock", `{"secret":"PINE-APPLE-42"}`)
+	s.mu.Lock()
+	n := len(s.tokens)
+	s.mu.Unlock()
+	if n != 1 {
+		t.Errorf("tokens kept: %d", n)
 	}
 }

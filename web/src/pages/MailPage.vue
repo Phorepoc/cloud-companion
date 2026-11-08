@@ -75,7 +75,7 @@
     <!-- composer -->
     <q-dialog v-model="composeOpen" persistent>
       <q-card class="ph-dialog" data-test="mail-compose-form">
-        <form @submit.prevent="send">
+        <form novalidate @submit.prevent="send">
           <q-card-section class="ph-formcol">
             <h2>{{ draft.replyTo ? 'Reply' : 'New message' }}</h2>
             <q-select v-if="accounts.length" v-model="draft.account" :options="fromOptions" emit-value map-options outlined label="From" data-test="mail-from"
@@ -97,7 +97,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { hubCall } from '../cloud'
+import { hubCall, NO_HUB } from '../cloud'
+import type { HubRequest } from '../proto'
 import type { MailAccount, MailBody, MailFolder, MailItem } from '../proto'
 
 /** The message being written: recipients, subject, text, the Message-ID it answers, and the account it goes out through. */
@@ -105,6 +106,7 @@ interface Draft { rcpt: string; subject: string; body: string; replyTo: string; 
 import { toast } from '../toast'
 import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
+import { latest } from '../latest'
 
 const folders = ref<MailFolder[]>([])
 const folder = ref('')
@@ -145,7 +147,7 @@ async function init() {
     if (!folder.value) folder.value = (folders.value.find((f) => f.role === 'inbox') || folders.value[0] || {}).id || ''
     if (folder.value) await loadList(true)
   } catch (e) {
-    error.value = /not set up/i.test((e as Error).message) ? 'The hub is not set up on this server, so there is no mail to show. See the hub guide to set it up.' : (e as Error).message
+    error.value = /not set up/i.test((e as Error).message) ? NO_HUB : (e as Error).message
   }
 }
 // the header: the folders as the title's view menu, then Write and Refresh (most important first; the host folds the rest into ⋮)
@@ -164,18 +166,23 @@ async function refresh() {
   await loadList(true)
 }
 
+const listLoad = latest()
+const mailLoad = latest()
 async function loadList(reset: boolean) {
   if (!folder.value) return
+  if (!reset && loading.value) return // "Show older" while the list reloads: the offset would be wrong
+  const t = listLoad.take()
   loading.value = true
   error.value = ''
   try {
     const r = await hubCall({ op: 'mail.list', folder: folder.value, pos: reset ? 0 : mails.value.length })
+    if (!listLoad.is(t)) return // another folder (or a refresh) was asked for meanwhile
     mails.value = reset ? r.mails || [] : [...mails.value, ...(r.mails || [])]
     total.value = r.total || mails.value.length
   } catch (e) {
-    error.value = (e as Error).message
+    if (listLoad.is(t)) error.value = (e as Error).message
   } finally {
-    loading.value = false
+    if (listLoad.is(t)) loading.value = false
   }
 }
 
@@ -185,13 +192,16 @@ async function openMail(m: MailItem) {
   reading.value = true
   formatted.value = false
   msg.value = null
+  const t = mailLoad.take()
   try {
-    msg.value = (await hubCall({ op: 'mail.read', id2: m.id })).mail || null
+    const r = (await hubCall({ op: 'mail.read', id2: m.id })).mail || null
+    if (mailLoad.is(t)) msg.value = r // another message opened meanwhile shows its own body, not this one
   } catch (e) {
+    if (!mailLoad.is(t)) return
     open.value = false
     error.value = (e as Error).message
   } finally {
-    reading.value = false
+    if (mailLoad.is(t)) reading.value = false
   }
 }
 
@@ -209,13 +219,15 @@ async function toggleRead() {
 }
 
 // moving and deleting wait for the length of the Undo toast before they reach the hub
-function leave(m: MailItem | null, label: string, action: () => Promise<unknown>) {
+function leave(m: MailItem | null, label: string, req: HubRequest) {
+  const action = () => hubCall(req)
   if (!m) return
   open.value = false
   const i = mails.value.findIndex((x) => x.id === m.id)
   const from = folder.value
   mails.value = mails.value.filter((x) => x.id !== m.id)
   toast(label, {
+    resume: ['hub.call', req],
     // back where it was, if that folder is still the one shown (another folder's list never gets it)
     undo: () => { if (folder.value !== from || mails.value.some((x) => x.id === m.id)) return; const l = [...mails.value]; l.splice(Math.min(Math.max(i, 0), l.length), 0, m); mails.value = l },
     onExpire: async () => { try { await action(); await refreshFolders() } catch (e) { error.value = (e as Error).message; await loadList(true) } },
@@ -225,15 +237,15 @@ async function refreshFolders() { try { folders.value = (await hubCall({ op: 'ma
 // the message is taken when Delete is tapped: the deletion runs after the Undo toast, when another message may be open
 function remove() {
   const m = current.value
-  if (m) leave(m, role.value === 'trash' ? 'Message deleted for good' : 'Moved to Trash', () => hubCall({ op: 'mail.delete', id2: m.id }))
+  if (m) leave(m, role.value === 'trash' ? 'Message deleted for good' : 'Moved to Trash', { op: 'mail.delete', id2: m.id })
 }
 function move(t: { label: string; role: string }) {
   const m = current.value
-  if (m) leave(m, `Moved to ${t.label}`, () => hubCall({ op: 'mail.move', id2: m.id, role: t.role }))
+  if (m) leave(m, `Moved to ${t.label}`, { op: 'mail.move', id2: m.id, role: t.role })
 }
 
 function openCompose(init?: Partial<Draft>) {
-  draft.value = { rcpt: '', subject: '', body: '', replyTo: '', account: accounts.value.length === 1 && !init ? '' : '', ...init }
+  draft.value = { rcpt: '', subject: '', body: '', replyTo: '', account: '', ...init }
   sendError.value = ''
   open.value = false
   composeOpen.value = true
@@ -249,8 +261,12 @@ function reply() {
     body: `\n\nOn ${new Date(m.date).toLocaleString()}, ${m.from} wrote:\n${quoted}` })
 }
 async function send() {
+  if (sending.value) return
+  const to = draft.value.rcpt.split(',').map((a) => a.trim()).filter(Boolean)
+  const bad = to.find((a) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(a))
+  sendError.value = !to.length ? 'Enter who the message is to.' : bad ? `"${bad}" isn't an email address.` : ''
+  if (sendError.value) return
   sending.value = true
-  sendError.value = ''
   try {
     await hubCall({ op: 'mail.send', rcpt: draft.value.rcpt, subject: draft.value.subject, body: draft.value.body, replyto: draft.value.replyTo || undefined, acct: draft.value.account || undefined })
     composeOpen.value = false

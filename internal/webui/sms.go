@@ -17,9 +17,11 @@ package webui
 //
 //	GET  /sms/conversations   conversations by number, with the hub contact name when the number matches one, and the devices
 //	GET  /sms/thread?key=     the messages of one conversation
+//	                          both with "seen": a fingerprint of the answer; ?seen=<it> answers {"same":true} when nothing changed
 //	POST /sms/send            {device, number, body}  -> queued for that device (the phone's next sync picks it up)
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -142,7 +144,7 @@ func (s *smsAPI) routes(mux *http.ServeMux) {
 			out = append(out, map[string]any{"key": c.Key, "number": c.Number, "name": names[c.Key], "last": c.Last, "last_ts": c.LastTS, "last_dir": c.LastDir,
 				"count": c.Count, "devices": strings.Split(c.Devices, ","), "last_failed": c.LastFail})
 		}
-		reply(w, 200, map[string]any{"conversations": out, "devices": s.st.SMSDevices()})
+		replySeen(w, r, map[string]any{"conversations": out, "devices": s.st.SMSDevices()})
 	})
 	mux.HandleFunc("/sms/thread", func(w http.ResponseWriter, r *http.Request) {
 		if !s.a.adminDevice(r) {
@@ -153,7 +155,7 @@ func (s *smsAPI) routes(mux *http.ServeMux) {
 		if lim <= 0 || lim > 500 {
 			lim = 200
 		}
-		reply(w, 200, map[string]any{"messages": s.st.SMSThread(r.URL.Query().Get("key"), lim)})
+		replySeen(w, r, map[string]any{"messages": s.st.SMSThread(r.URL.Query().Get("key"), lim)})
 	})
 	mux.HandleFunc("/sms/send", func(w http.ResponseWriter, r *http.Request) {
 		var in struct{ Device, Number, Body string }
@@ -180,4 +182,18 @@ func (s *smsAPI) routes(mux *http.ServeMux) {
 		}
 		reply(w, 200, map[string]any{"id": id, "key": store.NumberKey(in.Number)}) // the conversation it went to, however the number was typed
 	})
+}
+
+// replySeen answers v with its fingerprint, or only {"same":true} when the page already has it (?seen=): Chats asks every few
+// seconds, and the whole list went over the network each time
+func replySeen(w http.ResponseWriter, r *http.Request, v map[string]any) {
+	b, _ := json.Marshal(v)
+	sum := sha256.Sum256(b)
+	seen := hex.EncodeToString(sum[:8])
+	if r.URL.Query().Get("seen") == seen {
+		reply(w, 200, map[string]any{"same": true, "seen": seen})
+		return
+	}
+	v["seen"] = seen
+	reply(w, 200, v)
 }

@@ -15,6 +15,7 @@
     <template v-else>
       <p class="ph-muted" data-test="features-board">{{ boardText }}</p>
       <p v-if="loadError" class="ph-err" role="alert">{{ loadError }}</p>
+      <p v-if="other" class="ph-muted" role="status" data-test="features-waiting">{{ otherText }}</p>
       <ul class="ph-feat__list ph-card" data-test="features-list">
         <li v-for="f in features" :key="f.id" class="ph-feat__row" :data-test="'feature-' + f.id">
           <div class="ph-feat__main">
@@ -56,7 +57,7 @@ import { state, apiCall } from '../cloud'
 
 interface Setting { key: string; label: string; generate?: boolean; secret?: boolean; required?: boolean }
 interface Feature { id: string; title: string; about: string; core?: boolean; on: boolean; fits: boolean; why?: string; requiredBy?: string[]; settings?: Setting[]; values?: Record<string, string>; needs?: { memory?: string } }
-interface Job { id: string; state: 'running' | 'done' | 'failed'; error?: string; log: string[] }
+interface Job { id: string; kind?: string; feature?: string; state: 'running' | 'done' | 'failed'; error?: string; log: string[] }
 interface Board { model?: string; arch?: string; memory?: number }
 
 const available = ref<boolean | null>(null)
@@ -64,7 +65,14 @@ const board = ref<Board>({})
 const features = ref<Feature[]>([])
 const loadError = ref('')
 const jobs = reactive<Record<string, Job>>({})
-const busy = computed(() => Object.values(jobs).some((j) => j.state === 'running'))
+// an update, a backup or a restore running (started at night, or in another browser): Cloud Companion is paused, so changes wait
+const other = ref<Job | null>(null)
+const busy = computed(() => !!other.value || Object.values(jobs).some((j) => j.state === 'running'))
+const otherText = computed(() => {
+  const k = other.value?.kind
+  const what = k === 'update' ? 'An update is being installed' : k === 'restore' ? 'A backup is being restored' : 'A backup is running'
+  return `${what}. Features can be turned on or off when it's done.`
+})
 
 const boardText = computed(() => {
   const b = board.value
@@ -127,9 +135,16 @@ function confirmSettings() {
 
 // switching a feature can restart Cloud Companion, this page's server included: the job is followed through that gap
 async function run(f: Feature, method: 'POST' | 'DELETE', settings?: Record<string, string>) {
+  let j: Job
+  try { j = await apiCall(method, '/phe/host/features/' + f.id, method === 'POST' ? { settings } : undefined) } catch (e) {
+    jobs[f.id] = { id: '', state: 'failed', error: (e as Error).message, log: [] }
+    return
+  }
+  await follow(f.id, j)
+}
+async function follow(id: string, j: Job) {
   try {
-    let j: Job = await apiCall(method, '/phe/host/features/' + f.id, method === 'POST' ? { settings } : undefined)
-    jobs[f.id] = j
+    jobs[id] = j
     let away = 0
     while (j.state === 'running') {
       await new Promise((r) => setTimeout(r, 1000))
@@ -137,13 +152,15 @@ async function run(f: Feature, method: 'POST' | 'DELETE', settings?: Record<stri
         j = await apiCall('GET', '/phe/host/jobs/' + j.id)
         away = 0
       } catch (e) {
+        if ((e as Error).message.includes('no such job')) break // the manager restarted: the result is in what load() shows
         if (++away > 600) throw e // ten minutes without an answer
         continue
       }
-      jobs[f.id] = j
+      jobs[id] = j
     }
+    if (j.state === 'running') delete jobs[id] // forgotten by a restarted manager: the list shows where it ended up
   } catch (e) {
-    jobs[f.id] = { id: '', state: 'failed', error: (e as Error).message, log: [] }
+    jobs[id] = { id: '', state: 'failed', error: (e as Error).message, log: [] }
   }
   for (let i = 0; i < 60; i++) { // the list again, once the server answers
     await load()
@@ -153,7 +170,26 @@ async function run(f: Feature, method: 'POST' | 'DELETE', settings?: Record<stri
 }
 
 // the page can open before the connection says this device is the owner (a reload, a link): load once it does
-watch(() => state.admin, (a) => { if (a && available.value === null) load() }, { immediate: true })
+async function waitFor(j: Job) {
+  other.value = j
+  for (let away = 0; j.state === 'running' && away < 600;) {
+    await new Promise((r) => setTimeout(r, 2000))
+    try { j = await apiCall('GET', '/phe/host/jobs/' + j.id); away = 0 } catch (e) { if ((e as Error).message.includes('no such job')) break; away++ }
+  }
+  other.value = null
+  await load()
+}
+
+// opened (or reloaded) while features are being switched: each one shows its progress again
+async function rejoin() {
+  try {
+    for (const j of ((await apiCall('GET', '/phe/host/jobs')).jobs as Job[]) || []) {
+      if (j.feature && !jobs[j.feature]) follow(j.feature, j)
+      else if (['update', 'backup', 'restore', 'backup-setup'].includes(j.kind || '') && !other.value) waitFor(j)
+    }
+  } catch { /* nothing running, or an older manager */ }
+}
+watch(() => state.admin, async (a) => { if (a && available.value === null) { await load(); if (available.value) rejoin() } }, { immediate: true })
 </script>
 
 <style scoped>

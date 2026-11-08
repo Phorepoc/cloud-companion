@@ -127,6 +127,18 @@ await owner.waitForFunction(() => { const t = document.querySelector('[data-test
 assert.equal(await owner.locator('[data-test=conv]').count(), 3, 'no extra conversation for the other spelling')
 await shots('4-same-person')
 step('a new message to a known number, typed another way, opens that person')
+// a slow thread answers after another conversation was opened: the one open keeps its own messages
+await owner.route(/\/sms\/thread\?key=.*5550199/, async (r) => { await new Promise((ok) => setTimeout(ok, 2500)); await r.continue() })
+await owner.locator('[data-test=conv]', { hasText: /5550199/ }).click()
+await owner.locator('[data-test=conv]', { hasText: /5550100/ }).click()
+await owner.waitForTimeout(3500)
+const shown = (await owner.textContent('[data-test=thread]')) ?? ''
+assert.match(shown, /Same person, other spelling/, 'the open conversation shows its messages')
+assert.doesNotMatch(shown, /Newest conversation/, "the slow conversation's messages did not land here")
+await owner.unroute(/\/sms\/thread\?key=.*5550199/)
+// the newest message is in view when a conversation opens
+assert.ok(await owner.evaluate(() => { const l = document.querySelector('.ph-msgs')!; return l.scrollHeight - l.scrollTop - l.clientHeight < 40 }), 'scrolled to the newest message')
+step('a slow conversation does not replace the one opened after it; the newest message is in view')
 assert.deepEqual(log, [], 'page errors: ' + log.join('; '))
 await browser.close()
 console.log('CHATS PASS')

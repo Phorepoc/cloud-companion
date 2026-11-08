@@ -99,6 +99,17 @@ await page.click('[data-test=backups-where]')
 await visible('[data-test=backups-form]')
 await shot('8-change-dark')
 
+// opened during a backup (started at night, or from another browser): the page follows it instead of offering another
+const running = { id: 'dd44ee55ff66', kind: 'backup', state: 'running', log: ['stopping Cloud Companion'] }
+await page.route(/\/phe\/host\/jobs$/, (r) => r.fulfill({ json: { jobs: [running] } }))
+await page.route(/\/phe\/host\/jobs\/dd44ee55ff66/, (r) => r.fulfill({ json: running }))
+await page.goto(`${BASE}/#/settings/backups`); await page.reload()
+const jobText = () => page.locator('[data-test=backups-job]').first().textContent({ timeout: 1000 }).catch(() => '')
+for (let i = 0; i < 60 && !/Backing up… Cloud Companion is paused/.test(await jobText() || ''); i++) await page.waitForTimeout(250)
+assert.match(await jobText() || '', /Backing up… Cloud Companion is paused/, 'the running backup is shown')
+await page.screenshot({ path: `${OUT}/backups-rejoined.png`, fullPage: true })
+await page.unroute(/\/phe\/host\/jobs$/); await page.unroute(/\/phe\/host\/jobs\/dd44ee55ff66/)
+
 assert.deepEqual(errors, [], 'no page errors')
 console.log('backups ui ok')
 await browser.close()

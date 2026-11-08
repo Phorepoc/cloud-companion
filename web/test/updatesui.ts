@@ -68,6 +68,27 @@ await shot('4-went-back')
 await page.emulateMedia({ colorScheme: 'dark' })
 await shot('5-went-back-dark')
 
+// the sentences read as sentences: a check that failed, the last update, the automatic updates line
+setUpdate({ error: "Couldn't reach GitHub (dial tcp: no route to host)", last: { at: ago(2), from: 'v0.2.0', to: 'v0.3.0', ok: true } })
+await open()
+assert.match(await text('[data-test=updates-text]') || '', /^The last check didn't get an answer \(dial tcp: no route to host\)\. Cloud Companion checks again tomorrow, or you can check now\.$/)
+assert.match(await text('[data-test=updates-last]') || '', /Updated from v0\.2\.0 to v0\.3\.0 on /)
+assert.match(await text('[data-test=updates-auto]') || '', /New versions install at 03:30/)
+await shot('7-check-failed')
+setUpdate({ available: { version: 'v0.4.0' } })
+
+// opened while an update is being installed (another browser started it, or this page was reloaded): it follows that update
+await page.emulateMedia({ colorScheme: 'light' })
+const running = { id: 'aa11bb22cc33', kind: 'update', state: 'running', log: ['backing up first'] }
+await page.route(/\/phe\/host\/jobs$/, (r) => r.fulfill({ json: { jobs: [running] } }))
+await page.route(/\/phe\/host\/jobs\/aa11bb22cc33/, (r) => r.fulfill({ json: running }))
+await open()
+for (let i = 0; i < 20 && !/Backing up first/.test(await text('[data-test=updates-job]') || ''); i++) await page.waitForTimeout(250)
+assert.match(await text('[data-test=updates-job]') || '', /Backing up first/, 'the running update is shown')
+assert.equal(await page.locator('[data-test=updates-now][disabled], [data-test=updates-now]:disabled, [data-test=updates-now][aria-disabled=true]').count(), 1, 'Update now waits for it')
+await shot('6-rejoined')
+await page.unroute(/\/phe\/host\/jobs$/); await page.unroute(/\/phe\/host\/jobs\/aa11bb22cc33/)
+
 assert.deepEqual(errors, [], 'no page errors')
 console.log('updates ui ok')
 await browser.close()

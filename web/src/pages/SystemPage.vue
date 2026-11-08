@@ -82,10 +82,12 @@ async function put(on: boolean, password = '', name = '') {
   busy.value = true
   error.value = ''
   try {
-    takeSSH(await apiCall('PUT', '/phe/host/ssh', { on, user: name, password }))
+    const r = await apiCall('PUT', '/phe/host/ssh', { on, user: name, password })
+    takeSSH(r)
+    if (r.warning) error.value = r.warning
     asking.value = false
     pass1.value = pass2.value = ''
-  } catch (e) { error.value = (e as Error).message } finally { busy.value = false }
+  } catch (e) { error.value = (e as Error).message; load() /* what the board says now, not what the switch shows */ } finally { busy.value = false }
 }
 function flip(on: boolean) {
   if (!on) { asking.value ? (asking.value = false) : put(false); return }

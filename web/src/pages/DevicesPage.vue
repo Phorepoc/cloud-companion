@@ -44,6 +44,16 @@
       </ul>
     </section>
 
+    <q-dialog :model-value="!!asking" @update:model-value="(v: boolean) => { if (!v && !askBusy) asking = null }">
+      <q-card class="ph-dialog" data-test="devices-confirm">
+        <q-card-section><h2>{{ asking?.title }}</h2><p>{{ asking?.text }}</p></q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" :disable="askBusy" data-test="devices-confirm-cancel" @click="asking = null" />
+          <q-btn unelevated color="negative" :label="asking?.ok" :loading="askBusy" data-test="devices-confirm-ok" @click="askOk" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
     <q-dialog v-model="addOpen" persistent>
       <q-card class="ph-dialog" data-test="apppw-form">
         <form @submit.prevent="createPw">
@@ -89,11 +99,18 @@ import { toast } from '../toast'
 import { HdStatusState } from '@etesian-design/vue'
 
 const fmt = (t: number) => new Date(t * 1000).toLocaleString()
+// asking first, in the app's own dialog (the browser's pop-up looked foreign and can be switched off for a site)
+const asking = ref<{ title: string; text: string; ok: string; run: () => Promise<void> } | null>(null)
+const askBusy = ref(false)
+async function askOk() {
+  const a = asking.value
+  if (!a || askBusy.value) return
+  askBusy.value = true
+  try { await a.run() } finally { askBusy.value = false; asking.value = null }
+}
 function confirm(d: DeviceInfo) {
-  if (window.confirm('Sign out ' + (d.name || d.id) + '? It will need a new code to connect again.')) {
-    api.revoke(d.id)
-    setTimeout(() => api.devices(), 300)
-  }
+  asking.value = { title: 'Sign out ' + (d.name || d.id) + '?', text: 'It will need a new code to connect again.', ok: 'Sign out',
+    run: async () => { api.revoke(d.id); await new Promise((r) => setTimeout(r, 300)); api.devices() } }
 }
 
 // ---- app passwords (the hub's per-device passwords) ----
@@ -135,15 +152,17 @@ async function createPw() {
     adding.value = false
   }
 }
-async function revokePw(p: AppPassword) {
-  if (!window.confirm('Revoke the password for ' + p.name + '? That device can no longer read your mail, calendar or contacts.')) return
-  try {
-    await hubCall({ op: 'apppw.revoke', id2: p.id })
-    toast('Password revoked')
-  } catch (e) {
-    apppwError.value = (e as Error).message
-  }
-  await loadPw()
+function revokePw(p: AppPassword) {
+  asking.value = { title: 'Revoke the password for ' + p.name + '?', text: 'That device can no longer read your mail, calendar or contacts.', ok: 'Revoke',
+    run: async () => {
+      try {
+        await hubCall({ op: 'apppw.revoke', id2: p.id })
+        toast('Password revoked')
+      } catch (e) {
+        apppwError.value = (e as Error).message
+      }
+      await loadPw()
+    } }
 }
 async function copySecret() {
   try { await navigator.clipboard.writeText(created.value.secret); toast('Password copied') } catch (e) { toast('Couldn\'t copy. Select the password and copy it manually.') }

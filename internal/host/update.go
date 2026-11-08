@@ -292,12 +292,14 @@ func (m *Manager) Update() (*Job, error) {
 	go func() {
 		m.mu.Lock()
 		restart, err := m.update(c, j)
-		m.mu.Unlock()
 		j.finish(err)
 		if restart && m.Restart != nil {
+			// still holding mu: a backup or a feature change waiting for it would start here and be cut off by the restart.
+			// The new manager runs what is asked of it after.
 			time.Sleep(3 * time.Second) // the page reads the job's end first
 			m.Restart()
 		}
+		m.mu.Unlock()
 	}()
 	return j, nil
 }
@@ -323,9 +325,9 @@ func (m *Manager) update(c UpdateConfig, j *Job) (restart bool, err error) {
 
 	if b := m.BackupConfig(); b.On {
 		fmt.Fprintln(j, "backing up first")
-		snap, err := m.backup(ctx, b.Dest, j)
+		snap, warn, err := m.backup(ctx, b.Dest, j)
 		b = m.BackupConfig()
-		b.Last = &BackupRun{At: time.Now().UTC(), OK: err == nil, Snapshot: snap}
+		b.Last = &BackupRun{At: time.Now().UTC(), OK: err == nil, Snapshot: snap, Warning: warn}
 		if err != nil {
 			b.Last.Error = err.Error()
 			m.saveBackup(b)

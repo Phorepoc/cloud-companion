@@ -91,7 +91,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { hubCall } from '../cloud'
+import { hubCall, NO_HUB } from '../cloud'
 import type { Contact, Labeled } from '../proto'
 
 /** The edit form: a contact's fields as plain strings and editable lists. */
@@ -114,12 +114,15 @@ const phoneTypes = [{ label: 'Mobile', value: 'cell' }, { label: 'Home', value: 
 const emailTypes = [{ label: 'Home', value: 'home' }, { label: 'Work', value: 'work' }, { label: 'Other', value: 'other' }]
 
 function blank() { return { href: '', etag: '', given: '', family: '', org: '', note: '', phones: [], emails: [] } }
-const initials = (c: Contact) => (c.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+const initials = (c: Contact) => (c.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => (Array.from(w)[0] ?? '').toUpperCase()).join('')
 const secondary = (c: Contact) => c.org || (c.emails && c.emails[0] && c.emails[0].value) || (c.phones && c.phones[0] && c.phones[0].value) || ''
+// sorted once per change of the list (not on every key typed in the search), Ä next to A; the search text per contact made once too
+const byName = new Intl.Collator(undefined, { sensitivity: 'base' })
+const sortedContacts = computed(() => [...contacts.value].sort((a, b) => byName.compare(a.name, b.name))
+  .map((c) => ({ c, text: [c.name, c.org, ...(c.emails || []).map((e) => e.value), ...(c.phones || []).map((p) => p.value)].join(' ').toLowerCase() })))
 const shown = computed(() => {
   const q = (filter.value || '').toLowerCase().trim()
-  const list = [...contacts.value].sort((a, b) => a.name.localeCompare(b.name))
-  return q ? list.filter((c) => [c.name, c.org, ...(c.emails || []).map((e) => e.value), ...(c.phones || []).map((p) => p.value)].join(' ').toLowerCase().includes(q)) : list
+  return sortedContacts.value.filter((x) => !q || x.text.includes(q)).map((x) => x.c)
 })
 
 async function load() {
@@ -135,7 +138,7 @@ async function load() {
 }
 
 function friendly(m: string) {
-  if (/not set up/i.test(m)) return 'The hub is not set up on this server, so there are no contacts to show. See the hub guide to set it up.'
+  if (/not set up/i.test(m)) return NO_HUB
   return m
 }
 
@@ -168,6 +171,7 @@ async function save() {
     await load()
   } catch (e) {
     formError.value = (e as Error).message
+    if (/another device/.test(formError.value)) load() // the newer version, so the next edit starts from it
   } finally {
     saving.value = false
   }
@@ -178,7 +182,8 @@ function remove(c: Contact) {
   viewOpen.value = false
   contacts.value = contacts.value.filter((x) => x.href !== c.href)
   toast('Contact deleted', {
-    undo: () => { contacts.value = [...contacts.value, c] },
+    resume: ['hub.call', { op: 'contacts.delete', href: c.href, etag: c.etag }],
+    undo: () => load(), // from the server: the list may have been reloaded since (it came back twice)
     onExpire: async () => {
       try { await hubCall({ op: 'contacts.delete', href: c.href, etag: c.etag }) } catch (e) { error.value = (e as Error).message; await load() }
     },

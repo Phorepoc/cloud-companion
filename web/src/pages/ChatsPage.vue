@@ -8,7 +8,7 @@
     <div v-if="error" class="ph-error" role="alert" data-test="chat-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</div>
 
     <p v-if="loaded && !devices.length" class="ph-note" role="note" data-test="no-sms-devices">
-      <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> No phone is syncing messages yet. Install the Cloud Companion messages service on a phone and pair it; its messages then appear here.
+      <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> No phone is sharing its text messages yet. Pair a phone that has the Cloud Companion app, and its messages will appear here.
     </p>
 
     <div class="ph-chat" :class="{ 'ph-open': !!current }">
@@ -35,15 +35,15 @@
           <h2>{{ current.name || current.number || 'New message' }}</h2>
         </div>
         <q-input v-if="!current.key" v-model="newNumber" outlined dense label="To (phone number)" data-test="new-number" />
-        <ul class="ph-msgs" aria-live="polite">
+        <ul ref="list" class="ph-msgs" aria-live="polite">
           <li v-for="m in messages" :key="m.id" :class="m.dir === 'out' ? 'ph-out' : 'ph-in'" data-test="msg">
             <span class="ph-bubble">{{ m.body }}</span>
             <span class="ph-muted ph-small">{{ when(m.ts) }} · {{ deviceName(m.device) }}<template v-if="m.dir === 'out'"> · <span :class="m.status === 'failed' ? 'ph-error' : ''" data-test="msg-status">{{ statusText(m) }}</span></template></span>
           </li>
         </ul>
         <div class="ph-compose">
-          <q-select v-model="sendVia" :options="deviceOptions" emit-value map-options outlined dense label="Send through" data-test="send-via" :disable="!deviceOptions.length" />
-          <q-input v-model="text" outlined dense autogrow label="Message" data-test="sms-text" @keyup.ctrl.enter="send" />
+          <q-select v-model="sendVia" :options="deviceOptions" emit-value map-options outlined dense label="Send from" data-test="send-via" :disable="!deviceOptions.length" />
+          <q-input v-model="text" outlined dense autogrow label="Message" hint="Ctrl+Enter to send" data-test="sms-text" @keyup.ctrl.enter="send" />
           <q-btn unelevated color="primary" icon="sym_o_send" label="Send" :disable="!text.trim() || !sendVia" :loading="sending" data-test="sms-send" @click="send" />
         </div>
       </section>
@@ -52,9 +52,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useChrome } from '@etesian-design/shell'
 import { apiCall } from '../cloud'
+import { latest } from '../latest'
 import type { SmsConversation, SmsDevice, SmsMessage } from '../proto'
 
 // the title is in the host's header (the classic bar, a desktop window)
@@ -73,7 +74,10 @@ const text = ref('')
 const sendVia = ref('')
 const sending = ref(false)
 const newNumber = ref('')
-let timer: ReturnType<typeof setInterval> | undefined
+let timer: ReturnType<typeof setTimeout> | undefined
+let alive = true
+const list = ref<HTMLElement | null>(null)
+const threadLoad = latest()
 
 const deviceName = (id: string) => devices.value.find((d) => d.device === id)?.name || 'phone'
 const deviceOptions = computed(() => devices.value.map((d) => ({ label: d.name || d.device, value: d.device })))
@@ -83,26 +87,46 @@ const statusText = (m: SmsMessage) => {
 }
 const when = (t: number) => new Date(t * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
+// what the page has, by fingerprint: the server sends only {same: true} when nothing changed since
+let convSeen = '', threadSeen = '', threadKey = ''
 async function load() {
   try {
-    const j = await apiCall('GET', '/sms/conversations')
-    convs.value = j.conversations
-    devices.value = j.devices
+    const j = await apiCall('GET', '/sms/conversations' + (convSeen ? '?seen=' + convSeen : ''))
+    convSeen = j.seen || ''
+    if (!j.same) { convs.value = j.conversations; devices.value = j.devices }
     if (!sendVia.value && devices.value.length) sendVia.value = devices.value[0].device
     if (current.value && current.value.key) await loadThread()
     error.value = ''
   } catch (e) { error.value = (e as Error).message } finally { loaded.value = true }
 }
 async function loadThread() {
-  messages.value = (await apiCall('GET', '/sms/thread?key=' + encodeURIComponent(current.value!.key))).messages
+  const key = current.value!.key
+  const t = threadLoad.take()
+  const seen = key === threadKey ? threadSeen : ''
+  const j = await apiCall('GET', '/sms/thread?key=' + encodeURIComponent(key) + (seen ? '&seen=' + seen : ''))
+  if (!threadLoad.is(t) || current.value?.key !== key) return // another conversation opened meanwhile keeps its own
+  threadKey = key; threadSeen = j.seen || ''
+  if (!j.same) messages.value = j.messages
 }
+
+// the newest message in view: on opening a conversation, and when one arrives while the reader is at the bottom
+let shownKey = ''
+watch(messages, async () => {
+  const el = list.value
+  const opened = current.value?.key !== shownKey
+  const atEnd = !el || el.scrollHeight - el.scrollTop - el.clientHeight < 40
+  shownKey = current.value?.key ?? ''
+  if (!opened && !atEnd) return
+  await nextTick()
+  if (list.value) list.value.scrollTop = list.value.scrollHeight
+})
 async function open(c: SmsConversation) {
   current.value = c
   const own = (c.devices || []).find((d) => devices.value.some((x) => x.device === d))
   if (own) sendVia.value = own // answer through a phone that carries this conversation
   await loadThread()
 }
-function startNew() { current.value = { key: '', number: '', name: '' }; messages.value = []; newNumber.value = '' }
+function startNew() { threadLoad.drop(); threadKey = ''; current.value = { key: '', number: '', name: '' }; messages.value = []; newNumber.value = '' }
 async function send() {
   if (!current.value || sending.value) return // Ctrl+Enter twice, or with the button busy, sends once
   const number = current.value.key ? current.value.number : newNumber.value.trim()
@@ -120,8 +144,15 @@ async function send() {
   } catch (e) { error.value = (e as Error).message } finally { sending.value = false }
 }
 
-onMounted(() => { load(); timer = setInterval(load, 5000) })
-onBeforeUnmount(() => clearInterval(timer))
+// every 5 s while the page is in view: each check waits for the one before (on a slow link they piled up), and a hidden tab
+// does not ask at all; coming back to it checks at once
+async function poll() {
+  if (!document.hidden) await load()
+  if (alive) timer = setTimeout(poll, 5000)
+}
+const onVisible = () => { if (!document.hidden) { clearTimeout(timer); poll() } }
+onMounted(() => { poll(); document.addEventListener('visibilitychange', onVisible) })
+onBeforeUnmount(() => { alive = false; clearTimeout(timer); document.removeEventListener('visibilitychange', onVisible) })
 </script>
 
 <style scoped>

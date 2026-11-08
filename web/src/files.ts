@@ -12,8 +12,8 @@ export interface Track { path: string; title: string; artist: string; album: str
 const q = (p: string) => encodeURIComponent(p)
 export const listFiles = async (path: string): Promise<{ path: string; entries: FileEntry[] }> => apiCall('GET', '/phe/files?path=' + q(path))
 export const makeFolder = (path: string) => apiCall('POST', '/phe/files/mkdir', { path })
-export const moveFile = (from: string, to: string) => apiCall('POST', '/phe/files/move', { from, to })
-export const deleteFile = (path: string) => apiCall('POST', '/phe/files/delete', { path })
+export const moveFile = (from: string, to: string) => apiCall('POST', '/phe/files/move', { from, to }).then((r) => { forgetTickets(from); return r })
+export const deleteFile = (path: string) => apiCall('POST', '/phe/files/delete', { path }).then((r) => { forgetTickets(path); return r })
 export async function uploadFiles(dir: string, list: FileList | File[]) {
   const form = new FormData()
   for (const f of Array.from(list)) form.append('file', f, f.name)
@@ -22,6 +22,10 @@ export async function uploadFiles(dir: string, list: FileList | File[]) {
 
 // the browser's own players and links cannot sign requests: a ticket opens one file for 12 hours (kept here, per path)
 const tickets = new Map<string, { url: string; at: number }>()
+// a renamed or deleted file (or folder) is no longer at its tickets' paths
+function forgetTickets(path: string) {
+  for (const k of tickets.keys()) if (k === path || k.startsWith(path + '/')) tickets.delete(k)
+}
 export async function fileURL(path: string, download = false): Promise<string> {
   let t = tickets.get(path)
   if (!t || Date.now() - t.at > 11 * 3600e3) {

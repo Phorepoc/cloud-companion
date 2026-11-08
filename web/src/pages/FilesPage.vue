@@ -100,7 +100,7 @@
           <q-input v-if="sharing.url" :model-value="sharing.url" readonly outlined class="q-mt-md" data-test="files-share-url" @focus="($event.target as HTMLInputElement).select()" />
           <p v-if="sharing.error" class="text-negative q-mt-sm" role="alert">{{ sharing.error }}</p></q-card-section>
         <q-card-actions align="right"><q-btn flat label="Close" v-close-popup />
-          <q-btn v-if="!sharing.url" unelevated color="primary" label="Make the link" data-test="files-share-make" @click="makeShare" />
+          <q-btn v-if="!sharing.url" unelevated color="primary" label="Make the link" :loading="sharing.busy" data-test="files-share-make" @click="makeShare" />
           <q-btn v-else unelevated color="primary" label="Copy link" @click="copy(sharing.url)" /></q-card-actions>
       </q-card>
     </q-dialog>
@@ -111,7 +111,8 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
-import { toast } from '../toast'
+import { onResume, toast } from '../toast'
+import { latest } from '../latest'
 import { deleteFile, fileURL, iconOf, listFiles, listShares, loadTracks, makeFolder, moveFile, shareFile, shareLink, size, unshare, uploadFiles, type FileEntry, type Share } from '../files'
 import { play } from '../music'
 import { state } from '../cloud'
@@ -143,17 +144,20 @@ async function togglePhotos(e: FileEntry) {
   } catch (err) { error.value = (err as Error).message }
 }
 
+const folderLoad = latest()
 async function load() {
   if (state.admin) photoFolders().then((l) => { photoDirs.value = l }).catch(() => {})
+  const t = folderLoad.take()
   loading.value = true
   error.value = ''
   try {
     const [l, s] = await Promise.all([listFiles(path.value), listShares()])
+    if (!folderLoad.is(t)) return // another folder was opened meanwhile: its own list, not this one
     entries.value = l.entries
     shares.value = s
     for (const e of l.entries) if (e.source) mounts.value[e.path] = e.name
     if (path.value.startsWith('~') && !mounts.value[path.value.split('/')[0]]) for (const e of (await listFiles('')).entries) if (e.source) mounts.value[e.path] = e.name
-  } catch (e) { error.value = (e as Error).message } finally { loading.value = false }
+  } catch (e) { if (folderLoad.is(t)) error.value = (e as Error).message } finally { if (folderLoad.is(t)) loading.value = false }
 }
 function go(p: string) { path.value = p; entries.value = []; load() }
 const join = (n: string) => (path.value ? path.value + '/' + n : n)
@@ -169,20 +173,30 @@ function onDrop(ev: DragEvent) { dropping.value = false; if (!readOnly.value && 
 
 async function openEntry(e: FileEntry) {
   if (e.dir) return go(e.path)
+  error.value = ''
   if (e.type?.startsWith('audio/') && !e.readonly) {
     // play the song with the rest of its folder after it
-    const all = await loadTracks().catch(() => [])
-    const here = all.filter((t) => t.path.slice(0, t.path.lastIndexOf('/')) === path.value)
-    const i = here.findIndex((t) => t.path === e.path)
-    return i >= 0 ? play(here, i) : undefined
+    try {
+      const all = await loadTracks()
+      const here = all.filter((t) => t.path.slice(0, t.path.lastIndexOf('/')) === path.value)
+      const i = here.findIndex((t) => t.path === e.path)
+      if (i >= 0) return play(here, i)
+    } catch (err) { error.value = (err as Error).message; return }
   }
-  window.open(await fileURL(e.path), '_blank', 'noopener')
+  // the tab opens on the tap itself (a pop-up blocker lets that through, not one opened after the server's answer), then goes to the file
+  const w = window.open('about:blank', '_blank')
+  try {
+    const url = await fileURL(e.path)
+    if (w) { w.opener = null; w.location.href = url } else location.href = url
+  } catch (err) { w?.close(); error.value = (err as Error).message }
 }
 async function download(e: FileEntry) {
-  const a = document.createElement('a')
-  a.href = await fileURL(e.path, true)
-  a.download = e.name
-  a.click()
+  try {
+    const a = document.createElement('a')
+    a.href = await fileURL(e.path, true)
+    a.download = e.name
+    a.click()
+  } catch (err) { error.value = (err as Error).message }
 }
 
 const naming = reactive({ open: false, name: '', from: '', error: '' })
@@ -213,19 +227,29 @@ async function saveName() {
 function remove(e: FileEntry) {
   entries.value = entries.value.filter((x) => x.path !== e.path)
   toast(e.dir ? 'Folder deleted' : 'File deleted', {
+    resume: ['files.delete', e.path],
     undo: () => load(),
     onExpire: async () => { try { await deleteFile(e.path) } catch (err) { error.value = (err as Error).message; load() } },
   })
 }
 
-const sharing = reactive({ open: false, entry: null as FileEntry | null, days: 7, url: '', error: '' })
-function askShare(e: FileEntry) { Object.assign(sharing, { open: true, entry: e, days: 7, url: '', error: '' }) }
+const sharing = reactive({ open: false, entry: null as FileEntry | null, days: 7, url: '', error: '', busy: false })
+function askShare(e: FileEntry) { Object.assign(sharing, { open: true, entry: e, days: 7, url: '', error: '', busy: false }) }
 async function makeShare() {
-  try { sharing.url = await shareFile(sharing.entry!.path, sharing.days); shares.value = await listShares() } catch (e) { sharing.error = (e as Error).message }
+  if (sharing.busy) return // a double tap makes one link
+  sharing.busy = true
+  try { sharing.url = await shareFile(sharing.entry!.path, sharing.days); shares.value = await listShares() } catch (e) { sharing.error = (e as Error).message } finally { sharing.busy = false }
 }
-async function stopSharing(s: Share) { await unshare(s.token).catch(() => {}); shares.value = await listShares(); toast('Link removed') }
+async function stopSharing(s: Share) {
+  try {
+    await unshare(s.token)
+    shares.value = await listShares()
+    toast('Link removed')
+  } catch (e) { error.value = (e as Error).message }
+}
 function copy(t: string) { navigator.clipboard?.writeText(t).then(() => toast('Link copied'), () => {}) }
 
+onResume<string>('files.delete', (p) => deleteFile(p).then(load))
 onMounted(load)
 </script>
 

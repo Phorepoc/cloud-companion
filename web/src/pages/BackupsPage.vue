@@ -49,7 +49,7 @@
             <HdButton variant="plain" size="small" @click="loadDisks">Refresh</HdButton>
           </template>
           <template v-else-if="kind === 'sftp'">
-            <HdTextField v-model="sftp.host" label="Hostname or IP address" placeholder="nas.local" autocomplete="off" data-test="backups-sftp-host" />
+            <HdTextField v-model="sftp.host" label="Hostname or IP address" placeholder="nas.local" autocomplete="off" helper="Add the port if it isn't 22, such as nas.local:2222." data-test="backups-sftp-host" />
             <HdTextField v-model="sftp.user" label="Username" autocomplete="off" data-test="backups-sftp-user" />
             <HdTextField v-model="sftp.folder" label="Folder" helper="Created if it doesn't exist." data-test="backups-sftp-folder" />
             <div class="ph-bk__key">
@@ -61,7 +61,7 @@
           </template>
           <template v-else-if="kind === 's3'">
             <HdTextField v-model="s3.endpoint" label="Endpoint" placeholder="s3.eu-central-003.backblazeb2.com" autocomplete="off"
-                         helper="Your storage provider shows this next to the bucket." data-test="backups-s3-endpoint" />
+                         helper="Your storage provider shows this next to the bucket. Start it with http:// for storage on your own network without HTTPS." data-test="backups-s3-endpoint" />
             <HdTextField v-model="s3.bucket" label="Bucket" autocomplete="off" data-test="backups-s3-bucket" />
             <HdTextField v-model="s3.keyId" label="Access key ID" autocomplete="off" data-test="backups-s3-key" />
             <HdTextField v-model="s3.secret" label="Secret access key" type="password" autocomplete="off" :helper="editing ? 'Leave empty to keep the current key.' : ''" data-test="backups-s3-secret" />
@@ -77,7 +77,7 @@
           <p class="ph-muted">Backups are encrypted with this password. Keep it somewhere safe. Without it, nobody can restore your data,
             not even you.</p>
           <HdTextField v-model="pass1" type="password" autocomplete="new-password" label="Password"
-                       :helper="editing ? 'Leave empty to keep the current password.' : 'At least 10 characters.'" data-test="backups-password" />
+                       :helper="editing ? 'Leave empty to keep it. The backups already at a location stay locked with the password they were made with, so a new password only works with a new location.' : 'At least 10 characters.'" data-test="backups-password" />
           <HdTextField v-model="pass2" type="password" autocomplete="new-password" label="Confirm password" data-test="backups-password2" />
         </section>
 
@@ -125,7 +125,7 @@ import { HdButton, HdListItem, HdRadioButton, HdStatusState, HdTextField } from 
 import { state, apiCall } from '../cloud'
 
 interface Dest { kind: string; uuid?: string; path?: string; url?: string; keyId?: string }
-interface Run { at: string; ok: boolean; error?: string; snapshot?: string }
+interface Run { at: string; ok: boolean; error?: string; snapshot?: string; warning?: string }
 interface Job { id: string; kind: string; state: 'running' | 'done' | 'failed'; error?: string; log: string[] | null }
 interface Disk { uuid: string; label?: string; size: string; fs: string; model?: string }
 
@@ -189,7 +189,7 @@ const heroText = computed(() => {
   if (!on.value) return 'Your data is only stored on this server. If its memory card or disk fails, everything is lost. Turn on backups to save a copy somewhere else every night.'
   const l = last.value
   if (l && !l.ok) return `Backup failed ${when(l.at)}: ${l.error || 'no reason given'}. Fix the problem, then select Back up now.`
-  return `Backups run every night at ${at.value}.` + (l ? ` Last backup ${when(l.at)}.` : ' The first backup runs tonight, or you can back up now.')
+  return `Backups run every night at ${at.value}.` + (l ? ` Last backup ${when(l.at)}.` : ' The first backup runs tonight, or you can back up now.') + (l?.warning ? ' ' + l.warning + '.' : '')
 })
 const jobLine = computed(() => {
   const j = job.value
@@ -198,6 +198,7 @@ const jobLine = computed(() => {
   const log = j.log || []
   const paused = log.some((l) => /stopping Cloud Companion/.test(l)) && !log.some((l) => /starting Cloud Companion again/.test(l))
   if (j.kind === 'backup') return paused ? 'Backing up… Cloud Companion is paused for a minute or two.' : 'Backing up…'
+  if (j.kind === 'restore') return 'Restoring… Cloud Companion is paused until it is done.'
   return 'Checking the backup location…'
 })
 
@@ -212,12 +213,12 @@ function fill(d: Dest) {
   if (d.kind === 'rest') moreKinds.value = true
   if (d.kind === 'usb') usb.value = d.uuid || ''
   if (d.kind === 'sftp') {
-    const m = /^([^@]+)@([^:]+):(.*)$/.exec(d.path || '')
+    const m = /^([^@]+)@([^:]+(?::[0-9]+)?):(.*)$/.exec(d.path || '') // the host keeps its port ("nas.local:2222")
     if (m) Object.assign(sftp, { user: m[1], host: m[2], folder: m[3] })
   }
   if (d.kind === 's3') {
-    const m = /^https?:\/\/([^/]+)\/(.+)$/.exec(d.url || '')
-    if (m) Object.assign(s3, { endpoint: m[1], bucket: m[2], keyId: d.keyId || '', secret: '' })
+    const m = /^(https?:\/\/[^/]+)\/(.+)$/.exec(d.url || '')
+    if (m) Object.assign(s3, { endpoint: m[1].replace(/^https:\/\//, ''), bucket: m[2], keyId: d.keyId || '', secret: '' }) // http:// stays visible
   }
   if (d.kind === 'rest') rest.value = d.url || ''
 }
@@ -226,8 +227,10 @@ function dest() {
   if (kind.value === 'usb') d.uuid = usb.value
   if (kind.value === 'sftp') d.path = `${sftp.user.trim()}@${sftp.host.trim()}:${sftp.folder.trim() || 'cloud-backups'}`
   if (kind.value === 's3') {
-    const host = s3.endpoint.trim().replace(/^https?:\/\//, '').replace(/\/$/, '')
-    Object.assign(d, { url: `https://${host}/${s3.bucket.trim()}`, keyId: s3.keyId.trim(), secret: s3.secret })
+    // https unless http:// was typed (a MinIO on the local network)
+    const e = s3.endpoint.trim().replace(/\/$/, '')
+    const host = /^https?:\/\//.test(e) ? e : 'https://' + e
+    Object.assign(d, { url: `${host}/${s3.bucket.trim()}`, keyId: s3.keyId.trim(), secret: s3.secret })
   }
   if (kind.value === 'rest') d.url = rest.value.trim()
   return d
@@ -272,12 +275,14 @@ async function follow(j: Job) {
       j = await apiCall('GET', '/phe/host/jobs/' + j.id)
       away = 0
     } catch (e) {
+      if ((e as Error).message.includes('no such job')) break // the manager restarted: the result is in what load() shows
       if (++away > 600) throw e // ten minutes without an answer
       continue
     }
     job.value = j
   }
   if (j.state === 'failed') error.value = j.error || ''
+  if (j.state === 'running') job.value = null // forgotten by a restarted manager: no progress to show any more
   await load()
   return j.state === 'done'
 }
@@ -312,7 +317,14 @@ async function copyKey() {
 }
 
 // the page can open before the connection says this device is the owner (a reload, a link): load once it does
-watch(() => state.admin, (a) => { if (a && available.value === null) load() }, { immediate: true })
+// opened (or reloaded) during a backup or a restore: follow it, rather than offering to start another
+async function rejoin() {
+  try {
+    const run = ((await apiCall('GET', '/phe/host/jobs')).jobs as Job[] || []).find((j) => j.kind === 'backup' || j.kind === 'restore')
+    if (run && !job.value) await follow(run)
+  } catch { /* nothing running, or an older manager: the page works as before */ }
+}
+watch(() => state.admin, async (a) => { if (a && available.value === null) { await load(); if (available.value) rejoin() } }, { immediate: true })
 </script>
 
 <style scoped>

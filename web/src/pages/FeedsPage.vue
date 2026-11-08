@@ -6,6 +6,7 @@
 <template>
   <q-page class="ph-feeds" data-test="feeds">
     <p v-if="feedsError" class="ph-feeds__note" role="alert">Could not load: {{ feedsError }}</p>
+    <p v-if="removeFail" class="ph-feeds__note" role="alert" data-test="feeds-remove-error">{{ removeFail }}</p>
     <template v-if="feedsAt.view === 'feeds'">
       <XFeedList :feeds="sources" @open="openFeed" />
       <p v-if="!feedList.length" class="ph-feeds__note">{{ state.admin ? 'No feeds yet. Add one with +.' : 'No feeds yet. The owner adds them.' }}</p>
@@ -34,13 +35,14 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useChrome, XFeedList, XFeedPosts, XFeedReader, type FeedPost, type FeedSource } from '@etesian-design/shell'
 import { state } from '../cloud'
-import { toast } from '../toast'
+import { onResume, toast } from '../toast'
 import { feedList, posts, feedErrors, feedsError, loadFeeds, addFeed, removeFeed, openLink, isUnread, markRead, unreadOf, feedsAt, showPost, type Post } from '../desktop/feeds'
 
 const when = (p: Post) => { const d = new Date(p.published); return isNaN(d.getTime()) ? '' : d.toLocaleString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) }
 const asPost = (p: Post): FeedPost => ({ id: p.id, title: p.title || '(no title)', feed: p.feed, when: when(p), unread: isUnread(p), html: p.html, link: p.link })
 
-const sources = computed<FeedSource[]>(() => feedList.value.map((f) => ({ id: f.url, title: f.title || f.url, unread: unreadOf(f.url), error: feedErrors.value[f.url] ? "Can't update" : undefined })))
+const hidden = ref<string[]>([]) // removed, Undo still possible
+const sources = computed<FeedSource[]>(() => feedList.value.filter((f) => !hidden.value.includes(f.url)).map((f) => ({ id: f.url, title: f.title || f.url, unread: unreadOf(f.url), error: feedErrors.value[f.url] ? "Can't update" : undefined })))
 const feedTitle = computed(() => (feedsAt.feed === 'all' ? 'All posts' : feedList.value.find((f) => f.url === feedsAt.feed)?.title || feedsAt.feed))
 const inFeed = computed(() => posts.value.filter((p) => feedsAt.feed === 'all' || p.feedURL === feedsAt.feed))
 const shown = computed(() => inFeed.value.map(asPost))
@@ -71,11 +73,30 @@ chrome.on('tool', async (l) => {
   if (l === 'Add feed') { addFail.value = ''; adding.value = true }
   else if (l === 'Refresh') loadFeeds()
   else if (l === 'Mark all as read') markRead(inFeed.value.map((p) => p.id))
-  else if (l === 'Remove feed') { try { await removeFeed(feedsAt.feed); feedsAt.view = 'feeds' } catch (e) { toast((e as Error).message) } }
+  else if (l === 'Remove feed') remove(feedsAt.feed)
   else if (l === 'Open in browser' && post.value) openLink(post.value.link)
   else if (l === 'Mark as unread' && post.value) { markRead([post.value.id], false); feedsAt.view = 'posts' }
 })
 
+// removing waits for the toast, as every other delete does: Undo keeps the feed; an error is a banner, not a toast
+const removeFail = ref('')
+function remove(url: string) {
+  const f = feedList.value.find((x) => x.url === url)
+  if (!f) return
+  removeFail.value = ''
+  hidden.value = [...hidden.value, url]
+  feedsAt.view = 'feeds'
+  toast(`${f.title || f.url} removed`, {
+    resume: ['feeds.remove', url],
+    undo: () => { hidden.value = hidden.value.filter((u) => u !== url) },
+    onExpire: async () => {
+      try { await removeFeed(url) } catch (e) { removeFail.value = "Couldn't remove the feed: " + (e as Error).message }
+      hidden.value = hidden.value.filter((u) => u !== url)
+    },
+  })
+}
+
+onResume<string>('feeds.remove', async (url) => { await loadFeeds(); await removeFeed(url) })
 onMounted(loadFeeds)
 watch(() => state.status === 'online', (on) => { if (on) loadFeeds() })
 </script>

@@ -145,6 +145,14 @@ func TestSMSSync(t *testing.T) {
 	if len(th) != 4 || th[0].(map[string]any)["ts"].(float64) > th[3].(map[string]any)["ts"].(float64) {
 		t.Fatalf("thread: %v", th)
 	}
+	// asked again with what the page has: nothing changed, so only "same" comes back, not the 4 messages
+	seen := r["seen"].(string)
+	if _, again := admin.call(t, "GET", "/sms/thread?key="+key+"&seen="+seen, nil); again["same"] != true || again["messages"] != nil {
+		t.Errorf("unchanged thread: %v", again)
+	}
+	if _, again := admin.call(t, "GET", "/sms/thread?key="+key+"&seen=0000", nil); again["same"] == true || len(again["messages"].([]any)) != 4 {
+		t.Errorf("an older fingerprint gets the thread: %v", again)
+	}
 	if code, _ := phone.call(t, "GET", "/sms/conversations", nil); code != 403 {
 		t.Fatalf("a phone must not read the conversations (HTTP %d)", code)
 	}

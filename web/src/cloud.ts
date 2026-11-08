@@ -3,7 +3,8 @@
 
 // The app's single connection to the cloud and the state of the current page. Components read `state`; the canvas view
 // registers `onTile`/`onRedraw` hooks.
-import { reactive, shallowRef } from 'vue'
+import { reactive, shallowRef, watch } from 'vue'
+import { onResume } from './toast'
 import { PheClient, type Creds } from './pheclient'
 import { idbGet, idbSet, idbDel } from './idb'
 import { brand } from './brand'
@@ -247,6 +248,9 @@ function removed() {
   forget()
 }
 
+// what Mail, Contacts and Calendar say when the server has no mail service (the hub) switched on
+export const NO_HUB = "Mail, contacts and calendar isn't set up on this server. An admin can turn it on in Settings → Features."
+
 export async function forget() {
   if (client) client.close()
   client = null
@@ -401,7 +405,8 @@ async function signed(method: string, target: string, body: string | 'u' = '') {
 async function signedJSON(method: string, path: string, body?: unknown): Promise<any> {
   const text = body === undefined ? '' : JSON.stringify(body)
   const s = await signed(method, path, text)
-  const r = await fetch(path, { method, headers: { ...s.headers, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : text })
+  // keepalive: a change sent as the page goes away (a delete whose Undo toast was still up) still reaches the server
+  const r = await fetch(path, { method, headers: { ...s.headers, 'Content-Type': 'application/json' }, body: body === undefined ? undefined : text, keepalive: method !== 'GET' && text.length < 60000 })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
   return j
@@ -465,3 +470,6 @@ export async function apiUpload(path: string, form: FormData) {
   if (!r.ok) throw new Error(j.error || 'The server did not accept that.')
   return j
 }
+
+// a delete or move whose Undo toast was still up when the page was closed or reloaded (toast.ts): done now
+onResume<HubRequest>('hub.call', (r) => new Promise((ok) => { const stop = watch(() => state.status === 'online', (on) => { if (on) { queueMicrotask(() => stop()); ok(hubCall(r)) } }, { immediate: true }) }))
