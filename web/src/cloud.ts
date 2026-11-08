@@ -292,6 +292,7 @@ export async function hubCall(msg: HubRequest) {
 
 // open a page in a new tab of this browser (for "Open here" on another device's tab)
 export async function openInNewTab(url: string) {
+  if (!state.page.url || state.page.url === 'about:blank') { api.open(url); return } // a blank tab is used, not left behind
   const before = { n: state.tabs.length, v: state.activeView }
   api.tab('new')
   for (let i = 0; i < 80 && state.tabs.length <= before.n && state.activeView === before.v; i++) await new Promise((r) => setTimeout(r, 50))

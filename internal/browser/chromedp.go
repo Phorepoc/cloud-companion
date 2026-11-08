@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
@@ -422,9 +423,9 @@ func (s *cdpSession) Navigate(ctx context.Context, url, action string) error {
 	var a chromedp.Action
 	switch action {
 	case "back":
-		a = chromedp.NavigateBack()
+		a = s.history(-1)
 	case "forward":
-		a = chromedp.NavigateForward()
+		a = s.history(1)
 	case "reload":
 		a = chromedp.Reload()
 	default:
@@ -435,6 +436,37 @@ func (s *cdpSession) Navigate(ctx context.Context, url, action string) error {
 	}
 	s.sy = 0
 	return s.settle(ctx)
+}
+
+// history goes back (step -1) or forward (1). chromedp's NavigateBack waits for the page's network response, which never comes
+// when Chromium restores the page from its back/forward cache: Back then hung until its time ran out. This waits instead until
+// the tab shows that entry's address and has finished loading, from the cache or the network.
+func (s *cdpSession) history(step int64) chromedp.Action {
+	return chromedp.ActionFunc(func(ctx context.Context) error {
+		cur, entries, err := page.GetNavigationHistory().Do(ctx)
+		if err != nil {
+			return err
+		}
+		i := cur + step
+		if i < 0 || i >= int64(len(entries)) {
+			return errors.New("no page to go to")
+		}
+		if err := page.NavigateToHistoryEntry(entries[i].ID).Do(ctx); err != nil {
+			return err
+		}
+		for {
+			var ok bool
+			js := fmt.Sprintf(`location.href === %q && document.readyState !== 'loading'`, entries[i].URL)
+			if err := chromedp.Evaluate(js, &ok).Do(ctx); err == nil && ok {
+				return nil
+			}
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+	})
 }
 
 // Tap clicks at (x, y). sy < 0: x,y are viewport coordinates (fixed layers). Otherwise y is a document

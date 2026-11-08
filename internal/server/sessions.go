@@ -79,9 +79,12 @@ func (s *session) remote(raw []byte) error {
 		}
 		url := r.URL
 		op = func(ctx context.Context) error {
-			nt, _ := proto.Marshal(proto.Tab{T: proto.TTab, Action: "new"})
-			if err := target.tabAction(ctx, nt); err != nil {
-				return err
+			// a new tab, unless the device shows a blank one (after its last tab was closed, say): that one is used, not left behind
+			if t := target.tab; t == nil || (t.url != "" && t.url != "about:blank") {
+				nt, _ := proto.Marshal(proto.Tab{T: proto.TTab, Action: "new"})
+				if err := target.tabAction(ctx, nt); err != nil {
+					return err
+				}
 			}
 			or, _ := proto.Marshal(proto.Open{T: proto.TOpen, V: target.active, URL: url, Width: 360})
 			return target.dispatch(ctx, proto.TOpen, or)

@@ -69,8 +69,9 @@ try {
   const phoneSid = await A.page.evaluate(() => window.__phe.state.sessions.find((s) => s.name === 'Phone')!.sid)
   const phoneView = await A.page.evaluate(() => window.__phe.state.sessions.find((s) => s.name === 'Phone')!.tabs![0].v)
   await A.page.click(`[data-test=dev-close-${phoneSid}-${phoneView}]`)
-  await B.page.waitForFunction(() => window.__phe.state.tabs.length === 0, null, { timeout: 15000 })
-  step('closed the Phone tab from the Laptop: the Phone has no tabs any more')
+  // the last tab closed: a blank one takes its place under a new number (session.go), so the Phone never has no tab
+  await B.page.waitForFunction((v) => window.__phe.state.tabs.length === 1 && window.__phe.state.tabs[0].v !== v, phoneView, { timeout: 15000 })
+  step('closed the Phone tab from the Laptop: the Phone shows a blank tab instead')
 
   // open a page on the Phone from the Laptop
   await A.page.fill(`[data-test=dev-url-${phoneSid}]`, 'https://example.com')
