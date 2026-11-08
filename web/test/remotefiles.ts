@@ -93,7 +93,7 @@ assert.equal(await page.locator('[data-test="file-rename-sea.png"]').count(), 0,
 await page.keyboard.press('Escape')
 await shot(page, '3-folder')
 const [photo] = await Promise.all([ctx.waitForEvent('page'), page.click('[data-test="file-sea.png"]')])
-await photo.waitForLoadState()
+await photo.waitForURL(/^http/) // the tab opens blank on the tap, then goes to the file
 const res = await ctx.request.get(photo.url())
 assert.equal(res.status(), 200)
 assert.equal(res.headers()['content-type'], 'image/png')
