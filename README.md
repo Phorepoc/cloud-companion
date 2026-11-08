@@ -258,8 +258,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
   [Liberation](https://github.com/liberationfonts/liberation-fonts), [DejaVu](https://dejavu-fonts.github.io) and
   [Noto](https://notofonts.github.io) fonts
 - Android: [Redroid](https://github.com/remote-android/redroid-doc), the [Android Open Source Project](https://source.android.com)
-  and its SDK tools, [Gradle](https://gradle.org), [Eclipse Temurin](https://adoptium.net), [scrcpy](https://github.com/Genymobile/scrcpy)
-  and [Taskbar](https://github.com/farmerbb/Taskbar)
+  and its SDK tools, [Gradle](https://gradle.org), [Eclipse Temurin](https://adoptium.net) and [scrcpy](https://github.com/Genymobile/scrcpy)
 - The base systems under all of them: [Debian](https://www.debian.org), [Alpine Linux](https://alpinelinux.org), [Node.js](https://nodejs.org),
   [OpenSSL](https://www.openssl.org) and [fontTools](https://github.com/fonttools/fonttools)
 

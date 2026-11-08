@@ -131,7 +131,7 @@ func ensureDevice(ctx context.Context, notify func(phase string)) error {
 			} else {
 				log.Println("device ready, server jar pushed")
 				dev.ready = true
-				deskReset() // a (re)started device: display override and home app are checked again
+				// a (re)started device: its display override is set again
 				disp.Lock()
 				disp.w, disp.h, disp.dpi = 0, 0, 0
 				disp.Unlock()

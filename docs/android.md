@@ -68,20 +68,10 @@ comes from `dumpsys input_method` on the bridge (about 0.2 s, asked for when the
 Cheaper signals (scrcpy's clipboard messages) do not say whether anything is selected; uiautomator dumps are slower and do not show selections. Cut and Copy use scrcpy's copy / cut keys; Select all sends Ctrl+A.
 Long-pressing on a touch screen still works as on a phone (it is sent through as a touch). Test: `web/test/androidview.ts` (`ONLY=view sh web/test/android.sh`).
 
-## Desktop mode (freeform windows and a taskbar)
-A **large** viewer (a tablet, laptop or desktop window; see "The display follows the viewing device") gets a desktop: [Taskbar](https://github.com/farmerbb/Taskbar) as the home app, which draws a taskbar with a start menu, a clock
-and app buttons, and apps opening in **freeform windows** (movable, overlapping, with maximize and close buttons). A **phone** viewer gets the stock launcher back. The switch follows the viewer, also when the window is resized
-across the phone / large boundary (`web/test/screenshots/android/androiddesktop-*.png`).
-- **Licence:** Taskbar is Apache-2.0 (checked on F-Droid and GitHub: Braden Farmer, https://github.com/farmerbb/Taskbar). It is not shipped here: the bridge installs it from f-droid.org the first time a desktop viewer connects.
-- **What it needs:** an Android image that declares the freeform window feature (`deploy/android/Dockerfile.redroid-native`, `FREEFORM=1`, now the default: one xml file in `/system/etc/permissions`) and a rootable (userdebug) build, which Redroid is.
-  Without either, the display still follows the viewer and the stock launcher stays (the bridge logs why).
-- **How the bridge does it** (`cmd/pheandroid/desktop.go`): `adb root`; install Taskbar if missing; `settings put global enable_freeform_support 1` and `force_resizable_activities 1`; grant it the overlay and usage-access app ops;
-  write its preference file `shared_prefs/com.farmerbb.taskbar_preferences.xml` as root (`launcher`, `freeform_hack`, `taskbar_active`, ...) with the app's owner; `pm enable` its `HomeActivity`; `cmd package set-home-activity` to Taskbar,
-  start it, press Home. For a phone viewer: broadcast `com.farmerbb.taskbar.QUIT`, force-stop it, set the stock launcher (`com.android.launcher3/.uioverrides.QuickstepLauncher`) as home. The provisioning runs once per device start.
-- **Apps open freeform** from the Taskbar start menu; from adb use `am start --windowingMode 5 -n <activity>`. Measured on a throwaway container: Taskbar is home about 2 s after the viewer's display is set
-  (after the first-time install from F-Droid, a few more seconds), the first freeform window opens at once. Test: `web/test/androiddesktop.ts` (`ONLY=desktop sh web/test/android.sh`).
-- Redroid 14 and 15 images exist (`redroid/redroid:14.0.0-latest`, `15.0.0-latest`) but were not needed: Android 13 already provides the windowing.
-- **Limits:** the phone's own launcher state (widgets, home layout) is separate from Taskbar's; a window left open in desktop mode stays in the task list when a phone viewer connects; one viewer at a time, so two viewers of different kinds take turns.
+## Phone mode and desktop mode
+The two modes only change the display's shape: a **phone** viewer gets a portrait display, a **large** viewer (a tablet, laptop or desktop window) a landscape one
+(see "The display follows the viewing device"). The home app is always the image's own, Etesian's launcher on the Etesian image: the bridge never replaces it,
+never needs root and never installs anything. A desktop made for Etesian comes with Etesian itself. Test: `web/test/androiddesktop.ts` (`ONLY=desktop sh web/test/android.sh`).
 
 ## What the page can do
 - **Touch and keys**: mouse or touch on the screen; typed characters go to the focused field; Back / Home / Recent buttons.

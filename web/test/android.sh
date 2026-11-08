@@ -5,7 +5,7 @@
 # running stack's phe-redroid is not touched), capped, then a Playwright browser. A small loop runs the adb hooks the browser test asks for (settings, rotate, ...).
 # Needs: image phe-redroid-native:13 (deploy/android/Dockerfile.redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), an APK for the upload test
 # (APK=/path, any small app), the repo root as cwd.
-#   REDROID_IMAGE=etesian-redroid HOME_ACTIVITY=com.bompotis.etesian.launcher/.HomeActivity runs it on the Etesian image (inside a VM only: see etesian-redroid's vm-test.sh)
+#   REDROID_IMAGE=etesian-redroid:24.0 runs it on the Etesian image (inside a VM only: see etesian-redroid's vm-test.sh)
 #   (with QUERY='&codec=vp8' and APK=<Markor from F-Droid, net.gsantner.markor>: passes in full, 2026-11-04)
 #   QUERY='&codec=vp8' selects the codec (Playwright's Chromium has no H.264; real browsers do)
 set -eu
@@ -19,12 +19,12 @@ cleanup() { [ -n "${HOOKPID:-}" ] && kill "$HOOKPID" 2>/dev/null || true; docker
 cleanup; trap cleanup EXIT
 cp "$APK" "$ROOT/web/test/markor.apk"
 docker network create phepa >/dev/null
-docker run -d --name phe-redroid-t --network phepa --privileged --cpus 2 --memory 3g ${REDROID_IMAGE:-phe-redroid-native:13-ff} \
+docker run -d --name phe-redroid-t --network phepa --privileged --cpus 2 --memory 3g ${REDROID_IMAGE:-etesian-redroid:24.0} \
     androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320 androidboot.use_memfd=1 >/dev/null
 docker run -d --name phe-dockerproxy-t --network phepa --cpus 0.25 --memory 64m -e CONTAINERS=1 -e POST=1 -e ALLOW_START=1 -e ALLOW_STOP=1 -v /var/run/docker.sock:/var/run/docker.sock:ro tecnativa/docker-socket-proxy:0.3.0 >/dev/null
 docker build -q -f cmd/pheandroid/Dockerfile -t phe-android-bridge:dev . >/dev/null
 docker run -d --name phe-android-t --network phepa --cpus 1 --memory 256m -e PHE_ANDROID_SECRET=testsecret -e PHE_ANDROID_SERIAL=phe-redroid-t:5555 \
-    -e PHE_ANDROID_DOCKER=http://phe-dockerproxy-t:2375 -e PHE_ANDROID_CONTAINER=phe-redroid-t -e PHE_ANDROID_PARK_AFTER=${PARK_AFTER:-30s} -e PHE_ANDROID_HOME=${HOME_ACTIVITY:-} \
+    -e PHE_ANDROID_DOCKER=http://phe-dockerproxy-t:2375 -e PHE_ANDROID_CONTAINER=phe-redroid-t -e PHE_ANDROID_PARK_AFTER=${PARK_AFTER:-30s} \
     -v "$JAR":/scrcpy-server.jar:ro phe-android-bridge:dev >/dev/null
 # 2026-11-04: this waited forever when the image had no adbd; give up after 5 minutes with the bridge's log
 t=0; until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do sleep 2; t=$((t+2)); [ $t -lt 300 ] || { echo "bridge never reached the device:"; docker logs phe-android-t 2>&1 | tail -8; exit 1; }; done
@@ -47,10 +47,8 @@ t=0; until docker logs phe-android-t 2>&1 | grep -q "server jar pushed"; do slee
         pkgs) c='pm list packages -3' ;;
         tone) c='input keyevent 24; input keyevent 25' ;;
         wmsize) c='wm size; wm density' ;;
-        gohome) c='input keyevent 3; sleep 2; dumpsys window | grep mCurrentFocus | head -1' ;;
-        settingsff) c='am start --windowingMode 5 -n com.android.settings/.Settings' ;;
-        freeformcount) c='dumpsys activity activities | grep -c mode=freeform' ;;
-        taskbarwin) c='dumpsys window windows | grep -c "Window{.* Taskbar}"' ;;
+        gohome) c='input keyevent 3; sleep 2; dumpsys activity activities | grep -m1 -E "topResumedActivity|mResumedActivity"' ;;
+        foreignpkgs) c='pm list packages | grep -cxE "package:(com\.farmerbb\.taskbar|com\.android\.launcher3)"' ;;
         textfield) c='input keyevent 3; sleep 1; am start -a android.intent.action.SENDTO -d sms:5550100 >/dev/null; sleep 3; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep "class=.android.widget.EditText" | tail -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;  # a focused text field with any home app: a new message's body, tapped
         applist) c='am start -a android.settings.MANAGE_ALL_APPLICATIONS_SETTINGS' ;;
         settingssearch) c='am start -a android.settings.SETTINGS >/dev/null; sleep 2; uiautomator dump /sdcard/u.xml >/dev/null 2>&1; b=$(cat /sdcard/u.xml | tr ">" "\n" | grep -i "Search settings" | head -1 | grep -o "bounds=.\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]." | tr -dc "0-9,[]"); x1=${b#[}; x1=${x1%%,*}; y1=${b#*,}; y1=${y1%%]*}; x2=${b#*][}; x2=${x2%%,*}; y2=${b##*,}; y2=${y2%]}; input tap $(( (x1+x2)/2 )) $(( (y1+y2)/2 ))' ;;

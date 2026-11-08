@@ -71,15 +71,15 @@ assert(g.fw > g.fh, 'a desktop window gets a landscape frame')
 assert(g.fb <= g.vh + 40, 'the whole screen should be (nearly) visible without scrolling on desktop')
 await shots('1-desktop')
 
-// the app's own controls work: Home, then a click on Taskbar's start button (desktop mode: the large display has a taskbar, not an app drawer) opens the start menu
+// the app's own controls work: Home shows the image's own launcher, then a click in the middle of the screen (through the page canvas) changes it
 await tool(page, 'Home'); await page.waitForTimeout(2500)
 const h0 = (await canvas()).hash
 const box = await page.locator('[data-test=android-screen]').boundingBox()
 assert(box, 'the screen is laid out')
-await page.mouse.click(box.x + box.width * 0.418, box.y + box.height * 0.957)
+await page.mouse.click(box.x + box.width * 0.5, box.y + box.height * 0.5)
 await page.waitForTimeout(1800)
-assert.notEqual((await canvas()).hash, h0, 'a click on the start button through the page canvas did not change the screen')
-await page.screenshot({ path: `${OUT}/androidapp-start-menu.png` })
+assert.notEqual((await canvas()).hash, h0, 'a click through the page canvas did not change the screen')
+await page.screenshot({ path: `${OUT}/androidapp-tapped.png` })
 await tool(page, 'Back'); await page.waitForTimeout(800)
 console.log('input through the page: ok')
 await tool(page, 'Home'); await page.waitForTimeout(1000)

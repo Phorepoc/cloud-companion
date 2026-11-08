@@ -46,7 +46,6 @@ services:
       PHE_ANDROID_CONTAINER: phe-redroid
       PHE_ANDROID_PARK_AFTER: ${PHE_ANDROID_PARK_AFTER:-15m}   # 0 turns parking off
       PHE_ANDROID_PARK: ${PHE_ANDROID_PARK:-stop}
-      PHE_ANDROID_HOME: ${PHE_ANDROID_HOME:-}   # the phone home app; empty = the stock launcher (Etesian image: com.bompotis.etesian.launcher/.HomeActivity)
       PHE_ANDROID_SCRCPY_VERSION: ${PHE_SCRCPY_VERSION:-5.0.1}
     volumes:
       - ${PHE_SCRCPY_JAR:?path of the scrcpy server jar on the host}:/scrcpy-server.jar:ro

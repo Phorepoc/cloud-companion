@@ -1,7 +1,7 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
-// Desktop mode: a large (desktop) viewer gets Taskbar as the home app and freeform windows; a phone-sized window gets the stock launcher; and back. Runs against the bridge's
-// standalone page with the hooks of android.sh, on an image built with FREEFORM=1.
+// The two display shapes: a large (desktop) viewer gets a landscape display, a phone-sized window a portrait one, and back. The home app is the image's own
+// (Etesian's launcher) in both: the bridge never swaps it and never installs anything. Runs against the bridge's standalone page with the hooks of android.sh.
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
 import fs from 'fs'
@@ -30,31 +30,27 @@ const nonblank = () => page.evaluate(() => { const c = (document.getElementById(
 await page.goto(BASE + '/?t=' + TICKET + QUERY)
 await page.waitForFunction(() => (document.getElementById('info')?.textContent ?? '').includes('fps'), null, { timeout: 240000 })
 await waitShape(true, 'desktop stream')
+const HOME = new RegExp(process.env.HOME_RE || 'com\\.bompotis\\.etesian\\.launcher')
 const t0 = Date.now()
-let f = await waitFocus(/com\.farmerbb\.taskbar/, 'desktop viewer: Taskbar is not the home app')
-console.log('desktop viewer: Taskbar is the home app (', f.replace(/\s+/g, ' ').slice(0, 110), ') after', ((Date.now() - t0) / 1000).toFixed(0), 's of provisioning')
+let f = await waitFocus(HOME, 'desktop viewer: the image\'s own launcher should stay home')
+console.log('desktop viewer: own launcher is home (', f.replace(/\s+/g, ' ').slice(0, 110), ') after', ((Date.now() - t0) / 1000).toFixed(0), 's')
+assert.equal(await hook('foreignpkgs'), '0', 'the bridge installed an app of its own (Taskbar or a launcher)')
 await page.waitForTimeout(1500)
 await page.screenshot({ path: OUT + '/androiddesktop-1-home.png' })
 assert(await nonblank(), 'blank screen')
 
-await hook('settingsff'); await page.waitForTimeout(3000)
-const n = Number(await hook('freeformcount'))
-console.log('freeform windows open:', n)
-assert(n >= 1, 'an app opened from the desktop should be a freeform window')
-await page.screenshot({ path: OUT + '/androiddesktop-2-window.png' })
-
 await page.setViewportSize({ width: 390, height: 844 })
 await waitShape(false, 'phone stream')
-f = await waitFocus(/launcher3/, 'phone viewer: the stock launcher should be home again', 60000)
-console.log('phone viewer: stock launcher is home (', f.replace(/\s+/g, ' ').slice(0, 100), ')')
-assert.equal(await hook('taskbarwin'), '0', 'Taskbar window should be gone for a phone viewer')
+f = await waitFocus(HOME, 'phone viewer: the image\'s own launcher should stay home', 60000)
+console.log('phone viewer: own launcher is home (', f.replace(/\s+/g, ' ').slice(0, 100), ')')
 await page.waitForTimeout(1500)
-await page.screenshot({ path: OUT + '/androiddesktop-3-phone.png' })
+await page.screenshot({ path: OUT + '/androiddesktop-2-phone.png' })
 assert(await nonblank(), 'blank phone screen')
 
 await page.setViewportSize({ width: 1280, height: 800 })
 await waitShape(true, 'desktop stream again')
-await waitFocus(/com\.farmerbb\.taskbar/, 'back on desktop: Taskbar should be home again', 60000)
-console.log('desktop viewer again: Taskbar is the home app')
+await waitFocus(HOME, 'back on desktop: the own launcher should still be home', 60000)
+assert.equal(await hook('foreignpkgs'), '0', 'the bridge installed an app of its own')
+console.log('desktop viewer again: own launcher is home')
 await browser.close()
 console.log('OK')

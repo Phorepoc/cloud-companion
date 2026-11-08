@@ -78,7 +78,7 @@ function setMode(m: 'phone' | 'desktop') {
   stream.value.setKind(wire(m))
 }
 // declared after the state it reads: run before it, it failed on its first run and the bar never got the controls or the modes
-// the header: Android's two modes are the title's views (a phone: portrait, the launcher; a desktop: landscape, windows and a taskbar)
+// the header: Android's two modes are the title's views (the display's shape: portrait or landscape; the home app is always the image's own)
 const MODES: Record<string, 'phone' | 'desktop'> = { 'Phone mode': 'phone', 'Desktop mode': 'desktop' }
 const chrome = useChrome(() => ({
   title: 'Android',
