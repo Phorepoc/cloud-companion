@@ -104,16 +104,17 @@ async function open(c: SmsConversation) {
 }
 function startNew() { current.value = { key: '', number: '', name: '' }; messages.value = []; newNumber.value = '' }
 async function send() {
-  if (!current.value) return
+  if (!current.value || sending.value) return // Ctrl+Enter twice, or with the button busy, sends once
   const number = current.value.key ? current.value.number : newNumber.value.trim()
   if (!number) { error.value = 'Enter the phone number to send to.'; return }
   sending.value = true; error.value = ''
   try {
-    await apiCall('POST', '/sms/send', { device: sendVia.value, number, body: text.value })
+    const r = await apiCall('POST', '/sms/send', { device: sendVia.value, number, body: text.value })
     text.value = ''
     await load()
     if (!current.value.key) {
-      const c = convs.value.find((x) => x.number === number) || convs.value[0]
+      // the conversation the server filed it under: a number typed another way (+44 or 0, with spaces) is still that person's
+      const c = convs.value.find((x) => x.key === r.key)
       if (c) await open(c)
     } else await loadThread()
   } catch (e) { error.value = (e as Error).message } finally { sending.value = false }

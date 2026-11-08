@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -65,8 +66,8 @@ type Manager struct {
 
 	mu    sync.Mutex // the state and the compose project
 	jmu   sync.Mutex
+	umu   sync.Mutex // update.json (editUpdate)
 	jobs  map[string]*Job
-	jseq  int
 	state State
 }
 
@@ -155,44 +156,44 @@ func (m *Manager) Choose(want []string, values map[string]map[string]string) (*J
 			return nil, ErrNotFound
 		}
 	}
-	m.mu.Lock()
-	next := m.cloneState()
-	m.mu.Unlock()
-	ids, err := m.Cat.Closure(append(m.enabled(next), want...))
-	if err != nil {
-		return nil, err
-	}
-	for _, x := range ids {
-		g := m.Cat.Get(x)
-		if ok, why := g.Fits(m.Board); !ok {
-			return nil, fmt.Errorf("%s: %s", g.Title, why)
+	plan := func(next State) (State, error) {
+		ids, err := m.Cat.Closure(append(m.enabled(next), want...))
+		if err != nil {
+			return next, err
 		}
-		for _, c := range g.Conflicts {
-			if slices.Contains(ids, c) {
-				return nil, fmt.Errorf("%s can't run at the same time as %s", g.Title, m.Cat.Get(c).Title)
+		for _, x := range ids {
+			g := m.Cat.Get(x)
+			if ok, why := g.Fits(m.Board); !ok {
+				return next, fmt.Errorf("%s: %s", g.Title, why)
+			}
+			for _, c := range g.Conflicts {
+				if slices.Contains(ids, c) {
+					return next, fmt.Errorf("%s can't run at the same time as %s", g.Title, m.Cat.Get(c).Title)
+				}
+			}
+			if next.Features[x] == nil {
+				next.Features[x] = map[string]string{}
+			}
+			vals := next.Features[x]
+			for _, s := range g.Settings {
+				if v, ok := values[x][s.Key]; ok && !s.Generate {
+					vals[s.Key] = v
+				}
+				if s.Generate && vals[s.Key] == "" {
+					vals[s.Key] = randomSecret()
+				}
+				if s.Required && vals[s.Key] == "" {
+					return next, fmt.Errorf("%s: %s is required", g.Title, s.Label)
+				}
 			}
 		}
-		if next.Features[x] == nil {
-			next.Features[x] = map[string]string{}
-		}
-		vals := next.Features[x]
-		for _, s := range g.Settings {
-			if v, ok := values[x][s.Key]; ok && !s.Generate {
-				vals[s.Key] = v
-			}
-			if s.Generate && vals[s.Key] == "" {
-				vals[s.Key] = randomSecret()
-			}
-			if s.Required && vals[s.Key] == "" {
-				return nil, fmt.Errorf("%s: %s is required", g.Title, s.Label)
-			}
-		}
+		return next, nil
 	}
 	feature := ""
 	if len(want) == 1 {
 		feature = want[0]
 	}
-	return m.start("enable", feature, next), nil
+	return m.change("enable", feature, plan)
 }
 
 // Value is a setting of a feature that is on ("" when there is none).
@@ -246,25 +247,34 @@ func (m *Manager) Disable(id string) (*Job, error) {
 	if f.Core {
 		return nil, fmt.Errorf("%s is always on", f.Title)
 	}
-	m.mu.Lock()
-	next := m.cloneState()
-	m.mu.Unlock()
-	on, _ := m.Cat.Closure(m.enabled(next))
-	for _, o := range on {
-		if o != id && slices.Contains(m.Cat.Get(o).Requires, id) && next.Features[o] != nil {
-			return nil, fmt.Errorf("%s needs %s. Turn it off first", m.Cat.Get(o).Title, f.Title)
+	return m.change("disable", id, func(next State) (State, error) {
+		on, _ := m.Cat.Closure(m.enabled(next))
+		for _, o := range on {
+			if o != id && slices.Contains(m.Cat.Get(o).Requires, id) && next.Features[o] != nil {
+				return next, fmt.Errorf("%s needs %s. Turn it off first", m.Cat.Get(o).Title, f.Title)
+			}
 		}
+		delete(next.Features, id)
+		return next, nil
+	})
+}
+
+// change runs a change to the features as a job. The change is worked out on the state as it is when the job's turn comes, so
+// two changes made close together (two browsers, or one after the other) both stand; it is also tried at once on the state
+// now, so a change that cannot be made is refused straight away.
+func (m *Manager) change(kind, feature string, plan func(State) (State, error)) (*Job, error) {
+	m.mu.Lock()
+	now := m.cloneState()
+	m.mu.Unlock()
+	if _, err := plan(now); err != nil {
+		return nil, err
 	}
-	delete(next.Features, id)
-	return m.start("disable", id, next), nil
+	return m.run(kind, feature, func() (State, error) { return plan(m.cloneState()) }), nil
 }
 
 // Apply brings the compose project to the saved state (at start, and after an update).
 func (m *Manager) Apply() *Job {
-	m.mu.Lock()
-	s := m.cloneState()
-	m.mu.Unlock()
-	return m.start("apply", "", s)
+	return m.run("apply", "", func() (State, error) { return m.cloneState(), nil })
 }
 
 func (m *Manager) cloneState() State {
@@ -279,16 +289,22 @@ func (m *Manager) cloneState() State {
 	return s
 }
 
-// start runs a change as a job: the new state is applied; when that fails the old one is put back.
-func (m *Manager) start(kind, feature string, next State) *Job {
+// run runs a change as a job: next (called once the job holds m.mu) is the new state, which is applied; when that fails the old
+// one is put back.
+func (m *Manager) run(kind, feature string, plan func() (State, error)) *Job {
 	j := m.newJob(kind, feature)
 	go func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		prev := m.cloneState()
+		next, err := plan()
+		if err != nil {
+			j.finish(err)
+			return
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		defer cancel()
-		err := m.apply(ctx, next, j)
+		err = m.apply(ctx, next, j)
 		if err == nil {
 			err = m.save(next)
 		}
@@ -446,10 +462,50 @@ type Job struct {
 func (m *Manager) newJob(kind, feature string) *Job {
 	m.jmu.Lock()
 	defer m.jmu.Unlock()
-	m.jseq++
-	j := &Job{ID: strconv.Itoa(m.jseq), Kind: kind, Feature: feature, ch: make(chan struct{})}
+	return m.addJob(kind, feature)
+}
+
+// addJob makes a job with a random id: a manager started again after an update counts from nothing, and a page still following
+// the update's job must not be handed another job under the same number. m.jmu is held.
+func (m *Manager) addJob(kind, feature string) *Job {
+	b := make([]byte, 6)
+	rand.Read(b)
+	j := &Job{ID: hex.EncodeToString(b), Kind: kind, Feature: feature, ch: make(chan struct{})}
 	m.jobs[j.ID] = j
 	return j
+}
+
+// soleJob starts an update, a backup or a restore unless one of them is running already (an update backs up first, so they exclude each other
+// too): a second "Update now", from another browser or after coming back to the page, would back up and download again, and
+// overwrite the copies kept for going back.
+func (m *Manager) soleJob(kind string) (*Job, error) {
+	m.jmu.Lock()
+	defer m.jmu.Unlock()
+	for _, j := range m.jobs {
+		if (j.Kind == "update" || j.Kind == "backup" || j.Kind == "restore") && !j.isDone() {
+			switch j.Kind {
+			case "update":
+				return nil, ErrUpdating
+			case "restore":
+				return nil, ErrRestoring
+			}
+			return nil, ErrBackingUp
+		}
+	}
+	return m.addJob(kind, ""), nil
+}
+
+// ErrUpdating, ErrBackingUp and ErrRestoring: one of them is running, so another one waits until it is done.
+var (
+	ErrUpdating  = errors.New("An update is already being installed. Wait until it's done")
+	ErrBackingUp = errors.New("A backup is already running. Wait until it's done")
+	ErrRestoring = errors.New("A restore is already running. Wait until it's done")
+)
+
+func (j *Job) isDone() bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.done
 }
 
 func (m *Manager) Job(id string) *Job {

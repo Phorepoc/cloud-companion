@@ -8,11 +8,13 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -59,6 +61,29 @@ func TestFilesAPI(t *testing.T) {
 	}
 	if code, _ := phone.call(t, "GET", "/phe/files?path=../../etc", nil); code != 400 {
 		t.Fatal("out of the root")
+	}
+	// an upload cut short after its first file is not a success, and says what arrived
+	var cut bytes.Buffer
+	cmw := multipart.NewWriter(&cut)
+	w1, _ := cmw.CreateFormFile("file", "first.txt")
+	w1.Write([]byte("whole"))
+	w2, _ := cmw.CreateFormFile("file", "second.txt")
+	w2.Write([]byte("half"))
+	req, _ = http.NewRequest("POST", srv.URL+"/phe/files/upload?path=Cut", bytes.NewReader(cut.Bytes())) // no closing boundary
+	req.Header.Set("Content-Type", cmw.FormDataContentType())
+	ts = fmt.Sprint(time.Now().Unix())
+	m = hmac.New(sha256.New, pc.key)
+	m.Write([]byte(pc.id + "." + ts + ".POST /phe/files/upload"))
+	req.Header.Set("X-Phe-Auth", pc.id+"."+ts+"."+hex.EncodeToString(m.Sum(nil)))
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cj map[string]any
+	json.NewDecoder(resp.Body).Decode(&cj)
+	resp.Body.Close()
+	if msg, _ := cj["error"].(string); resp.StatusCode != 400 || !strings.Contains(msg, "first.txt") || strings.Contains(msg, "second.txt") {
+		t.Errorf("a cut-short upload: %d %v", resp.StatusCode, cj)
 	}
 	// stream with a ticket, with a Range
 	_, j := pc.call(t, "POST", "/phe/files/ticket", map[string]any{"path": "Music/A/B/01 One.mp3"})

@@ -6,3 +6,5 @@ services:
   phecloud:
     container_name: phe-cloud-t
     ports: !override []
+  zpush:
+    ports: !override []

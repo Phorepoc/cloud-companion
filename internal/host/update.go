@@ -79,6 +79,16 @@ func (m *Manager) saveUpdate(c UpdateConfig) error {
 	return writeFileAtomic(m.updateFile(), b, 0o600)
 }
 
+// editUpdate changes update.json in one step: a check, the automatic switch and an update in progress each write their own
+// fields, and none of them puts back an older copy of the others' (which once could switch the images back to the old release).
+func (m *Manager) editUpdate(change func(*UpdateConfig)) (UpdateConfig, error) {
+	m.umu.Lock()
+	defer m.umu.Unlock()
+	c := m.UpdateConfig()
+	change(&c)
+	return c, m.saveUpdate(c)
+}
+
 // BoardVersion is the release of the board files in place (bundle.sh's VERSION); "" for a checkout.
 func (m *Manager) BoardVersion() string {
 	b, _ := os.ReadFile(filepath.Join(m.ComposeDir, "VERSION"))
@@ -171,16 +181,15 @@ func (m *Manager) get(ctx context.Context, addr string) (*http.Response, error) 
 
 // CheckUpdate asks GitHub for the newest release, and keeps what it found in update.json.
 func (m *Manager) CheckUpdate(ctx context.Context) (UpdateConfig, error) {
-	c := m.UpdateConfig()
-	c.Checked = time.Now().UTC()
 	avail, board, err := m.latest(ctx, m.Version(), m.BoardVersion())
-	c.Error = ""
-	if err != nil {
-		c.Error = "Couldn't reach GitHub (" + err.Error() + ")"
-	} else {
-		c.Available, c.Board = avail, board
-	}
-	m.saveUpdate(c)
+	c, _ := m.editUpdate(func(c *UpdateConfig) {
+		c.Checked, c.Error = time.Now().UTC(), ""
+		if err != nil {
+			c.Error = "Couldn't reach GitHub (" + err.Error() + ")"
+		} else {
+			c.Available, c.Board = avail, board
+		}
+	})
 	return c, err
 }
 
@@ -260,9 +269,8 @@ func plainNotes(md string) string {
 
 // SetAutoUpdate switches installing updates during the night on or off.
 func (m *Manager) SetAutoUpdate(on bool) error {
-	c := m.UpdateConfig()
-	c.Auto = on
-	return m.saveUpdate(c)
+	_, err := m.editUpdate(func(c *UpdateConfig) { c.Auto = on })
+	return err
 }
 
 // ErrUpToDate: there is nothing to install.
@@ -277,7 +285,10 @@ func (m *Manager) Update() (*Job, error) {
 	if !m.SetUp() {
 		return nil, errors.New("Finish setup first")
 	}
-	j := m.newJob("update", "")
+	j, err := m.soleJob("update")
+	if err != nil {
+		return nil, err
+	}
 	go func() {
 		m.mu.Lock()
 		restart, err := m.update(c, j)
@@ -298,15 +309,16 @@ func (m *Manager) update(c UpdateConfig, j *Job) (restart bool, err error) {
 	from, to := m.Version(), c.Available.Version
 	run := &UpdateRun{At: time.Now().UTC(), From: from, To: to}
 	defer func() {
-		c := m.UpdateConfig()
 		run.OK = err == nil
 		if err != nil {
 			run.Error = err.Error()
-		} else {
-			c.Available, c.Board = nil, nil
 		}
-		c.Last = run
-		m.saveUpdate(c)
+		m.editUpdate(func(c *UpdateConfig) {
+			if err == nil {
+				c.Available, c.Board = nil, nil
+			}
+			c.Last = run
+		})
 	}()
 
 	if b := m.BackupConfig(); b.On {
@@ -340,10 +352,8 @@ func (m *Manager) update(c UpdateConfig, j *Job) (restart bool, err error) {
 		}
 	}
 
-	prev := m.UpdateConfig()
-	nc := prev
-	nc.Images = to
-	m.saveUpdate(nc)
+	prevImages := m.UpdateConfig().Images
+	m.editUpdate(func(c *UpdateConfig) { c.Images = to })
 	fmt.Fprintf(j, "starting Cloud Companion %s\n", to)
 	err = m.apply(ctx, m.cloneState(), j)
 	if err == nil {
@@ -351,7 +361,7 @@ func (m *Manager) update(c UpdateConfig, j *Job) (restart bool, err error) {
 	}
 	if err != nil {
 		fmt.Fprintf(j, "failed: %v; going back to %s\n", err, from)
-		m.saveUpdate(prev)
+		m.editUpdate(func(c *UpdateConfig) { c.Images = prevImages })
 		if newBoard {
 			m.putBack(keep, j)
 		}

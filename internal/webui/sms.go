@@ -178,6 +178,6 @@ func (s *smsAPI) routes(mux *http.ServeMux) {
 			bad(w, 400, err.Error())
 			return
 		}
-		reply(w, 200, map[string]any{"id": id})
+		reply(w, 200, map[string]any{"id": id, "key": store.NumberKey(in.Number)}) // the conversation it went to, however the number was typed
 	})
 }

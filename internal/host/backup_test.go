@@ -245,10 +245,15 @@ func TestSnapshotsAndRestore(t *testing.T) {
 		t.Error("a bad snapshot id was taken")
 	}
 	// the restore writes the staged files back from what restic restored into the stage folder
+	m.mu.Lock() // the first restore stays running: it waits for the manager before starting Cloud Companion
 	j, err := m.Restore(dest, "4f2a9c1e")
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := m.Restore(dest, "4f2a9c1e"); !errors.Is(err, ErrRestoring) {
+		t.Errorf("a second restore while the first runs: %v", err)
+	}
+	m.mu.Unlock()
 	<-j.Done()
 	if st := j.Status(); st.State != "done" {
 		t.Fatalf("restore: %+v", st)
@@ -274,5 +279,65 @@ func TestEnvFileReleaseVersion(t *testing.T) {
 	os.WriteFile(filepath.Join(m.ComposeDir, "VERSION"), []byte("v0.4.0\n"), 0o644)
 	if !strings.Contains(string(m.envFile(State{}, nil)), `PHECLOUD_VERSION="v0.4.0"`) {
 		t.Errorf("not passed on:\n%s", m.envFile(State{}, nil))
+	}
+}
+
+// Saving the schedule sends back the destination as the page has it: its login masked, its password empty. Both are kept.
+func TestSetBackupKeepsHiddenLogin(t *testing.T) {
+	m, _ := newBackupManager(t)
+	dest := Destination{Kind: "rest", URL: "https://me:hunter2@h:8000/cloud", Password: "a long backup password"}
+	j, err := m.SetBackup(true, dest, "03:30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-j.Done()
+	shown := m.BackupConfig().Dest.Public()
+	j, err = m.SetBackup(true, shown, "04:00")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-j.Done()
+	if c := m.BackupConfig(); c.Dest.URL != dest.URL || c.Dest.Password != dest.Password || c.At != "04:00" {
+		t.Errorf("after saving the schedule: %+v", c.Dest)
+	}
+	if got := unmaskURL("https://…@other:8000/x", dest.URL); got != "https://me:hunter2@other:8000/x" {
+		t.Errorf("a new host keeps the login: %s", got)
+	}
+	if got := unmaskURL("https://you:pw@h/x", dest.URL); got != "https://you:pw@h/x" {
+		t.Errorf("a login typed in was replaced: %s", got)
+	}
+}
+
+// While a backup runs, neither another backup nor an update starts (an update backs up first); once it is done, they can.
+func TestOneBackupOrUpdateAtATime(t *testing.T) {
+	m, _ := newBackupManager(t)
+	os.WriteFile(filepath.Join(m.StateDir, "state.json"), []byte(`{"features":{"core":{"first-owner":"x"}}}`), 0o600)
+	m.Load()
+	j, err := m.SetBackup(true, Destination{Kind: "rest", URL: "http://rest:8000/cloud", Password: "a long backup password"}, "03:30")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-j.Done()
+	m.mu.Lock() // holds the backup at its start, as a long one would be
+	first, err := m.BackupNow()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := m.BackupNow(); !errors.Is(err, ErrBackingUp) {
+		t.Errorf("a second backup: %v", err)
+	}
+	m.editUpdate(func(c *UpdateConfig) { c.Available = &Release{Version: "v9.0.0"} })
+	if _, err := m.Update(); !errors.Is(err, ErrBackingUp) {
+		t.Errorf("an update during a backup: %v", err)
+	}
+	m.mu.Unlock()
+	<-first.Done()
+	again, err := m.BackupNow()
+	if err != nil {
+		t.Fatalf("after the first was done: %v", err)
+	}
+	<-again.Done()
+	if first.ID == again.ID || len(first.ID) < 8 {
+		t.Errorf("job ids: %q %q", first.ID, again.ID)
 	}
 }

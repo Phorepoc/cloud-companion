@@ -204,7 +204,7 @@ try {
 
   // ---- mail, read-only ----
   await go('mail')
-  await page.waitForSelector('[data-test=mail-folder]')
+  await page.waitForSelector('.x-cl__title.is-menu') // the folders are the views in the title's menu
   await page.waitForTimeout(1500)
   await shots('mail')
   const mailCount = await page.locator('[data-test^=mail-row-]').count()
@@ -236,22 +236,22 @@ try {
     }
   }, stamp)
   const selectFolder = async (name: string | RegExp) => {
-    await page.click('[data-test=mail-folder]')
-    await page.locator('.q-menu .q-item', { hasText: name }).first().click()
+    await page.click('.x-cl__title.is-menu')
+    await page.locator('.x-cl__views .x-cl__item', { hasText: name }).first().click()
     await page.waitForTimeout(900)
   }
   const waitRow = async (text: string, tries = 12) => {
     for (let i = 0; i < tries; i++) {
       if (await page.locator('[data-test^=mail-row-]', { hasText: text }).count()) return
-      await page.click('[data-test=mail-refresh]')
+      await page.click('.x-cl__actions [aria-label="Refresh"]')
       await page.waitForTimeout(1000)
     }
     assert.fail('no mail row with ' + text)
   }
   try {
     await go('mail')
-    await page.waitForSelector('[data-test=mail-compose]')
-    await page.click('[data-test=mail-compose]')
+    await page.waitForSelector('.x-cl__actions [aria-label="Write"]') // the page's actions sit in the frame's bar
+    await page.click('.x-cl__actions [aria-label="Write"]')
     await page.fill('[data-test=mail-to]', 'someone@elsewhere.example')
     await page.fill('[data-test=mail-subject]', SUBJ)
     await page.fill('[data-test=mail-body]', 'Hello from the test.')
@@ -273,14 +273,14 @@ try {
     await page.click('[data-test=mail-toggle-read]')
     await page.waitForFunction(() => /Marked as read/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
     await page.keyboard.press('Escape')
-    await page.click('[data-test=mail-refresh]')
+    await page.click('.x-cl__actions [aria-label="Refresh"]')
     await page.waitForTimeout(1200)
     assert.equal(await row().locator('[data-test=mail-unread]').count(), 0, 'marked read on the server')
     await row().click()
     await page.click('[data-test=mail-toggle-read]')
     await page.waitForFunction(() => /Marked as unread/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
     await page.keyboard.press('Escape')
-    await page.click('[data-test=mail-refresh]')
+    await page.click('.x-cl__actions [aria-label="Refresh"]')
     await page.waitForTimeout(1200)
     assert.equal(await row().locator('[data-test=mail-unread]').count(), 1, 'marked unread again')
     step('mark as read and as unread reach the hub')
@@ -297,6 +297,19 @@ try {
     await page.waitForFunction(() => /Message sent/.test(document.querySelector('[data-test=toasts]')?.textContent || ''))
     await waitRow('Re: ' + SUBJ)
     step('reply: recipient, subject and quoted text prefilled; the answer arrived')
+
+    // delete one message, then open another before the Undo toast runs out: the one deleted is the one that goes
+    await page.locator('[data-test^=mail-row-]', { hasText: 'Re: ' + SUBJ }).first().click()
+    await page.click('[data-test=mail-delete]')
+    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).first().click()
+    await page.waitForSelector('[data-test=mail-view-body]')
+    await page.waitForTimeout(5500)
+    await page.keyboard.press('Escape')
+    await page.click('.x-cl__actions [aria-label="Refresh"]')
+    await page.waitForTimeout(1200)
+    assert.equal(await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).count(), 1, 'the message opened after Delete stays')
+    assert.equal(await page.locator('[data-test^=mail-row-]', { hasText: 'Re: ' + SUBJ }).count(), 0, 'the message deleted is gone')
+    step('delete, then open another message at once: only the deleted one goes')
 
     // move with Undo, then for real
     await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).first().click()
@@ -320,12 +333,12 @@ try {
     await page.waitForTimeout(5500)
     await selectFolder(/Trash|Deleted/i)
     await waitRow(SUBJ)
-    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).first().click()
+    await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).first().click()
     await page.click('[data-test=mail-delete]')
     await page.waitForTimeout(5500)
-    await page.click('[data-test=mail-refresh]')
+    await page.click('.x-cl__actions [aria-label="Refresh"]')
     await page.waitForTimeout(1200)
-    assert.equal(await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).count(), 0, 'deleted for good from Trash')
+    assert.equal(await page.locator('[data-test^=mail-row-]', { hasText: SUBJ }).filter({ hasNotText: 'Re:' }).count(), 0, 'deleted for good from Trash')
     step('delete: Trash first, then destroyed from Trash')
 
     // the sanitised HTML view, when a message has one: a sandboxed frame without any network access
@@ -357,7 +370,7 @@ try {
       '<p><a href="https://example.org/x">a link</a> <a href="javascript:fetch(\'http://canary.test/js\')">bad link</a></p><img src="x" onerror="fetch(\'http://canary.test/onerror\')">' +
       '<iframe src="http://canary.test/frame"></iframe><form action="http://canary.test/form"><input name="q"></form>'
     await page.evaluate(([to, s, h]) => window.__phe.hubCall({ op: 'mail.send', rcpt: to, subject: s, body: 'Plain version of the message.', htmlbody: h }), [OWNER, HSUBJ, evilHtml])
-    await page.click('[data-test=mail-refresh]')
+    await page.click('.x-cl__actions [aria-label="Refresh"]')
     await waitRow(HSUBJ)
     await page.locator('[data-test^=mail-row-]', { hasText: HSUBJ }).first().click()
     await page.waitForSelector('[data-test=mail-view-body]')
@@ -398,6 +411,7 @@ try {
   console.log('HUB PASS')
 } catch (e) {
   console.error('HUB FAIL:', (e as Error).message)
+  try { console.error('page text:', ((await page.textContent('#main')) ?? '').replace(/\s+/g, ' ').slice(0, 600)) } catch { /* the page is gone */ }
   console.error(log.slice(-12).join('\n'))
   await page.screenshot({ path: OUT + '/hub-fail.png' }).catch(() => {})
   process.exitCode = 1

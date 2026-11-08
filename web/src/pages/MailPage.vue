@@ -213,14 +213,20 @@ function leave(m: MailItem | null, label: string, action: () => Promise<unknown>
   if (!m) return
   open.value = false
   const i = mails.value.findIndex((x) => x.id === m.id)
+  const from = folder.value
   mails.value = mails.value.filter((x) => x.id !== m.id)
   toast(label, {
-    undo: () => { const l = [...mails.value]; l.splice(Math.min(Math.max(i, 0), l.length), 0, m); mails.value = l },
+    // back where it was, if that folder is still the one shown (another folder's list never gets it)
+    undo: () => { if (folder.value !== from || mails.value.some((x) => x.id === m.id)) return; const l = [...mails.value]; l.splice(Math.min(Math.max(i, 0), l.length), 0, m); mails.value = l },
     onExpire: async () => { try { await action(); await refreshFolders() } catch (e) { error.value = (e as Error).message; await loadList(true) } },
   })
 }
 async function refreshFolders() { try { folders.value = (await hubCall({ op: 'mail.folders' })).folders || folders.value } catch (e) { /* ignore */ } }
-const remove = () => leave(current.value, role.value === 'trash' ? 'Message deleted for good' : 'Moved to Trash', () => hubCall({ op: 'mail.delete', id2: current.value!.id }))
+// the message is taken when Delete is tapped: the deletion runs after the Undo toast, when another message may be open
+function remove() {
+  const m = current.value
+  if (m) leave(m, role.value === 'trash' ? 'Message deleted for good' : 'Moved to Trash', () => hubCall({ op: 'mail.delete', id2: m.id }))
+}
 function move(t: { label: string; role: string }) {
   const m = current.value
   if (m) leave(m, `Moved to ${t.label}`, () => hubCall({ op: 'mail.move', id2: m.id, role: t.role }))

@@ -265,3 +265,21 @@ func TestUntarStaysInside(t *testing.T) {
 		t.Error("a file outside the folder was taken")
 	}
 }
+
+// A check, or the automatic switch, while an update is installing never puts the old release back in update.json.
+func TestUpdateFileWritersDoNotUndoEachOther(t *testing.T) {
+	g := newFakeGitHub(t)
+	g.release("v0.4.0", "", "new compose", "new manager", false)
+	m, _, _ := newUpdateManager(t, g)
+	var wg sync.WaitGroup
+	for i := 0; i < 50; i++ {
+		wg.Add(3)
+		go func() { defer wg.Done(); m.editUpdate(func(c *UpdateConfig) { c.Images = "v0.4.0" }) }()
+		go func() { defer wg.Done(); m.CheckUpdate(context.Background()) }()
+		go func() { defer wg.Done(); m.SetAutoUpdate(i%2 == 0) }()
+	}
+	wg.Wait()
+	if c := m.UpdateConfig(); c.Images != "v0.4.0" {
+		t.Errorf("the release in use went back to %q", c.Images)
+	}
+}

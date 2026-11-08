@@ -303,3 +303,36 @@ func TestNewJobLogIsEmptyList(t *testing.T) {
 		t.Errorf("%s", b)
 	}
 }
+
+// Two features turned on close together (two browsers, or one right after the other) both stay on: the second change is
+// worked out once the first is done, not from the state before it.
+func TestChangesCloseTogetherBothStand(t *testing.T) {
+	gate := make(chan struct{})
+	var once sync.Once
+	d := &fakeDocker{fail: func(args []string) bool {
+		if slices.Contains(args, "up") {
+			once.Do(func() { <-gate }) // the first change is still applying when the second comes
+		}
+		return false
+	}}
+	m, _ := newTestManager(t, d)
+	j1, err := m.Choose([]string{"signal"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	j2, err := m.Choose([]string{"asterisk"}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	close(gate)
+	<-j1.Done()
+	<-j2.Done()
+	if j1.Status().State != "done" || j2.Status().State != "done" {
+		t.Fatalf("jobs: %+v %+v", j1.Status(), j2.Status())
+	}
+	for _, id := range []string{"signal", "asterisk"} {
+		if m.Value(id, "") == "" && !slices.Contains(m.enabled(m.cloneState()), id) {
+			t.Errorf("%s was undone by the other change", id)
+		}
+	}
+}

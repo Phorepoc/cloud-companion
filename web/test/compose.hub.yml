@@ -6,6 +6,7 @@ services:
     env_file:
       - ${HUB_ENV_FILE:?set HUB_ENV_FILE to the hub's .env.phecloud}
     networks: [default, hub]
+    ports: !override [] # the test's browser reaches it on the network: nothing on the machine's own ports
 networks:
   hub:
     name: ${HUB_NETWORK:-phehub_default}

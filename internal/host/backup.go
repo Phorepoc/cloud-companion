@@ -116,6 +116,17 @@ func (d Destination) Public() Destination {
 	return d
 }
 
+// unmaskURL puts back the login that Public hid ("https://…@host/x"), from the saved address: saving the schedule sends the
+// masked address back, and the backups would no longer sign in.
+func unmaskURL(u, saved string) string {
+	i := strings.Index(u, "://…@")
+	j, k := strings.Index(saved, "://"), strings.Index(saved, "@")
+	if i < 0 || j < 0 || k < j || saved[:j] != u[:i] {
+		return u
+	}
+	return saved[:k] + u[i+len("://…"):]
+}
+
 func (m *Manager) backupFile() string { return filepath.Join(m.StateDir, "backup.json") }
 
 // BackupConfig reads backup.json (zero when there is none).
@@ -319,9 +330,10 @@ func resticError(out string, err error) error {
 // run pulls restic.
 func (m *Manager) SetBackup(on bool, d Destination, at string) (*Job, error) {
 	old := m.BackupConfig()
-	if d.Password == "" && d.Kind == old.Dest.Kind { // unchanged secrets come back empty from the page
+	if d.Password == "" { // unchanged secrets come back empty from the page (the page says so, for any kind of location)
 		d.Password = old.Dest.Password
 	}
+	d.URL = unmaskURL(d.URL, old.Dest.URL)
 	if d.Secret == "" && d.Kind == "s3" {
 		d.Secret = old.Dest.Secret
 	}
@@ -376,7 +388,10 @@ func (m *Manager) BackupNow() (*Job, error) {
 	if !c.On {
 		return nil, errors.New("Backups are off")
 	}
-	j := m.newJob("backup", "")
+	j, err := m.soleJob("backup")
+	if err != nil {
+		return nil, err
+	}
 	go func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
@@ -536,7 +551,10 @@ func (m *Manager) Restore(d Destination, snapshot string) (*Job, error) {
 	if snapshot != "latest" && !regexp.MustCompile(`^[0-9a-f]{8,64}$`).MatchString(snapshot) {
 		return nil, errors.New("Choose a backup to restore")
 	}
-	j := m.newJob("restore", "")
+	j, err := m.soleJob("restore") // two clicks, or two browsers, start one restore
+	if err != nil {
+		return nil, err
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 12*time.Hour)
 		defer cancel()

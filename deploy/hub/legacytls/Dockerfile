@@ -5,7 +5,7 @@ FROM nginx:1.28-bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY openssl-legacy.cnf /etc/nginx/openssl-legacy.cnf
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY entrypoint.sh /entrypoint.sh
+COPY --chmod=0755 entrypoint.sh /entrypoint.sh
 ENV OPENSSL_CONF=/etc/nginx/openssl-legacy.cnf
 VOLUME /data
 ENTRYPOINT ["/entrypoint.sh"]

@@ -21,7 +21,7 @@ RUN a2enmod remoteip
 COPY backend-config/ /usr/share/z-push/backend/
 COPY z-push-extra.php /usr/share/z-push/z-push-extra.php
 COPY z-push.conf /etc/apache2/conf-enabled/z-push.conf
-COPY entrypoint.sh /entrypoint.sh
+COPY --chmod=0755 entrypoint.sh /entrypoint.sh
 ENV ZPUSH_TIMEZONE=UTC ZPUSH_LOGLEVEL=INFO
 VOLUME /var/lib/z-push
 ENTRYPOINT ["/entrypoint.sh"]

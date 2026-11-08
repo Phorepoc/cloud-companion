@@ -30,6 +30,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"path"
@@ -289,10 +290,26 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			return
 		}
 		saved := []files.Entry{}
+		// the connection dropped, or the form was cut short: not a success, whatever arrived before
+		interrupted := func() {
+			names := make([]string, len(saved))
+			for i, e := range saved {
+				names[i] = e.Name
+			}
+			msg := "The upload was interrupted. Try again."
+			if len(names) > 0 {
+				msg = "The upload was interrupted. Only these arrived: " + strings.Join(names, ", ") + ". Try the rest again."
+			}
+			reply(w, 400, map[string]any{"error": msg, "saved": saved})
+		}
 		for {
 			part, err := mr.NextPart()
-			if err != nil {
+			if err == io.EOF {
 				break
+			}
+			if err != nil {
+				interrupted()
+				return
 			}
 			if part.FormName() != "file" || part.FileName() == "" {
 				part.Close()
@@ -300,6 +317,10 @@ func (f *filesAPI) routes(mux *http.ServeMux) {
 			}
 			e, err := f.fs.Save(dir, path.Base(strings.ReplaceAll(part.FileName(), "\\", "/")), part)
 			part.Close()
+			if errors.Is(err, io.ErrUnexpectedEOF) {
+				interrupted()
+				return
+			}
 			if err != nil {
 				fileErr(w, err)
 				return
