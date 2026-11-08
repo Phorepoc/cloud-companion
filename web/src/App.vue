@@ -8,7 +8,8 @@
   <!-- the classic layout: one section at a time, the efficient single-task view. The Etesian classic bar (@etesian-design/shell
        XClassic): the apps button (a grid of the sections with search and the recent ones, and Desktop on a wide screen), the section's
        squircle and title (a menu of its views), its actions (as many as fit, the rest in ⋮; below 600 px a bottom bar), the status. -->
-  <XClassic v-else-if="creds && route.path !== '/pair'" class="ph-classic" :brand="brand.name" :apps="apps" :app="current" :recent="recent"
+  <!-- a media app in Hybrid is dark all the way, its bar included, as on the N9 -->
+  <XClassic v-else-if="creds && route.path !== '/pair'" class="ph-classic" :class="{ 'hd-mode-dark': pageMode(current) }" :data-hd-mode="pageMode(current)" :brand="brand.name" :apps="apps" :app="current" :recent="recent"
             :status="statusText" :online="state.status === 'online'" data-test="classic" @open="openApp">
     <template #logo><BrandLogo :size="22" /></template>
     <q-layout view="hHh lpR fFf" container class="ph-classic__layout">
@@ -38,6 +39,7 @@ import { state, creds } from './cloud'
 import { sections } from './nav'
 import { brand } from './brand'
 import BrandLogo from './components/BrandLogo.vue'
+import { pageMode } from './theme'
 import ToastHost from './components/ToastHost.vue'
 import DesktopView from './desktop/DesktopView.vue'
 import { setLayout, DESKTOP_MIN_WIDTH } from './desktop/layout'
@@ -78,4 +80,12 @@ watch(() => !!creds.value, (on) => { if (on) listenForRemote(loadTracks) }, { im
 <style scoped>
 .ph-classic { position: fixed; inset: 0; }
 .ph-classic__layout { flex: 1; min-width: 0; height: 100%; }
+</style>
+
+<style>
+/* outline and flat accent buttons read as the light accent on a dark surface (Dark, or a media app in Hybrid) */
+[data-hd-mode="dark"] .q-btn--outline.text-primary, [data-hd-mode="dark"] .q-btn--flat.text-primary { color: var(--hd-c-accent-text) !important; }
+/* a desktop window in its own colour mode (a media app in Hybrid) fills its area, as the page itself would */
+.ph-page-mode { min-height: 100%; }
+.ph-win__layout .ph-page-mode, .ph-page-mode > .q-layout { height: 100%; }
 </style>

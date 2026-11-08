@@ -45,6 +45,33 @@ const sb = (await page.locator(side).boundingBox())!, pb = (await page.locator('
 assert(pb.x >= sb.x + sb.width - 1, 'the page sits beside the panel')
 await page.screenshot({ path: `${OUT}/settings-wide.png` })
 
+step('Hybrid (the N9 look, the default): light pages, Music dark all the way; Light keeps Music light')
+const pageBg = () => page.evaluate(() => {
+  const el = document.querySelector('#main .q-page') as HTMLElement
+  const [r, g, b] = (getComputedStyle(el.closest('.ph-page-mode, [data-hd-mode=dark]') || el).backgroundColor.match(/\d+/g) || []).map(Number)
+  return (r + g + b) / 3
+})
+const pickTheme = async (name: string) => {
+  await page.goto(BASE + '/#/settings/appearance')
+  await page.locator('[data-test=theme]').getByRole('button', { name, exact: true }).click()
+}
+const openMusic = async () => { await openApp(page, 'Music'); await page.waitForSelector('#main .q-page') }
+assert.equal(await page.evaluate(() => document.documentElement.dataset.hdMode), 'hybrid', 'Hybrid is the default')
+assert((await pageBg()) > 180, 'Settings is light in Hybrid')
+await openMusic()
+assert((await pageBg()) < 40, 'Music is dark in Hybrid')
+const barBg = await page.evaluate(() => getComputedStyle(document.querySelector('.x-cl__bar')!).backgroundColor.match(/\d+/g)!.slice(0, 3).map(Number).reduce((a, b) => a + b) / 3)
+assert(barBg < 40, 'its bar is dark too')
+const btn = await page.evaluate(() => getComputedStyle(document.querySelector('[data-test=music-empty] .q-btn')!).color.match(/\d+/g)!.slice(0, 3).map(Number).reduce((a, b) => a + b) / 3)
+assert(btn > 120, 'the Open Files button is readable on black')
+await page.screenshot({ path: `${OUT}/theme-hybrid-music.png` })
+await pickTheme('Light')
+assert.equal(await page.evaluate(() => document.documentElement.dataset.hdMode), 'light')
+await openMusic()
+assert((await pageBg()) > 180, 'Music stays light in Light')
+await pickTheme('Hybrid')
+await page.screenshot({ path: `${OUT}/theme-hybrid-settings.png` })
+
 step('picking Devices shows it and gives it its address')
 await row('Devices').click()
 await page.waitForSelector('.x-sset__page h1:has-text("Devices")')

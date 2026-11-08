@@ -6,9 +6,9 @@
 
     <section v-if="part === 'appearance'" class="ph-card ph-section" aria-labelledby="set-appearance">
       <h2 id="set-appearance">Appearance</h2>
-      <p class="ph-muted">Choose how the app looks. Match system follows your device's light or dark setting.</p>
+      <p class="ph-muted">Hybrid is the N9 look: light pages with dark bars and menus, and dark Music, Photos and Android. Match system switches between light and dark with your device.</p>
       <q-btn-toggle v-model="choice" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
-                    :options="[{ label: 'Match system', value: 'system', icon: 'sym_o_contrast' }, { label: 'Light', value: 'light', icon: 'sym_o_light_mode' }, { label: 'Dark', value: 'dark', icon: 'sym_o_dark_mode' }]"
+                    :options="[{ label: 'Hybrid', value: 'hybrid', icon: 'sym_o_routine' }, { label: 'Light', value: 'light', icon: 'sym_o_light_mode' }, { label: 'Dark', value: 'dark', icon: 'sym_o_dark_mode' }, { label: 'Match system', value: 'system', icon: 'sym_o_contrast' }]"
                     data-test="theme" @update:model-value="applyTheme" />
       <template v-if="$q.screen.width >= DESKTOP_MIN_WIDTH">
         <h3 id="set-layout">Layout</h3>

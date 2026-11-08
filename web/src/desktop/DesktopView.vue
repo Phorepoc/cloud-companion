@@ -40,6 +40,8 @@ import { state } from '../cloud'
 import { sections } from '../nav'
 import { brand } from '../brand'
 import BrandLogo from '../components/BrandLogo.vue'
+import { HdTheme } from '@etesian-design/vue'
+import { pageMode } from '../theme'
 import ToastHost from '../components/ToastHost.vue'
 import EventsPanel from './EventsPanel.vue'
 import DesktopWidgets from './DesktopWidgets.vue'
@@ -67,7 +69,12 @@ const WinPage = defineComponent({
   props: { id: { type: String, required: true }, page: { type: Object, required: true } },
   setup(p) {
     // a page is a QPage: it needs a layout around it, here one that fills the window
-    return () => (p.page.component ? h(QLayout, { view: 'hhh lpr fff', container: true, class: 'ph-win__layout' }, () => h(QPageContainer, null, () => h(p.page.component, p.page.props))) : null)
+    return () => {
+      if (!p.page.component) return null
+      const page = h(QLayout, { view: 'hhh lpr fff', container: true, class: 'ph-win__layout' }, () => h(QPageContainer, null, () => h(p.page.component!, p.page.props)))
+      const mode = pageMode(p.id)
+      return mode ? h(HdTheme, { mode, class: 'ph-page-mode' }, () => page) : page // the N9's dark media apps, in Hybrid
+    }
   },
 })
 
