@@ -56,6 +56,28 @@ import { useChrome } from '@etesian-design/shell'
 import { AndroidStream, type StreamState, type StreamStats } from '../android/stream'
 
 const route = useRoute()
+const $q = useQuasar()
+const narrow = computed(() => $q.screen.lt.sm)
+const cv = ref<HTMLCanvasElement | null>(null), file = ref<HTMLInputElement | null>(null), stage = ref<HTMLElement | null>(null)
+const configured = ref(false), loaded = ref(false), busy = ref(false), problem = ref(''), conn = ref<StreamState>('idle'), connMsg = ref('')
+const w = ref(360), h = ref(640), note = ref(''), stats = ref<StreamStats | null>(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
+const stream = shallowRef(new AndroidStream(document.createElement('canvas'), { base: '/android/' })) // replaced once the canvas exists
+
+// ---- the two Android modes ----
+// "auto" picks by the size of the window the first time; the buttons choose, and the choice is kept for this browser. The display on the server follows the choice AND the window's size.
+type Mode = 'auto' | 'phone' | 'desktop'
+const saved = ((): Mode => { try { const v = localStorage.getItem('phecloud-android-mode'); return v === 'phone' || v === 'desktop' ? v : 'auto' } catch { return 'auto' } })()
+const mode = ref<Mode>(saved)
+const stageSize = ref({ w: 0, h: 0 })
+/** What is on screen now: the mode, or (auto) what suits the window. */
+const kind = computed<'phone' | 'desktop'>(() => (mode.value !== 'auto' ? mode.value : stageSize.value.w >= 700 && stageSize.value.h >= 420 ? 'desktop' : 'phone'))
+const wire = (k: string) => (k === 'desktop' ? 'large' : 'phone')
+function setMode(m: 'phone' | 'desktop') {
+  mode.value = m
+  try { localStorage.setItem('phecloud-android-mode', m) } catch { /* private window */ }
+  stream.value.setKind(wire(m))
+}
+// declared after the state it reads: run before it, it failed on its first run and the bar never got the controls or the modes
 // the header: Android's two modes are the title's views (a phone: portrait, the launcher; a desktop: landscape, windows and a taskbar)
 const MODES: Record<string, 'phone' | 'desktop'> = { 'Phone mode': 'phone', 'Desktop mode': 'desktop' }
 const chrome = useChrome(() => ({
@@ -81,27 +103,6 @@ chrome.on('tool', (l) => {
     case 'Reconnect': connect(); break
   }
 })
-const $q = useQuasar()
-const narrow = computed(() => $q.screen.lt.sm)
-const cv = ref<HTMLCanvasElement | null>(null), file = ref<HTMLInputElement | null>(null), stage = ref<HTMLElement | null>(null)
-const configured = ref(false), loaded = ref(false), busy = ref(false), problem = ref(''), conn = ref<StreamState>('idle'), connMsg = ref('')
-const w = ref(360), h = ref(640), note = ref(''), stats = ref<StreamStats | null>(null), sound = ref(false), installOpen = ref(false), pkg = ref('')
-const stream = shallowRef(new AndroidStream(document.createElement('canvas'), { base: '/android/' })) // replaced once the canvas exists
-
-// ---- the two Android modes ----
-// "auto" picks by the size of the window the first time; the buttons choose, and the choice is kept for this browser. The display on the server follows the choice AND the window's size.
-type Mode = 'auto' | 'phone' | 'desktop'
-const saved = ((): Mode => { try { const v = localStorage.getItem('phecloud-android-mode'); return v === 'phone' || v === 'desktop' ? v : 'auto' } catch { return 'auto' } })()
-const mode = ref<Mode>(saved)
-const stageSize = ref({ w: 0, h: 0 })
-/** What is on screen now: the mode, or (auto) what suits the window. */
-const kind = computed<'phone' | 'desktop'>(() => (mode.value !== 'auto' ? mode.value : stageSize.value.w >= 700 && stageSize.value.h >= 420 ? 'desktop' : 'phone'))
-const wire = (k: string) => (k === 'desktop' ? 'large' : 'phone')
-function setMode(m: 'phone' | 'desktop') {
-  mode.value = m
-  try { localStorage.setItem('phecloud-android-mode', m) } catch { /* private window */ }
-  stream.value.setKind(wire(m))
-}
 
 // the screen fills the window: the stream's own aspect ratio, as large as the stage allows (in desktop mode the display was made for this window, so that is all of it)
 const frameStyle = computed(() => {
