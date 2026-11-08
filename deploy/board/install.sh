@@ -96,7 +96,7 @@ if [ -n "$BOARD" ]; then
   [ -e /etc/docker/daemon.json ] || { mkdir -p /etc/docker; install -m 0644 $S/docker-daemon.json /etc/docker/daemon.json; }
   systemctl enable cloud-ram-logs.service cloud-ram-logs-sync.timer >/dev/null 2>&1 || true
   mkdir -p /etc/systemd/system/phehost.service.d   # the setup hotspot: only on a board
-  printf '[Service]\nExecStart=\nExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock -binary /usr/local/bin/phehost -wifi wlan0\n' \
+  printf '[Service]\nExecStart=\nExecStart=/usr/local/bin/phehost -compose /opt/cloud -state /var/lib/phehost -socket /run/phehost/api.sock -binary /usr/local/bin/phehost -ssh-user cloud -wifi wlan0\n' \
     > /etc/systemd/system/phehost.service.d/board.conf
 fi
 

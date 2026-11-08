@@ -54,6 +54,8 @@ type Manager struct {
 	Run        Runner
 	Host       func(ctx context.Context, name string, args ...string) ([]byte, error) // mount, lsblk (backups to a USB disk)
 
+	SSHUser string // the board's account remote login unlocks (ssh.go); "" = no switch (a server set up by hand)
+
 	// updates (update.go)
 	Releases   string        // GitHub's release list; "" = DefaultReleases
 	HTTP       *http.Client  // nil = a plain one

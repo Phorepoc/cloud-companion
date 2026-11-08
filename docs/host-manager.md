@@ -104,6 +104,13 @@ installed on the board for it.
 The API: `GET /v1/backup` (without secrets, plus the SFTP key), `PUT /v1/backup` (checks the destination, makes the restic
 repository there if it is new; a job), `POST /v1/backup/run` (a job), `GET /v1/backup/snapshots`, `GET /v1/backup/usb`.
 
+## Remote login (SSH)
+
+Off by default. Settings, System has a switch (`internal/host/ssh.go`). The first time it goes on, the owner chooses a password
+for the board's `cloud` account (ten characters or more), and the board starts SSH; from the same network, `ssh cloud@cloud.local`.
+The `cloud` account can use `sudo`. Off locks the account again and stops SSH. On again unlocks it with the same password, which
+can be changed on the page. The password goes to `chpasswd` through a root-only file, never a command line, and is not kept.
+
 ## Recovery
 
 The manager checks Cloud Companion's health. When it stays unhealthy for 5 minutes (crash loop, failed update that could not

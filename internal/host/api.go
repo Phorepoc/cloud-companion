@@ -83,6 +83,26 @@ func (m *Manager) Handler() http.Handler {
 	mux.HandleFunc("GET /v1/backup/usb", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"disks": m.USBDisks(r.Context())})
 	})
+	// remote login (ssh.go)
+	mux.HandleFunc("GET /v1/ssh", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"available": m.SSHUser != "", "ssh": m.SSH()})
+	})
+	mux.HandleFunc("PUT /v1/ssh", func(w http.ResponseWriter, r *http.Request) {
+		var in struct {
+			On       bool   `json:"on"`
+			Password string `json:"password"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&in); err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		s, err := m.SetSSH(r.Context(), in.On, in.Password)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"available": true, "ssh": s})
+	})
 	// updates (update.go)
 	mux.HandleFunc("GET /v1/update", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, m.updateInfo())

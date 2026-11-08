@@ -19,6 +19,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'connections', title: 'Connections', icon: 'split', color: '#347708', subtitle: 'Accounts and messaging', admin: true },
     { id: 'devices', title: 'Devices', icon: 'window', color: '#F77219', subtitle: 'Paired phones and browsers', admin: true },
     { id: 'features', title: 'Features', icon: 'grid', color: '#7A3FB8', subtitle: 'Switch parts of the server on and off', admin: true },
+    { id: 'system', title: 'System', icon: 'settings', color: '#4A5568', subtitle: 'The board, remote login', admin: true },
     { id: 'updates', title: 'Updates', icon: 'refresh', color: '#1C7C3C', subtitle: 'New versions, at night', admin: true },
     { id: 'backups', title: 'Backups', icon: 'save', color: '#0B7A75', subtitle: 'Every night, to a disk or a server', admin: true },
     { id: 'catalogue', title: 'Catalogue', icon: 'bag', color: '#1C51AF', subtitle: 'Apps and services', admin: true },

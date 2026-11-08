@@ -15,6 +15,7 @@
           <FeaturesPage v-else-if="id === 'features'" />
           <BackupsPage v-else-if="id === 'backups'" />
           <UpdatesPage v-else-if="id === 'updates'" />
+          <SystemPage v-else-if="id === 'system'" />
           <DeviceSettings v-else :part="id" />
         </template>
       </XSettingsSplit>
@@ -36,6 +37,7 @@ const CataloguePage = defineAsyncComponent(() => import('./CataloguePage.vue'))
 const FeaturesPage = defineAsyncComponent(() => import('./FeaturesPage.vue'))
 const BackupsPage = defineAsyncComponent(() => import('./BackupsPage.vue'))
 const UpdatesPage = defineAsyncComponent(() => import('./UpdatesPage.vue'))
+const SystemPage = defineAsyncComponent(() => import('./SystemPage.vue'))
 
 const route = useRoute()
 const router = useRouter()
