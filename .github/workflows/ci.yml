@@ -63,15 +63,47 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
-      - run: docker build --secret id=github_packages_token,env=GITHUB_PACKAGES_TOKEN -t phe-cloud:ci .
-      - run: docker build -t phe-android-bridge:ci -f cmd/pheandroid/Dockerfile .
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f   # v3
+      # built once here: the browser jobs load these, and the release reuses the layers (same cache scope)
+      - name: Build phecloud
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8   # v6
+        with:
+          context: .
+          load: true
+          tags: phe-cloud:dev
+          cache-from: type=gha,scope=phecloud
+          cache-to: type=gha,mode=max,scope=phecloud
+          secrets: github_packages_token=${{ secrets.GITHUB_TOKEN }}
+      - name: Build fakes
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8   # v6
+        with:
+          context: .
+          target: fakes
+          load: true
+          tags: phe-fakes:dev
+          cache-from: type=gha,scope=phecloud
+          secrets: github_packages_token=${{ secrets.GITHUB_TOKEN }}
+      - name: Build Android bridge
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8   # v6
+        with:
+          context: .
+          file: cmd/pheandroid/Dockerfile
+          cache-from: type=gha,scope=phecloud-android-bridge
+          cache-to: type=gha,mode=max,scope=phecloud-android-bridge
       - name: Smoke test image
         run: |
-          docker run -d --name ci-cloud -p 127.0.0.1:8080:8080 phe-cloud:ci
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
+          docker run -d --name ci-cloud -p 127.0.0.1:8080:8080 phe-cloud:dev
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
           curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy"
           docker exec ci-cloud test -s /etc/ssl/certs/ca-certificates.crt
           docker logs ci-cloud | tail -5
+      - name: Save images
+        run: docker save phe-cloud:dev phe-fakes:dev | gzip -1 > images.tar.gz
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
+        with:
+          name: images
+          path: images.tar.gz
+          retention-days: 1
 
   browser-types:
     name: Typecheck
@@ -86,30 +118,89 @@ jobs:
       - run: npm install --no-audit --no-fund && npm run check
         working-directory: web/test
 
+  # the browser suites in four groups, on the images built above (no suite builds). Matrix, IRC and Nextcloud Talk have the
+  # same connection dialog as XMPP, so only XMPP runs here; all of them run against the real services in integration.yml.
   browser:
-    name: Browser (${{ matrix.script }})
+    name: Browser (${{ matrix.group }})
+    needs: images
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        script: [csp.sh, desktop.sh, settings.sh, browserinput.sh, widgets.sh, feeds.sh, shapes.sh, passkey.sh, chats.sh, oauth.sh, proxy.sh, routing.sh, sipservice.sh, matrix.sh, xmpp.sh, xmppfront.sh, irc.sh, nctalk.sh, signal.sh, telegram.sh, remotefiles.sh, photos.sh, dav.sh]
+        include:
+          - group: desktop
+            suites: desktop browserinput widgets feeds settings shapes
+          - group: sign-in
+            suites: csp passkey oauth proxy
+          - group: chats
+            suites: chats routing sipservice xmpp xmppfront telegram signal
+          - group: files
+            suites: remotefiles photos dav
+    env:
+      PHE_UP: --no-build
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
-      - run: sh web/test/${{ matrix.script }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093   # v4
+        with:
+          name: images
+      - name: Load images
+        run: gunzip -c images.tar.gz | docker load
+      - name: Run suites
+        run: |
+          fail=0
+          for s in ${{ matrix.suites }}; do
+            echo "::group::$s"
+            sh web/test/$s.sh || { fail=1; echo "::error::$s failed"; }
+            echo "::endgroup::"
+          done
+          exit $fail
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
         if: always()
         with:
-          name: shots-${{ matrix.script }}
+          name: shots-${{ matrix.group }}
           path: web/test/out/*.png
           if-no-files-found: ignore
 
+  # the SQL on PostgreSQL and MariaDB: every package whose tests open a store (SQLite runs in the Go job)
   databases:
     name: Go databases
     runs-on: ubuntu-latest
+    env:
+      GOFLAGS: -tags=goolm
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: pw
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U postgres" --health-interval 2s --health-retries 30
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: pw
+        ports: ["3306:3306"]
+        options: --health-cmd "healthcheck.sh --connect --innodb_initialized" --health-interval 2s --health-retries 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4
-      - run: sh web/test/db_test.sh postgres
-      - run: sh web/test/db_test.sh mariadb
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff   # v5
+        with:
+          go-version-file: go.mod
+      - name: Create web dist placeholder
+        run: mkdir -p internal/webui/dist && touch internal/webui/dist/placeholder.txt
+      - name: Find packages with a store
+        run: echo "PKGS=$(grep -rl 'OpenTest(t)' internal --include=*_test.go | xargs -n1 dirname | sort -u | sed 's#^#./#' | tr '\n' ' ')" >> "$GITHUB_ENV"
+      - name: PostgreSQL
+        run: |
+          # shellcheck disable=SC2086 # PKGS is a list of packages
+          go test -count=1 $PKGS
+        env:
+          PHECLOUD_TEST_DB: postgres://postgres:pw@127.0.0.1:5432/postgres?sslmode=disable
+      - name: MariaDB
+        run: |
+          # shellcheck disable=SC2086 # PKGS is a list of packages
+          go test -count=1 $PKGS
+        env:
+          PHECLOUD_TEST_DB: mysql://root:pw@127.0.0.1:3306/mysql
 
   client:
     name: C client

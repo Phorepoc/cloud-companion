@@ -9,7 +9,7 @@ DC="docker compose -p phepk2 -f docker-compose.yml -f docker-compose.build.yml -
 $DC down -v >/dev/null 2>&1 || true
 docker rm -f phe-imapmem >/dev/null 2>&1 || true
 sh web/test/pull.sh $DC
-$DC up -d --build phecloud >/dev/null 2>&1
+$DC up -d ${PHE_UP:---build} phecloud >/dev/null 2>&1
 trap '$DC down -v >/dev/null 2>&1; docker rm -f phe-imapmem >/dev/null 2>&1' EXIT
 NET=$(docker inspect phe-cloud-pk --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}')
 docker run -d --name phe-imapmem --cpus 0.5 --memory 256m --network "$NET" golang:1.26-bookworm sh -c \

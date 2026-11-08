@@ -9,7 +9,7 @@ ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p phercf -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml -f web/test/compose.fakes.yml"
 $DC down -v >/dev/null 2>&1 || true
 sh web/test/pull.sh $DC
-FAKES=nextcloud $DC up -d --build phecloud fakes > "$OUT/remotefiles-up.log" 2>&1 || { tail -20 "$OUT/remotefiles-up.log"; exit 1; }
+FAKES=nextcloud $DC up -d ${PHE_UP:---build} phecloud fakes > "$OUT/remotefiles-up.log" 2>&1 || { tail -20 "$OUT/remotefiles-up.log"; exit 1; }
 # on a failure anywhere (set -e stops quietly), show what the servers said before they go
 trap 'rc=$?; [ $rc -eq 0 ] || { echo "failed (exit $rc): the last log lines" >&2; docker logs --tail 30 phe-fakes >&2 2>&1; docker logs --tail 15 phe-cloud-pk >&2 2>&1; }; $DC down -v >/dev/null 2>&1' EXIT
 A=$(docker exec phe-cloud-pk phecloud paircode --admin 2>/dev/null)

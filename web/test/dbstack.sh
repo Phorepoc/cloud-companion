@@ -15,7 +15,7 @@ DC="docker compose -p phedb -f docker-compose.yml -f docker-compose.build.yml -f
 $DC down -v >/dev/null 2>&1 || true
 trap '$DC down -v >/dev/null 2>&1' EXIT
 sh web/test/pull.sh $DC
-$DC up -d --build $SVC >/dev/null 2>&1
+$DC up -d ${PHE_UP:---build} $SVC >/dev/null 2>&1
 for i in $(seq 1 60); do docker logs phe-$SVC 2>&1 | grep -qi "ready to accept connections\|ready for connections" && break; sleep 2; done; sleep 4
 $DC up -d phecloud >/dev/null 2>&1
 sleep 8

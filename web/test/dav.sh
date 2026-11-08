@@ -9,7 +9,7 @@ ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"
 DC="docker compose -p phedav -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml"
 $DC down -v >/dev/null 2>&1 || true
 sh web/test/pull.sh $DC
-$DC up -d --build phecloud > "$OUT/dav-up.log" 2>&1 || { tail -20 "$OUT/dav-up.log"; exit 1; }
+$DC up -d ${PHE_UP:---build} phecloud > "$OUT/dav-up.log" 2>&1 || { tail -20 "$OUT/dav-up.log"; exit 1; }
 trap '$DC down -v >/dev/null 2>&1' EXIT
 A=$(docker exec phe-cloud-pk phecloud paircode --admin 2>/dev/null)
 rm -f "$OUT/dav-login"

@@ -16,6 +16,6 @@ up)
       -e '/dc up -d --build zpush/d' deploy/hub/hub-init.sh > /tmp/hub-init-t.sh
   cp /tmp/hub-init-t.sh deploy/hub/hub-init-t.sh
   HUB_DOMAIN=hub.test sh deploy/hub/hub-init-t.sh
-  $DC up -d --build phecloud >/dev/null 2>&1
+  $DC up -d ${PHE_UP:---build} phecloud >/dev/null 2>&1
   echo "throwaway hub up: phe-stalwart-t, phe-cloud-t (network phetest_default), env in $T/deploy/hub/.env.phecloud" ;;
 esac

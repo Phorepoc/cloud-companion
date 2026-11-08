@@ -58,7 +58,7 @@ await page.fill('[data-test=f-nick]', 'Cloudy')
 let sent: Record<string, unknown> = {}
 page.on('request', (r) => { if (r.url().endsWith('/phe/connections/test')) sent = JSON.parse(String(r.postDataJSON().config)) })
 await page.click('[data-test=f-test]')
-await page.waitForFunction(() => /login works as cc@localhost/.test(document.querySelector('[data-test=test-result]')?.textContent || ''))
+await page.locator('[data-test=test-result]', { hasText: /login works as cc@localhost/ }).waitFor().catch(async (e) => { throw new Error('the Test button said: ' + await page.locator('[data-test=test-result]').textContent().catch(() => '(nothing)') + '; ' + e.message) })
 assert.deepEqual([sent.rooms, sent.nick], [['team@conference.localhost', 'ops@conference.localhost'], 'Cloudy'])
 await shot('1-dialog')
 await page.click('[data-test=f-add]')
