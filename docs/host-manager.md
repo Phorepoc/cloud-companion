@@ -36,7 +36,7 @@ Cloud Companion never gets the Docker socket: a break-in to it must not mean roo
 
 1. The image is flashed. Raspberry Pi Imager can write Wi-Fi details; we add an optional `cloud-setup.txt` on the boot
    partition with a setup code.
-2. The board boots, grows its file system and starts the manager. It announces itself as `cloud.local` (mDNS).
+2. The board boots, grows its file system and starts the manager. It announces itself as `cloud-companion.local` (mDNS).
 3. No network (no cable, no Wi-Fi details): the board opens its own Wi-Fi, "Cloud setup", with a page to pick a network.
 4. The manager's setup UI on port 80 asks for the setup code (from the boot partition; without one, the first visitor within
    30 minutes of boot may set up, and the window closes after).
@@ -79,7 +79,7 @@ a USB disk plugged in later is left until someone needs it.
 On a board (`-wifi wlan0`), when there is no network 90 seconds after boot, the manager opens an open Wi-Fi called "Cloud
 setup" (NetworkManager, shared mode, the page at `10.42.0.1`; every DNS name points there, so phones offer it as the
 network's sign-in page). After the setup code, the page lists the Wi-Fi networks it saw before the hotspot started; joining
-one closes the hotspot, and the page asks to move to that network and open `http://cloud.local`. A failed join reopens the
+one closes the hotspot, and the page asks to move to that network and open `http://cloud-companion.local`. A failed join reopens the
 hotspot with the reason. Setup itself needs the internet and refuses to start without it.
 
 ## Backups
@@ -107,8 +107,8 @@ repository there if it is new; a job), `POST /v1/backup/run` (a job), `GET /v1/b
 ## Remote login (SSH)
 
 Off by default. Settings, System has a switch (`internal/host/ssh.go`). The first time it goes on, the owner chooses a password
-for the board's `cloud` account (ten characters or more), and the board starts SSH; from the same network, `ssh cloud@cloud.local`.
-The `cloud` account can use `sudo`. Off locks the account again and stops SSH. On again unlocks it with the same password, which
+and a user name for the board's account (the image's `cloud` account, renamed; ten characters or more for the password), and the board starts SSH; from the same network, `ssh <name>@cloud-companion.local`.
+That account can use `sudo`. Off locks the account again and stops SSH. On again unlocks it with the same password, which
 can be changed on the page. The password goes to `chpasswd` through a root-only file, never a command line, and is not kept.
 
 ## Recovery

@@ -30,8 +30,8 @@ docker run --rm --network container:phe-ui-cloud --ipc=host -v "$ROOT/web/test":
   sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning $UI_TEST.ts'
 # systemui leaves remote login on with its password in OUT/ssh-password: log in for real, then the test turns it off
 if [ "${UI_TEST:-}" = systemui ]; then
-  P=$(cat "$OUT/ssh-password"); rm -f "$OUT/ssh-password"
-  docker run --rm --network container:phe-ui-host -e SSHPASS="$P" alpine:3.22 sh -c \
-    'apk add -q openssh-client sshpass >/dev/null && sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR cloud@127.0.0.1 "echo logged in as \$(whoami)"' | grep -x "logged in as cloud"
+  read -r U P < "$OUT/ssh-password"; rm -f "$OUT/ssh-password"
+  docker run --rm --network container:phe-ui-host -e SSHPASS="$P" -e U="$U" alpine:3.22 sh -c \
+    'apk add -q openssh-client sshpass >/dev/null && sshpass -e ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR "$U@127.0.0.1" "echo logged in as \$(whoami) in \$HOME"' | grep -x "logged in as anna in /home/anna"
   echo "ssh login ok"
 fi

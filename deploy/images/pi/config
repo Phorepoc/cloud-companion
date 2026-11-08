@@ -3,7 +3,7 @@
 IMG_NAME=cloud-companion
 PI_GEN_RELEASE="Cloud Companion"
 RELEASE=trixie
-TARGET_HOSTNAME=cloud
+TARGET_HOSTNAME=cloud-companion
 LOCALE_DEFAULT=en_GB.UTF-8
 KEYBOARD_KEYMAP=gb
 KEYBOARD_LAYOUT="English (UK)"

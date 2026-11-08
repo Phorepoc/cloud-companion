@@ -24,7 +24,8 @@
           </template>
         </HdListItem>
         <form v-if="asking" class="ph-sys__ask" data-test="system-ssh-form" @submit.prevent="turnOn">
-          <p class="ph-muted">Choose a password for logging in. You need it each time; the board does not show it again.</p>
+          <p class="ph-muted">{{ ssh.hasPassword ? 'A new password for' : 'Choose a user name and a password for logging in. You need them each time; the board does not show the password again.' }}{{ ssh.hasPassword ? ' ' + ssh.user + '.' : '' }}</p>
+          <HdTextField v-if="!ssh.hasPassword" v-model="user" label="User name" helper="Small letters and digits, for example anna" autocomplete="off" data-test="system-ssh-user" />
           <HdTextField v-model="pass1" type="password" autocomplete="new-password" label="Password (10 characters or more)" data-test="system-ssh-password" />
           <HdTextField v-model="pass2" type="password" autocomplete="new-password" label="The same again" data-test="system-ssh-password2" />
           <div class="ph-sys__actions">
@@ -57,9 +58,10 @@ const ssh = reactive<SSH>({ available: false, on: false, user: 'cloud', hasPassw
 const asking = ref(false)
 const busy = ref(false)
 const error = ref('')
+const user = ref('')
 const pass1 = ref('')
 const pass2 = ref('')
-const hostName = location.hostname.endsWith('.local') ? location.hostname : 'cloud.local'
+const hostName = location.hostname.endsWith('.local') ? location.hostname : 'cloud-companion.local'
 
 const memory = computed(() => (board.memory ? Math.round(board.memory / 2 ** 30) + ' GB' : 'Unknown'))
 const storageText = computed(() => ({ sd: 'A memory card', nvme: 'An NVMe drive', usb: 'A USB drive' } as Record<string, string>)[board.storage] || board.storage)
@@ -77,11 +79,11 @@ async function load() {
     if (available.value === null) available.value = false
   }
 }
-async function put(on: boolean, password = '') {
+async function put(on: boolean, password = '', name = '') {
   busy.value = true
   error.value = ''
   try {
-    takeSSH(await apiCall('PUT', '/phe/host/ssh', { on, password }))
+    takeSSH(await apiCall('PUT', '/phe/host/ssh', { on, user: name, password }))
     asking.value = false
     pass1.value = pass2.value = ''
   } catch (e) { error.value = (e as Error).message } finally { busy.value = false }
@@ -92,9 +94,10 @@ function flip(on: boolean) {
   else asking.value = true
 }
 function turnOn() {
+  if (!ssh.hasPassword && !/^[a-z][a-z0-9_-]{0,31}$/.test(user.value.trim())) { error.value = 'The user name: small letters and digits, starting with a letter.'; return }
   if (pass1.value.length < 10) { error.value = 'The password needs 10 characters or more.'; return }
   if (pass1.value !== pass2.value) { error.value = 'The two passwords are not the same.'; return }
-  put(true, pass1.value)
+  put(true, pass1.value, user.value.trim())
 }
 
 // the page can open before the connection says this device is the owner (a reload, a link): load once it does

@@ -266,7 +266,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 **The boards**
 [Raspberry Pi OS](https://www.raspberrypi.com/software/) and [pi-gen](https://github.com/RPi-Distro/pi-gen) for the board image,
 [Docker Engine](https://docs.docker.com/engine/) with [Compose](https://github.com/docker/compose), [NetworkManager](https://networkmanager.dev)
-with [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) for the setup hotspot, [Avahi](https://avahi.org) for `cloud.local`,
+with [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) for the setup hotspot, [Avahi](https://avahi.org) for `cloud-companion.local`,
 [systemd](https://systemd.io), [restic](https://restic.net) for backups (and its [REST server](https://github.com/restic/rest-server) in our tests), and [QEMU](https://www.qemu.org) with [binfmt](https://github.com/tonistiigi/binfmt) for building it on x86.
 
 **The servers our tests run against**

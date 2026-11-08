@@ -8,7 +8,7 @@
 #
 #   --version vX.Y.Z  a release with board files (default: the newest one that has them)
 #   --from DIR        phehost-linux-<arch> and cloud-board.tar.gz from DIR instead of the release (tests, the image build)
-#   --board           a machine that is only Cloud Companion (the Raspberry Pi image): named cloud.local, NetworkManager's setup
+#   --board           a machine that is only Cloud Companion (the Raspberry Pi image): named cloud-companion.local, NetworkManager's setup
 #                     hotspot; never on a machine you use for other things
 #   --no-start        install only (an image being built)
 set -eu
@@ -73,9 +73,9 @@ install -m 0644 /opt/cloud/deploy/board/phehost.service /etc/systemd/system/pheh
 if [ -n "$BOARD" ]; then
   say "board"
   # written in place: in the image build's chroot hostnamectl has no systemd, and /etc/hosts may be a mount
-  echo cloud > /etc/hostname
-  { grep -v '^127\.0\.1\.1' /etc/hosts; printf '127.0.1.1\tcloud\n'; } > "$W/hosts" && cat "$W/hosts" > /etc/hosts
-  hostname cloud 2>/dev/null || true
+  echo cloud-companion > /etc/hostname
+  { grep -v '^127\.0\.1\.1' /etc/hosts; printf '127.0.1.1\tcloud-companion\n'; } > "$W/hosts" && cat "$W/hosts" > /etc/hosts
+  hostname cloud-companion 2>/dev/null || true
   apt-get install -y -q --no-install-recommends network-manager >/dev/null
   mkdir -p /etc/NetworkManager/dnsmasq-shared.d
   install -m 0644 /opt/cloud/deploy/board/dnsmasq-cloud-setup.conf /etc/NetworkManager/dnsmasq-shared.d/cloud-setup.conf

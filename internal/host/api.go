@@ -90,13 +90,14 @@ func (m *Manager) Handler() http.Handler {
 	mux.HandleFunc("PUT /v1/ssh", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			On       bool   `json:"on"`
+			User     string `json:"user"`
 			Password string `json:"password"`
 		}
 		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<10)).Decode(&in); err != nil {
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
-		s, err := m.SetSSH(r.Context(), in.On, in.Password)
+		s, err := m.SetSSH(r.Context(), in.On, in.User, in.Password)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err)
 			return
