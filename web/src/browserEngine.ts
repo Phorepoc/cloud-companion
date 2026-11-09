@@ -6,10 +6,12 @@ import { reactive } from 'vue'
 import { NekoClient, mount } from '@m1k1o/neko'
 import { apiCall } from './cloud'
 
-export interface FxTab { id: number; title: string; url: string; active: boolean; loading: boolean; mobile?: boolean }
+export interface FxTab { id: number; title: string; url: string; active: boolean; loading: boolean; mobile?: boolean; starred?: boolean }
 export const engine = reactive({
   status: 'idle' as 'idle' | 'insecure' | 'unconfigured' | 'connecting' | 'live' | 'failed',
   up: false, tabs: [] as FxTab[], busy: false, zoom: 1, note: '', saved: '',
+  marks: [] as { id: string; title: string; url: string }[],
+  history: [] as { url: string; title: string; at: number }[],
   pick: null as null | { id: string; accept: string; multiple: boolean; site: string }, // a page asks for files
 })
 ;(window as any).__pheBrowser = engine // tests read the tab list from here
@@ -42,6 +44,8 @@ function onBridge(e: MessageEvent) {
   if (m.t === 'tabs') { engine.tabs = m.tabs; if (!m.tabs.some((t: FxTab) => t.loading)) engine.busy = false }
   else if (m.t === 'engine') { engine.up = m.up; flush() }
   else if (m.t === 'zoom') engine.zoom = m.factor
+  else if (m.t === 'marks') engine.marks = m.list
+  else if (m.t === 'history') engine.history = m.list
   else if (m.t === 'pick') engine.pick = { id: m.id, accept: m.accept, multiple: !!m.multiple, site: m.site || '' }
   else if (m.t === 'picked') { if (engine.pick?.id === m.id) engine.pick = null }
   else if (m.t === 'nav') { if (m.state === 'start') engine.busy = true; else if (m.state !== 'commit') engine.busy = false }

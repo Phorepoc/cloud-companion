@@ -8,7 +8,9 @@ const MOBILE_UA = navigator.userAgent.replace(/\([^)]*rv:([\d.]+)\) Gecko\/\d+/,
 const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)) }
 async function tabs() {
   const all = await browser.tabs.query({})
-  send({ t: 'tabs', tabs: all.map((x) => ({ id: x.id, title: x.title, url: x.url, active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id), asleep: !!x.discarded })) })
+  const marked = new Set()
+  for (const x of all) if (x.url && /^https?:/.test(x.url) && (await browser.bookmarks.search({ url: x.url }).catch(() => [])).length) marked.add(x.id)
+  send({ t: 'tabs', tabs: all.map((x) => ({ starred: marked.has(x.id), id: x.id, title: x.title, url: x.url, active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id), asleep: !!x.discarded })) })
 }
 for (const e of ['onCreated', 'onRemoved', 'onActivated', 'onUpdated', 'onMoved']) browser.tabs[e].addListener(tabs)
 browser.tabs.onRemoved.addListener((id) => mobile.delete(id))
@@ -45,6 +47,9 @@ async function fit() {
 browser.tabs.onActivated.addListener(fit)
 browser.tabs.onCreated.addListener(fit)
 browser.tabs.onRemoved.addListener(fit)
+// bookmarks and history are Firefox's own, in the profile (a Cloud Companion volume, in its backups); the Browser page shows them
+for (const e of ['onCreated', 'onRemoved', 'onChanged']) browser.bookmarks[e].addListener(() => tabs())
+const pick = (n) => ({ id: n.id, title: n.title || '', url: n.url })
 const nav = (state) => (d) => { if (!d.frameId) send({ t: 'nav', state, tab: d.tabId, url: d.url }) }
 browser.webNavigation.onBeforeNavigate.addListener(nav('start'))
 browser.webNavigation.onCommitted.addListener(nav('commit'))
@@ -100,6 +105,21 @@ const cmds = {
     }
     await browser.tabs.sendMessage(at[0], { files, id: m.id }, { frameId: at[1] })
   },
+  async bookmark(m) {
+    const have = await browser.bookmarks.search({ url: m.url })
+    if (m.on && !have.length) await browser.bookmarks.create({ title: m.title || m.url, url: m.url })
+    if (!m.on) for (const b of have) await browser.bookmarks.remove(b.id)
+  },
+  async marks(m) {
+    const all = (await browser.bookmarks.search(m.q ? { query: m.q } : {})).filter((b) => b.url)
+    send({ t: 'marks', list: all.reverse().slice(0, 500).map(pick) })
+  },
+  async unmark(m) { await browser.bookmarks.remove(m.id); await cmds.marks(m) },
+  async history(m) {
+    const all = await browser.history.search({ text: m.q || '', startTime: 0, maxResults: 300 })
+    send({ t: 'history', list: all.map((h) => ({ url: h.url, title: h.title || '', at: h.lastVisitTime })) })
+  },
+  async forget(m) { if (m.url) await browser.history.deleteUrl({ url: m.url }); else await browser.history.deleteAll(); await cmds.history(m) },
   async budget(m) { override = Math.max(0, Number(m.n) || 0); await fit() },
   async zoom(m) { await browser.tabs.setZoom((await active()).id, m.factor) },
 }

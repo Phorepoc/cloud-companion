@@ -82,6 +82,17 @@ try {
   await until(async () => (await title()) === 'clip:from the device', 'paste from the device'); step('paste: this device\'s clipboard goes into the page')
   await p.keyboard.type(' and back', { delay: 30 }); await p.keyboard.press('Control+A'); await p.keyboard.press('Control+C')
   await until(() => p.evaluate(() => navigator.clipboard.readText().then((t) => t === 'from the device and back')), 'copy back to the device'); step('copy: text copied in the page reaches this device\'s clipboard')
+  // the star bookmarks the page; Bookmarks and history lists it, with the pages visited, and removes it
+  const starred = () => p.evaluate(() => !!(window as any).__pheBrowser.tabs.find((t: any) => t.active)?.starred)
+  await go(SITE + 'two.html'); await until(async () => (await title()) === 'probe two', 'two again')
+  await p.click(".x-bf__row [aria-label='Bookmark']"); await until(starred, 'starred')
+  assert.equal(await p.getAttribute(".x-bf__row [aria-label='Bookmark']", 'aria-pressed'), 'true'); step('the star bookmarks the page and shows it')
+  await more('saved-open'); await p.waitForSelector('[data-test=saved-dialog]')
+  await p.locator('[data-test=saved-dialog]').getByText('probe two').first().waitFor({ timeout: 5000 })
+  await p.click('[data-test=saved-history]'); await p.locator('[data-test=saved-dialog]').getByText('probe one').first().waitFor({ timeout: 5000 })
+  await p.click('[data-test=saved-marks]'); await p.locator('[data-test=saved-dialog] [aria-label^=Remove]').first().click()
+  await until(async () => !(await starred()), 'unstarred'); await p.keyboard.press('Escape'); step('Bookmarks and history: the bookmark and the visited pages, and removing it')
+  await p.waitForTimeout(400)
   // a page's file input asks this device for the file, and the page gets it
   await go(SITE + 'upload.html'); await until(async () => (await title()) === 'upload', 'upload page'); await p.waitForTimeout(800)
   await p.mouse.move(...await at(150, 100)); await p.mouse.down(); await p.mouse.up()

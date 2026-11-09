@@ -5,7 +5,7 @@
     <!-- the Etesian browser frame around Firefox's picture: the tabs, address and buttons are ours and follow Firefox live -->
     <XBrowserFrame class="ph-bf" :address="address" :secure="secure" :back="true" :forward="true"
                    :loading="engine.busy ? 60 : undefined" :tabs="tabs" :current="current" :tabs-at="browserPrefs.tabsAt"
-                   data-test="browser-frame"
+                   data-test="browser-frame" :class="{ 'is-starred': starred }" @click.capture="onFrameClick"
                    @go="go" @back="act({ c: 'back' })" @forward="act({ c: 'forward' })" @reload="act({ c: 'reload' })"
                    @pick="(v: string) => act({ c: 'pick', id: Number(v) })" @close="(v: string) => command({ c: 'close', id: Number(v) })"
                    @add="newTab" @more="moreOpen = true">
@@ -13,6 +13,7 @@
         <q-menu v-model="moreOpen" no-parent-event anchor="bottom right" self="top right" class="ph-bf-more" data-test="browser-more">
           <q-list dense style="min-width: 220px">
             <q-item clickable v-close-popup data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
+            <q-item clickable v-close-popup data-test="saved-open" @click="openSaved('marks')"><q-item-section>Bookmarks and history</q-item-section></q-item>
             <q-item clickable v-close-popup data-test="other-devices" @click="othersOpen = true"><q-item-section>Tabs on your devices</q-item-section></q-item>
             <q-item clickable v-close-popup :disable="!activeTab()?.url || shown(activeTab()?.url) === ''" data-test="send-device" @click="openSend"><q-item-section>Send to device</q-item-section></q-item>
             <q-item clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(desktopSite)" :disable="!activeTab()" data-test="desktop-site" @click="toggleSite">
@@ -72,6 +73,31 @@
         <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- Firefox's bookmarks and history (kept in its profile, a Cloud Companion volume) -->
+    <q-dialog v-model="savedOpen">
+      <q-card class="ph-dialog ph-saved" data-test="saved-dialog">
+        <q-tabs v-model="savedTab" dense align="justify" no-caps @update:model-value="loadSaved">
+          <q-tab name="marks" label="Bookmarks" data-test="saved-marks" />
+          <q-tab name="history" label="History" data-test="saved-history" />
+        </q-tabs>
+        <q-card-section>
+          <q-input v-model="savedQ" dense outlined clearable placeholder="Search" aria-label="Search" data-test="saved-search" @update:model-value="loadSaved" />
+          <p v-if="!savedList.length" class="ph-muted ph-small">{{ savedTab === 'marks' ? 'No bookmarks yet. The star in the address bar adds the page.' : 'No history.' }}</p>
+          <ul class="ph-tablist">
+            <li v-for="(e, i) in savedList" :key="i" class="ph-trow" :data-test="'saved-row-' + i">
+              <button type="button" class="ph-ttext ph-saved__open" v-close-popup @click="openSavedUrl(e.url)">
+                <span class="ph-ttitle">{{ e.title || e.url }}</span><span class="ph-small ph-muted ph-turl">{{ e.url }}</span>
+              </button>
+              <q-btn flat round icon="sym_o_close" :aria-label="'Remove ' + (e.title || e.url)" @click="removeSaved(e)" />
+            </li>
+          </ul>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn v-if="savedTab === 'history' && savedList.length" flat label="Clear history" data-test="saved-clear" @click="command({ c: 'forget' })" />
+          <q-btn flat label="Close" v-close-popup />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <!-- a page's "choose a file": the files of this device, uploaded to Cloud Companion and handed to the page -->
     <q-dialog :model-value="!!engine.pick" persistent>
       <q-card v-if="engine.pick" class="ph-dialog" data-test="pick-dialog">
@@ -118,6 +144,26 @@ import { XBrowserFrame } from '@etesian-design/shell'
 import { engine, activeTab, act, command, focusPage, fitScreen, start, stop } from '../browserEngine'
 
 const router = useRouter()
+// bookmarks and history
+const savedOpen = ref(false), savedTab = ref<'marks' | 'history'>('marks'), savedQ = ref<string | null>('')
+const savedList = computed<{ id?: string; title: string; url: string }[]>(() => (savedTab.value === 'marks' ? engine.marks : engine.history))
+function loadSaved() { command({ c: savedTab.value, q: savedQ.value || '' }) }
+function openSaved(t: 'marks' | 'history') { savedTab.value = t; savedOpen.value = true; loadSaved() }
+function openSavedUrl(u: string) { act({ c: 'go', url: u }); focusPage() }
+function removeSaved(e: { id?: string; url: string }) {
+  if (savedTab.value === 'marks') command({ c: 'unmark', id: e.id, q: savedQ.value || '' })
+  else command({ c: 'forget', url: e.url, q: savedQ.value || '' })
+}
+// the frame's star (Etesian's browser frame has no event for it yet): adds or removes the page's bookmark, and shows which
+const starred = computed(() => !!activeTab()?.starred)
+function onFrameClick(e: MouseEvent) {
+  if (!(e.target as Element).closest?.('[aria-label="Bookmark"]')) return
+  const t = activeTab()
+  if (!t?.url || !/^https?:/.test(t.url)) return
+  command({ c: 'bookmark', url: t.url, title: t.title, on: !t.starred })
+  toast(t.starred ? 'Bookmark removed' : 'Bookmarked')
+}
+watch(starred, (on) => { document.querySelectorAll('.ph-bf [aria-label="Bookmark"]').forEach((b) => b.setAttribute('aria-pressed', String(on))) }, { flush: 'post', immediate: true })
 const picker = ref<HTMLInputElement | null>(null)
 const uploading = ref(false), pickError = ref('')
 async function picked() {
@@ -205,6 +251,9 @@ onBeforeUnmount(() => { ro?.disconnect(); clearTimeout(sizeTimer); stop() })
 .ph-trow { display: flex; align-items: center; gap: var(--ph-s2); min-height: var(--ph-tap); border-bottom: 1px solid var(--ph-divider); }
 .ph-ttext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ph-ttitle, .ph-turl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-saved__open { all: unset; cursor: pointer; flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ph-saved__open:focus-visible { outline: 2px solid var(--ph-accent, currentColor); }
+.ph-bf.is-starred :deep([aria-label="Bookmark"]) { color: var(--hd-c-accent, #4591ff); }
 .ph-screen { position: absolute; inset: 0; background: #000; }
 .ph-connecting { position: absolute; inset: 0; display: flex; gap: var(--ph-s2); align-items: center; justify-content: center; background: #000; color: #fff; }
 </style>
