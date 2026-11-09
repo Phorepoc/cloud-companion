@@ -8,7 +8,7 @@ FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f0
 # software WebGL (LLVM, Mesa, about 200 MB) stays: sites expect it. Build with PHE_BROWSER_WEBGL=0 to leave it out.
 ARG PHE_BROWSER_WEBGL=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      firefox-esr openbox xserver-xorg-core xserver-xorg-video-dummy xkb-data x11-xkb-utils pulseaudio \
+      firefox-esr openbox xserver-xorg-core xserver-xorg-video-dummy xkb-data x11-xkb-utils xclip pulseaudio \
       gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-x gstreamer1.0-pulseaudio gstreamer1.0-plugins-ugly \
       libgtk-3-0t64 libxtst6 libxcvt0 \
       fonts-liberation fonts-dejavu-core fonts-noto-color-emoji fonts-wqy-microhei zip ca-certificates \

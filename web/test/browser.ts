@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 const { BASE, CODE, CODE2, OUT } = process.env as Record<string, string>
 const SITE = 'http://site/'
 const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
-const ctx = await b.newContext({ viewport: { width: 1280, height: 860 } })
+const ctx = await b.newContext({ viewport: { width: 1280, height: 860 }, permissions: ['clipboard-read', 'clipboard-write'] })
 const p = await ctx.newPage()
 const errs: string[] = []
 p.on('pageerror', (e) => errs.push(e.message))
@@ -71,6 +71,17 @@ try {
     await q.touchscreen.tap(v.x + (v.width - s.w * k) / 2 + 60 * k, v.y + (v.height - s.h * k) / 2 + 130 * k) }
   await until(async () => (await q.inputValue(addr)).includes('two.html'), 'phone: a tap follows the link'); step('on a phone a tap follows a link')
   await ctx2.close()
+  // the clipboard both ways: this device's text pastes into the page, and what is copied there comes back to this device
+  await go(SITE + 'clip.html'); await until(async () => (await title()) === 'clip', 'clip page'); await p.waitForTimeout(800)
+  await p.evaluate(() => navigator.clipboard.writeText('from the device'))
+  await p.mouse.move(...await at(150, 100)); await p.mouse.down(); await p.mouse.up(); await p.waitForTimeout(300)
+  // headless Chromium does not turn Ctrl+V into a paste event, as a browser on a device does: the event is made here
+  await p.keyboard.down('Control')
+  await p.evaluate(() => { const d = new DataTransfer(); d.setData('text/plain', 'from the device'); document.activeElement!.dispatchEvent(new ClipboardEvent('paste', { clipboardData: d, bubbles: true, cancelable: true })) })
+  await p.keyboard.up('Control')
+  await until(async () => (await title()) === 'clip:from the device', 'paste from the device'); step('paste: this device\'s clipboard goes into the page')
+  await p.keyboard.type(' and back', { delay: 30 }); await p.keyboard.press('Control+A'); await p.keyboard.press('Control+C')
+  await until(() => p.evaluate(() => navigator.clipboard.readText().then((t) => t === 'from the device and back')), 'copy back to the device'); step('copy: text copied in the page reaches this device\'s clipboard')
   // a page's file input asks this device for the file, and the page gets it
   await go(SITE + 'upload.html'); await until(async () => (await title()) === 'upload', 'upload page'); await p.waitForTimeout(800)
   await p.mouse.move(...await at(150, 100)); await p.mouse.down(); await p.mouse.up()

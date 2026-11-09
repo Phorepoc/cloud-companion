@@ -8,7 +8,8 @@ export PHE_BROWSER_IP=${PHE_BROWSER_IP:-$(hostname -I | cut -d' ' -f1)}
 DC="docker compose -p phebr -f docker-compose.yml -f docker-compose.build.yml -f web/test/compose.passkey.yml -f docker-compose.browser.yml -f web/test/compose.browser.yml"
 $DC down -v >/dev/null 2>&1 || true
 $DC up -d ${PHE_UP:---build} phecloud browser site >/dev/null 2>&1
-trap '$DC down -v >/dev/null 2>&1' EXIT
+done_() { docker logs phe-browser 2>&1 | grep -iE 'clip|paste|error' | tail -8; $DC down -v >/dev/null 2>&1; }
+trap done_ EXIT
 sleep 15
 A=$(docker exec phe-cloud-pk phecloud paircode --admin 2>/dev/null); B=$(docker exec phe-cloud-pk phecloud paircode --admin 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network container:phe-cloud-pk --ipc=host \

@@ -25,4 +25,4 @@ keep as_neko pulseaudio --log-level=error --disallow-module-loading --disallow-e
 keep as_neko openbox &
 keep as_neko firefox-esr --kiosk --display="$DISPLAY" &
 sleep 1
-while :; do as_neko sh -c 'cd /home/neko && exec env -i HOME=/home/neko USER=neko DISPLAY=$DISPLAY PULSE_SERVER=$PULSE_SERVER XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR '"$(env | grep ^NEKO_ | sed "s/.*/'&'/" | tr "\n" " ")"' /usr/bin/neko serve' || true; sleep 1; done
+while :; do as_neko sh -c 'cd /home/neko && exec env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/neko USER=neko DISPLAY=$DISPLAY PULSE_SERVER=$PULSE_SERVER XDG_RUNTIME_DIR=$XDG_RUNTIME_DIR '"$(env | grep ^NEKO_ | sed "s/.*/'&'/" | tr "\n" " ")"' /usr/bin/neko serve' || true; sleep 1; done
