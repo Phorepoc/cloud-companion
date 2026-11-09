@@ -22,6 +22,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=web /web/dist internal/webui/dist
+RUN mkdir -p /rootfs/tmp && chmod 1777 /rootfs/tmp
 RUN GOARCH=$TARGETARCH go build -trimpath -o /out/phecloud ./cmd/phecloud \
  && GOARCH=$TARGETARCH go build -trimpath -o /out/phecloud-client ./cmd/phecloud-client
 
@@ -31,9 +32,10 @@ FROM build AS fakes
 RUN GOARCH=$TARGETARCH go build -trimpath -o /usr/local/bin/fakesvc ./cmd/fakesvc
 ENTRYPOINT ["fakesvc"]
 
-FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+# Nothing but the program: no shell, no packages. Diagnose with `docker logs`, or run it locally; a crash restarts the container.
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /rootfs/ /
 COPY --from=build /out/ /usr/local/bin/
 ENV PHECLOUD_TLSDIR=/data PHECLOUD_DB=/data/phecloud.db
 VOLUME /data

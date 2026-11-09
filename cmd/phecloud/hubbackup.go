@@ -99,7 +99,7 @@ func backupMain(args []string) {
 
 	// 1. phecloud's own state, consistent while it runs
 	tmp := "/tmp/phecloud-backup.db"
-	if err := dockerOut(nil, io.Discard, "exec", cloud, "sh", "-c", "rm -f "+tmp); err != nil {
+	if err := dockerOut(nil, io.Discard, "exec", cloud, "phecloud", "rmfile", tmp); err != nil {
 		fail(err)
 	}
 	external := false
@@ -120,7 +120,7 @@ func backupMain(args []string) {
 		if err != nil {
 			fail(err)
 		}
-		err = dockerOut(nil, out, "exec", cloud, "cat", f.src)
+		err = dockerOut(nil, out, "exec", cloud, "phecloud", "readfile", f.src)
 		out.Close()
 		if err != nil {
 			if f.name != "phecloud.db" { // a server that never ran TLS has no certificate files
@@ -130,7 +130,7 @@ func backupMain(args []string) {
 			fail(err)
 		}
 	}
-	dockerOut(nil, io.Discard, "exec", cloud, "rm", "-f", tmp)
+	dockerOut(nil, io.Discard, "exec", cloud, "phecloud", "rmfile", tmp)
 
 	// 2. Stalwart: stop, archive both volumes, start again (always)
 	if m.StalwartImage, _ = dockerText("inspect", sw, "--format", "{{.Config.Image}}"); m.StalwartImage == "" {

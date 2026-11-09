@@ -16,11 +16,9 @@ CODE=$(docker exec phe-cloud phecloud paircode 2>/dev/null)
 rm -rf "$ROOT/.testrun-mem"; mkdir -p "$ROOT/.testrun-mem"
 
 sample() { # label
-    local cg rss n
+    local cg
     cg=$(docker stats --no-stream --format '{{.MemUsage}}' phe-cloud | cut -d/ -f1 | tr -d ' ')
-    read -r rss n < <(docker exec phe-cloud sh -c 'for d in /proc/[0-9]*; do awk "/^Name:/{n=\$2} /^VmRSS:/{r=\$2} END{if(r) print n, r}" $d/status 2>/dev/null; done' |
-        awk '/headless/{s+=$2;c++} END{print s, c}')
-    echo "$1: container $cg, chromium RSS $((rss / 1024)) MB in $n processes"
+    echo "$1: container $cg"
 }
 
 sample "idle server (2 warm tabs)"

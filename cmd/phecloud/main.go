@@ -19,6 +19,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -64,6 +65,10 @@ func main() {
 		hubMain(os.Args[2:])
 		return
 	}
+	if (os.Args[1] == "readfile" || os.Args[1] == "rmfile") && len(os.Args) < 3 {
+		fmt.Fprintln(os.Stderr, os.Args[1]+" <path>")
+		os.Exit(2)
+	}
 	st, err := store.Open(env("PHECLOUD_DB", "phecloud.db"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "db:", err)
@@ -81,6 +86,23 @@ func main() {
 		if fp, err := tlsutil.FingerprintFile(env("PHECLOUD_TLSDIR", "/data")); err == nil {
 			fmt.Fprintln(os.Stderr, "server certificate fingerprint (sha256):", fp)
 		}
+	case "readfile": // phecloud readfile <path>: the file on stdout (hub backup; the image has no shell or cat)
+		f, err := os.Open(os.Args[2])
+		if err == nil {
+			defer f.Close()
+			_, err = io.Copy(os.Stdout, f)
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	case "rmfile": // phecloud rmfile <path>: removes it if it is there (hub backup)
+		if err := os.Remove(os.Args[2]); err != nil && !errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
 	case "snapshot": // phecloud snapshot <path>: a consistent copy of the database (used by hub backup)
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "snapshot <path>")
