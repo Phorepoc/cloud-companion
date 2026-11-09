@@ -51,7 +51,11 @@ browser.webNavigation.onCommitted.addListener(nav('commit'))
 browser.webNavigation.onCompleted.addListener(nav('done'))
 browser.webNavigation.onErrorOccurred.addListener(nav('error'))
 browser.downloads.onCreated.addListener((d) => send({ t: 'download', state: 'start', id: d.id, url: d.url }))
-browser.downloads.onChanged.addListener((d) => { if (d.state) send({ t: 'download', state: d.state.current, id: d.id }) })
+browser.downloads.onChanged.addListener(async (d) => {
+  if (!d.state) return
+  const [it] = await browser.downloads.search({ id: d.id }).catch(() => [])
+  send({ t: 'download', state: d.state.current, id: d.id, name: it ? it.filename.split('/').pop() : '' })
+})
 const active = async () => (await browser.tabs.query({ active: true, currentWindow: true }))[0]
 const sendZoom = async (id) => send({ t: 'zoom', factor: await browser.tabs.getZoom(id) })
 browser.tabs.onZoomChange.addListener((z) => send({ t: 'zoom', factor: z.newZoomFactor }))

@@ -60,6 +60,11 @@ try {
   await q.click('[data-test=sent-open]'); await q.waitForURL(/#\/browse/)
   await until(async () => (await tabCount()) === before + 1, 'the sent page opens in a new tab'); step('Send to device: the other device asks, and opens it in the Browser')
   await ctx2.close()
+  // a download lands in Files, Downloads, and the page says so with a way there
+  await go(SITE + 'phe-download.txt')
+  await until(async () => /Saved in Files, Downloads: phe-download\.txt/.test(await p.textContent('[data-test=browser-note]').catch(() => '') || ''), 'download saved')
+  await p.click('[data-test=download-show]'); await p.waitForURL(/#\/files/)
+  await p.getByText('phe-download.txt').first().waitFor({ timeout: 10000 }); step('a download is saved in Files, Downloads, and Show in Files opens it')
   // Settings, Browser: the number of tabs kept loaded follows the memory; set to 2, the others unload and come back when picked
   const loaded = () => p.evaluate(() => (window as any).__pheBrowser.tabs.filter((t: any) => !t.asleep).length as number)
   await p.goto(BASE + '/#/settings/webbrowser'); await p.waitForSelector('[data-test=bset-memory]')

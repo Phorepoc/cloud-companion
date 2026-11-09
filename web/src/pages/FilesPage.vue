@@ -109,6 +109,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 import { onResume, toast } from '../toast'
@@ -118,7 +119,9 @@ import { play } from '../music'
 import { state } from '../cloud'
 import { photoFolders, setPhotoFolders } from '../photos'
 
-const path = ref('')
+// a link can open a folder (the Browser's "Show in Files": /files?dir=Downloads)
+const route = useRoute()
+const path = ref(typeof route.query.dir === 'string' ? route.query.dir : '')
 const entries = ref<FileEntry[]>([])
 const shares = ref<Share[]>([])
 const loading = ref(false), uploading = ref(false), dropping = ref(false)

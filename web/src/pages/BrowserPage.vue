@@ -38,10 +38,13 @@
       </template>
       <div class="ph-bf__page">
         <span class="ph-sr" data-test="title">{{ activeTab()?.title }}</span>
-        <q-banner v-if="engine.note" class="ph-note" rounded role="status">
+        <q-banner v-if="engine.note" class="ph-note" rounded role="status" data-test="browser-note">
           <template #avatar><q-icon name="sym_o_download" aria-hidden="true" /></template>
           {{ engine.note }}
-          <template #action><q-btn flat label="OK" @click="engine.note = ''" /></template>
+          <template #action>
+            <q-btn v-if="engine.saved" flat label="Show in Files" data-test="download-show" @click="showDownloads" />
+            <q-btn flat label="OK" @click="engine.note = ''" />
+          </template>
         </q-banner>
         <div ref="stage" class="ph-stage" data-test="stage">
           <HdStatusState v-if="engine.status === 'insecure'" state="error" title="The browser needs a secure address" text="Open Cloud Companion over https or at localhost." data-test="browser-insecure" />
@@ -93,11 +96,14 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { state, api, browserPrefs, setBrowserPref } from '../cloud'
 import { toast } from '../toast'
+import { useRouter } from 'vue-router'
 import type { SessionInfo } from '../proto'
 import { HdStatusState } from '@etesian-design/vue'
 import { XBrowserFrame } from '@etesian-design/shell'
 import { engine, activeTab, act, command, focusPage, fitScreen, start, stop } from '../browserEngine'
 
+const router = useRouter()
+function showDownloads() { engine.note = ''; void router.push({ path: '/files', query: { dir: 'Downloads' } }) }
 const stage = ref<HTMLElement | null>(null)
 const screen = ref<HTMLElement | null>(null)
 const moreOpen = ref(false)

@@ -9,6 +9,9 @@ services:
       PHECLOUD_BROWSER_URL: http://browser:8080
       PHECLOUD_BROWSER_PASSWORD: ${PHECLOUD_BROWSER_PASSWORD:?}
       PHECLOUD_BROWSER_SECRET: ${PHECLOUD_BROWSER_SECRET:?}
+    volumes:
+      # what Firefox downloads is in Files, Downloads (if you set PHECLOUD_FILES_DIR, set PHECLOUD_DOWNLOADS_AT to <it>/Downloads)
+      - phecloud-downloads:${PHECLOUD_DOWNLOADS_AT:-/data/files/Downloads}
   browser:
     build: deploy/browser
     image: phe-browser:dev
@@ -20,6 +23,7 @@ services:
       - "${PHE_BROWSER_UDP:-59100-59120}:59100-59120/udp"
     volumes:
       - phecloud-browser:/home/neko/.config/mozilla   # sign-ins and settings: Cloud Companion's data, not the container's
+      - phecloud-downloads:/home/neko/Downloads        # only the Downloads folder of Files, nothing else of Cloud Companion's
     environment:
       PHE_BROWSER_SECRET: ${PHECLOUD_BROWSER_SECRET:?}
       PHE_BROWSER_BRIDGE: ws://phecloud:8080/phe/browser/ext
@@ -35,3 +39,4 @@ services:
     restart: unless-stopped
 volumes:
   phecloud-browser:
+  phecloud-downloads:

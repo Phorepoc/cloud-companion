@@ -4,7 +4,7 @@
 # Firefox's policies, with the way back to Cloud Companion, then Neko's own start.
 set -eu
 : "${PHE_BROWSER_SECRET:?}"; : "${PHE_BROWSER_BRIDGE:?}"
-chown -R neko:neko /home/neko/.config
+chown -R neko:neko /home/neko/.config; chown neko:neko /home/neko/Downloads
 # the memory this container may use (its limit, or the machine's), for how many tabs Firefox keeps loaded
 MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
 case $MEM in max|'') MEM=$(awk '/^MemTotal/ {print $2 * 1024}' /proc/meminfo) ;; esac
