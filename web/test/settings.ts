@@ -57,7 +57,7 @@ const pickTheme = async (name: string) => {
 }
 const openMusic = async () => { await openApp(page, 'Music'); await page.waitForSelector('#main .q-page') }
 assert.equal(await page.evaluate(() => document.documentElement.dataset.hdMode), 'hybrid', 'Hybrid is the default')
-assert((await pageBg()) > 180, 'Settings is light in Hybrid')
+assert((await pageBg()) < 40, 'Settings is black in Hybrid')
 await openMusic()
 assert((await pageBg()) < 40, 'Music is dark in Hybrid')
 const barBg = await page.evaluate(() => getComputedStyle(document.querySelector('.x-cl__bar')!).backgroundColor.match(/\d+/g)!.slice(0, 3).map(Number).reduce((a, b) => a + b) / 3)
@@ -111,6 +111,8 @@ await page.goto(BASE + '/#/settings/appearance')
 await openApp(page, 'Desktop')
 await page.waitForSelector('.x-win[data-win=settings] .x-sset').catch(async (e) => { await page.screenshot({ path: `${OUT}/settings-fail.png` }); throw e })
 await page.screenshot({ path: `${OUT}/settings-desktop-open.png` })
+const setBox = (await page.locator('.x-win[data-win=settings] .x-sset').boundingBox())!
+assert(setBox.height > 300 && setBox.width > 500, 'the dark Settings window fills its area')
 await page.evaluate(() => { location.hash = '#/connections' })
 await page.waitForSelector('.x-win[data-win=settings] .x-sset__page h1:has-text("Connections")')
 assert(await page.locator('[data-test=desktop]').isVisible(), 'still on the desktop')

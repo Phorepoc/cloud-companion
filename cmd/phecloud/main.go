@@ -10,8 +10,8 @@
 //	phecloud hub ...            personal hub: per-device app passwords (see hub.go)
 //	phecloud sip add <name>     a SIP login for a phone (prints its password once); sip list, sip rm <name> (docs/messaging.md)
 //
-// Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400), PHECLOUD_CHROME (chromium binary),
-// PHECLOUD_MAX_PAGE_H (page height cap in px, 8192), PHECLOUD_SIP_LISTEN (the SIP front, e.g. :5060; off when unset).
+// Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400),
+// PHECLOUD_SIP_LISTEN (the SIP front, e.g. :5060; off when unset).
 package main
 
 import (
@@ -110,16 +110,9 @@ func main() {
 	case "sip":
 		sipMain(st, os.Args[2:])
 	case "serve":
-		maxH, _ := strconv.Atoi(env("PHECLOUD_MAX_PAGE_H", "8192"))
 		log := slog.Default()
-		var br browser.Factory
-		if cdp, err := browser.NewCDP(os.Getenv("PHECLOUD_CHROME"), maxH, 2); err != nil {
-			log.Error("browser unavailable; everything else runs", "err", err)
-			br = browser.Unavailable{Err: err}
-		} else {
-			br = cdp
-		}
-		defer br.Close()
+		// no browser engine for now: pages get the reason, everything else runs
+		br := browser.Unavailable{Err: errors.New("the browser is being replaced and is not available right now")}
 		// a virgin server prints a first-owner code (or adopts PHECLOUD_FIRST_OWNER_CODE) so the first owner can register without a second command
 		webURL := env("PHECLOUD_PUBLIC_URL", "http://127.0.0.1:8080")
 		if err := store.FirstStart(st, strings.TrimSpace(os.Getenv("PHECLOUD_FIRST_OWNER_CODE")), webURL, os.Stderr, log); err != nil {

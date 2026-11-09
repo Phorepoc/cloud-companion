@@ -185,6 +185,7 @@ onMounted(load)
   background: #141414; color: #fff; box-shadow: var(--hd-shadow-overlay), -1px 0 0 rgba(255, 255, 255, 0.1);
   font-family: var(--ph-font);
 }
+.x-shell-panel--events .ph-events { width: 100%; box-shadow: none; } /* the shell's panel sets the width: a narrower panel left a black strip beside it */
 .ph-events__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--ph-s2); }
 .ph-events__day { display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
   font: var(--hd-font-weight-light) var(--ph-text-title)/1.2 var(--ph-font-light); }

@@ -13,6 +13,7 @@ The README has the quick start; this file has the long form. Measurements are fr
   4-byte big-endian length + CBOR map with a `"t"` type key. Frames: `challenge`, `pair`/`hello`, `welcome`,
   `error`, `open`, `navigate` (url | back | forward | reload), `input` (tap / scroll / text), `page`, `layers`, `tile`,
   `regions`, `done`.
+- **Removed 2026-11-09: the browser engine** (Chromium, Xvfb, chromedp). The UI and `browser.Factory` / `browser.Session` stay for its replacement; below is history.
 - **Cloud browser v1** (`internal/browser`, `internal/tiles`): headless Chromium through one adapter interface
   (`browser.Factory` / `browser.Session`; chromedp v0.11.2 is the only implementation). The page is rendered at
   360 px width, dpr 1, mobile UA, full height (cap 8192 px, `PHECLOUD_MAX_PAGE_H`), after a scroll pass that triggers

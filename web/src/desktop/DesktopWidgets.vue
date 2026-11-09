@@ -47,7 +47,7 @@
         <p v-if="mailOf(w).error" class="ph-wg__none">{{ mailOf(w).error }}</p>
         <p v-else-if="!mailOf(w).items.length" class="ph-wg__none">No mail.</p>
         <!-- the newest 20, read or not (unread marked), scrolling: as the Belle Mail widget -->
-        <div v-else class="ph-wg__list" data-test="widget-mail-list">
+        <div v-else v-scroll-thumb class="ph-wg__list" data-test="widget-mail-list">
           <button v-for="m in mailOf(w).items" :key="m.id" type="button" class="ph-wg__row" :class="{ 'is-unread': m.unread }" :disabled="editing" @click="emit('open', 'mail')">
             <span class="ph-wg__title">{{ m.from || '(no sender)' }}<span class="ph-wg__sec ph-wg__when">{{ mailTime(m.date) }}</span></span>
             <span class="ph-wg__sec ph-wg__line">{{ m.subject || '(no subject)' }}</span>
@@ -60,7 +60,7 @@
         <header class="ph-wg__head"><SectionTile :section="byId.calendar" :size="32" /><b>Today</b></header>
         <p v-if="cal.error" class="ph-wg__none">{{ cal.error }}</p>
         <p v-else-if="!today.length" class="ph-wg__none">Nothing planned today.</p>
-        <div v-else class="ph-wg__list">
+        <div v-else v-scroll-thumb class="ph-wg__list">
           <button v-for="e in today" :key="e.href || e.title + e.start" type="button" class="ph-wg__row" :disabled="editing" @click="emit('open', 'calendar')">
             <span class="ph-wg__title">{{ e.title || '(no title)' }}</span>
             <span class="ph-wg__sec ph-wg__line">{{ e.allday ? 'All day' : timeLabel(toDate(e.start)) }}{{ e.location ? ' · ' + e.location : '' }}</span>
@@ -73,7 +73,7 @@
         <header class="ph-wg__head"><SectionTile :section="byId.chats" :size="32" /><b>Chats</b></header>
         <p v-if="chats.error" class="ph-wg__none">{{ chats.error }}</p>
         <p v-else-if="!chats.items.length" class="ph-wg__none">No messages yet.</p>
-        <div v-else class="ph-wg__list">
+        <div v-else v-scroll-thumb class="ph-wg__list">
           <button v-for="c in chats.items" :key="c.key" type="button" class="ph-wg__row" :disabled="editing" @click="emit('open', 'chats')">
             <span class="ph-wg__title">{{ c.name || c.number }}<span class="ph-wg__sec ph-wg__when">{{ ago(now, c.last_ts) }}</span></span>
             <span class="ph-wg__sec ph-wg__line">{{ c.last_dir === 'out' ? 'You: ' : '' }}{{ c.last }}</span>
@@ -210,7 +210,7 @@
         <header class="ph-wg__rsshead"><span><b>{{ w.opt ? feedName(w.opt) : 'Feeds' }}</b><small>{{ w.opt ? 'Feed' : feedList.length === 1 ? feedList[0].title : feedList.length + ' feeds' }}</small></span>
           <button v-if="editing" type="button" class="ph-wg__arrow" aria-label="Pick the feed" title="Pick the feed" data-test="widget-feeds-pick" @pointerdown.stop @click="setting = w"><q-icon name="sym_o_settings" size="20px" /></button>
           <button v-else type="button" class="ph-wg__arrow" aria-label="Refresh" @click="loadFeeds"><q-icon name="sym_o_refresh" size="24px" /></button></header>
-        <div class="ph-wg__rssbody">
+        <div v-scroll-thumb class="ph-wg__rssbody">
           <p v-if="feedsError" class="ph-wg__rssnone">Could not load: {{ feedsError }}</p>
           <p v-else-if="!postsOf(w).length" class="ph-wg__rssnone">{{ feedList.length ? 'No posts yet.' : 'No feeds yet. Add them in Feeds.' }}</p>
           <button v-for="p in postsOf(w).slice(0, 20)" :key="p.id" type="button" class="ph-wg__rssrow" :class="{ 'is-read': !isUnread(p) }" :disabled="editing" data-test="widget-feed" @click="showPost(p); emit('open', 'feeds')">
@@ -247,7 +247,7 @@
         <header class="ph-wg__head"><SectionTile :section="byId.devices" :size="32" /><b>Devices</b></header>
         <p v-if="!state.admin" class="ph-wg__none">Only the owner sees the devices.</p>
         <p v-else-if="!devices.length" class="ph-wg__none">No devices yet.</p>
-        <div v-else class="ph-wg__list">
+        <div v-else v-scroll-thumb class="ph-wg__list">
           <button v-for="d in devices" :key="d.id" type="button" class="ph-wg__dev" :disabled="editing" @click="emit('open', 'devices')">
             <i class="ph-wg__devdot" :class="{ 'is-on': d.online }" /><span class="ph-wg__title">{{ d.name }}</span>
             <span class="ph-wg__sec">{{ d.online ? 'Connected' : d.seen ? 'Seen ' + ago(now, d.seen) : 'Never seen' }}</span></button>
@@ -318,6 +318,7 @@ import SectionTile from '../components/SectionTile.vue'
 import { quiet, loadEvents, eventsOn, loadMail, mailAccounts, loadChats, loadContacts, ago } from './glance'
 import { ymd } from '../dates'
 import WeatherPlaceDialog from './WeatherPlaceDialog.vue'
+import { vScrollThumb } from './scrollThumb'
 import { forecast, noPlace, weatherError, loadWeather, weatherIcon } from './weather'
 import { getPref, setPref } from '../prefs'
 import { BelleWidget, BelleGearDial } from '@etesian-design/shell'
@@ -650,9 +651,10 @@ const musicButtons = computed(() => [
 }
 .ph-wg__add:hover, .ph-wg__add:focus-visible { background: rgba(255, 255, 255, 0.1); }
 .ph-wg__add .q-icon { color: #4591FF; }
-/* the list widgets hold more than fits (up to 20) and scroll, with a thin scrollbar so there is clearly more */
-.ph-wg__list { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; margin: 0 -8px; padding: 0 8px;
-  scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.35) transparent; }
+/* the list widgets hold more than fits (up to 20) and scroll; no scrollbar, only the position indicator while scrolling (scrollThumb.ts) */
+.ph-wg__list { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; overscroll-behavior: contain; margin: 0 -8px; padding: 0 8px; }
+:deep(.ph-scrollthumb-list), .ph-scrollthumb-list { scrollbar-width: none; }
+.ph-scrollthumb-list::-webkit-scrollbar { display: none; }
 .ph-wg__list > .ph-wg__row { flex: none; }
 .ph-wg__row.is-unread .ph-wg__title { font-weight: 600; }
 .ph-wg__row.is-unread::before { content: ''; position: absolute; left: -2px; top: 14px; width: 6px; height: 6px; border-radius: 50%; background: #4591FF; }
@@ -728,4 +730,6 @@ const musicButtons = computed(() => [
 .ph-wg__mlt { position: relative; display: flex; gap: 10px; align-items: baseline; max-width: 100%; margin-top: 4px; font-size: 14px; white-space: nowrap; overflow: hidden; }
 .ph-wg__mlt u { color: #4A9BFF; font-size: 13px; text-decoration: none; }
 .ph-wg__mlctl { position: relative; margin-top: auto; margin-bottom: 10px; display: flex; align-items: center; gap: 18px; }
+.ph-wg__w :deep(.ph-scrollthumb), :deep(.ph-scrollthumb) { position: absolute; right: 2px; width: 3px; border-radius: 2px; background: rgba(128, 128, 128, 0.75); opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+:deep(.ph-scrollthumb.is-on) { opacity: 1; }
 </style>

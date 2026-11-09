@@ -82,7 +82,18 @@
   --q-dark-page: var(--hd-c-bg);
 }
 
-:root[data-hd-mode="dark"] {
+/* a dark section in Hybrid (Settings, Music, ...) sits under a light <html>: the colours that follow the mode resolve again there */
+[data-hd-mode="dark"], .hd-mode-dark {
+  --ph-bg: var(--hd-c-bg);
+  --ph-surface: var(--hd-c-surface);
+  --ph-surface-2: var(--hd-c-surface-raised);
+  --ph-divider: var(--hd-c-divider);
+  --ph-border: var(--hd-c-fg-tertiary);
+  --ph-text: var(--hd-c-fg);
+  --ph-text-muted: var(--hd-c-fg-secondary);
+  --ph-focus: var(--hd-c-focus);
+}
+[data-hd-mode="dark"], .hd-mode-dark {
   --ph-accent: #7FB0FF;
   --ph-on-accent: #0b1220;
   --ph-accent-soft: color-mix(in srgb, var(--ph-accent) 18%, var(--hd-c-surface));

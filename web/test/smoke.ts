@@ -3,11 +3,10 @@
 //
 // Playwright test of the web app, run against a live server:
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types smoke.ts
-// Environment: QUICK=1 stops after the tap test (used for the TLS proxy check); IGNORE_TLS=1 accepts a self-signed proxy cert.
+// Environment: QUICK=1 stops after the Browser page (used for the TLS proxy check); IGNORE_TLS=1 accepts a self-signed proxy cert.
 //
-// Pairs, opens example.com, taps the link on the canvas, tests zoom, then a page with an input, a select and three
-// JavaScript dialogs (keyboard overlay typing and Backspace, select chooser, alert/confirm/prompt), HTTP auth (wrong then
-// right password), the devices page (admin), settings, and a reload that re-authenticates from the stored key.
+// Pairs, opens the Browser page (no engine for now: it says so), the devices page (admin), settings, and a reload that
+// re-authenticates from the stored key.
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -84,190 +83,13 @@ try {
   assert(stored, 'device key must be stored in IndexedDB')
   step('device key stored in IndexedDB')
 
-  // 2. open example.com
-  await openUrl('https://example.com')
-  await waitTitle('Example Domain')
-  await idle()
-  await page.waitForTimeout(300)
-  assert.equal(await title(), 'Example Domain')
-  step('example.com loaded')
-  await page.screenshot({ path: OUT + '/web-example.png' })
-
-  // 3. scroll + tap the link on the canvas
-  await tapRegion('Learn more')
-  await waitTitle('Example Domains')
-  await idle()
-  assert(await S(() => window.__phe.state.page.back), 'history: back must be available')
-  step('tapped the link: title is now ' + (await title()))
-  await page.waitForTimeout(300)
-  await page.screenshot({ path: OUT + '/web-after-tap.png' })
-
-  // 4. back button
-  await page.click(BACK)
-  await waitTitle('Example Domain')
-  await idle()
-  step('back button works')
-
-  if (QUICK) { console.log('SMOKE PASS (quick)'); process.exit(0) }
-
-  // 5. zoom: the cloud re-renders at the nearest scale (sharp text); the tap still lands on the right region
-  assert((await S(() => window.__phe.state.features)).includes('zoom'), 'the server must advertise the zoom feature')
-  await menuItem('zoom-in')
-  await menuItem('zoom-in') // 1.25^2 = 1.56 -> the 150% render
-  await page.waitForFunction(() => window.__phe.state.page.zoom === 150, null, { timeout: 20000 })
-  await page.waitForFunction(() => !window.__phe.state.loading)
-  const ph = await S(() => window.__phe.state.page.h)
-  assert(ph > 918 * 1.4, 'the page is rendered 1.5x taller at 150%, got h=' + ph)
-  const z = await S(() => window.__phe.renderer.view.zoom)
-  assert(z > 1 && z < 1.1, 'the leftover local zoom is 1.5625/1.5, got ' + z)
-  await page.waitForTimeout(250)
-  await page.screenshot({ path: OUT + '/web-zoomed.png' })
-  await page.keyboard.press('Escape') // the zoom buttons leave the menu open; on a phone-wide window it covers the page
-  await page.waitForSelector('[data-test=browser-more]', { state: 'hidden' })
-  await tapRegion('Learn more')
-  await waitTitle('Example Domains')
-  await idle()
-  step('zoom: server render at 150%, page height ' + ph + ', tap correct')
-  await page.click(BACK)
-  await waitTitle('Example Domain')
-  await idle()
-  // ctrl + wheel zoom to the top of the ladder, then back out to 100%
-  const box = await page.locator('[data-test=canvas]').boundingBox()
-  assert(box, 'the canvas is laid out')
-  await page.mouse.move(box.x + 180, box.y + 200)
-  
-  await page.keyboard.down('Control')
-  await page.mouse.wheel(0, -100)
-  await page.keyboard.up('Control')
-  await page.waitForFunction(() => window.__phe.state.page.zoom === 300, null, { timeout: 20000 })
-  for (let i = 0; i < 9; i++) await menuItem('zoom-out')
-  await page.waitForFunction(() => window.__phe.state.page.zoom === 100, null, { timeout: 20000 })
-  await page.waitForFunction(() => !window.__phe.state.loading)
-  assert.equal(await S(() => window.__phe.renderer.view.zoom), 1)
-  step('ctrl+wheel -> 300% render, zoom-out -> back to 100%')
-
-  // 6. a page with an input, a select and dialogs
-  const html = readFileSync(new URL('./webgaps.html', import.meta.url), 'utf8')
-  await openUrl('data:text/html,' + encodeURIComponent(html))
-  await waitTitle('WebGaps')
-  await idle()
-
-  // keyboard overlay: tap the field, type, Backspace
-  await tapRegion(null, 'input')
-  await page.waitForSelector('[data-test=keyboard-overlay]')
-  await page.keyboard.type('abc')
-  await page.waitForFunction(() => window.__phe.state.focus.value === 'abc', null, { timeout: 10000 })
-  step('keyboard overlay: typed "abc", server field value is ' + (await S(() => window.__phe.state.focus.value)))
-  await page.keyboard.press('Backspace')
-  await page.waitForFunction(() => window.__phe.state.focus.value === 'ab', null, { timeout: 10000 })
-  step('keyboard overlay: Backspace -> "ab"')
-  await page.screenshot({ path: OUT + '/web-keyboard.png' })
-
-  // select chooser
-  await tapRegion(null, 'select')
-  await page.waitForSelector('[data-test=select-dialog]')
-  await page.locator('[data-test=select-dialog] .q-radio').nth(2).click()
-  await page.click('[data-test=select-ok]')
-  await page.waitForSelector('[data-test=select-dialog]', { state: 'detached' })
-  await page.waitForFunction(() => { const r = window.__phe.state.regions.find((g) => g.kind === 'select'); return r && r.opts?.[2]?.s }, null, { timeout: 10000 })
-  step('select chooser: option "Three" selected on the server')
-
-  // alert
-  await tapRegion('alert')
-  await page.waitForSelector('[data-test=dialog]')
-  assert((await text('[data-test=dialog]')).includes('hello'))
-  await page.click('[data-test=dialog-ok]')
-  await page.waitForSelector('[data-test=dialog]', { state: 'detached' })
-  await waitTitle('alerted')
-  step('alert dialog: shown and accepted')
-  // confirm: cancel then ok
-  await tapRegion('confirm')
-  await page.waitForSelector('[data-test=dialog]')
-  assert((await text('[data-test=dialog]')).includes('sure?'))
-  await page.click('[data-test=dialog-cancel]')
-  await page.waitForSelector('[data-test=dialog]', { state: 'detached' })
-  await waitTitle('no')
-  await tapRegion('confirm')
-  await page.waitForSelector('[data-test=dialog]')
-  await page.click('[data-test=dialog-ok]')
-  await page.waitForSelector('[data-test=dialog]', { state: 'detached' })
-  await waitTitle('yes')
-  step('confirm dialog: cancel -> "no", ok -> "yes"')
-  // prompt
-  await tapRegion('ask')
-  await page.waitForSelector('[data-test=dialog]')
-  assert.equal(await page.inputValue('[data-test=dialog-text]'), 'def')
-  await page.fill('[data-test=dialog-text]', 'Zed')
-  await page.click('[data-test=dialog-ok]')
-  await page.waitForSelector('[data-test=dialog]', { state: 'detached' })
-  await waitTitle('Zed')
-  step('prompt dialog: default shown, answer "Zed" reached the page')
-  await page.screenshot({ path: OUT + '/web-dialogs.png' })
-
-  // 7. HTTP authentication: a wrong password is asked again, the right one is accepted
-  await openUrl('https://httpbin.org/basic-auth/zed/pw')
-  await page.waitForSelector('[data-test=dialog-user]', { timeout: 30000 })
-  assert((await text('[data-test=dialog]')).includes('httpbin.org'))
-  await page.fill('[data-test=dialog-user]', 'zed')
-  await page.fill('[data-test=dialog-pass]', 'wrong')
-  await page.screenshot({ path: OUT + '/web-auth.png' })
-  const firstId = await S(() => window.__phe.state.dialogs[0].id)
-  await page.click('[data-test=dialog-ok]')
-  // the server rejected the password: a NEW auth dialog (another id) is asked
-  await page.waitForFunction((id) => window.__phe.state.dialogs.length > 0 && window.__phe.state.dialogs[0].id !== id, firstId, { timeout: 30000 })
-  await page.waitForSelector('[data-test=dialog-user]')
-  await page.fill('[data-test=dialog-user]', 'zed')
-  await page.fill('[data-test=dialog-pass]', 'pw')
-  await page.click('[data-test=dialog-ok]')
-  await page.waitForSelector('[data-test=dialog]', { state: 'detached', timeout: 30000 })
-  await page.waitForFunction(() => window.__phe.state.dialogs.length === 0)
-  await page.waitForTimeout(3000)
-  assert.equal(await S(() => window.__phe.state.dialogs.length), 0, 'no further auth prompt after the right password')
-  await idle()
-  step('auth dialog: wrong password asked again, right password accepted')
-
-  // 7b. several tabs over one connection: three at most
-  assert((await S(() => window.__phe.state.features)).includes('tabs'))
-  await menuItem('tab-new')
-  await page.waitForFunction(() => window.__phe.state.tabs.length === 2 && window.__phe.state.activeView === 2)
-  await openUrl('https://example.com')
-  await waitTitle('Example Domain')
-  await idle()
-  await menuItem('tab-new')
-  await page.waitForFunction(() => window.__phe.state.tabs.length === 3 && window.__phe.state.activeView === 3)
-  const gaps = readFileSync(new URL('./webgaps.html', import.meta.url), 'utf8')
-  await openUrl('data:text/html,' + encodeURIComponent(gaps))
-  await waitTitle('WebGaps')
-  await idle()
-  await more()
-  assert.equal(await page.locator('[data-test=tab-new]').getAttribute('aria-disabled'), 'true', 'the fourth tab must be refused (cap of 3)')
-  await page.keyboard.press('Escape')
-  await page.screenshot({ path: OUT + '/web-tabs.png' })
-  await tabGo(2)
-  await waitTitle('Example Domain')
-  await idle()
-  await tabGo(1)
-  await page.waitForFunction(() => window.__phe.state.activeView === 1 && window.__phe.state.page.url.includes('httpbin.org'), null, { timeout: 20000 })
-  await tabGo(3)
-  await waitTitle('WebGaps')
-  await tabClose(2)
-  await page.waitForFunction(() => window.__phe.state.tabs.length === 2)
-  await menuItem('tab-new')
-  await page.waitForFunction(() => window.__phe.state.tabs.length === 3)
-  step('tabs: three tabs, fourth refused, switching re-shows each page, close and new work')
-
-  // the page in the new tab, to check that Browser shows it again after visiting other sections (below)
-  await openUrl('https://example.com')
-  await waitTitle('Example Domain')
-  await idle()
-  await page.waitForTimeout(600)
-  // dark pixels on the canvas: the page's text
-  const ink = () => page.evaluate(() => {
-    const c = document.querySelector('[data-test=canvas]') as HTMLCanvasElement; const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data
-    let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 160) n++
-    return n
-  })
-  assert((await ink()) > 1000, 'the page is drawn')
+  // 2. no browser engine for now: the Browser page still opens, and says so when a page is asked for
+  await page.goto(BASE + '/#/browse')
+  await page.waitForSelector('[data-test=browser-frame]')
+  await page.evaluate(() => window.__phe.api.open('https://example.com/'))
+  await page.locator('[role=alert]', { hasText: 'being replaced' }).waitFor({ timeout: 15000 })
+  step('Browser page: the UI is there and says the engine is being replaced')
+  if (QUICK) { console.log('SMOKE PASS'); await browser.close(); process.exit(0) }
 
   // 8. devices page (the first/--admin device)
   await openApp(page, 'Settings'); await page.click('.x-sset__side .hd-list-item:has-text("Devices")')
@@ -290,13 +112,6 @@ try {
   await page.waitForFunction(() => document.body.classList.contains('body--dark'))
   await page.locator('[data-test=theme]').getByRole('button', { name: 'Match system', exact: true }).click()
   step('theme toggle: dark mode applies and system mode restores')
-  // back to Browser: the page is drawn again from the tiles already received (the server does not send them twice)
-  await openApp(page, 'Browser')
-  await page.waitForSelector('[data-test=canvas]')
-  await page.waitForTimeout(400)
-  assert((await ink()) > 1000, 'Browser shows the page again after visiting other sections')
-  step('back to Browser: the page is still drawn')
-
   // 10. reload: the stored key authenticates without pairing again
   await page.goto(BASE + '/#/browse')
   await page.reload()

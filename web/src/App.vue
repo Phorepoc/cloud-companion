@@ -88,6 +88,5 @@ watch(() => !!creds.value, (on, was) => { if (was && !on && route.path !== '/pai
 /* outline and flat accent buttons read as the light accent on a dark surface (Dark, or a media app in Hybrid) */
 [data-hd-mode="dark"] .q-btn--outline.text-primary, [data-hd-mode="dark"] .q-btn--flat.text-primary { color: var(--hd-c-accent-text) !important; }
 /* a desktop window in its own colour mode (a media app in Hybrid) fills its area, as the page itself would */
-.ph-page-mode { min-height: 100%; }
-.ph-win__layout .ph-page-mode, .ph-page-mode > .q-layout { height: 100%; }
+.ph-page-mode, .ph-page-mode > .q-layout { width: 100%; height: 100%; }
 </style>

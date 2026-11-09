@@ -12,8 +12,8 @@ const KEY = 'phecloud-theme'
 export type ThemeChoice = 'hybrid' | 'system' | 'light' | 'dark'
 export const theme = ref<ThemeChoice>('hybrid')
 
-// the sections the N9 drew inverted (black): its Music, Gallery and Camera/Video apps
-const MEDIA = new Set(['music', 'photos', 'android'])
+// the sections drawn inverted (black) in Hybrid: Music, Photos, Android and Settings
+const MEDIA = new Set(['music', 'photos', 'android', 'settings'])
 
 // pageMode is the colour mode of one section's page: dark for a media app in Hybrid, otherwise the page follows <html>
 export function pageMode(id: string | undefined): 'dark' | undefined {

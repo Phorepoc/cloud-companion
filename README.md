@@ -12,8 +12,8 @@ Cloud Companion is a [Phorepoc](https://github.com/Phorepoc) project, and one of
 revival) and [Etesian](https://etesian-design.com) (the design language) meet: its web desktop wears the Etesian look,
 and Phorepoc OS phones get a few extras, like pairing and the Catalogue store. Neither is needed to use it.
 
-- **A browser in the cloud.** Old phone browsers can't open most websites anymore. The server opens the page in
-  Chromium instead and sends the phone pictures of it, over a compact encrypted connection.
+- **A browser in the cloud** (being replaced, not available right now). Old phone browsers can't open most websites
+  anymore, so the server is to open them for you.
 - **A messaging gateway.** Your SIP or XMPP phone, or the web app, can reach SMS, Matrix, XMPP, IRC, Nextcloud Talk,
   Signal and Telegram, and you decide which address goes where.
 - **A web app** you can install on any device, with a browser, your text messages (sent through your own phone), mail,
@@ -221,8 +221,7 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
   and [mathutil](https://gitlab.com/cznic/mathutil), [bigfft](https://github.com/remyoudompheng/bigfft);
   [pgx](https://github.com/jackc/pgx), [puddle](https://github.com/jackc/puddle), [pgpassfile](https://github.com/jackc/pgpassfile),
   [pgservicefile](https://github.com/jackc/pgservicefile); [go-sql-driver/mysql](https://github.com/go-sql-driver/mysql)
-- Web and browser: [chromedp](https://github.com/chromedp/chromedp), [cdproto](https://github.com/chromedp/cdproto) and
-  [sysutil](https://github.com/chromedp/sysutil); [coder/websocket](https://github.com/coder/websocket); [gobwas ws](https://github.com/gobwas/ws),
+- Web and browser: [coder/websocket](https://github.com/coder/websocket); [gobwas ws](https://github.com/gobwas/ws),
   [httphead](https://github.com/gobwas/httphead) and [pool](https://github.com/gobwas/pool)
 - Encoding, compression and tools: [fxamacker/cbor](https://github.com/fxamacker/cbor), [x448/float16](https://github.com/x448/float16),
   [go-faster jx](https://github.com/go-faster/jx), [errors](https://github.com/go-faster/errors) and [xor](https://github.com/go-faster/xor),
@@ -254,9 +253,6 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 - [Caddy](https://caddyserver.com), [Traefik](https://traefik.io), [PostgreSQL](https://www.postgresql.org), [MariaDB](https://mariadb.org),
   [docker-socket-proxy](https://github.com/Tecnativa/docker-socket-proxy), [nginx](https://nginx.org), [PHP](https://www.php.net),
   [Docker](https://www.docker.com)
-- [Chromium](https://www.chromium.org) as [Debian](https://www.debian.org) packages it, on [Xvfb](https://www.x.org), with the
-  [Liberation](https://github.com/liberationfonts/liberation-fonts), [DejaVu](https://dejavu-fonts.github.io) and
-  [Noto](https://notofonts.github.io) fonts
 - Android: [Redroid](https://github.com/remote-android/redroid-doc), the [Android Open Source Project](https://source.android.com)
   and its SDK tools, [Gradle](https://gradle.org), [Eclipse Temurin](https://adoptium.net) and [scrcpy](https://github.com/Genymobile/scrcpy)
 - The base systems under all of them: [Debian](https://www.debian.org), [Alpine Linux](https://alpinelinux.org), [Node.js](https://nodejs.org),

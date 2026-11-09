@@ -22,7 +22,7 @@ docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ip
 # (the desktop view and the Etesian theme: web/test/desktop.sh. It needs a secure origin (localhost) for the Android window, so it
 # has its own run, as in CI.)
 
-# HTTPS through the Caddy reverse proxy (compose profile "tls", internal CA): pair, open example.com, tap the link over wss
+# HTTPS through the Caddy reverse proxy (compose profile "tls", internal CA): pair and open the Browser page over wss
 if [ "${TLS_CHECK:-1}" = 1 ]; then
     echo "== HTTPS via Caddy (profile tls)"
     PHECLOUD_HTTPS_PORT=18443 PHECLOUD_DOMAIN=caddy CADDYFILE=./deploy/Caddyfile.local $DC --profile tls up -d caddy >/dev/null 2>&1
@@ -33,7 +33,7 @@ if [ "${TLS_CHECK:-1}" = 1 ]; then
         mcr.microsoft.com/playwright:v1.49.1-noble sh -c 'npm install --no-audit --no-fund --silent && node --experimental-strip-types --no-warnings=ExperimentalWarning smoke.ts'
 fi
 
-# two devices at once: the "tabs on your devices" list (Browser section)
+# two devices at once: signing one out from the other
 echo "== tabs across devices"
 CA=$(docker exec phe-cloud phecloud paircode --admin 2>/dev/null); CB=$(docker exec phe-cloud phecloud paircode 2>/dev/null)
 docker run --rm --name phe-playwright --cpus 2 --memory 2g --network "$NET" --ipc=host \

@@ -30,10 +30,13 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { myPlace, setMyPlace, searchPlaces, loadWeather, type Place } from './weather'
+import { useRouter } from 'vue-router'
+import { state } from '../cloud'
+import { myPlace, setMyPlace, searchPlaces, loadWeather, noPlace, type Place } from './weather'
 
 defineProps<{ modelValue: boolean }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
+const router = useRouter()
 const query = ref(''), places = ref<Place[]>([]), note = ref(''), mine = ref(false)
 let timer = 0, asked = 0
 
@@ -50,7 +53,14 @@ async function find() {
   } catch (e) { if (n === asked) { places.value = []; note.value = (e as Error).message } }
 }
 function first() { if (places.value.length) pick(places.value[0]) }
-function pick(p: Place | null) { setMyPlace(p); emit('update:modelValue', false); loadWeather() }
+async function pick(p: Place | null) {
+  setMyPlace(p)
+  await loadWeather()
+  // no default place yet: this is where it is set; a device that cannot set it is told so
+  if (!p && noPlace.value && !state.admin) { note.value = 'The server has no default place yet. Pick a town above, or ask its owner to set one.'; return }
+  emit('update:modelValue', false)
+  if (!p && noPlace.value) router.push('/settings/weather')
+}
 </script>
 
 <style scoped>

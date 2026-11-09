@@ -129,7 +129,7 @@ jobs:
       matrix:
         include:
           - group: desktop
-            suites: desktop browserinput widgets feeds settings shapes
+            suites: desktop widgets feeds settings shapes
           - group: sign-in
             suites: csp passkey oauth proxy
           - group: chats

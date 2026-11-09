@@ -31,17 +31,12 @@ FROM build AS fakes
 RUN GOARCH=$TARGETARCH go build -trimpath -o /usr/local/bin/fakesvc ./cmd/fakesvc
 ENTRYPOINT ["fakesvc"]
 
-# Chromium is an external runtime dependency (not vendored), pinned to one version.
-# The full browser (not headless-shell), in a window on a virtual display (Xvfb, started by the entrypoint).
 FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
-RUN apt-get update && apt-get install -y --no-install-recommends chromium=156.0.8078.79-1~deb13u1 xvfb \
-    ca-certificates fonts-liberation fonts-dejavu-core fonts-noto-core \
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 COPY --from=build /out/ /usr/local/bin/
-ENV PHECLOUD_TLSDIR=/data PHECLOUD_DB=/data/phecloud.db PHECLOUD_CHROME=/usr/bin/chromium
+ENV PHECLOUD_TLSDIR=/data PHECLOUD_DB=/data/phecloud.db
 VOLUME /data
 EXPOSE 7400 8080
-ENV DISPLAY=:99
-# a restarted container keeps /tmp: the old display's lock goes first, and the browser starts once the display is there
-ENTRYPOINT ["/bin/sh", "-c", "rm -f /tmp/.X99-lock /tmp/.X11-unix/X99; Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp >/dev/null 2>&1 & for i in $(seq 100); do [ -e /tmp/.X11-unix/X99 ] && break; sleep 0.1; done; exec /usr/local/bin/phecloud \"$@\"", "phecloud"]
+ENTRYPOINT ["/usr/local/bin/phecloud"]
 CMD ["serve"]

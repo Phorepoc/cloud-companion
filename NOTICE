@@ -5,7 +5,7 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE). Ev
 are part of the project and under the same licence.
 
 Third-party software built into the phecloud binary (Go modules, as reported by google/go-licenses for ./cmd/...; re-run in CI, see .github/workflows/ci.yml; test-only modules such as go-smtp are not shipped):
-  MIT:           gotd/td, gotd/ige, go-faster/jx, cenkalti/backoff, uber-go/atomic, multierr (Telegram); segmentio/asm (MIT-0), cespare/xxhash; chromedp, cdproto, sysutil; emersion go-imap, go-message, go-sasl; fxamacker/cbor; jackc pgx, pgpassfile, pgservicefile, puddle; golang-jwt/jwt; gobwas httphead, pool, ws;
+  MIT:           gotd/td, gotd/ige, go-faster/jx, cenkalti/backoff, uber-go/atomic, multierr (Telegram); segmentio/asm (MIT-0), cespare/xxhash; emersion go-imap, go-message, go-sasl; fxamacker/cbor; jackc pgx, pgpassfile, pgservicefile, puddle; golang-jwt/jwt; gobwas httphead, pool, ws;
                  aymerick/douceur; dustin/go-humanize; icholy/digest; rs/zerolog; mattn/go-colorable, go-isatty; tidwall/gjson, sjson, match, pretty; go-viper/mapstructure; josharian/intern; mailru/easyjson; philhofer/fwd; tinylib/msgp; x448/float16; modernc.org/libc
   BSD-3-Clause:  go-webauthn/webauthn and x/encoding/asn1; microcosm-cc/bluemonday; google/uuid; gorilla/css; rsc.io/qr, gotd/neo, go-faster/errors, xor, golang.org/x/exp (Telegram); filippo.io/edwards25519; golang.org/x/{crypto,net,sync,sys,text};
                  modernc.org/sqlite, memory, mathutil; remyoudompheng/bigfft
@@ -21,9 +21,8 @@ web/src/css/etesian/ with their licence) and its @etesian-design/tokens, vue and
 Third-party software in the phone client (client/): mbedTLS (Apache-2.0 OR GPL-2.0-or-later; used under Apache-2.0), libpng (libpng licence) and libjpeg-turbo (BSD-3-Clause / IJG) in the
 Symbian web-engine plug-in builds. The C client core (client/phc*.c) is ours.
 
-Container images. The phecloud image contains Chromium headless-shell (chromedp/headless-shell, BSD-3-Clause and the Chromium third-party licences) and the fonts Liberation, DejaVu and Noto
-(SIL OFL / free licences). Separate containers that the compose files can start, each under its own licence and not part of this project: Stalwart Mail Server (AGPL-3.0), Z-Push (AGPL-3.0),
+Container images. The phecloud image is Debian with CA certificates and the phecloud binary. Separate containers that the compose files can start, each under its own licence and not part of this project: Stalwart Mail Server (AGPL-3.0), Z-Push (AGPL-3.0),
 Radicale (GPL-3.0), Conduit (Apache-2.0, Matrix tests only), Prosody (MIT, XMPP tests only), Ergo (MIT, IRC tests only), Nextcloud and Talk (AGPL-3.0, Nextcloud Talk and remote files tests only), Seafile (AGPL-3.0 server, remote files tests only) with Redis (RSALv2/SSPLv1/AGPLv3, tests only), curl (curl licence, tests only), rclone (MIT, WebDAV tests only), async-upnp-client (Apache-2.0, DLNA tests only) on Python (PSF-2.0), Immich (AGPL-3.0, photos tests only) with Valkey (BSD-3-Clause) and its PostgreSQL image with VectorChord (AGPL-3.0 / ELv2) and pgvecto.rs (Apache-2.0), tests only, signal-cli-rest-api (MIT) with signal-cli (GPL-3.0) in the optional "signal" profile, slixmpp (MIT, XMPP front tests only), Caddy (Apache-2.0), PostgreSQL (PostgreSQL licence), MariaDB (GPL-2.0), tecnativa/docker-socket-proxy, Redroid and the Android it runs (Apache-2.0 and Android's component licences), Asterisk from Alpine's package (GPL-2.0).
-Optional runtime downloads, never shipped by us: the scrcpy server jar (Apache-2.0), adb from Debian (Apache-2.0), Taskbar from F-Droid (Apache-2.0), and the apps a user installs.
+Optional runtime downloads, never shipped by us: the scrcpy server jar (Apache-2.0), adb from Debian (Apache-2.0), and the apps a user installs.
 
 The services in the Docker images are separate programs that talk to phecloud over network protocols; nothing AGPL or GPL is linked into the phecloud binary.
