@@ -27,6 +27,7 @@ export interface AppState {
   tabs: TabInfo[]
   activeView: number
   sessions: SessionInfo[]
+  sent: { url: string; title: string; from: string }[] // pages other devices sent here, not answered yet
   features: string[]
   settings: { q: number; gray: boolean }
   viewport: { w: number; h: number; phone: boolean } // the size pages are laid out at in the cloud (the window's, or the phone's 360 x 640)
@@ -48,6 +49,7 @@ export const state = reactive<AppState>({
   adminError: '',
   tabs: [],                 // the views of this connection: [{v, title, url}]
   activeView: 1,
+  sent: [],
   sessions: [],             // the connected devices and their tabs (for the "other devices" list)
   features: [],             // optional server features from the welcome frame (zoom, tabs)
   settings: { q: 70, gray: false },
@@ -156,6 +158,9 @@ function onFrame(f: ServerFrame) {
       if (/admin only/.test(f.msg)) state.adminError = f.msg
       break
     case 'pong':
+      break
+    case 'sent':
+      state.sent.push({ url: f.url, title: f.title || '', from: f.from })
       break
   }
 }
@@ -274,7 +279,7 @@ export const api = {
   zoom: (pct: number) => client && client.zoom(pct),
   tab: (action: string, v?: number) => client && client.tab(action, v),
   sessions: () => client && client.send({ t: 'sessions' }),
-  remote: (msg: { sid: number; action: 'close' | 'open'; view?: number; url?: string }) => client && client.send({ t: 'remote', ...msg }),
+  remote: (msg: { sid: number; action: 'close' | 'open' | 'send'; view?: number; url?: string; title?: string }) => client && client.send({ t: 'remote', ...msg }),
   settings(q: number, gray: boolean) {
     state.settings.q = q
     state.settings.gray = gray

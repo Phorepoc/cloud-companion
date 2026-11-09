@@ -6,7 +6,7 @@ import { reactive } from 'vue'
 import { NekoClient, mount } from '@m1k1o/neko'
 import { apiCall } from './cloud'
 
-export interface FxTab { id: number; title: string; url: string; active: boolean; loading: boolean }
+export interface FxTab { id: number; title: string; url: string; active: boolean; loading: boolean; mobile?: boolean }
 export const engine = reactive({
   status: 'idle' as 'idle' | 'insecure' | 'unconfigured' | 'connecting' | 'live' | 'failed',
   up: false, tabs: [] as FxTab[], busy: false, zoom: 1, note: '',
@@ -15,6 +15,7 @@ export const engine = reactive({
 let client: NekoClient | null = null, ws: WebSocket | null = null, unmount: (() => void) | null = null
 let stopped = true, watchdog: ReturnType<typeof setTimeout> | undefined, busyTimer: ReturnType<typeof setTimeout> | undefined
 let box: HTMLElement | null = null
+let pending = '' // a page to open once Firefox's extension is there (one sent from another device)
 
 export const activeTab = () => engine.tabs.find((t) => t.active)
 export function command(m: Record<string, unknown>) {
@@ -26,13 +27,19 @@ export function act(m: Record<string, unknown>) {
   clearTimeout(busyTimer); busyTimer = setTimeout(() => { engine.busy = false }, 5000)
   command(m)
 }
+/** opens a page in a new tab of Firefox: now, or as soon as the Browser page is connected */
+export function openPage(url: string) {
+  if (ws?.readyState === WebSocket.OPEN && engine.up) act({ c: 'newTab', url })
+  else pending = url
+}
+function flush() { if (pending && ws?.readyState === WebSocket.OPEN && engine.up) { const u = pending; pending = ''; act({ c: 'newTab', url: u }) } }
 /** keys go to the page again (after the address field had them) */
 export function focusPage() { box?.querySelector('textarea')?.focus({ preventScroll: true }) }
 
 function onBridge(e: MessageEvent) {
   const m = JSON.parse(e.data)
   if (m.t === 'tabs') { engine.tabs = m.tabs; if (!m.tabs.some((t: FxTab) => t.loading)) engine.busy = false }
-  else if (m.t === 'engine') engine.up = m.up
+  else if (m.t === 'engine') { engine.up = m.up; flush() }
   else if (m.t === 'zoom') engine.zoom = m.factor
   else if (m.t === 'nav') { if (m.state === 'start') engine.busy = true; else if (m.state !== 'commit') engine.busy = false }
   else if (m.t === 'download') engine.note = m.state === 'complete' ? 'Download finished' : m.state === 'interrupted' ? 'Download failed' : 'Downloading…'

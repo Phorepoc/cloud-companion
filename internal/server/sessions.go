@@ -93,6 +93,16 @@ func (s *session) remote(raw []byte) error {
 	if target == nil || !mayReach(s, target) {
 		return errors.New("that device is no longer connected")
 	}
+	if r.Action == "send" {
+		if r.URL == "" {
+			return errors.New("there is no page to send")
+		}
+		from := s.devName
+		if from == "" {
+			from = s.dev
+		}
+		return target.c.send(proto.Sent{T: proto.TSent, URL: r.URL, Title: r.Title, From: from})
+	}
 	var op func(ctx context.Context) error
 	switch r.Action {
 	case "close":

@@ -2,7 +2,7 @@
 // What a person does on the Browser page, against real Firefox, with the web app's real CSP.
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'
-const { BASE, CODE, OUT } = process.env as Record<string, string>
+const { BASE, CODE, CODE2, OUT } = process.env as Record<string, string>
 const SITE = 'http://site/'
 const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
 const ctx = await b.newContext({ viewport: { width: 1280, height: 860 } })
@@ -46,6 +46,20 @@ try {
   await until(async () => (await tabCount()) === n, 'closing them'); await p.keyboard.press('Escape'); step('closing them from Tabs on your devices')
   await p.waitForTimeout(500); await p.click(".x-bf__row [aria-label^='More']"); await p.click('[data-test=zoom-in]')
   await until(async () => (await p.textContent('[data-test=zoom-pct]')) === '125%', 'zoom'); await p.click('[data-test=zoom-out]'); await p.keyboard.press('Escape'); step('Zoom')
+  // Desktop site off: the phone version of sites, in the request and to the page's scripts; on again: the desktop one
+  await go(SITE + 'ua'); await until(async () => (await title()) === 'header-desktop script-desktop', 'desktop ua')
+  await more('desktop-site'); await until(async () => (await title()) === 'header-mobile script-mobile', 'mobile ua')
+  await more('desktop-site'); await until(async () => (await title()) === 'header-desktop script-desktop', 'desktop ua again'); step('Desktop site switches the tab between the phone and desktop versions')
+  // Send to device: a second device (its own browser context) is asked, and opens the page in the Browser
+  const ctx2 = await b.newContext({ viewport: { width: 400, height: 800 } }); const q = await ctx2.newPage()
+  await q.goto(BASE + '/#/pair'); await q.fill('[data-test=code]', CODE2); await q.click('[data-test=pair]'); await q.waitForURL(/#\/(?!pair)/, { timeout: 30000 })
+  await go(SITE + 'two.html'); await until(async () => (await title()) === 'probe two', 'two')
+  await more('send-device'); await p.locator('[data-test=send-dialog] [data-test^=send-btn-]').first().click({ timeout: 10000 })
+  await q.waitForSelector('[data-test=sent-dialog]', { timeout: 10000 }); assert.match(await q.textContent('[data-test=sent-dialog]') || '', /two\.html|probe two/)
+  const before = await tabCount()
+  await q.click('[data-test=sent-open]'); await q.waitForURL(/#\/browse/)
+  await until(async () => (await tabCount()) === before + 1, 'the sent page opens in a new tab'); step('Send to device: the other device asks, and opens it in the Browser')
+  await ctx2.close()
   await p.screenshot({ path: OUT + '/browser-end.png' })
   console.log('BROWSER PASS')
 } catch (e) { await p.screenshot({ path: OUT + '/browser-fail.png' }).catch(() => {}); console.log(errs.slice(-8).join('\n').slice(0, 900)); throw e } finally { await b.close() }

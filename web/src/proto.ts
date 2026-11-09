@@ -57,11 +57,12 @@ export interface TabsFrame { t: 'tabs'; active: number; list?: TabInfo[] }
 export interface SessionListFrame { t: 'sessionlist'; list?: SessionInfo[] }
 export interface ErrorFrame { t: 'error'; msg: string }
 export interface PongFrame { t: 'pong' }
+export interface SentFrame { t: 'sent'; url: string; title?: string; from: string }
 export interface ChallengeFrame { t: 'challenge'; nonce: Uint8Array }
 export interface HubResFrame extends HubResult { t: 'hubres'; id: number; ok: boolean; err?: string }
 
 export type ServerFrame = WelcomeFrame | PageFrame | TileFrame | LayersFrame | RegionsFrame | FocusFrame | DoneFrame | DialogFrame | DownloadFrame
-  | DeviceListFrame | TabsFrame | SessionListFrame | ErrorFrame | PongFrame | ChallengeFrame | HubResFrame
+  | DeviceListFrame | TabsFrame | SessionListFrame | ErrorFrame | PongFrame | ChallengeFrame | HubResFrame | SentFrame
 
 // ---- the personal hub (contacts, calendar, mail) ----
 

@@ -26,6 +26,7 @@
       </template>
     </XShell>
     <ToastHost />
+    <SentHost />
   </div>
 </template>
 
@@ -43,6 +44,7 @@ import BrandLogo from '../components/BrandLogo.vue'
 import { HdTheme } from '@etesian-design/vue'
 import { pageMode } from '../theme'
 import ToastHost from '../components/ToastHost.vue'
+import SentHost from '../components/SentHost.vue'
 import EventsPanel from './EventsPanel.vue'
 import DesktopWidgets from './DesktopWidgets.vue'
 import { loadUnread } from './glance'

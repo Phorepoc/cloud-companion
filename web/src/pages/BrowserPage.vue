@@ -14,6 +14,11 @@
           <q-list dense style="min-width: 220px">
             <q-item clickable v-close-popup data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
             <q-item clickable v-close-popup data-test="other-devices" @click="othersOpen = true"><q-item-section>Tabs on your devices</q-item-section></q-item>
+            <q-item clickable v-close-popup :disable="!activeTab()?.url || shown(activeTab()?.url) === ''" data-test="send-device" @click="openSend"><q-item-section>Send to device</q-item-section></q-item>
+            <q-item clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(desktopSite)" :disable="!activeTab()" data-test="desktop-site" @click="toggleSite">
+              <q-item-section>Desktop site</q-item-section>
+              <q-item-section side><q-toggle :model-value="desktopSite" dense tabindex="-1" aria-hidden="true" @click.stop="toggleSite" /></q-item-section>
+            </q-item>
             <q-item>
               <q-item-section>Zoom</q-item-section>
               <q-item-section side>
@@ -64,12 +69,31 @@
         <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- the page on another device: it asks there whether to open it in the Browser or in its own browser -->
+    <q-dialog v-model="sendOpen">
+      <q-card class="ph-dialog" data-test="send-dialog">
+        <q-card-section>
+          <h2>Send to device</h2>
+          <p class="ph-muted ph-small ph-ttitle">{{ activeTab()?.title || activeTab()?.url }}</p>
+          <HdStatusState v-if="!targets.length" state="empty" title="No other device is connected" text="Open Cloud Companion on the device you want to send this page to." />
+          <ul v-else class="ph-tablist">
+            <li v-for="s in targets" :key="s.sid" class="ph-trow" :data-test="'send-to-' + s.sid">
+              <span class="ph-ttext"><span class="ph-ttitle">{{ s.name || 'Device' }}</span></span>
+              <q-btn flat color="primary" label="Send" v-close-popup :data-test="'send-btn-' + s.sid" @click="sendTo(s)" />
+            </li>
+          </ul>
+        </q-card-section>
+        <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
+      </q-card>
+    </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { browserPrefs, setBrowserPref } from '../cloud'
+import { state, api, browserPrefs, setBrowserPref } from '../cloud'
+import { toast } from '../toast'
+import type { SessionInfo } from '../proto'
 import { HdStatusState } from '@etesian-design/vue'
 import { XBrowserFrame } from '@etesian-design/shell'
 import { engine, activeTab, act, command, focusPage, fitScreen, start, stop } from '../browserEngine'
@@ -86,7 +110,24 @@ const address = computed(() => typed.value || shown(activeTab()?.url))
 watch(() => activeTab()?.url, () => { typed.value = '' })
 const secure = computed(() => !address.value || address.value.startsWith('https:'))
 function toggleSide() { setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side') }
-function newTab() { act({ c: 'newTab' }); focusPage() }
+// a phone-sized window opens tabs with the phone version of sites, as a phone's browser does; "Desktop site" changes one tab
+const narrow = () => (stage.value?.getBoundingClientRect().width ?? window.innerWidth) < 600
+function newTab() { act({ c: 'newTab', mobile: narrow() }); focusPage() }
+const desktopSite = computed(() => !activeTab()?.mobile)
+function toggleSite() { const t = activeTab(); if (t) act({ c: 'site', id: t.id, mobile: !t.mobile }) }
+// one entry per other device (a device with two windows open is still one place to send to)
+const sendOpen = ref(false)
+const targets = computed(() => {
+  const seen = new Set<string>(state.sessions.filter((s) => s.self).map((s) => s.dev))
+  return state.sessions.filter((s) => !seen.has(s.dev) && (seen.add(s.dev), true))
+})
+function openSend() { sendOpen.value = true; api.sessions() }
+function sendTo(s: SessionInfo) {
+  const t = activeTab()
+  if (!t?.url) return
+  api.remote({ sid: s.sid, action: 'send', url: t.url, title: t.title })
+  toast('Sent to ' + (s.name || 'the device'))
+}
 function zoomBy(d: number) { command({ c: 'zoom', factor: Math.min(3, Math.max(0.3, engine.zoom + d)) }) }
 function go(a: string) {
   let u = a.trim()

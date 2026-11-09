@@ -18,6 +18,7 @@
       </q-page-container>
     </q-layout>
     <ToastHost />
+    <SentHost />
   </XClassic>
   <!-- pairing (and its recovery-code dialog, until it moves on): just the page -->
   <q-layout v-else view="hHh lpR fFf" class="ph-shell">
@@ -41,6 +42,7 @@ import { brand } from './brand'
 import BrandLogo from './components/BrandLogo.vue'
 import { pageMode } from './theme'
 import ToastHost from './components/ToastHost.vue'
+import SentHost from './components/SentHost.vue'
 import DesktopView from './desktop/DesktopView.vue'
 import { setLayout, DESKTOP_MIN_WIDTH } from './desktop/layout'
 import { listenForRemote } from './music'

@@ -2,12 +2,28 @@
 // SPDX-License-Identifier: Apache-2.0
 // Firefox's state for the Browser page, and the page's commands for Firefox, through Cloud Companion's server.
 let ws
+// "Desktop site" off: these tabs get the phone version of sites (Firefox for Android's user agent, in the requests and to scripts)
+const mobile = new Set()
+const MOBILE_UA = navigator.userAgent.replace(/\([^)]*rv:([\d.]+)\) Gecko\/\d+/, '(Android 14; Mobile; rv:$1) Gecko/$1')
 const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)) }
 async function tabs() {
   const all = await browser.tabs.query({})
-  send({ t: 'tabs', tabs: all.map((x) => ({ id: x.id, title: x.title, url: x.url, active: x.active, loading: x.status === 'loading' })) })
+  send({ t: 'tabs', tabs: all.map((x) => ({ id: x.id, title: x.title, url: x.url, active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id) })) })
 }
 for (const e of ['onCreated', 'onRemoved', 'onActivated', 'onUpdated', 'onMoved']) browser.tabs[e].addListener(tabs)
+browser.tabs.onRemoved.addListener((id) => mobile.delete(id))
+browser.webRequest.onBeforeSendHeaders.addListener((d) => {
+  if (!mobile.has(d.tabId)) return
+  for (const h of d.requestHeaders) if (h.name.toLowerCase() === 'user-agent') h.value = MOBILE_UA
+  return { requestHeaders: d.requestHeaders }
+}, { urls: ['<all_urls>'] }, ['blocking', 'requestHeaders'])
+const UA_PAGE = `(() => { const ua = ${JSON.stringify(MOBILE_UA)}, P = window.wrappedJSObject.Navigator.prototype
+  const get = (v) => ({ get: exportFunction(() => v, window), configurable: true })
+  Reflect.defineProperty(P, 'userAgent', get(ua)); Reflect.defineProperty(P, 'platform', get('Linux armv8l'))
+  Reflect.defineProperty(P, 'appVersion', get(ua.slice(8))); Reflect.defineProperty(P, 'maxTouchPoints', get(5)) })()`
+browser.webNavigation.onCommitted.addListener((d) => {
+  if (mobile.has(d.tabId)) browser.tabs.executeScript(d.tabId, { code: UA_PAGE, frameId: d.frameId, runAt: 'document_start' }).catch(() => {})
+})
 const nav = (state) => (d) => { if (!d.frameId) send({ t: 'nav', state, tab: d.tabId, url: d.url }) }
 browser.webNavigation.onBeforeNavigate.addListener(nav('start'))
 browser.webNavigation.onCommitted.addListener(nav('commit'))
@@ -20,7 +36,19 @@ const sendZoom = async (id) => send({ t: 'zoom', factor: await browser.tabs.getZ
 browser.tabs.onZoomChange.addListener((z) => send({ t: 'zoom', factor: z.newZoomFactor }))
 browser.tabs.onActivated.addListener((i) => sendZoom(i.tabId))
 const cmds = {
-  async newTab(m) { await browser.tabs.create(m.url ? { url: m.url } : {}) },
+  async newTab(m) {
+    if (!m.mobile) return void await browser.tabs.create(m.url ? { url: m.url } : {})
+    const t = await browser.tabs.create({}) // marked before its first request goes out
+    mobile.add(t.id)
+    if (m.url) await browser.tabs.update(t.id, { url: m.url })
+    tabs()
+  },
+  async site(m) {
+    const id = m.id ?? (await active()).id
+    if (m.mobile) mobile.add(id); else mobile.delete(id)
+    tabs()
+    await browser.tabs.reload(id, { bypassCache: true })
+  },
   async close(m) { await browser.tabs.remove(m.id) },
   async pick(m) { await browser.tabs.update(m.id, { active: true }) },
   async go(m) { await browser.tabs.update((await active()).id, { url: m.url }) },

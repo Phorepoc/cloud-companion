@@ -47,7 +47,8 @@ const (
 	TRevoke      = "revoke"      // C->S  (admin) revoke a device
 	TSessions    = "sessions"    // C->S  the connected devices and their tabs
 	TSessionList = "sessionlist" // S->C
-	TRemote      = "remote"      // C->S  close a tab on / open a tab on another connected device
+	TRemote      = "remote"      // C->S  close a tab on / open a tab on / send a page to another connected device
+	TSent        = "sent"        // S->C  a page another device sent here
 	TTab         = "tab"         // C->S  new | close | switch | list a view
 	THub         = "hub"         // C->S  contacts / calendar request (the personal hub)
 	THubRes      = "hubres"      // S->C  its answer
@@ -573,13 +574,23 @@ type SessionList struct {
 	List []SessionInfo `cbor:"list"`
 }
 
-// Remote: act on another connected device's tabs. Action = close (V = the view) | open (URL: a new tab on that device).
+// Remote: act on another connected device's tabs. Action = close (V = the view) | open (URL: a new tab on that device) |
+// send (URL, Title: offer the page to that device, which asks its user where to open it).
 type Remote struct {
 	T      string `cbor:"t"`
 	SID    int    `cbor:"sid"`
 	Action string `cbor:"action"`
 	V      int    `cbor:"view,omitempty"`
 	URL    string `cbor:"url,omitempty"`
+	Title  string `cbor:"title,omitempty"`
+}
+
+// Sent: a page another of the owner's devices sent to this one.
+type Sent struct {
+	T     string `cbor:"t"`
+	URL   string `cbor:"url"`
+	Title string `cbor:"title,omitempty"`
+	From  string `cbor:"from"`
 }
 
 // SMSMsg is one message a phone uploads. ID is the PHONE's own message id (the Symbian message server's TMsvId): uploading it again changes nothing.
