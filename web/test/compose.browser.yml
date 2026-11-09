@@ -6,3 +6,11 @@ services:
       - ./web/test/browsersite:/usr/share/nginx/html:ro
       - ./web/test/browsersite.conf:/etc/nginx/conf.d/default.conf:ro
       - ./web/test/browsersite-tls:/etc/nginx/tls:ro
+    networks:
+      default:
+        aliases: [site-bad]   # the same site under a name its certificate is not for: Firefox refuses it
+  browser:
+    environment:
+      PHE_BROWSER_CA: /opt/test-ca.pem   # the test CA, which signed the site's certificate: https://site is trusted
+    volumes:
+      - ./web/test/browsersite-tls/ca.pem:/opt/test-ca.pem:ro

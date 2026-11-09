@@ -12,6 +12,7 @@ export const engine = reactive({
   up: false, tabs: [] as FxTab[], busy: false, zoom: 1, note: '', saved: '',
   marks: [] as { id: string; title: string; url: string }[],
   history: [] as { url: string; title: string; at: number }[],
+  passkey: null as null | { id: string; kind: 'create' | 'get'; origin: string; site: string; options: Record<string, unknown> },
   pick: null as null | { id: string; accept: string; multiple: boolean; site: string }, // a page asks for files
 })
 ;(window as any).__pheBrowser = engine // tests read the tab list from here
@@ -46,6 +47,8 @@ function onBridge(e: MessageEvent) {
   else if (m.t === 'zoom') engine.zoom = m.factor
   else if (m.t === 'marks') engine.marks = m.list
   else if (m.t === 'history') engine.history = m.list
+  else if (m.t === 'passkey') engine.passkey = { id: m.id, kind: m.kind, origin: m.origin, site: m.site, options: m.options }
+  else if (m.t === 'passkeyDone') { if (engine.passkey?.id === m.id) engine.passkey = null }
   else if (m.t === 'pick') engine.pick = { id: m.id, accept: m.accept, multiple: !!m.multiple, site: m.site || '' }
   else if (m.t === 'picked') { if (engine.pick?.id === m.id) engine.pick = null }
   else if (m.t === 'nav') { if (m.state === 'start') engine.busy = true; else if (m.state !== 'commit') engine.busy = false }

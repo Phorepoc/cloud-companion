@@ -1,4 +1,4 @@
 {"manifest_version":2,"name":"Cloud Companion bridge","version":"1.0",
 "browser_specific_settings":{"gecko":{"id":"bridge@cloud-companion.local"}},
 "permissions":["bookmarks","history","tabs","webNavigation","webRequest","webRequestBlocking","downloads","storage","<all_urls>"],"background":{"scripts":["bg.js"]},
-"content_scripts":[{"matches":["<all_urls>"],"js":["pick.js"],"all_frames":true,"run_at":"document_start"}]}
+"content_scripts":[{"matches":["<all_urls>"],"js":["pick.js","passkey.js"],"all_frames":true,"run_at":"document_start"}]}

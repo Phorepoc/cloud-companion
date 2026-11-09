@@ -1,6 +1,8 @@
 // Copyright The Phorepoc Authors
 // SPDX-License-Identifier: Apache-2.0
 // A page's "choose a file" opens the picker of the device you are on (through the Browser page), not one of the server's disk.
+// (in a block: the content scripts share one scope)
+{
 let n = 0
 const waiting = new Map()
 function ask(input) {
@@ -33,3 +35,4 @@ browser.runtime.onMessage.addListener((m) => {
   input.dispatchEvent(new Event('input', { bubbles: true }))
   input.dispatchEvent(new Event('change', { bubbles: true }))
 })
+}

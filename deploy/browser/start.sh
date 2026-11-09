@@ -9,8 +9,10 @@ chown -R neko:neko /home/neko/.config; chown neko:neko /home/neko/Downloads
 MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
 case $MEM in max|'') MEM=$(awk '/^MemTotal/ {print $2 * 1024}' /proc/meminfo) ;; esac
 MEM_MB=$((MEM / 1048576))
+# PHE_BROWSER_CA: a CA certificate (PEM, a path inside the container) Firefox trusts too, for sites on your own network
+CA=''; [ -n "${PHE_BROWSER_CA:-}" ] && CA='"Certificates":{"Install":["'"$PHE_BROWSER_CA"'"]},'
 cat > /usr/share/firefox-esr/distribution/policies.json <<J
-{"policies":{"DisableAppUpdate":true,"DisableTelemetry":true,"DisableFirefoxStudies":true,"DontCheckDefaultBrowser":true,
+{"policies":{$CA"DisableAppUpdate":true,"DisableTelemetry":true,"DisableFirefoxStudies":true,"DontCheckDefaultBrowser":true,
 "OverrideFirstRunPage":"","OverridePostUpdatePage":"","Homepage":{"URL":"about:blank","StartPage":"previous-session"},
 "ExtensionSettings":{"bridge@cloud-companion.local":{"installation_mode":"force_installed","install_url":"file:///opt/bridge.xpi"}},
 "3rdparty":{"Extensions":{"bridge@cloud-companion.local":{"url":"$PHE_BROWSER_BRIDGE","secret":"$PHE_BROWSER_SECRET","memoryMB":$MEM_MB}}}}}

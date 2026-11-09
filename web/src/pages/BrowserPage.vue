@@ -98,6 +98,23 @@
         </q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- a site asks for a passkey: the device's own passkeys answer (passkeys.ts); without them, the site hears no -->
+    <q-dialog :model-value="!!engine.passkey" persistent>
+      <q-card v-if="engine.passkey" class="ph-dialog" data-test="passkey-dialog">
+        <q-card-section>
+          <h2>{{ engine.passkey.kind === 'create' ? 'Create a passkey' : 'Sign in with a passkey' }}</h2>
+          <template v-if="provider">
+            <p>{{ engine.passkey.site }} {{ engine.passkey.kind === 'create' ? 'wants to save a passkey' : 'asks for your passkey' }}. This device's passkeys answer; Cloud Companion keeps none.</p>
+          </template>
+          <p v-else data-test="passkey-none">This device can't offer its passkeys to the Browser yet (that needs the Etesian app, or the Cloud Companion helper on a computer). Sign in to {{ engine.passkey.site }} another way, such as a password.</p>
+          <p v-if="passkeyError" class="ph-err" role="alert">{{ passkeyError }}</p>
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat :label="provider ? 'Cancel' : 'OK'" :disable="passkeyBusy" data-test="passkey-cancel" @click="passkeyAnswer(null)" />
+          <q-btn v-if="provider" unelevated color="primary" :loading="passkeyBusy" label="Continue" data-test="passkey-go" @click="usePasskey" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <!-- a page's "choose a file": the files of this device, uploaded to Cloud Companion and handed to the page -->
     <q-dialog :model-value="!!engine.pick" persistent>
       <q-card v-if="engine.pick" class="ph-dialog" data-test="pick-dialog">
@@ -137,6 +154,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { state, api, apiUpload, browserPrefs, setBrowserPref } from '../cloud'
 import { toast } from '../toast'
+import { passkeyProvider } from '../passkeys'
 import { useRouter } from 'vue-router'
 import type { SessionInfo } from '../proto'
 import { HdStatusState } from '@etesian-design/vue'
@@ -144,6 +162,23 @@ import { XBrowserFrame } from '@etesian-design/shell'
 import { engine, activeTab, act, command, focusPage, fitScreen, start, stop } from '../browserEngine'
 
 const router = useRouter()
+// passkeys: the device's provider, if it has one
+const provider = computed(() => (engine.passkey ? passkeyProvider() : null))
+const passkeyBusy = ref(false), passkeyError = ref('')
+function passkeyAnswer(result: Record<string, unknown> | null, error = 'NotAllowedError') {
+  const p = engine.passkey
+  if (!p) return
+  command(result ? { c: 'passkeyDone', id: p.id, result } : { c: 'passkeyDone', id: p.id, error })
+  engine.passkey = null; passkeyError.value = ''; focusPage()
+}
+async function usePasskey() {
+  const p = engine.passkey, prov = provider.value
+  if (!p || !prov) return
+  passkeyBusy.value = true; passkeyError.value = ''
+  try { passkeyAnswer(await prov.request({ kind: p.kind, origin: p.origin, options: p.options })) }
+  catch (e) { passkeyError.value = (e as Error).message || 'The passkey was not used.' }
+  finally { passkeyBusy.value = false }
+}
 // bookmarks and history
 const savedOpen = ref(false), savedTab = ref<'marks' | 'history'>('marks'), savedQ = ref<string | null>('')
 const savedList = computed<{ id?: string; title: string; url: string }[]>(() => (savedTab.value === 'marks' ? engine.marks : engine.history))

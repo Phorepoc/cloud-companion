@@ -89,7 +89,7 @@ try {
   await until(() => p.evaluate(() => navigator.clipboard.readText().then((t) => t === 'from the device and back')), 'copy back to the device'); step('copy: text copied in the page reaches this device\'s clipboard')
   // a refused certificate: the address is https, but the bar does not show it as secure
   const notSecure = () => p.locator(".x-bf__row [aria-label='Not secure']").count().then((n) => n > 0)
-  await go('https://site/two.html')
+  await go('https://site-bad/two.html')
   await until(() => p.evaluate(() => (window as any).__pheBrowser.tabs.find((t: any) => t.active)?.security === 'broken'), 'certificate refused')
   assert(await notSecure(), 'a refused certificate shows Not secure'); await p.waitForTimeout(2000); await p.screenshot({ path: OUT + '/browser-cert.png' }); step('a refused certificate shows Not secure, not a lock')
   // the star bookmarks the page; Bookmarks and history lists it, with the pages visited, and removes it
@@ -103,6 +103,22 @@ try {
   await p.click('[data-test=saved-marks]'); await p.locator('[data-test=saved-dialog] [aria-label^=Remove]').first().click()
   await until(async () => !(await starred()), 'unstarred'); await p.keyboard.press('Escape'); step('Bookmarks and history: the bookmark and the visited pages, and removing it')
   await p.waitForTimeout(400)
+  // passkeys: a site's request reaches this device; with no passkey provider here the site hears no, with one it gets the answer
+  await go('https://site/passkey.html')
+  await until(async () => (await title()) === 'passkey', 'passkey page'); await p.waitForTimeout(800)
+  const press = async () => { await p.mouse.move(...await at(150, 100)); await p.mouse.down(); await p.mouse.up() }
+  await press()
+  await p.waitForSelector('[data-test=passkey-none]', { timeout: 10000 }); await p.click('[data-test=passkey-cancel]')
+  await until(async () => (await title()) === 'err NotAllowedError', 'no provider: not allowed'); step('passkey with no provider on this device: the site is told no, and can offer another way')
+  await p.evaluate(() => { const b = (s: string) => btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+    ;(window as any).phePasskeys = { request: async (r: any) => { (window as any).__pkAsked = r
+      return { id: 'Y3JlZA', rawId: 'Y3JlZA', type: 'public-key', response: { clientDataJSON: b(JSON.stringify({ type: 'webauthn.get', origin: r.origin, challenge: r.options.challenge })), authenticatorData: b('a'.repeat(37)), signature: b('s'.repeat(70)), userHandle: null } } } } })
+  await p.waitForSelector('[data-test=passkey-dialog]', { state: 'detached' }); await p.waitForTimeout(300)
+  await press(); await p.waitForSelector('[data-test=passkey-go]', { timeout: 10000 }); await p.click('[data-test=passkey-go]')
+  await until(async () => (await title()) === 'got Y3JlZA public-key https://site sig=70', 'the site got the credential')
+  const asked = await p.evaluate(() => (window as any).__pkAsked)
+  assert.equal(asked.origin, 'https://site'); assert.equal(asked.kind, 'get'); assert.equal(asked.options.rpId, 'site'); assert.equal(Buffer.from(asked.options.challenge, 'base64url').toString(), 'challenge-123')
+  step('passkey with this device\'s provider: it gets the site, the origin and the challenge, and the site gets the credential')
   // a page's file input asks this device for the file, and the page gets it
   await go(SITE + 'upload.html'); await until(async () => (await title()) === 'upload', 'upload page'); await p.waitForTimeout(800)
   await p.mouse.move(...await at(150, 100)); await p.mouse.down(); await p.mouse.up()

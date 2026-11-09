@@ -1,0 +1,14 @@
+<!doctype html><title>passkey</title>
+<style>body{margin:0}button{position:absolute;left:0;top:0;width:400px;height:200px;font-size:30px}</style>
+<button id=b>Sign in with a passkey</button>
+<script>
+const enc = new TextEncoder(), dec = new TextDecoder()
+document.getElementById('b').onclick = async () => {
+  document.title = 'asking'
+  try {
+    const c = await navigator.credentials.get({ publicKey: { challenge: enc.encode('challenge-123'), rpId: 'site', allowCredentials: [], userVerification: 'preferred' } })
+    const cd = JSON.parse(dec.decode(c.response.clientDataJSON))
+    document.title = 'got ' + c.id + ' ' + c.type + ' ' + cd.origin + ' sig=' + c.response.signature.byteLength
+  } catch (e) { document.title = 'err ' + e.name }
+}
+</script>

@@ -83,6 +83,13 @@ browser.runtime.onMessage.addListener((m, sender) => {
   send({ t: 'pick', ...m.pick, site: sender.url ? new URL(sender.url).host : '' })
 })
 let httpBase = '', secret = ''
+// passkey requests: to the device in use (the Browser page), the answer back to the frame that asked
+const passkeys = new Map()
+browser.runtime.onMessage.addListener((m, sender) => {
+  if (!m.passkey) return
+  passkeys.set(m.passkey.id, [sender.tab.id, sender.frameId])
+  send({ t: 'passkey', ...m.passkey, site: sender.url ? new URL(sender.url).host : '' })
+})
 const active = async () => (await browser.tabs.query({ active: true, currentWindow: true }))[0]
 const sendZoom = async (id) => send({ t: 'zoom', factor: await browser.tabs.getZoom(id) })
 browser.tabs.onZoomChange.addListener((z) => send({ t: 'zoom', factor: z.newZoomFactor }))
@@ -134,6 +141,12 @@ const cmds = {
     send({ t: 'history', list: all.map((h) => ({ url: h.url, title: h.title || '', at: h.lastVisitTime })) })
   },
   async forget(m) { if (m.url) await browser.history.deleteUrl({ url: m.url }); else await browser.history.deleteAll(); await cmds.history(m) },
+  async passkeyDone(m) {
+    const at = passkeys.get(m.id)
+    passkeys.delete(m.id)
+    send({ t: 'passkeyDone', id: m.id })
+    if (at) await browser.tabs.sendMessage(at[0], { passkeyDone: m }, { frameId: at[1] })
+  },
   async budget(m) { override = Math.max(0, Number(m.n) || 0); await fit() },
   async zoom(m) { await browser.tabs.setZoom((await active()).id, m.factor) },
 }
