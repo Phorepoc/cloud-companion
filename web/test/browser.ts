@@ -1,0 +1,51 @@
+// SPDX-License-Identifier: Apache-2.0
+// What a person does on the Browser page, against real Firefox, with the web app's real CSP.
+import { chromium } from 'playwright'
+import assert from 'node:assert/strict'
+const { BASE, CODE, OUT } = process.env as Record<string, string>
+const SITE = 'http://site/'
+const b = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
+const ctx = await b.newContext({ viewport: { width: 1280, height: 860 } })
+const p = await ctx.newPage()
+const errs: string[] = []
+p.on('pageerror', (e) => errs.push(e.message))
+p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()) })
+const step = (s: string) => console.log('ok -', s)
+const addr = '.x-bf__row input'
+const until = async (f: () => Promise<boolean>, what: string, ms = 15000) => { const t = Date.now(); for (;;) { if (await f()) return; assert(Date.now() - t < ms, 'timed out: ' + what); await p.waitForTimeout(50) } }
+const live = () => until(() => p.evaluate(() => { const v = document.querySelector('[data-test=screen] video') as HTMLVideoElement | null; return !!v && v.videoWidth > 0 && v.currentTime > 0 }), 'live video', 30000)
+const value = () => p.inputValue(addr)
+const title = () => p.locator('[data-test=title]').textContent()
+const tabCount = () => p.evaluate(() => (window as any).__pheBrowser.tabs.length as number)
+const more = async (t: string) => { await p.click(".x-bf__row [aria-label^='More']"); await p.click(`[data-test=${t}]`) }
+// the video element fills the stage, the picture is centred in it
+const at = async (x: number, y: number) => { const v = await p.locator('[data-test=screen] video').boundingBox(); assert(v); const s = await p.evaluate(() => { const e = document.querySelector('[data-test=screen] video') as HTMLVideoElement; return [e.videoWidth, e.videoHeight] }); const k = Math.min(v.width / s[0], v.height / s[1]); return [v.x + (v.width - s[0] * k) / 2 + x * k, v.y + (v.height - s[1] * k) / 2 + y * k] as const }
+const go = async (u: string) => { await p.fill(addr, u); await p.press(addr, 'Enter') }
+try {
+  await p.goto(BASE + '/#/pair'); await p.fill('[data-test=code]', CODE); await p.click('[data-test=pair]')
+  await p.waitForSelector('[data-test=browser-frame]', { timeout: 30000 })
+  const trace = () => p.evaluate(() => { const t0 = Date.now(); let last = ''; setInterval(() => { const v = document.querySelector('[data-test=screen] video') as HTMLVideoElement | null; const s = document.querySelector('[data-test=browser-connecting]') ? 'overlay' : 'clear'; const n = s + ' ' + (v ? v.videoWidth + 'x' + v.videoHeight + ' ' + (v.currentTime > 0) + ' ' + v.readyState : 'novideo'); if (n !== last) { console.log('STATE', Date.now() - t0, n); last = n } }, 100) })
+  p.on('console', (m) => { if (m.text().startsWith('STATE')) console.log(m.text()) })
+  await p.goto(BASE + '/#/browse'); await trace(); await live(); step('the picture is live in the real page')
+  await go(SITE + 'index.html')
+  await until(async () => (await title()) === 'probe one', 'title'); step('address bar loads a page, title follows')
+  await p.waitForTimeout(800)
+  await p.keyboard.type('typed through our page', { delay: 30 }); await p.waitForTimeout(800)
+  await p.screenshot({ path: OUT + '/browser-typed.png' }); step('keys go to the page straight after the address bar (see the screenshot)')
+  await p.mouse.move(...await at(60, 130)); await p.waitForTimeout(300); await p.mouse.down(); await p.mouse.up()
+  await until(async () => (await value()).includes('two.html'), 'link updates address'); step('a link in the stream updates the address bar')
+  await p.click(".x-bf__row [aria-label='Back']"); await until(async () => (await title()) === 'probe one', 'back'); step('Back')
+  await p.click(".x-bf__row [aria-label='Forward']"); await until(async () => (await title()) === 'probe two', 'forward'); step('Forward')
+  await p.reload(); await trace(); await live(); await until(async () => (await title()) === 'probe two', 'tab back after reload'); step('reloading our page reconnects and restores the tab')
+  assert.deepEqual(errs.filter((e) => /Content Security Policy/.test(e)), [], 'CSP'); step('no CSP errors')
+  const n = await tabCount()
+  for (let i = 0; i < 5; i++) { await more('tab-new'); await p.waitForTimeout(150) }
+  await until(async () => (await tabCount()) === n + 5, 'five new tabs, more than the old limit'); step('five quick new tabs, past the old limit of three')
+  await more('other-devices'); await p.waitForSelector('[data-test=others-dialog]')
+  for (let i = 0; i < 5; i++) { await p.locator('[data-test=others-dialog] [aria-label^=Close]').last().click(); await p.waitForTimeout(150) }
+  await until(async () => (await tabCount()) === n, 'closing them'); await p.keyboard.press('Escape'); step('closing them from Tabs on your devices')
+  await p.waitForTimeout(500); await p.click(".x-bf__row [aria-label^='More']"); await p.click('[data-test=zoom-in]')
+  await until(async () => (await p.textContent('[data-test=zoom-pct]')) === '125%', 'zoom'); await p.click('[data-test=zoom-out]'); await p.keyboard.press('Escape'); step('Zoom')
+  await p.screenshot({ path: OUT + '/browser-end.png' })
+  console.log('BROWSER PASS')
+} catch (e) { await p.screenshot({ path: OUT + '/browser-fail.png' }).catch(() => {}); console.log(errs.slice(-8).join('\n').slice(0, 900)); throw e } finally { await b.close() }

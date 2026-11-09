@@ -14,6 +14,7 @@
     "@etesian-design/tokens": "^0.11.0",
     "@etesian-design/vue": "^0.11.0",
     "@fontsource/fira-sans": "^5.3.0",
+    "@m1k1o/neko": "^3.2.0",
     "@noble/hashes": "^1.5.0",
     "@quasar/extras": "^1.16.12",
     "cbor-x": "^1.6.0",

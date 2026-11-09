@@ -73,7 +73,7 @@ try {
   await page.goto(BASE + '/#/pair')
   await page.fill('[data-test=code]', CODE)
   await page.click('[data-test=pair]')
-  await page.waitForSelector('[data-test=canvas]')
+  await page.waitForSelector('[data-test=browser-frame]')
   await page.waitForFunction(() => window.__phe && window.__phe.state.status === 'online')
   step('paired and online (' + BASE + ')')
   const stored = await page.evaluate(() => new Promise((res) => {
@@ -83,12 +83,12 @@ try {
   assert(stored, 'device key must be stored in IndexedDB')
   step('device key stored in IndexedDB')
 
-  // 2. no browser engine for now: the Browser page still opens, and says so when a page is asked for
+  // 2. without the browser container the Browser page still opens, and says how to set it up
   await page.goto(BASE + '/#/browse')
   await page.waitForSelector('[data-test=browser-frame]')
-  await page.evaluate(() => window.__phe.api.open('https://example.com/'))
-  await page.locator('[role=alert]', { hasText: 'being replaced' }).waitFor({ timeout: 15000 })
-  step('Browser page: the UI is there and says the engine is being replaced')
+  // (on plain http it asks for a secure address first, as device requests can't be signed there)
+  await page.waitForSelector(BASE.startsWith('https:') || BASE.includes('localhost') ? '[data-test=browser-off]' : '[data-test=browser-insecure]', { timeout: 15000 })
+  step('Browser page: the UI is there and says what it needs')
   if (QUICK) { console.log('SMOKE PASS'); await browser.close(); process.exit(0) }
 
   // 8. devices page (the first/--admin device)

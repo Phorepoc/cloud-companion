@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+# The engine of the Browser page: Firefox with Neko's stream, one for the single user of Cloud Companion. Start with
+#   docker compose -f docker-compose.yml -f docker-compose.browser.yml up -d
+# Set PHECLOUD_BROWSER_PASSWORD and PHECLOUD_BROWSER_SECRET (long random strings), and PHE_BROWSER_IP to the address your
+# devices reach this server at (the video goes directly to them over UDP).
+services:
+  phecloud:
+    environment:
+      PHECLOUD_BROWSER_URL: http://browser:8080
+      PHECLOUD_BROWSER_PASSWORD: ${PHECLOUD_BROWSER_PASSWORD:?}
+      PHECLOUD_BROWSER_SECRET: ${PHECLOUD_BROWSER_SECRET:?}
+  browser:
+    build: deploy/browser
+    image: phe-browser:dev
+    container_name: phe-browser
+    cpus: ${PHE_BROWSER_CPUS:-2}
+    mem_limit: ${PHE_BROWSER_MEM:-3g}
+    shm_size: 1g
+    ports:
+      - "${PHE_BROWSER_UDP:-59100-59120}:59100-59120/udp"
+    volumes:
+      - phecloud-browser:/home/neko/.config/mozilla   # sign-ins and settings: Cloud Companion's data, not the container's
+    environment:
+      PHE_BROWSER_SECRET: ${PHECLOUD_BROWSER_SECRET:?}
+      PHE_BROWSER_BRIDGE: ws://phecloud:8080/phe/browser/ext
+      NEKO_DESKTOP_SCREEN: 1280x720@30
+      NEKO_SESSION_COOKIE_ENABLED: "false"
+      NEKO_SESSION_IMPLICIT_HOSTING: "true"
+      NEKO_MEMBER_PROVIDER: multiuser
+      NEKO_MEMBER_MULTIUSER_ADMIN_PASSWORD: ${PHECLOUD_BROWSER_PASSWORD:?}
+      NEKO_MEMBER_MULTIUSER_USER_PASSWORD: ${PHECLOUD_BROWSER_PASSWORD:?}-viewer
+      NEKO_WEBRTC_EPR: 59100-59120
+      NEKO_WEBRTC_ICELITE: "1"
+      NEKO_WEBRTC_NAT1TO1: ${PHE_BROWSER_IP:?}
+    restart: unless-stopped
+volumes:
+  phecloud-browser:

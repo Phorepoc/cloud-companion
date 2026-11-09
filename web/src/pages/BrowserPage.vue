@@ -1,32 +1,28 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: Apache-2.0 -->
 <template>
-  <q-page class="ph-browse" :class="{ 'is-phone': phoneSize }">
-    <!-- the Etesian browser frame: Back, Forward, Reload, the address, the tab count (a picker of the pages) and More; on a wide window
-         the tabs are a list on the left. Below 560 px the row moves to the bottom, within the thumb's reach. -->
-    <XBrowserFrame class="ph-bf" :address="editing ? urlInput : state.page.url || urlInput" :secure="secure" :back="!!state.page.back" :forward="!!state.page.fwd"
-                   :loading="state.loading ? 60 : undefined" :tabs="tabs" :current="String(state.activeView)" :tabs-at="browserPrefs.tabsAt" :max="3"
+  <q-page class="ph-browse">
+    <!-- the Etesian browser frame around Firefox's picture: the tabs, address and buttons are ours and follow Firefox live -->
+    <XBrowserFrame class="ph-bf" :address="address" :secure="secure" :back="true" :forward="true"
+                   :loading="engine.busy ? 60 : undefined" :tabs="tabs" :current="current" :tabs-at="browserPrefs.tabsAt"
                    data-test="browser-frame"
-                   @go="(a: string) => { urlInput = a; go() }" @back="api.action('back')" @forward="api.action('forward')" @reload="api.action('reload')"
-                   @pick="(v: string) => api.tab('switch', Number(v))" @close="closeTab" @add="newTab" @more="moreOpen = true">
+                   @go="go" @back="act({ c: 'back' })" @forward="act({ c: 'forward' })" @reload="act({ c: 'reload' })"
+                   @pick="(v: string) => act({ c: 'pick', id: Number(v) })" @close="(v: string) => command({ c: 'close', id: Number(v) })"
+                   @add="newTab" @more="moreOpen = true">
       <template #more>
         <q-menu v-model="moreOpen" no-parent-event anchor="bottom right" self="top right" class="ph-bf-more" data-test="browser-more">
           <q-list dense style="min-width: 220px">
-            <q-item clickable v-close-popup :disable="state.tabs.length >= 3 || !state.features.includes('tabs')" data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
-            <q-item clickable v-close-popup data-test="other-devices" @click="openOthers"><q-item-section>Tabs on your other devices</q-item-section></q-item>
+            <q-item clickable v-close-popup data-test="tab-new" @click="newTab"><q-item-section>New tab</q-item-section></q-item>
+            <q-item clickable v-close-popup data-test="other-devices" @click="othersOpen = true"><q-item-section>Tabs on your devices</q-item-section></q-item>
             <q-item>
               <q-item-section>Zoom</q-item-section>
               <q-item-section side>
                 <div class="ph-bf-zoom">
-                  <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="renderer && renderer.zoomBy(1 / 1.25)" />
-                  <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ state.page.zoom || 100 }}%</span>
-                  <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="renderer && renderer.zoomBy(1.25)" />
+                  <q-btn flat round dense icon="sym_o_remove" aria-label="Zoom out" data-test="zoom-out" @click="zoomBy(-0.25)" />
+                  <span class="ph-small" aria-live="polite" data-test="zoom-pct">{{ Math.round(engine.zoom * 100) }}%</span>
+                  <q-btn flat round dense icon="sym_o_add" aria-label="Zoom in" data-test="zoom-in" @click="zoomBy(0.25)" />
                 </div>
               </q-item-section>
-            </q-item>
-            <q-item v-if="canFull" clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(desktopSite)" data-test="desktop-site" @click="toggleSite">
-              <q-item-section>Desktop site</q-item-section>
-              <q-item-section side><q-toggle :model-value="desktopSite" dense tabindex="-1" aria-hidden="true" @click.stop="toggleSite" /></q-item-section>
             </q-item>
             <q-item clickable v-close-popup role="menuitemcheckbox" :aria-checked="String(browserPrefs.tabsAt === 'side')" data-test="tabs-side" @click="toggleSide">
               <q-item-section>Tabs on the side</q-item-section>
@@ -36,285 +32,83 @@
         </q-menu>
       </template>
       <div class="ph-bf__page">
-    <span class="ph-sr" data-test="title">{{ state.page.title }}</span>
-
-    <q-banner v-if="state.error" class="ph-note is-error" rounded role="alert">
-      <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
-      {{ state.error }}
-      <template #action><q-btn flat label="Dismiss" @click="state.error = ''" /></template>
-    </q-banner>
-    <q-banner v-if="state.downloadNote" class="ph-note" rounded role="status">
-      <template #avatar><q-icon name="sym_o_download" aria-hidden="true" /></template>
-      {{ state.downloadNote }}
-      <template #action><q-btn flat label="OK" @click="state.downloadNote = ''" /></template>
-    </q-banner>
-
-    <div ref="stage" class="ph-stage" data-test="stage">
-      <div class="viewport" :style="vpStyle">
-        <canvas ref="cv" data-test="canvas" class="ph-canvas" aria-label="Web page" />
-        <!-- the keys: an invisible field over the focused one takes the keyboard (and the phone's on-screen keyboard); every key goes
-             to the page as a key press and the page's own field shows the text -->
-        <input v-if="overlayRect" ref="ov" class="keys" :type="inputType === 'password' ? 'password' : 'text'" :style="overlayRect"
-               :inputmode="inputMode" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Text field" data-test="keyboard-overlay"
-               @keydown="onKey" @beforeinput="onBeforeInput" @input="onInput" @paste.prevent="onPaste" />
-      </div>
-    </div>
-    <div v-if="state.page.trunc" class="ph-small ph-muted">The rest of this page is not shown. Open it on a larger screen to read on.</div>
+        <span class="ph-sr" data-test="title">{{ activeTab()?.title }}</span>
+        <q-banner v-if="engine.note" class="ph-note" rounded role="status">
+          <template #avatar><q-icon name="sym_o_download" aria-hidden="true" /></template>
+          {{ engine.note }}
+          <template #action><q-btn flat label="OK" @click="engine.note = ''" /></template>
+        </q-banner>
+        <div ref="stage" class="ph-stage" data-test="stage">
+          <HdStatusState v-if="engine.status === 'insecure'" state="error" title="The browser needs a secure address" text="Open Cloud Companion over https or at localhost." data-test="browser-insecure" />
+          <HdStatusState v-else-if="engine.status === 'unconfigured'" state="empty" title="The browser is not set up" text="Start Cloud Companion with docker-compose.browser.yml to browse from here." data-test="browser-off" />
+          <HdStatusState v-else-if="engine.status === 'failed'" state="error" title="The browser could not be reached" text="It may still be starting." data-test="browser-failed" />
+          <div v-show="engine.status === 'live' || engine.status === 'connecting'" ref="screen" class="ph-screen" data-test="screen" />
+          <div v-if="engine.status === 'connecting'" class="ph-connecting" role="status" data-test="browser-connecting"><q-spinner size="32px" /> Connecting to the browser…</div>
+        </div>
       </div>
     </XBrowserFrame>
-
-    <q-dialog :model-value="!!dlg" persistent>
-      <q-card v-if="dlg" class="ph-dialog" data-test="dialog" role="alertdialog" :aria-label="dlgTitle">
-        <q-card-section>
-          <h2>{{ dlgTitle }}</h2>
-          <p class="ph-dialog-text">{{ dlg.message }}</p>
-          <q-input v-if="dlg.kind === 'prompt'" v-model="dlgText" autofocus outlined aria-label="Your answer" data-test="dialog-text" />
-          <template v-if="dlg.kind === 'auth'">
-            <q-input v-model="dlgText" label="User name" autofocus outlined class="q-mb-sm" autocomplete="username" data-test="dialog-user" />
-            <q-input v-model="dlgPass" label="Password" type="password" outlined autocomplete="current-password" data-test="dialog-pass" />
-          </template>
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn v-if="dlg.kind !== 'alert'" flat :label="dlg.kind === 'cert' ? 'Go back' : 'Cancel'" data-test="dialog-cancel" @click="reply(false)" />
-          <q-btn unelevated color="primary" :label="dlg.kind === 'cert' ? 'Continue anyway' : dlg.kind === 'auth' ? 'Sign in' : 'OK'" data-test="dialog-ok" @click="reply(true)" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="selOpen">
-      <q-card v-if="selRegion" class="ph-dialog" data-test="select-dialog">
-        <q-card-section class="q-pb-none"><h2>{{ selRegion.label || 'Choose an option' }}</h2></q-card-section>
-        <q-card-section>
-          <q-option-group v-model="selIndex" type="radio" :options="selOptions" />
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat label="Cancel" v-close-popup />
-          <q-btn unelevated color="primary" label="OK" v-close-popup data-test="select-ok" @click="pickSelect" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
-
-    <q-dialog v-model="othersOpen" @hide="stopPoll">
+    <!-- one browser for all your devices: every tab is here, whichever device opened it -->
+    <q-dialog v-model="othersOpen">
       <q-card class="ph-dialog" data-test="others-dialog">
         <q-card-section>
           <h2>Tabs on your devices</h2>
-          <p class="ph-muted ph-small">Browser tabs that are open right now on the devices that are connected. Closing a tab here closes it on that device.</p>
-          <HdStatusState v-if="!state.sessions.length" state="loading" title="Looking for devices" text="" />
-          <section v-for="s in state.sessions" :key="s.sid" class="ph-dev" :data-test="'dev-' + s.sid">
-            <h3>{{ s.name || 'Device' }} <q-badge v-if="s.self" color="positive" text-color="white" label="This browser" /></h3>
-            <p v-if="!s.tabs || !s.tabs.length" class="ph-muted ph-small">No tabs open.</p>
-            <ul v-else class="ph-tablist">
-              <li v-for="t in s.tabs" :key="t.v" class="ph-trow" :data-test="'dev-tab-' + s.sid + '-' + t.v">
-                <span class="ph-ttext"><span class="ph-ttitle">{{ t.title || t.url || 'New tab' }}</span><span class="ph-small ph-muted ph-turl">{{ t.url }}</span></span>
-                <q-btn v-if="!s.self && t.url" flat round icon="sym_o_open_in_new" aria-label="Open here" :data-test="'dev-open-' + s.sid + '-' + t.v" @click="openHere(t)">
-                  <q-tooltip>Open here</q-tooltip>
-                </q-btn>
-                <q-btn flat round icon="sym_o_close" :aria-label="'Close ' + (t.title || 'tab')" :disable="s.self && s.tabs.length === 1 && false" :data-test="'dev-close-' + s.sid + '-' + t.v" @click="closeRemote(s, t)" />
-              </li>
-            </ul>
-            <form v-if="!s.self" class="ph-send" @submit.prevent="sendTo(s)">
-              <q-input v-model="sendUrl[s.sid]" dense outlined placeholder="Open a page on this device" aria-label="Web address to open on this device" :data-test="'dev-url-' + s.sid" />
-              <q-btn flat color="primary" label="Open" type="submit" :data-test="'dev-send-' + s.sid" />
-            </form>
-          </section>
+          <p class="ph-muted ph-small">All your devices share one browser, so these are the same everywhere.</p>
+          <ul class="ph-tablist">
+            <li v-for="t in engine.tabs" :key="t.id" class="ph-trow" :data-test="'fx-tab-' + t.id">
+              <span class="ph-ttext"><span class="ph-ttitle">{{ t.title || 'New tab' }}</span><span class="ph-small ph-muted ph-turl">{{ t.url }}</span></span>
+              <q-btn flat round icon="sym_o_open_in_new" aria-label="Open here" v-close-popup @click="act({ c: 'pick', id: t.id })"><q-tooltip>Open here</q-tooltip></q-btn>
+              <q-btn flat round icon="sym_o_close" :aria-label="'Close ' + (t.title || 'tab')" @click="command({ c: 'close', id: t.id })" />
+            </li>
+          </ul>
         </q-card-section>
-        <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /><q-btn flat icon="sym_o_refresh" label="Refresh" @click="api.sessions()" /></q-card-actions>
+        <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>
   </q-page>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted, onBeforeUnmount, nextTick, type HTMLAttributes } from 'vue'
-import { state, api, connect, creds, openInNewTab, browserPrefs, setBrowserPref } from '../cloud'
-import type { Region, SessionInfo, TabInfo } from '../proto'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { browserPrefs, setBrowserPref } from '../cloud'
 import { HdStatusState } from '@etesian-design/vue'
 import { XBrowserFrame } from '@etesian-design/shell'
-/** a tab as the frame shows it (the BrowserTab of XBrowserTabs, not exported by name) */
-interface BrowserTab { id: string; title: string; icon?: string; address?: string; thumb?: string }
-import { Renderer } from '../renderer'
+import { engine, activeTab, act, command, focusPage, fitScreen, start, stop } from '../browserEngine'
 
-// on a phone-width screen the bar has room for the essentials only (pinch zooms, and the page already is phone sized)
 const stage = ref<HTMLElement | null>(null)
-const cv = ref<HTMLCanvasElement | null>(null)
-const ov = ref<HTMLInputElement | null>(null)
-const urlInput = ref(state.page.url)
-const editing = ref(false)
-const dlgText = ref('')
-const dlgPass = ref('')
-const selOpen = ref(false)
-const selRegion = ref<Region | null>(null)
-const selIndex = ref(0)
-let renderer: Renderer | null = null
-
-// ---- the size of the remote window ----
-// The cloud lays the page out at the size of this window, whatever it is; a resize reaches the cloud (debounced), which lays
-// the page out again and sends tiles for the new size. Only a server too old to resize keeps the 360 x 640 phone layout.
-const canFull = computed(() => state.features.includes('viewport'))
-const phoneSize = computed(() => !canFull.value)
-// "Desktop site", as in a phone browser: on by itself in a wide window; a change reloads the page
-const desktopSite = computed(() => (browserPrefs.desktopSite ?? (state.viewport.w >= 600 ? 'desktop' : 'mobile')) === 'desktop')
-function toggleSite() {
-  setBrowserPref('desktopSite', desktopSite.value ? 'mobile' : 'desktop')
-  if (state.page.pid !== 0) api.viewport(state.viewport.w, state.viewport.h)
-}
-const vpStyle = computed(() => (phoneSize.value
-  ? { width: '360px', height: '640px', maxWidth: '100%', maxHeight: '100%', position: 'relative' as const }
-  : { width: state.viewport.w + 'px', height: state.viewport.h + 'px', position: 'absolute' as const, left: '0', top: '0' }))
-let resizeObs: ResizeObserver | null = null
-let vpTimer: ReturnType<typeof setTimeout> | undefined
-function applySize(now = false) {
-  if (!stage.value) return
-  const r = stage.value.getBoundingClientRect()
-  const w = phoneSize.value ? 360 : Math.max(240, Math.floor(r.width))
-  const h = phoneSize.value ? 640 : Math.max(240, Math.floor(r.height))
-  const same = state.viewport.w === w && state.viewport.h === h && state.viewport.phone === phoneSize.value
-  state.viewport = { w, h, phone: phoneSize.value }
-  renderer?.setSize(w, h)
-  if (same) return
-  clearTimeout(vpTimer)
-  const send = () => { if (canFull.value && state.page.pid !== 0) api.viewport(w, h) }
-  if (now) send()
-  else vpTimer = setTimeout(send, 250)
-}
-watch(canFull, () => nextTick(() => applySize(true)))
-// the page's keyboard hint for the focused field (text, numeric, email…)
-const inputMode = computed(() => (state.focus.im || undefined) as HTMLAttributes['inputmode'])
-
-const dlg = computed(() => state.dialogs[0] || null)
-const dlgTitle = computed(() => ({ alert: 'This page says', confirm: 'This page asks', prompt: 'This page asks', beforeunload: 'Leave this page?', auth: 'Sign in to continue', cert: 'This connection is not secure' })[dlg.value?.kind] || 'Message')
-watch(dlg, (d) => { dlgText.value = d ? d.def || '' : ''; dlgPass.value = '' })
-
-function reply(ok: boolean) {
-  const d = dlg.value
-  if (!d) return
-  api.answer(d, ok, d.kind === 'prompt' || d.kind === 'auth' ? dlgText.value : '', d.kind === 'auth' ? dlgPass.value : '')
-}
-
-watch(() => state.page.url, (u) => { if (!editing.value) urlInput.value = u })
-
-// the frame's tabs, the lock (https), a list on the left when the window is wide, and the ⋮ menu
-// before any page or New tab the window still shows one tab: the view it is on
-const tabs = computed<BrowserTab[]>(() => (state.tabs.length ? state.tabs : [{ v: state.activeView, title: state.page.title, url: state.page.url }])
-  .map((t) => ({ id: String(t.v), title: t.title || t.url || 'New tab', address: t.url })))
-function toggleSide() { setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side') }
-const secure = computed(() => !state.page.url || state.page.url.startsWith('https:'))
+const screen = ref<HTMLElement | null>(null)
 const moreOpen = ref(false)
-function closeTab(v: string) { if (state.tabs.some((t) => String(t.v) === v)) api.tab('close', Number(v)) }
-function newTab() { if (state.tabs.length < 3 && state.features.includes('tabs')) api.tab('new') }
-
-function go() {
-  let u = urlInput.value.trim()
+const othersOpen = ref(false)
+const typed = ref('')
+const tabs = computed(() => engine.tabs.map((t) => ({ id: String(t.id), title: t.title || t.url || 'New tab', address: t.url })))
+const current = computed(() => String(activeTab()?.id ?? ''))
+const shown = (u?: string) => (!u || u.startsWith('about:') ? '' : u)
+const address = computed(() => typed.value || shown(activeTab()?.url))
+watch(() => activeTab()?.url, () => { typed.value = '' })
+const secure = computed(() => !address.value || address.value.startsWith('https:'))
+function toggleSide() { setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side') }
+function newTab() { act({ c: 'newTab' }); focusPage() }
+function zoomBy(d: number) { command({ c: 'zoom', factor: Math.min(3, Math.max(0.3, engine.zoom + d)) }) }
+function go(a: string) {
+  let u = a.trim()
   if (!u) return
   if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = /\s/.test(u) || !u.includes('.') ? 'https://duckduckgo.com/?q=' + encodeURIComponent(u) : 'https://' + u
-  if (state.page.pid === 0) api.open(u)
-  else api.navigate(u)
+  typed.value = u
+  act({ c: 'go', url: u })
+  focusPage()
 }
-
-// the keys field: over the focused field, so the phone keeps the page in view when its keyboard opens
-const overlayRect = computed(() => {
-  const f = state.focus
-  if (f.kind !== 'text' && f.kind !== 'textarea') return null
-  const r = state.regions.find((q) => q.id === f.id)
-  void renderer?.view.scrollY
-  const sr = r && renderer ? renderer.screenRect(r) : null
-  if (!sr) return { left: '8px', bottom: '8px', width: '344px', height: '34px' }
-  return { left: sr.x + 'px', top: sr.y + 'px', width: Math.max(sr.w, 60) + 'px', height: Math.max(sr.h, 24) + 'px' }
+let ro: ResizeObserver | null = null
+let sizeTimer: ReturnType<typeof setTimeout> | undefined
+function measure() {
+  clearTimeout(sizeTimer)
+  sizeTimer = setTimeout(() => { const r = stage.value?.getBoundingClientRect(); if (r) fitScreen(Math.floor(r.width), Math.floor(r.height)) }, 250)
+}
+watch(() => engine.status, (s) => { if (s === 'live') measure() })
+onMounted(() => {
+  void start(screen.value!)
+  ro = new ResizeObserver(measure)
+  if (stage.value) ro.observe(stage.value)
 })
-const inputType = computed(() => (state.focus.kind === 'text' && ['password', 'email', 'url', 'tel', 'number', 'search'].includes(state.focus.type) ? state.focus.type : 'text'))
-// the field takes the keys again whenever the page has a text field focused (also after a tap on the page took them away)
-watch(() => [state.focus.kind, state.focus.id, state.focus.value, state.focus.start], async () => {
-  if (state.focus.kind !== 'text' && state.focus.kind !== 'textarea') return
-  await nextTick()
-  if (document.activeElement !== ov.value) ov.value?.focus({ preventScroll: true })
-})
-const NAMED = ['Backspace', 'Enter', 'Tab', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Escape']
-function onKey(e: KeyboardEvent) {
-  if (e.isComposing || e.ctrlKey || e.metaKey) return // composing: beforeinput sends it; shortcuts (paste) stay the browser's
-  if (NAMED.includes(e.key) || [...e.key].length === 1) { e.preventDefault(); api.key(e.key) }
-}
-// on-screen keyboards send no usable key events: what they type arrives here
-function onBeforeInput(e: InputEvent) {
-  if (e.isComposing) return
-  e.preventDefault()
-  if (e.inputType === 'insertText' && e.data) for (const ch of e.data) api.key(ch)
-  else if (e.inputType === 'deleteContentBackward') api.key('Backspace')
-  else if (e.inputType === 'deleteContentForward') api.key('Delete')
-  else if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') api.key('Enter')
-}
-// what still landed in the field (a finished composition) goes as keys too; the field stays empty
-function onInput() {
-  const el = ov.value
-  if (!el || !el.value) return
-  for (const ch of el.value) api.key(ch)
-  el.value = ''
-}
-function onPaste(e: ClipboardEvent) {
-  for (const ch of [...(e.clipboardData?.getData('text') || '')].slice(0, 2000)) api.key(ch === '\n' ? 'Enter' : ch)
-}
-
-const selOptions = computed(() => (selRegion.value ? (selRegion.value.opts || []).map((o, i) => ({ label: o.l || '(empty)', value: i })) : []))
-function pickSelect() {
-  if (selRegion.value) api.select(selRegion.value.id, selIndex.value)
-}
-
-onMounted(async () => {
-  // measure first: the canvas is made at the size the cloud will lay the page out at
-  if (stage.value) {
-    const r = stage.value.getBoundingClientRect()
-    state.viewport = phoneSize.value ? { w: 360, h: 640, phone: true } : { w: Math.max(240, Math.floor(r.width)), h: Math.max(240, Math.floor(r.height)), phone: false }
-  }
-  renderer = new Renderer(cv.value!)
-  renderer.onSelect = (r) => {
-    selRegion.value = r
-    selIndex.value = Math.max(0, (r.opts || []).findIndex((o) => o.s))
-    selOpen.value = true
-  }
-  renderer.attach()
-  applySize(true)
-  resizeObs = new ResizeObserver(() => applySize())
-  if (stage.value) resizeObs.observe(stage.value)
-  // test/debug hook: screen position (client coordinates) of a region by label
-  window.__phe = Object.assign(window.__phe || {}, {
-    renderer,
-    // client coordinates of a region's centre; match by label text (or name / placeholder), optionally restricted to a kind
-    regionClientPos(q: string | null, kind?: string) {
-      const r = state.regions.find((g) => (!kind || g.kind === kind) && (!q || (g.label || '').includes(q) || g.name === q || g.ph === q))
-      if (!r || !renderer) return null
-      const sr = renderer.screenRect(r)
-      if (!sr) return null
-      const b = cv.value!.getBoundingClientRect()
-      const k = b.width / renderer.vw
-      return { x: b.left + (sr.x + sr.w / 2) * k, y: b.top + (sr.y + sr.h / 2) * k, scrollY: renderer.view.scrollY, zoom: renderer.view.zoom }
-    },
-  })
-  if (creds.value && state.status === 'offline') {
-    try { await connect() } catch (e) { /* shown by the status banner */ }
-  }
-})
-onBeforeUnmount(() => { resizeObs?.disconnect(); clearTimeout(vpTimer); if (renderer) renderer.detach() })
-
-// ---- tabs on other devices ----
-const othersOpen = ref(false)
-const sendUrl = reactive<Record<number, string>>({})
-let poll: ReturnType<typeof setInterval> | undefined
-function openOthers() { othersOpen.value = true; api.sessions(); clearInterval(poll); poll = setInterval(() => api.sessions(), 4000) }
-function stopPoll() { clearInterval(poll) }
-function closeRemote(s: SessionInfo, t: TabInfo) {
-  if (s.self) api.tab('close', t.v)
-  else api.remote({ sid: s.sid, action: 'close', view: t.v })
-  setTimeout(() => api.sessions(), 500)
-}
-function sendTo(s: SessionInfo) {
-  let u = (sendUrl[s.sid] || '').trim()
-  if (!u) return
-  if (!/^[a-z][a-z0-9+.-]*:/i.test(u)) u = 'https://' + u
-  api.remote({ sid: s.sid, action: 'open', url: u })
-  sendUrl[s.sid] = ''
-  setTimeout(() => api.sessions(), 1500)
-}
-async function openHere(t: TabInfo) { othersOpen.value = false; await openInNewTab(t.url || '') }
-onBeforeUnmount(() => clearInterval(poll))
+onBeforeUnmount(() => { ro?.disconnect(); clearTimeout(sizeTimer); stop() })
 </script>
 
 <style scoped>
@@ -330,20 +124,14 @@ onBeforeUnmount(() => clearInterval(poll))
 .ph-note.is-error { border-color: var(--ph-negative); }
 .ph-note.is-error :deep(.q-icon) { color: var(--ph-negative); }
 .ph-stage { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--ph-bg); }
-.ph-canvas { width: 100%; height: 100%; display: block; touch-action: none; background: #fff; }
-.is-phone .ph-canvas { border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); box-shadow: var(--ph-elev-1); }
-.keys { position: absolute; box-sizing: border-box; margin: 0; padding: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; opacity: 0; font-size: 16px; }
 .ph-dialog { width: min(92vw, 420px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); }
-.ph-dialog-text { white-space: pre-wrap; margin: 0 0 var(--ph-s3); overflow-wrap: anywhere; }
-.ph-dev { margin-top: var(--ph-s4); }
-.ph-dev h3 { margin-bottom: var(--ph-s2); }
 .ph-tablist { list-style: none; padding: 0; margin: 0 0 var(--ph-s2); }
 .ph-trow { display: flex; align-items: center; gap: var(--ph-s2); min-height: var(--ph-tap); border-bottom: 1px solid var(--ph-divider); }
 .ph-ttext { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ph-ttitle, .ph-turl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-send { display: flex; gap: var(--ph-s2); align-items: center; }
-.ph-send .q-field { flex: 1; }
+.ph-screen { position: absolute; inset: 0; background: #000; }
+.ph-connecting { position: absolute; inset: 0; display: flex; gap: var(--ph-s2); align-items: center; justify-content: center; background: #000; color: #fff; }
 </style>
 
 <style>
