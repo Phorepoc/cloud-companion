@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  cd /usr/share && rm -rf doc/* man/* locale/[!e]* /var/lib/apt/lists/* /usr/lib/firefox-esr/crashreporter /var/cache/apt/*
 COPY --from=neko /usr/bin/neko /usr/bin/neko
 COPY --from=neko /usr/lib/xorg/modules/input/neko_drv.so /usr/lib/xorg/modules/input/neko_drv.so
-COPY --from=neko /etc/neko/xorg.conf /etc/neko/xorg.conf
+COPY xorg.conf /etc/neko/xorg.conf
 COPY --from=neko /etc/pulse/default.pa /etc/pulse/default.pa
 COPY ext /opt/ext
 COPY mozilla.cfg /usr/lib/firefox-esr/mozilla.cfg

@@ -51,7 +51,7 @@ try {
   await more('desktop-site'); await until(async () => (await title()) === 'header-mobile script-mobile', 'mobile ua')
   await more('desktop-site'); await until(async () => (await title()) === 'header-desktop script-desktop', 'desktop ua again'); step('Desktop site switches the tab between the phone and desktop versions')
   // Send to device: a second device (its own browser context) is asked, and opens the page in the Browser
-  const ctx2 = await b.newContext({ viewport: { width: 400, height: 800 } }); const q = await ctx2.newPage()
+  const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true }); const q = await ctx2.newPage()
   await q.goto(BASE + '/#/pair'); await q.fill('[data-test=code]', CODE2); await q.click('[data-test=pair]'); await q.waitForURL(/#\/(?!pair)/, { timeout: 30000 })
   await go(SITE + 'two.html'); await until(async () => (await title()) === 'probe two', 'two')
   await more('send-device'); await p.locator('[data-test=send-dialog] [data-test^=send-btn-]').first().click({ timeout: 10000 })
@@ -59,6 +59,17 @@ try {
   const before = await tabCount()
   await q.click('[data-test=sent-open]'); await q.waitForURL(/#\/browse/)
   await until(async () => (await tabCount()) === before + 1, 'the sent page opens in a new tab'); step('Send to device: the other device asks, and opens it in the Browser')
+  // that device is a phone: the picture is portrait and fills its page closely, and a tap on a link follows it
+  const qv = () => q.evaluate(() => { const v = document.querySelector('[data-test=screen] video') as HTMLVideoElement | null; const s = document.querySelector('[data-test=stage]')!.getBoundingClientRect(); return v && v.videoWidth ? { w: v.videoWidth, h: v.videoHeight, sw: Math.floor(s.width), sh: Math.floor(s.height) } : null })
+  await until(async () => { const v = await qv(); return !!v && v.h > v.w && v.w <= v.sw && v.h <= v.sh && v.sw - v.w < 40 && v.sh - v.h < 60 }, 'phone-sized picture', 20000)
+  console.log('phone picture', JSON.stringify(await qv()))
+  await q.waitForSelector('[data-test=sent-dialog]', { state: 'detached' }); await q.waitForTimeout(500)
+  await q.screenshot({ path: OUT + '/browser-phone.png' }); step('on a phone the picture is portrait and fits the page (see the screenshot)')
+  await q.fill(addr, SITE + 'index.html'); await q.press(addr, 'Enter')
+  await until(async () => (await q.locator('[data-test=title]').textContent()) === 'probe one', 'phone: page one', 15000); await q.waitForTimeout(800)
+  { const v = await q.locator('[data-test=screen] video').boundingBox(); const s = await qv(); assert(v && s); const k = Math.min(v.width / s.w, v.height / s.h)
+    await q.touchscreen.tap(v.x + (v.width - s.w * k) / 2 + 60 * k, v.y + (v.height - s.h * k) / 2 + 130 * k) }
+  await until(async () => (await q.inputValue(addr)).includes('two.html'), 'phone: a tap follows the link'); step('on a phone a tap follows a link')
   await ctx2.close()
   // a download lands in Files, Downloads, and the page says so with a way there
   await go(SITE + 'phe-download.txt')
