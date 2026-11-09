@@ -7,7 +7,7 @@ const mobile = new Set()
 const MOBILE_UA = navigator.userAgent.replace(/\([^)]*rv:([\d.]+)\) Gecko\/\d+/, '(Android 14; Mobile; rv:$1) Gecko/$1')
 const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)) }
 async function tabs() {
-  const all = await browser.tabs.query({})
+  const all = (await browser.tabs.query({})).filter((x) => !isPhoneTab(x.id)) // the phone link's views are not the page's tabs
   const marked = new Set()
   for (const x of all) if (x.url && /^https?:/.test(x.url) && (await browser.bookmarks.search({ url: x.url }).catch(() => [])).length) marked.add(x.id)
   send({ t: 'tabs', tabs: all.map((x) => ({ starred: marked.has(x.id), id: x.id, title: x.title, url: x.url, security: security.get(x.id) || (x.url && x.url.startsWith('https:') ? 'secure' : 'none'), active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id), asleep: !!x.discarded })) })
@@ -36,7 +36,7 @@ async function fit() {
   if (fitting) return
   fitting = true
   try {
-    const all = await browser.tabs.query({})
+    const all = (await browser.tabs.query({})).filter((t) => !isPhoneTab(t.id)) // a phone's view is in use: never unloaded
     const loaded = all.filter((t) => !t.discarded)
     const spare = loaded.filter((t) => !t.active).sort((a, b) => a.lastAccessed - b.lastAccessed)
     const drop = spare.slice(0, Math.max(0, loaded.length - budget()))
@@ -64,7 +64,7 @@ browser.webRequest.onErrorOccurred.addListener((d) => {
 // bookmarks and history are Firefox's own, in the profile (a Cloud Companion volume, in its backups); the Browser page shows them
 for (const e of ['onCreated', 'onRemoved', 'onChanged']) browser.bookmarks[e].addListener(() => tabs())
 const pick = (n) => ({ id: n.id, title: n.title || '', url: n.url })
-const nav = (state) => (d) => { if (!d.frameId) send({ t: 'nav', state, tab: d.tabId, url: d.url }) }
+const nav = (state) => (d) => { if (!d.frameId && !isPhoneTab(d.tabId)) send({ t: 'nav', state, tab: d.tabId, url: d.url }) }
 browser.webNavigation.onBeforeNavigate.addListener(nav('start'))
 browser.webNavigation.onCommitted.addListener(nav('commit'))
 browser.webNavigation.onCompleted.addListener(nav('done'))
@@ -90,9 +90,9 @@ browser.runtime.onMessage.addListener((m, sender) => {
   passkeys.set(m.passkey.id, [sender.tab.id, sender.frameId])
   send({ t: 'passkey', ...m.passkey, site: sender.url ? new URL(sender.url).host : '' })
 })
-const active = async () => (await browser.tabs.query({ active: true, currentWindow: true }))[0]
+const active = async () => (await browser.tabs.query({ active: true, windowType: 'normal' }))[0]
 const sendZoom = async (id) => send({ t: 'zoom', factor: await browser.tabs.getZoom(id) })
-browser.tabs.onZoomChange.addListener((z) => send({ t: 'zoom', factor: z.newZoomFactor }))
+browser.tabs.onZoomChange.addListener((z) => isPhoneTab(z.tabId) || send({ t: 'zoom', factor: z.newZoomFactor }))
 browser.tabs.onActivated.addListener((i) => sendZoom(i.tabId))
 const cmds = {
   async newTab(m) {
@@ -160,7 +160,10 @@ async function dial() {
   ws.onopen = async () => { tabs(); fit(); const a = await active(); if (a) sendZoom(a.id) }
   ws.onmessage = async (e) => {
     const m = JSON.parse(e.data)
-    try { await cmds[m.c](m) } catch (err) { send({ t: 'error', c: m.c, error: String(err) }) }
+    // with r: Cloud Companion waits for the answer (the phone link's commands)
+    try { const v = await cmds[m.c](m); if (m.r) send({ t: 'r', r: m.r, v: v === undefined ? null : v }) } catch (err) {
+      send(m.r ? { t: 'r', r: m.r, error: String(err && err.message || err) } : { t: 'error', c: m.c, error: String(err) })
+    }
   }
   ws.onclose = () => setTimeout(dial, 1000)
 }

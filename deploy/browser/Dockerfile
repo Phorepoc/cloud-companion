@@ -23,6 +23,10 @@ COPY ext /opt/ext
 COPY mozilla.cfg /usr/lib/firefox-esr/mozilla.cfg
 COPY autoconfig.js /usr/lib/firefox-esr/defaults/pref/autoconfig.js
 COPY start.sh /usr/local/bin/phe-browser-start
+# the phone link's views (deploy/browser/ext/phone.js) are small windows titled "Cloud Companion phone view …": always below the
+# window the Browser page streams, never focused, so they never show in the picture
+RUN sed -i 's#</applications>#<application title="Cloud Companion phone view*"><layer>below</layer><focus>no</focus><decor>no</decor><skip_taskbar>yes</skip_taskbar><skip_pager>yes</skip_pager></application></applications>#' /etc/xdg/openbox/rc.xml \
+ && grep -q 'Cloud Companion phone view' /etc/xdg/openbox/rc.xml
 RUN chmod +x /usr/local/bin/phe-browser-start; cd /opt/ext && zip -qr /opt/bridge.xpi . && rm -f /usr/bin/zip \
  && useradd -m -u 1000 neko && usermod -aG audio,video neko \
  && mkdir -p /usr/share/firefox-esr/distribution /home/neko/.config/mozilla /home/neko/Downloads /tmp/.X11-unix /etc/neko && chmod 1777 /tmp/.X11-unix \

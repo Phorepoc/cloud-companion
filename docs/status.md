@@ -13,7 +13,13 @@ The README has the quick start; this file has the long form. Measurements are fr
   4-byte big-endian length + CBOR map with a `"t"` type key. Frames: `challenge`, `pair`/`hello`, `welcome`,
   `error`, `open`, `navigate` (url | back | forward | reload), `input` (tap / scroll / text), `page`, `layers`, `tile`,
   `regions`, `done`.
-- **Removed 2026-11-09: the browser engine** (Chromium, Xvfb, chromedp). The UI and `browser.Factory` / `browser.Session` stay for its replacement; below is history.
+- **2026-11-09: the phone link's cloud browser runs on the browser container's Firefox** (`internal/browser/firefox.go`, the
+  extension's `deploy/browser/ext/phone.js`), replacing Chromium, Xvfb and chromedp. Same protocol, tiles, layers and regions; the
+  page scripts are the old ones. No remote control is turned on in Firefox (navigator.webdriver stays false): each phone view is a
+  tab in its own 360 px popup window, kept below the streamed window by openbox. Typing goes through Firefox's editor (trusted
+  input events); taps are clicks made inside the page (isTrusted false); a page's alert/confirm/prompt and HTTP authentication go
+  to the phone. Not yet: certificate-error "continue", download notices, cookies per device (the one profile is shared). Test:
+  `web/test/phonebrowser.sh`. Below is the Chromium history.
 - **Cloud browser v1** (`internal/browser`, `internal/tiles`): headless Chromium through one adapter interface
   (`browser.Factory` / `browser.Session`; chromedp v0.11.2 is the only implementation). The page is rendered at
   360 px width, dpr 1, mobile UA, full height (cap 8192 px, `PHECLOUD_MAX_PAGE_H`), after a scroll pass that triggers

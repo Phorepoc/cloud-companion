@@ -16,6 +16,7 @@ import (
 
 	"github.com/coder/websocket"
 
+	"github.com/phorepoc/cloud-companion/internal/browser"
 	"github.com/phorepoc/cloud-companion/internal/catalogue"
 	"github.com/phorepoc/cloud-companion/internal/connectors"
 	"github.com/phorepoc/cloud-companion/internal/dlna"
@@ -71,7 +72,8 @@ func Handler(s *server.Server, m *connectors.Manager, cat *catalogue.Manager) ht
 	a := newAuth(s.Store)
 	a.routes(mux)
 	a.androidRoutes(mux)
-	a.browserRoutes(mux)
+	ff, _ := s.Browser.(*browser.Firefox)
+	a.browserRoutes(mux, ff)
 	a.pairRoutes(mux)
 	(&smsAPI{a: a, st: s.Store, hub: s.Hub}).routes(mux)
 	if s.Chat != nil {

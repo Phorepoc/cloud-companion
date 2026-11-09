@@ -13,6 +13,8 @@ package webui
 //	GET /phe/browser/file/{tok}?s= (the extension) one of those files, once, within two minutes
 //	GET /phe/browser/settings   (admin) -> {configured, override, memory: the extension's last report (memoryMB, auto, budget, open, loaded)}
 //	PUT /phe/browser/settings   (admin) {override}: how many tabs Firefox keeps loaded, 0 = from its memory
+//	POST /phe/browser/ask?s=&tab=&kind=&url= (the extension, for a phone link's view) {msg, def}: a page's alert, confirm or prompt,
+//	                            answered on the phone -> {ok, text}
 //
 // Neither Neko's port nor Firefox is reachable from outside: everything but the WebRTC media comes through here.
 
@@ -35,9 +37,12 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/phorepoc/cloud-companion/internal/browser"
 )
 
 type browserHub struct {
+	ff    *browser.Firefox // the phone link's cloud browser, on the same Firefox (nil: not this server's engine)
 	mu    sync.Mutex
 	ext   *websocket.Conn
 	pages map[*websocket.Conn]bool
@@ -61,10 +66,10 @@ type heldFile struct {
 
 const browserUploadMax = 200 << 20
 
-func (a *auth) browserRoutes(mux *http.ServeMux) {
+func (a *auth) browserRoutes(mux *http.ServeMux, ff *browser.Firefox) {
 	base, pass, secret := os.Getenv("PHECLOUD_BROWSER_URL"), os.Getenv("PHECLOUD_BROWSER_PASSWORD"), os.Getenv("PHECLOUD_BROWSER_SECRET")
 	on := base != "" && pass != "" && secret != ""
-	h := &browserHub{pages: map[*websocket.Conn]bool{}, st: a.st, files: map[string]*heldFile{}}
+	h := &browserHub{ff: ff, pages: map[*websocket.Conn]bool{}, st: a.st, files: map[string]*heldFile{}}
 	mux.HandleFunc("GET /phe/browser/settings", func(w http.ResponseWriter, r *http.Request) {
 		if !a.adminDevice(r) {
 			bad(w, 403, "admin only")
@@ -196,6 +201,20 @@ func (a *auth) browserRoutes(mux *http.ServeMux) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		_, _ = w.Write(f.data)
 	})
+	mux.HandleFunc("POST /phe/browser/ask", func(w http.ResponseWriter, r *http.Request) {
+		if !hmac.Equal([]byte(r.URL.Query().Get("s")), []byte(secret)) {
+			bad(w, 403, "wrong secret")
+			return
+		}
+		var in struct{ Msg, Def string }
+		_ = json.NewDecoder(http.MaxBytesReader(w, r.Body, 64<<10)).Decode(&in)
+		tab, _ := strconv.Atoi(r.URL.Query().Get("tab"))
+		ans := browser.Answer{}
+		if h.ff != nil {
+			ans = h.ff.Ask(tab, browser.Dialog{Kind: r.URL.Query().Get("kind"), Message: in.Msg, Default: in.Def, URL: r.URL.Query().Get("url")})
+		}
+		reply(w, 200, map[string]any{"ok": ans.OK, "text": ans.Text})
+	})
 	mux.HandleFunc("/phe/browser/bridge", func(w http.ResponseWriter, r *http.Request) {
 		if !browserTicketOK(secret, r.URL.Query().Get("t"), time.Now()) {
 			bad(w, 403, "no valid ticket")
@@ -248,10 +267,14 @@ func (h *browserHub) servePage(ctx context.Context, c *websocket.Conn) {
 
 func (h *browserHub) serveExt(ctx context.Context, c *websocket.Conn) {
 	defer c.CloseNow()
-	c.SetReadLimit(1 << 20)
+	c.SetReadLimit(64 << 20) // a phone view's page capture
 	h.mu.Lock()
 	h.ext = c
 	h.mu.Unlock()
+	if h.ff != nil {
+		h.ff.Attach(func(ctx context.Context, b []byte) error { return c.Write(ctx, websocket.MessageText, b) })
+		defer h.ff.Detach()
+	}
 	n, _ := strconv.Atoi(h.st.Setting(browserOverrideKey))
 	h.toExt(ctx, n)
 	h.toPages(ctx, []byte(`{"t":"engine","up":true}`))
@@ -267,6 +290,9 @@ func (h *browserHub) serveExt(ctx context.Context, c *websocket.Conn) {
 		_, m, err := c.Read(ctx)
 		if err != nil {
 			return
+		}
+		if h.ff != nil && h.ff.Handle(m) {
+			continue // the phone link's, not the pages'
 		}
 		head := m[:min(len(m), 16)]
 		if bytes.Contains(head, []byte(`"t":"mem"`)) {

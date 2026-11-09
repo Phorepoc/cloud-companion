@@ -10,7 +10,7 @@
 //	phecloud hub ...            personal hub: per-device app passwords (see hub.go)
 //	phecloud sip add <name>     a SIP login for a phone (prints its password once); sip list, sip rm <name> (docs/messaging.md)
 //
-// Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400),
+// Environment: PHECLOUD_DB (sqlite path), PHECLOUD_LISTEN (:7400), PHECLOUD_MAX_PAGE_H (a phone page's height cap in px, 8192),
 // PHECLOUD_SIP_LISTEN (the SIP front, e.g. :5060; off when unset).
 package main
 
@@ -133,8 +133,12 @@ func main() {
 		sipMain(st, os.Args[2:])
 	case "serve":
 		log := slog.Default()
-		// no browser engine for now: pages get the reason, everything else runs
-		br := browser.Unavailable{Err: errors.New("the browser is being replaced and is not available right now")}
+		// the phone link's cloud browser: the Firefox of the browser container (docker-compose.browser.yml), through its extension
+		var br browser.Factory = browser.Unavailable{Err: errors.New("the browser is not set up (docker-compose.browser.yml, or Settings, Features, Browser)")}
+		if os.Getenv("PHECLOUD_BROWSER_URL") != "" {
+			maxH, _ := strconv.Atoi(env("PHECLOUD_MAX_PAGE_H", "8192"))
+			br = browser.NewFirefox(maxH)
+		}
 		// a virgin server prints a first-owner code (or adopts PHECLOUD_FIRST_OWNER_CODE) so the first owner can register without a second command
 		webURL := env("PHECLOUD_PUBLIC_URL", "http://127.0.0.1:8080")
 		if err := store.FirstStart(st, strings.TrimSpace(os.Getenv("PHECLOUD_FIRST_OWNER_CODE")), webURL, os.Stderr, log); err != nil {

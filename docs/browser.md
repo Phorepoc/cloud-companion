@@ -29,6 +29,14 @@ The page needs a secure address (https, or localhost): its requests are signed w
 - **Screen size**: Xorg offers 110 sizes (`deploy/browser/xorg.conf`), phones and tablets in portrait included; the device in use
   (the one pressed or focused last) gets the largest that fits it.
 
+## Old phones: the phone link
+
+Phones that can't run a modern web page (the Nokia 701 and its kind) use the same Firefox through the phone link instead of the
+stream: Cloud Companion lays the page out at the phone's width and sends it as tiles, with its fixed parts, scroll boxes and tap
+regions; the phone scrolls and highlights on its own (`client/`, `docs/status.md`). Each phone view is a tab in a small window of
+its own, behind the window the Browser page streams, so the two never get in each other's way, and it shares the profile: you are
+signed in on the phone where you are signed in here.
+
 ## Your data
 
 Everything stays with Cloud Companion; the container itself keeps nothing:

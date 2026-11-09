@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phone link test</title>
+<style>body{margin:0;font:18px sans-serif}header{position:fixed;top:0;left:0;right:0;height:44px;background:#222;color:#fff;padding:10px}
+main{padding:64px 12px 12px}.bar{position:sticky;top:44px;background:#ffd;padding:8px}.box{height:120px;overflow:auto;border:1px solid #999}
+.s{height:300px;color:#fff;padding:12px;font-size:28px}input,select,button{font-size:18px;margin:6px 0}</style></head><body>
+<header>Fixed header</header>
+<main><h1>Phone link test</h1>
+<a href="/two.html">Go to page two</a>
+<form action="/two.html"><input name="q" placeholder="type here" autocomplete="off"></form>
+<select id="pick"><option>one</option><option>two</option><option>three</option></select>
+<button id="ask" onclick="document.getElementById('said').textContent=confirm('Sure?')?'yes':'no'">ask</button> <span id="said"></span>
+<a href="data:application/octet-stream,hello" download="hello.txt">dl</a>
+<div class="bar">Sticky bar</div>
+<div class="box"><p>Scroll box line 1</p><p>line 2</p><p>line 3</p><p>line 4</p><p>line 5</p><p>line 6</p><p><a href="/two.html">link in box</a></p></div>
+<div class="s" style="background:#c0392b">Stripe 1: red</div><div class="s" style="background:#27ae60">Stripe 2: green</div>
+<div class="s" style="background:#2980b9">Stripe 3: blue</div><div class="s" style="background:#8e44ad">Stripe 4: purple</div>
+<p id="typed"></p>
+<script>document.querySelector('input').addEventListener('input',e=>{document.getElementById('typed').textContent='typed:'+e.target.value+':'+e.isTrusted})</script>
+</main></body></html>
