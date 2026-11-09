@@ -72,6 +72,21 @@
         <q-card-actions align="right"><q-btn flat label="Close" v-close-popup /></q-card-actions>
       </q-card>
     </q-dialog>
+    <!-- a page's "choose a file": the files of this device, uploaded to Cloud Companion and handed to the page -->
+    <q-dialog :model-value="!!engine.pick" persistent>
+      <q-card v-if="engine.pick" class="ph-dialog" data-test="pick-dialog">
+        <q-card-section>
+          <h2>{{ engine.pick.multiple ? 'Choose files' : 'Choose a file' }}</h2>
+          <p class="ph-muted">{{ engine.pick.site || 'The page' }} asks for {{ engine.pick.multiple ? 'files' : 'a file' }} from this device.</p>
+          <p v-if="pickError" class="ph-err" role="alert">{{ pickError }}</p>
+          <input ref="picker" type="file" class="ph-sr" :accept="engine.pick.accept" :multiple="engine.pick.multiple" data-test="pick-input" @change="picked" />
+        </q-card-section>
+        <q-card-actions align="right">
+          <q-btn flat label="Cancel" :disable="uploading" data-test="pick-cancel" @click="cancelPick" />
+          <q-btn unelevated color="primary" :loading="uploading" :label="engine.pick.multiple ? 'Choose files' : 'Choose a file'" data-test="pick-choose" @click="picker?.click()" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
     <!-- the page on another device: it asks there whether to open it in the Browser or in its own browser -->
     <q-dialog v-model="sendOpen">
       <q-card class="ph-dialog" data-test="send-dialog">
@@ -94,7 +109,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { state, api, browserPrefs, setBrowserPref } from '../cloud'
+import { state, api, apiUpload, browserPrefs, setBrowserPref } from '../cloud'
 import { toast } from '../toast'
 import { useRouter } from 'vue-router'
 import type { SessionInfo } from '../proto'
@@ -103,6 +118,19 @@ import { XBrowserFrame } from '@etesian-design/shell'
 import { engine, activeTab, act, command, focusPage, fitScreen, start, stop } from '../browserEngine'
 
 const router = useRouter()
+const picker = ref<HTMLInputElement | null>(null)
+const uploading = ref(false), pickError = ref('')
+async function picked() {
+  const p = engine.pick, files = picker.value?.files
+  if (!p || !files?.length) return
+  const form = new FormData()
+  for (const f of files) form.append('file', f, f.name)
+  uploading.value = true; pickError.value = ''
+  try { await apiUpload('/phe/browser/upload?id=' + encodeURIComponent(p.id), form); engine.pick = null; focusPage() }
+  catch (e) { pickError.value = (e as Error).message }
+  finally { uploading.value = false }
+}
+function cancelPick() { const p = engine.pick; if (p) command({ c: 'files', id: p.id, files: [] }); engine.pick = null; pickError.value = ''; focusPage() }
 function showDownloads() { engine.note = ''; void router.push({ path: '/files', query: { dir: 'Downloads' } }) }
 const stage = ref<HTMLElement | null>(null)
 const screen = ref<HTMLElement | null>(null)

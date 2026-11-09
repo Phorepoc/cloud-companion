@@ -1,0 +1,4 @@
+<!doctype html><title>upload</title>
+<style>body{margin:0}input{position:absolute;left:0;top:0;width:400px;height:200px;font-size:30px}</style>
+<input type="file" id="f">
+<script>document.getElementById('f').addEventListener('change', async (e) => { const f = e.target.files[0]; document.title = 'got ' + f.name + ': ' + (await f.text()).trim() })</script>

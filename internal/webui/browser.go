@@ -9,6 +9,8 @@ package webui
 //	/phe/browser/neko/...       the stream's API and socket; Neko checks the token
 //	/phe/browser/bridge?t=...   the page's socket for tabs, navigation and downloads
 //	/phe/browser/ext?s=...      the socket of the extension inside Firefox (shared secret)
+//	POST /phe/browser/upload?id=  (signed device) files picked on the device for a page's file input -> handed to the extension
+//	GET /phe/browser/file/{tok}?s= (the extension) one of those files, once, within two minutes
 //	GET /phe/browser/settings   (admin) -> {configured, override, memory: the extension's last report (memoryMB, auto, budget, open, loaded)}
 //	PUT /phe/browser/settings   (admin) {override}: how many tabs Firefox keeps loaded, 0 = from its memory
 //
@@ -18,6 +20,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -40,6 +43,7 @@ type browserHub struct {
 	pages map[*websocket.Conn]bool
 	tabs  []byte // the last tab list, for a page that connects later
 	mem   []byte // the extension's last memory report
+	files map[string]*heldFile
 	st    interface {
 		Setting(string) string
 		SetSetting(string, string) error
@@ -48,10 +52,19 @@ type browserHub struct {
 
 const browserOverrideKey = "browser.loaded-tabs"
 
+// heldFile is a file picked on a device for a page in Firefox, until the extension takes it.
+type heldFile struct {
+	name, typ string
+	data      []byte
+	until     time.Time
+}
+
+const browserUploadMax = 200 << 20
+
 func (a *auth) browserRoutes(mux *http.ServeMux) {
 	base, pass, secret := os.Getenv("PHECLOUD_BROWSER_URL"), os.Getenv("PHECLOUD_BROWSER_PASSWORD"), os.Getenv("PHECLOUD_BROWSER_SECRET")
 	on := base != "" && pass != "" && secret != ""
-	h := &browserHub{pages: map[*websocket.Conn]bool{}, st: a.st}
+	h := &browserHub{pages: map[*websocket.Conn]bool{}, st: a.st, files: map[string]*heldFile{}}
 	mux.HandleFunc("GET /phe/browser/settings", func(w http.ResponseWriter, r *http.Request) {
 		if !a.adminDevice(r) {
 			bad(w, 403, "admin only")
@@ -109,6 +122,80 @@ func (a *auth) browserRoutes(mux *http.ServeMux) {
 		return
 	}
 	mux.Handle("/phe/browser/neko/", http.StripPrefix("/phe/browser/neko", httputil.NewSingleHostReverseProxy(target)))
+	mux.HandleFunc("POST /phe/browser/upload", func(w http.ResponseWriter, r *http.Request) {
+		if _, _, ok := a.signedDevice(r); !ok {
+			bad(w, 403, "this device is not signed in")
+			return
+		}
+		id := r.URL.Query().Get("id")
+		r.Body = http.MaxBytesReader(w, r.Body, browserUploadMax)
+		if err := r.ParseMultipartForm(32 << 20); err != nil {
+			bad(w, 413, "the files are too big (200 MB at most)")
+			return
+		}
+		defer r.MultipartForm.RemoveAll()
+		type out struct {
+			Name string `json:"name"`
+			Type string `json:"type"`
+			Tok  string `json:"tok"`
+		}
+		var list []out
+		h.mu.Lock()
+		for k, f := range h.files { // what was never taken
+			if time.Now().After(f.until) {
+				delete(h.files, k)
+			}
+		}
+		h.mu.Unlock()
+		for _, fh := range r.MultipartForm.File["file"] {
+			f, err := fh.Open()
+			if err != nil {
+				bad(w, 400, err.Error())
+				return
+			}
+			b, err := io.ReadAll(f)
+			f.Close()
+			if err != nil {
+				bad(w, 400, err.Error())
+				return
+			}
+			var t [16]byte
+			_, _ = rand.Read(t[:])
+			tok := hex.EncodeToString(t[:])
+			typ := fh.Header.Get("Content-Type")
+			h.mu.Lock()
+			h.files[tok] = &heldFile{name: fh.Filename, typ: typ, data: b, until: time.Now().Add(2 * time.Minute)}
+			h.mu.Unlock()
+			list = append(list, out{fh.Filename, typ, tok})
+		}
+		m, _ := json.Marshal(map[string]any{"c": "files", "id": id, "files": list})
+		h.mu.Lock()
+		e := h.ext
+		h.mu.Unlock()
+		if e == nil {
+			bad(w, 502, "the browser is not connected")
+			return
+		}
+		_ = e.Write(r.Context(), websocket.MessageText, m)
+		h.toPages(r.Context(), []byte(`{"t":"picked","id":`+strconv.Quote(id)+`}`))
+		reply(w, 200, map[string]any{"files": len(list)})
+	})
+	mux.HandleFunc("GET /phe/browser/file/{tok}", func(w http.ResponseWriter, r *http.Request) {
+		if !hmac.Equal([]byte(r.URL.Query().Get("s")), []byte(secret)) {
+			bad(w, 403, "wrong secret")
+			return
+		}
+		h.mu.Lock()
+		f := h.files[r.PathValue("tok")]
+		delete(h.files, r.PathValue("tok"))
+		h.mu.Unlock()
+		if f == nil || time.Now().After(f.until) {
+			bad(w, 404, "no such file")
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		_, _ = w.Write(f.data)
+	})
 	mux.HandleFunc("/phe/browser/bridge", func(w http.ResponseWriter, r *http.Request) {
 		if !browserTicketOK(secret, r.URL.Query().Get("t"), time.Now()) {
 			bad(w, 403, "no valid ticket")

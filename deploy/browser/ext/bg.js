@@ -56,6 +56,14 @@ browser.downloads.onChanged.addListener(async (d) => {
   const [it] = await browser.downloads.search({ id: d.id }).catch(() => [])
   send({ t: 'download', state: d.state.current, id: d.id, name: it ? it.filename.split('/').pop() : '' })
 })
+// a page's file input: the Browser page asks on the device, the files come back through Cloud Companion
+const picks = new Map() // id -> [tab, frame]
+browser.runtime.onMessage.addListener((m, sender) => {
+  if (!m.pick) return
+  picks.set(m.pick.id, [sender.tab.id, sender.frameId])
+  send({ t: 'pick', ...m.pick, site: sender.url ? new URL(sender.url).host : '' })
+})
+let httpBase = '', secret = ''
 const active = async () => (await browser.tabs.query({ active: true, currentWindow: true }))[0]
 const sendZoom = async (id) => send({ t: 'zoom', factor: await browser.tabs.getZoom(id) })
 browser.tabs.onZoomChange.addListener((z) => send({ t: 'zoom', factor: z.newZoomFactor }))
@@ -80,12 +88,26 @@ const cmds = {
   async back() { await browser.tabs.goBack((await active()).id) },
   async forward() { await browser.tabs.goForward((await active()).id) },
   async reload() { await browser.tabs.reload((await active()).id) },
+  async files(m) {
+    const at = picks.get(m.id)
+    picks.delete(m.id)
+    send({ t: 'picked', id: m.id })
+    if (!at) return
+    const files = []
+    for (const f of m.files || []) {
+      const r = await fetch(`${httpBase}/phe/browser/file/${f.tok}?s=${encodeURIComponent(secret)}`)
+      if (r.ok) files.push({ name: f.name, type: f.type, data: await r.arrayBuffer() })
+    }
+    await browser.tabs.sendMessage(at[0], { files, id: m.id }, { frameId: at[1] })
+  },
   async budget(m) { override = Math.max(0, Number(m.n) || 0); await fit() },
   async zoom(m) { await browser.tabs.setZoom((await active()).id, m.factor) },
 }
 async function dial() {
   const c = await browser.storage.managed.get(['url', 'secret', 'memoryMB']).catch(() => ({}))
   memoryMB = Number(c.memoryMB) || 2048
+  secret = c.secret || ''
+  httpBase = c.url ? c.url.replace(/^ws/, 'http').replace(/\/phe\/browser\/ext$/, '') : ''
   if (!c.url) return setTimeout(dial, 3000)
   ws = new WebSocket(c.url + '?s=' + encodeURIComponent(c.secret))
   ws.onopen = async () => { tabs(); fit(); const a = await active(); if (a) sendZoom(a.id) }

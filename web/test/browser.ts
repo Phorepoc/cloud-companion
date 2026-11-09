@@ -71,6 +71,12 @@ try {
     await q.touchscreen.tap(v.x + (v.width - s.w * k) / 2 + 60 * k, v.y + (v.height - s.h * k) / 2 + 130 * k) }
   await until(async () => (await q.inputValue(addr)).includes('two.html'), 'phone: a tap follows the link'); step('on a phone a tap follows a link')
   await ctx2.close()
+  // a page's file input asks this device for the file, and the page gets it
+  await go(SITE + 'upload.html'); await until(async () => (await title()) === 'upload', 'upload page'); await p.waitForTimeout(800)
+  await p.mouse.move(...await at(150, 100)); await p.mouse.down(); await p.mouse.up()
+  await p.waitForSelector('[data-test=pick-dialog]', { timeout: 10000 })
+  await p.setInputFiles('[data-test=pick-input]', { name: 'hello.txt', mimeType: 'text/plain', buffer: Buffer.from('hello from the device') })
+  await until(async () => (await title()) === 'got hello.txt: hello from the device', 'the page got the file'); step('a page asks for a file: this device picks it, the page gets it')
   // a download lands in Files, Downloads, and the page says so with a way there
   await go(SITE + 'phe-download.txt')
   await until(async () => /Saved in Files, Downloads: phe-download\.txt/.test(await p.textContent('[data-test=browser-note]').catch(() => '') || ''), 'download saved')

@@ -10,6 +10,7 @@ export interface FxTab { id: number; title: string; url: string; active: boolean
 export const engine = reactive({
   status: 'idle' as 'idle' | 'insecure' | 'unconfigured' | 'connecting' | 'live' | 'failed',
   up: false, tabs: [] as FxTab[], busy: false, zoom: 1, note: '', saved: '',
+  pick: null as null | { id: string; accept: string; multiple: boolean; site: string }, // a page asks for files
 })
 ;(window as any).__pheBrowser = engine // tests read the tab list from here
 let client: NekoClient | null = null, ws: WebSocket | null = null, unmount: (() => void) | null = null
@@ -41,6 +42,8 @@ function onBridge(e: MessageEvent) {
   if (m.t === 'tabs') { engine.tabs = m.tabs; if (!m.tabs.some((t: FxTab) => t.loading)) engine.busy = false }
   else if (m.t === 'engine') { engine.up = m.up; flush() }
   else if (m.t === 'zoom') engine.zoom = m.factor
+  else if (m.t === 'pick') engine.pick = { id: m.id, accept: m.accept, multiple: !!m.multiple, site: m.site || '' }
+  else if (m.t === 'picked') { if (engine.pick?.id === m.id) engine.pick = null }
   else if (m.t === 'nav') { if (m.state === 'start') engine.busy = true; else if (m.state !== 'commit') engine.busy = false }
   else if (m.t === 'download') {
     engine.saved = m.state === 'complete' ? m.name || '' : ''
