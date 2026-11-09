@@ -5,11 +5,15 @@
 set -eu
 : "${PHE_BROWSER_SECRET:?}"; : "${PHE_BROWSER_BRIDGE:?}"
 chown -R neko:neko /home/neko/.config
+# the memory this container may use (its limit, or the machine's), for how many tabs Firefox keeps loaded
+MEM=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
+case $MEM in max|'') MEM=$(awk '/^MemTotal/ {print $2 * 1024}' /proc/meminfo) ;; esac
+MEM_MB=$((MEM / 1048576))
 cat > /usr/share/firefox-esr/distribution/policies.json <<J
 {"policies":{"DisableAppUpdate":true,"DisableTelemetry":true,"DisableFirefoxStudies":true,"DontCheckDefaultBrowser":true,
 "OverrideFirstRunPage":"","OverridePostUpdatePage":"","Homepage":{"URL":"about:blank","StartPage":"previous-session"},
 "ExtensionSettings":{"bridge@cloud-companion.local":{"installation_mode":"force_installed","install_url":"file:///opt/bridge.xpi"}},
-"3rdparty":{"Extensions":{"bridge@cloud-companion.local":{"url":"$PHE_BROWSER_BRIDGE","secret":"$PHE_BROWSER_SECRET"}}}}}
+"3rdparty":{"Extensions":{"bridge@cloud-companion.local":{"url":"$PHE_BROWSER_BRIDGE","secret":"$PHE_BROWSER_SECRET","memoryMB":$MEM_MB}}}}}
 J
 mkdir -p "$XDG_RUNTIME_DIR"; chown neko "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR"; rm -f /tmp/.X99-lock
 # what supervisord did in Neko's image: each part restarts if it stops

@@ -19,6 +19,7 @@ export const SETTINGS_GROUPS: SettingsGroup[] = [
     { id: 'connections', title: 'Connections', icon: 'split', color: '#347708', subtitle: 'Accounts and messaging', admin: true },
     { id: 'devices', title: 'Devices', icon: 'window', color: '#F77219', subtitle: 'Paired phones and browsers', admin: true },
     { id: 'features', title: 'Features', icon: 'grid', color: '#7A3FB8', subtitle: 'Turn optional parts on or off', admin: true },
+    { id: 'webbrowser', title: 'Browser', icon: 'globe', color: '#E66000', subtitle: 'Tabs kept loaded', admin: true },
     { id: 'system', title: 'System', icon: 'settings', color: '#4A5568', subtitle: 'Hardware and SSH access', admin: true },
     { id: 'updates', title: 'Updates', icon: 'refresh', color: '#1C7C3C', subtitle: 'Automatic updates', admin: true },
     { id: 'backups', title: 'Backups', icon: 'save', color: '#0B7A75', subtitle: 'Nightly backups of your data', admin: true },

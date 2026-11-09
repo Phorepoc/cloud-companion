@@ -60,6 +60,22 @@ try {
   await q.click('[data-test=sent-open]'); await q.waitForURL(/#\/browse/)
   await until(async () => (await tabCount()) === before + 1, 'the sent page opens in a new tab'); step('Send to device: the other device asks, and opens it in the Browser')
   await ctx2.close()
+  // Settings, Browser: the number of tabs kept loaded follows the memory; set to 2, the others unload and come back when picked
+  const loaded = () => p.evaluate(() => (window as any).__pheBrowser.tabs.filter((t: any) => !t.asleep).length as number)
+  await p.goto(BASE + '/#/settings/webbrowser'); await p.waitForSelector('[data-test=bset-memory]')
+  await until(async () => /GB|MB/.test(await p.textContent('[data-test=bset-memory]') || ''), 'memory shown')
+  assert.match(await p.textContent('[data-test=bset-auto]') || '', /\d+ tabs loaded at most/); step('Settings shows the memory and the automatic number')
+  await p.click('[data-test=bset-auto-switch]'); await p.fill('[data-test=bset-number] input', '2'); await p.click('[data-test=bset-save]')
+  await until(async () => /loaded/.test(await p.textContent('[data-test=bset-open]') || ''), 'saved')
+  await p.goto(BASE + '/#/browse'); await live()
+  for (const u of ['index.html', 'two.html', 'ua']) { await more('tab-new'); await p.waitForTimeout(400); await go(SITE + u); await p.waitForTimeout(1200) }
+  await until(async () => (await loaded()) <= 2, 'at most two loaded'); assert((await tabCount()) >= 4, 'no tab was closed'); step('above the number, background tabs unload and stay open')
+  const sleeper = await p.evaluate(() => (window as any).__pheBrowser.tabs.find((t: any) => t.asleep)?.id as number)
+  await p.locator(`.x-bf [data-tab-id="${sleeper}"], .x-bf [data-id="${sleeper}"]`).first().click({ timeout: 3000 }).catch(async () => { await more('other-devices'); await p.locator(`[data-test=fx-tab-${sleeper}] [aria-label='Open here']`).click() })
+  await until(() => p.evaluate((id) => !(window as any).__pheBrowser.tabs.find((t: any) => t.id === id)?.asleep, sleeper), 'picked tab loads again'); step('an unloaded tab loads again when picked')
+  await p.goto(BASE + '/#/settings/webbrowser'); await p.waitForSelector('[data-test=bset-auto-switch]'); await p.click('[data-test=bset-auto-switch]')
+  await until(async () => /from the memory/.test(await p.textContent('[data-test=bset-auto]') || ''), 'auto again'); step('back to automatic')
+  await p.goto(BASE + '/#/browse'); await live()
   await p.screenshot({ path: OUT + '/browser-end.png' })
   console.log('BROWSER PASS')
 } catch (e) { await p.screenshot({ path: OUT + '/browser-fail.png' }).catch(() => {}); console.log(errs.slice(-8).join('\n').slice(0, 900)); throw e } finally { await b.close() }

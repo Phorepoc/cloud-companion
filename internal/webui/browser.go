@@ -9,6 +9,8 @@ package webui
 //	/phe/browser/neko/...       the stream's API and socket; Neko checks the token
 //	/phe/browser/bridge?t=...   the page's socket for tabs, navigation and downloads
 //	/phe/browser/ext?s=...      the socket of the extension inside Firefox (shared secret)
+//	GET /phe/browser/settings   (admin) -> {configured, override, memory: the extension's last report (memoryMB, auto, budget, open, loaded)}
+//	PUT /phe/browser/settings   (admin) {override}: how many tabs Firefox keeps loaded, 0 = from its memory
 //
 // Neither Neko's port nor Firefox is reachable from outside: everything but the WebRTC media comes through here.
 
@@ -37,12 +39,51 @@ type browserHub struct {
 	ext   *websocket.Conn
 	pages map[*websocket.Conn]bool
 	tabs  []byte // the last tab list, for a page that connects later
+	mem   []byte // the extension's last memory report
+	st    interface {
+		Setting(string) string
+		SetSetting(string, string) error
+	}
 }
+
+const browserOverrideKey = "browser.loaded-tabs"
 
 func (a *auth) browserRoutes(mux *http.ServeMux) {
 	base, pass, secret := os.Getenv("PHECLOUD_BROWSER_URL"), os.Getenv("PHECLOUD_BROWSER_PASSWORD"), os.Getenv("PHECLOUD_BROWSER_SECRET")
 	on := base != "" && pass != "" && secret != ""
-	h := &browserHub{pages: map[*websocket.Conn]bool{}}
+	h := &browserHub{pages: map[*websocket.Conn]bool{}, st: a.st}
+	mux.HandleFunc("GET /phe/browser/settings", func(w http.ResponseWriter, r *http.Request) {
+		if !a.adminDevice(r) {
+			bad(w, 403, "admin only")
+			return
+		}
+		h.mu.Lock()
+		mem := h.mem
+		h.mu.Unlock()
+		var m any
+		if mem != nil {
+			_ = json.Unmarshal(mem, &m)
+		}
+		n, _ := strconv.Atoi(a.st.Setting(browserOverrideKey))
+		reply(w, 200, map[string]any{"configured": on, "override": n, "memory": m})
+	})
+	mux.HandleFunc("PUT /phe/browser/settings", func(w http.ResponseWriter, r *http.Request) {
+		if !a.adminDevice(r) {
+			bad(w, 403, "admin only")
+			return
+		}
+		var in struct{ Override int }
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1024)).Decode(&in) != nil || in.Override < 0 || in.Override > 500 {
+			bad(w, 400, "enter a number from 0 to 500")
+			return
+		}
+		if err := a.st.SetSetting(browserOverrideKey, strconv.Itoa(in.Override)); err != nil {
+			bad(w, 500, err.Error())
+			return
+		}
+		h.toExt(r.Context(), in.Override)
+		reply(w, 200, map[string]any{"override": in.Override})
+	})
 	mux.HandleFunc("/phe/browser/ticket", func(w http.ResponseWriter, r *http.Request) {
 		id, _, ok := a.signedDevice(r)
 		if !ok {
@@ -124,6 +165,8 @@ func (h *browserHub) serveExt(ctx context.Context, c *websocket.Conn) {
 	h.mu.Lock()
 	h.ext = c
 	h.mu.Unlock()
+	n, _ := strconv.Atoi(h.st.Setting(browserOverrideKey))
+	h.toExt(ctx, n)
 	h.toPages(ctx, []byte(`{"t":"engine","up":true}`))
 	defer func() {
 		h.mu.Lock()
@@ -138,12 +181,29 @@ func (h *browserHub) serveExt(ctx context.Context, c *websocket.Conn) {
 		if err != nil {
 			return
 		}
-		if bytes.Contains(m[:min(len(m), 16)], []byte(`"t":"tabs"`)) {
+		head := m[:min(len(m), 16)]
+		if bytes.Contains(head, []byte(`"t":"mem"`)) {
+			h.mu.Lock()
+			h.mem = m
+			h.mu.Unlock()
+			continue // for Settings, not the pages
+		}
+		if bytes.Contains(head, []byte(`"t":"tabs"`)) {
 			h.mu.Lock()
 			h.tabs = m
 			h.mu.Unlock()
 		}
 		h.toPages(ctx, m)
+	}
+}
+
+// toExt tells the extension how many tabs to keep loaded (0: from its memory).
+func (h *browserHub) toExt(ctx context.Context, n int) {
+	h.mu.Lock()
+	e := h.ext
+	h.mu.Unlock()
+	if e != nil {
+		_ = e.Write(ctx, websocket.MessageText, []byte(`{"c":"budget","n":`+strconv.Itoa(n)+`}`))
 	}
 }
 
