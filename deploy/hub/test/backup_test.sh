@@ -22,7 +22,7 @@ cleanup() {
     docker rm -f phe-rt-stalwart >/dev/null 2>&1 || true
     docker network rm phe-rt-net >/dev/null 2>&1 || true
     docker volume rm phe-rt-stalwart-data phe-rt-stalwart-etc phe-rt-phecloud-data phe-rt2-stalwart-data phe-rt2-stalwart-etc phe-rt2-phecloud-data >/dev/null 2>&1 || true
-    [ -d "$BK" ] && { bb sh -c 'rm -rf /b/* /b/.[!.]*' >/dev/null 2>&1 || true; rmdir "$BK" 2>/dev/null || true; }
+    if [ -d "$BK" ]; then bb sh -c 'rm -rf /b/* /b/.[!.]*' >/dev/null 2>&1 || true; rmdir "$BK" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
 cleanup
