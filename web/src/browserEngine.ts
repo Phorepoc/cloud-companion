@@ -6,7 +6,7 @@ import { reactive } from 'vue'
 import { NekoClient, mount } from '@m1k1o/neko'
 import { apiCall } from './cloud'
 
-export interface FxTab { id: number; title: string; url: string; active: boolean; loading: boolean; mobile?: boolean; starred?: boolean }
+export interface FxTab { id: number; title: string; url: string; active: boolean; loading: boolean; mobile?: boolean; starred?: boolean; security?: 'secure' | 'insecure' | 'broken' | 'none' }
 export const engine = reactive({
   status: 'idle' as 'idle' | 'insecure' | 'unconfigured' | 'connecting' | 'live' | 'failed',
   up: false, tabs: [] as FxTab[], busy: false, zoom: 1, note: '', saved: '',

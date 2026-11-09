@@ -10,7 +10,7 @@ async function tabs() {
   const all = await browser.tabs.query({})
   const marked = new Set()
   for (const x of all) if (x.url && /^https?:/.test(x.url) && (await browser.bookmarks.search({ url: x.url }).catch(() => [])).length) marked.add(x.id)
-  send({ t: 'tabs', tabs: all.map((x) => ({ starred: marked.has(x.id), id: x.id, title: x.title, url: x.url, active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id), asleep: !!x.discarded })) })
+  send({ t: 'tabs', tabs: all.map((x) => ({ starred: marked.has(x.id), id: x.id, title: x.title, url: x.url, security: security.get(x.id) || (x.url && x.url.startsWith('https:') ? 'secure' : 'none'), active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id), asleep: !!x.discarded })) })
 }
 for (const e of ['onCreated', 'onRemoved', 'onActivated', 'onUpdated', 'onMoved']) browser.tabs[e].addListener(tabs)
 browser.tabs.onRemoved.addListener((id) => mobile.delete(id))
@@ -47,6 +47,20 @@ async function fit() {
 browser.tabs.onActivated.addListener(fit)
 browser.tabs.onCreated.addListener(fit)
 browser.tabs.onRemoved.addListener(fit)
+// how safe each tab's page is, for the lock in the address bar: secure, insecure (http), broken (a certificate Firefox refused
+// or one with problems): Firefox's own view of the connection, not just the address
+const security = new Map()
+browser.tabs.onRemoved.addListener((id) => security.delete(id))
+browser.webRequest.onHeadersReceived.addListener(async (d) => {
+  if (d.tabId < 0) return
+  if (!d.url.startsWith('https:')) { security.set(d.tabId, 'insecure'); return }
+  const i = await browser.webRequest.getSecurityInfo(d.requestId, {}).catch(() => null)
+  security.set(d.tabId, i && i.state === 'secure' ? 'secure' : 'broken')
+  tabs()
+}, { urls: ['<all_urls>'], types: ['main_frame'] }, ['blocking'])
+browser.webRequest.onErrorOccurred.addListener((d) => {
+  if (d.tabId >= 0 && /SEC_ERROR|SSL_ERROR|MOZILLA_PKIX|CERT/i.test(d.error)) { security.set(d.tabId, 'broken'); tabs() }
+}, { urls: ['<all_urls>'], types: ['main_frame'] })
 // bookmarks and history are Firefox's own, in the profile (a Cloud Companion volume, in its backups); the Browser page shows them
 for (const e of ['onCreated', 'onRemoved', 'onChanged']) browser.bookmarks[e].addListener(() => tabs())
 const pick = (n) => ({ id: n.id, title: n.title || '', url: n.url })

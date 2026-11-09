@@ -71,6 +71,11 @@ try {
     await q.touchscreen.tap(v.x + (v.width - s.w * k) / 2 + 60 * k, v.y + (v.height - s.h * k) / 2 + 130 * k) }
   await until(async () => (await q.inputValue(addr)).includes('two.html'), 'phone: a tap follows the link'); step('on a phone a tap follows a link')
   await ctx2.close()
+  // the shared screen is the phone's now: Firefox's window follows it (it has a minimum width of its own, lifted)
+  await go(SITE + 'size.html'); await until(async () => /^size (\d+)x\d+ screen \1x/.test(await title() || ''), 'Firefox as narrow as the phone'); step('Firefox\'s window is as narrow as the phone\'s screen')
+  // using this device again takes the screen back to its own size
+  await p.mouse.move(...await at(10, 300)); await p.mouse.down(); await p.mouse.up()
+  await until(() => p.evaluate(() => (document.querySelector('[data-test=screen] video') as HTMLVideoElement).videoWidth >= 1000), 'desktop size again'); step('using the desktop again gives it its own screen size back')
   // the clipboard both ways: this device's text pastes into the page, and what is copied there comes back to this device
   await go(SITE + 'clip.html'); await until(async () => (await title()) === 'clip', 'clip page'); await p.waitForTimeout(800)
   await p.evaluate(() => navigator.clipboard.writeText('from the device'))
@@ -82,6 +87,11 @@ try {
   await until(async () => (await title()) === 'clip:from the device', 'paste from the device'); step('paste: this device\'s clipboard goes into the page')
   await p.keyboard.type(' and back', { delay: 30 }); await p.keyboard.press('Control+A'); await p.keyboard.press('Control+C')
   await until(() => p.evaluate(() => navigator.clipboard.readText().then((t) => t === 'from the device and back')), 'copy back to the device'); step('copy: text copied in the page reaches this device\'s clipboard')
+  // a refused certificate: the address is https, but the bar does not show it as secure
+  const notSecure = () => p.locator(".x-bf__row [aria-label='Not secure']").count().then((n) => n > 0)
+  await go('https://site/two.html')
+  await until(() => p.evaluate(() => (window as any).__pheBrowser.tabs.find((t: any) => t.active)?.security === 'broken'), 'certificate refused')
+  assert(await notSecure(), 'a refused certificate shows Not secure'); await p.waitForTimeout(2000); await p.screenshot({ path: OUT + '/browser-cert.png' }); step('a refused certificate shows Not secure, not a lock')
   // the star bookmarks the page; Bookmarks and history lists it, with the pages visited, and removes it
   const starred = () => p.evaluate(() => !!(window as any).__pheBrowser.tabs.find((t: any) => t.active)?.starred)
   await go(SITE + 'two.html'); await until(async () => (await title()) === 'probe two', 'two again')

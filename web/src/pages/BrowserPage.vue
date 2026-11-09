@@ -188,7 +188,8 @@ const current = computed(() => String(activeTab()?.id ?? ''))
 const shown = (u?: string) => (!u || u.startsWith('about:') ? '' : u)
 const address = computed(() => typed.value || shown(activeTab()?.url))
 watch(() => activeTab()?.url, () => { typed.value = '' })
-const secure = computed(() => !address.value || address.value.startsWith('https:'))
+// Firefox's view of the connection (a refused certificate is not secure, whatever the address says); while typing, the address
+const secure = computed(() => !address.value || (typed.value ? typed.value.startsWith('https:') : activeTab()?.security ? activeTab()!.security !== 'broken' && activeTab()!.security !== 'insecure' : address.value.startsWith('https:')))
 function toggleSide() { setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side') }
 // a phone-sized window opens tabs with the phone version of sites, as a phone's browser does; "Desktop site" changes one tab
 const narrow = () => (stage.value?.getBoundingClientRect().width ?? window.innerWidth) < 600
@@ -224,12 +225,16 @@ function measure() {
   sizeTimer = setTimeout(() => { const r = stage.value?.getBoundingClientRect(); if (r) fitScreen(Math.floor(r.width), Math.floor(r.height)) }, 250)
 }
 watch(() => engine.status, (s) => { if (s === 'live') measure() })
+// one screen for every device: whichever is used takes it to its own size (a press in the picture, or coming back to the window)
+const reclaim = () => { if (engine.status === 'live') measure() }
+const onFocus = () => reclaim()
 onMounted(() => {
   void start(screen.value!)
   ro = new ResizeObserver(measure)
-  if (stage.value) ro.observe(stage.value)
+  if (stage.value) { ro.observe(stage.value); stage.value.addEventListener('pointerdown', reclaim, true) }
+  window.addEventListener('focus', onFocus)
 })
-onBeforeUnmount(() => { ro?.disconnect(); clearTimeout(sizeTimer); stop() })
+onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); ro?.disconnect(); clearTimeout(sizeTimer); stop() })
 </script>
 
 <style scoped>
