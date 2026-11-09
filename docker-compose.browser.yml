@@ -14,7 +14,7 @@ services:
       - phecloud-downloads:${PHECLOUD_DOWNLOADS_AT:-/data/files/Downloads}
   browser:
     build: deploy/browser
-    image: phe-browser:dev
+    image: ghcr.io/phorepoc/phecloud-browser:${PHECLOUD_VERSION:-v0.2.0}   # the released image; --build makes it from this checkout
     container_name: phe-browser
     cpus: ${PHE_BROWSER_CPUS:-2}
     mem_limit: ${PHE_BROWSER_MEM:-3g}

@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+id: browser
+title: Browser
+about: "Firefox on your server, shown on the Browser page of every device, with your sign-ins, tabs and downloads kept here."
+files: [docker-compose.browser.yml]
+needs: { memory: 7G }   # an 8 GB board (its MemTotal reads a little under 8 GiB)
+settings:
+  - { key: password, label: Stream password, env: PHECLOUD_BROWSER_PASSWORD, generate: true, secret: true }
+  - { key: secret, label: Extension secret, env: PHECLOUD_BROWSER_SECRET, generate: true, secret: true }
+  - { key: ip, label: "This server's address on your network (the picture goes straight to your devices)", env: PHE_BROWSER_IP, required: true }

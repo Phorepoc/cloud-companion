@@ -48,7 +48,7 @@
         </q-banner>
         <div ref="stage" class="ph-stage" data-test="stage">
           <HdStatusState v-if="engine.status === 'insecure'" state="error" title="The browser needs a secure address" text="Open Cloud Companion over https or at localhost." data-test="browser-insecure" />
-          <HdStatusState v-else-if="engine.status === 'unconfigured'" state="empty" title="The browser is not set up" text="Start Cloud Companion with docker-compose.browser.yml to browse from here." data-test="browser-off" />
+          <HdStatusState v-else-if="engine.status === 'unconfigured'" state="empty" title="The browser is not set up" text="Turn on Browser in Settings, Features (or start Cloud Companion with docker-compose.browser.yml)." data-test="browser-off" />
           <HdStatusState v-else-if="engine.status === 'failed'" state="error" title="The browser could not be reached" text="It may still be starting." data-test="browser-failed" />
           <div v-show="engine.status === 'live' || engine.status === 'connecting'" ref="screen" class="ph-screen" data-test="screen" />
           <div v-if="engine.status === 'connecting'" class="ph-connecting" role="status" data-test="browser-connecting"><q-spinner size="32px" /> Connecting to the browser…</div>

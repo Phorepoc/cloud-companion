@@ -7,7 +7,7 @@
     <h1>Browser</h1>
     <HdStatusState v-if="!state.admin" icon="lock" title="Only admin devices can see this page" text="Open this page on an admin device." />
     <HdStatusState v-else-if="info === null" state="loading" title="Connecting to the server" text="One moment…" />
-    <HdStatusState v-else-if="!info.configured" state="empty" title="The browser is not set up" text="Start Cloud Companion with docker-compose.browser.yml to browse from here." />
+    <HdStatusState v-else-if="!info.configured" state="empty" title="The browser is not set up" text="Turn on Browser in Settings, Features (or start Cloud Companion with docker-compose.browser.yml)." />
     <template v-else>
       <section class="ph-card ph-bset__list">
         <HdListItem title="Open tabs" :subtitle="mem ? `${mem.open} open, ${mem.loaded} loaded` : 'The browser is starting'" data-test="bset-open" />
