@@ -2,9 +2,9 @@
 # Firefox and Neko's server, without Neko's web client: the Browser page of the web app is the only way in.
 # Only Neko's own files come from its image; everything else is the least Debian that runs them (no LLVM, FFmpeg, python, font packs).
 # Pinned by the Debian release the Neko files were built on.
-FROM ghcr.io/m1k1o/neko/base:latest AS neko
+FROM ghcr.io/m1k1o/neko/base:3.2.0@sha256:587a3389b6b99c8999eb00a768c79205a74647c57cf5b9695a90234a0edaa446 AS neko
 
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 # software WebGL (LLVM, Mesa, about 200 MB) stays: sites expect it. Build with PHE_BROWSER_WEBGL=0 to leave it out.
 ARG PHE_BROWSER_WEBGL=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
