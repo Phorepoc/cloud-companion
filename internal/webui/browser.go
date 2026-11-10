@@ -272,8 +272,8 @@ func (h *browserHub) serveExt(ctx context.Context, c *websocket.Conn) {
 	h.ext = c
 	h.mu.Unlock()
 	if h.ff != nil {
-		h.ff.Attach(func(ctx context.Context, b []byte) error { return c.Write(ctx, websocket.MessageText, b) })
-		defer h.ff.Detach()
+		n := h.ff.Attach(func(ctx context.Context, b []byte) error { return c.Write(ctx, websocket.MessageText, b) })
+		defer h.ff.Detach(n)
 	}
 	n, _ := strconv.Atoi(h.st.Setting(browserOverrideKey))
 	h.toExt(ctx, n)

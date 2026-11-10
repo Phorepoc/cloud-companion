@@ -14,7 +14,7 @@ for i in $(seq 60); do docker logs phe-cloud-pk 2>&1 | grep -q 'browser' && dock
 sleep 12 # Firefox up, its extension connected
 CODE=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null)
 docker exec phe-cloud-pk phecloud-client -addr 127.0.0.1:7400 -code "$CODE" -state /tmp/phone.json -out /tmp/tiles \
-  -url http://site/phone.html -scenario gaps -tap-first-link | tee "$OUT/phone.log"
+  -url http://site/phone.html -scenario gaps -tap-first-link -summary | tee "$OUT/phone.log"
 # while a phone has views open, the Browser page's picture shows only its own window (the views stay behind it)
 CODE=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null); U="-url http://site/phone.html -url http://site/index.html"
 docker exec phe-cloud-pk phecloud-client -addr 127.0.0.1:7400 -code "$CODE" -state /tmp/p2.json -out /tmp/t2 $U $U $U $U $U $U >/dev/null 2>&1 &
@@ -25,3 +25,15 @@ curl -s -o /o/phone-stream.jpg -H "Authorization: Bearer $T" http://browser:8080
 wait
 rm -rf "$OUT/phone-tiles"; docker cp phe-cloud-pk:/tmp/tiles "$OUT/phone-tiles" >/dev/null
 docker logs phe-cloud-pk 2>&1 | grep -iE 'update|error|warn' | tail -25
+# what the phone saw, step by step (SUMMARY lines of the test client)
+fail=0
+check() { if grep "^SUMMARY step=$1 " "$OUT/phone.log" | grep -q -- "$2"; then echo "ok - $3"; else echo "not ok - $3"; fail=1; fi; }
+check open 'url=https://site/phone.html .*layers=3' 'the page comes as tiles with its fixed, sticky and scroll layers'
+check tap 'url=https://site/two.html' 'tapping a link opens it'
+check back 'url=https://site/phone.html .*fwd=true' 'Back, with Forward offered'
+check text 'fvalue=abc ' 'typing goes into the focused field'
+check key 'fvalue=ab ' 'Backspace'
+check select 'sel=2 ' 'a select option'
+check dialog 'dlgkind=confirm ' "a page's confirm is asked on the phone"
+if grep '^SUMMARY' "$OUT/phone.log" | grep -qv ' err=-$'; then echo 'not ok - a step failed'; fail=1; else echo 'ok - no step failed'; fi
+exit $fail

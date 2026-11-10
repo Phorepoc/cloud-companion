@@ -37,6 +37,9 @@ regions; the phone scrolls and highlights on its own (`client/`, `docs/status.md
 its own, behind the window the Browser page streams, so the two never get in each other's way, and it shares the profile: you are
 signed in on the phone where you are signed in here.
 
+The phone link's browser is part of this add-on: without it (no `docker-compose.browser.yml`, Browser off in Features) the rest of
+Cloud Companion runs as before and a phone's browser says it is not set up.
+
 ## Your data
 
 Everything stays with Cloud Companion; the container itself keeps nothing:

@@ -37,6 +37,7 @@ type Firefox struct {
 
 	mu    sync.Mutex
 	write func(context.Context, []byte) error
+	conn  int // which connection write belongs to: a late Detach of an old one leaves a newer one alone
 	next  int
 	wait  map[int]chan ffReply
 	tabs  map[int]*ffSession
@@ -56,15 +57,27 @@ func NewFirefox(maxH int) *Firefox {
 
 var errNoFirefox = errors.New("the browser is starting or not reachable")
 
-func (f *Firefox) Attach(write func(context.Context, []byte) error) {
+// Attach returns the connection's number, for its Detach.
+func (f *Firefox) Attach(write func(context.Context, []byte) error) int {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.drop()
+	f.conn++
 	f.write = write
-	f.mu.Unlock()
+	return f.conn
 }
 
 // Detach: the extension went away (Firefox restarted): calls waiting fail, and the phone views are gone with their windows.
-func (f *Firefox) Detach() {
+func (f *Firefox) Detach(conn int) {
 	f.mu.Lock()
+	defer f.mu.Unlock()
+	if conn == f.conn {
+		f.drop()
+	}
+}
+
+// drop: calls waiting on the connection fail, and the phone views were in its Firefox (with f.mu held).
+func (f *Firefox) drop() {
 	f.write = nil
 	for id, ch := range f.wait {
 		ch <- ffReply{Err: errNoFirefox.Error()}
@@ -74,7 +87,6 @@ func (f *Firefox) Detach() {
 		s.gone = true
 		delete(f.tabs, t)
 	}
-	f.mu.Unlock()
 }
 
 // Handle takes the extension's replies ({"t":"r"}) and questions about phone tabs ({"t":"pask"}); false: not ours.
@@ -186,10 +198,12 @@ func (f *Firefox) Close() {}
 const viewH = 640
 
 type ffSession struct {
-	f    *Firefox
-	tab  int
-	gone bool
-	maxH int
+	f      *Firefox
+	tab    int
+	gone   bool // its Firefox went away (f.mu): the next command opens the view again, on the same page
+	closed bool
+	url    string
+	maxH   int
 
 	hmu sync.Mutex
 	h   Handlers
@@ -201,9 +215,50 @@ type ffSession struct {
 	sy            int
 }
 
+// alive opens the view again after Firefox restarted: same size, zoom and site version, the last page.
+func (s *ffSession) alive(ctx context.Context) error {
+	s.f.mu.Lock()
+	gone := s.gone
+	s.f.mu.Unlock()
+	if !gone {
+		return nil
+	}
+	if s.closed {
+		return errNoFirefox
+	}
+	v, err := s.f.call(ctx, 20*time.Second, map[string]any{"c": "pOpen", "w": 360, "h": viewH})
+	if err != nil {
+		return err
+	}
+	var tab int
+	if err := json.Unmarshal(v, &tab); err != nil || tab == 0 {
+		return fmt.Errorf("opening a tab: %s", v)
+	}
+	s.f.mu.Lock()
+	s.tab, s.gone = tab, false
+	s.f.tabs[tab] = s
+	s.f.mu.Unlock()
+	if !s.opened {
+		return nil
+	}
+	if _, err := s.do(ctx, 10*time.Second, "pSite", map[string]any{"mobile": s.mobile(), "reload": false}); err != nil {
+		return err
+	}
+	if err := s.applyView(ctx); err != nil {
+		return err
+	}
+	if s.url != "" {
+		if _, err := s.do(ctx, 30*time.Second, "pNav", map[string]any{"url": s.url}); err != nil {
+			return err
+		}
+		return s.settle(ctx)
+	}
+	return nil
+}
+
 func (s *ffSession) do(ctx context.Context, d time.Duration, c string, args map[string]any) (json.RawMessage, error) {
-	if s.gone {
-		return nil, errNoFirefox
+	if err := s.alive(ctx); err != nil {
+		return nil, err
 	}
 	if args == nil {
 		args = map[string]any{}
@@ -229,8 +284,8 @@ func (s *ffSession) Close() {
 	s.f.mu.Lock()
 	delete(s.f.tabs, s.tab)
 	s.f.mu.Unlock()
-	_, _ = s.do(context.Background(), 5*time.Second, "pClose", nil)
-	s.gone = true
+	s.closed = true
+	_, _ = s.f.call(context.Background(), 5*time.Second, map[string]any{"c": "pClose", "tab": s.tab})
 }
 
 func (s *ffSession) SetHandlers(h Handlers) { s.hmu.Lock(); s.h = h; s.hmu.Unlock() }
@@ -267,6 +322,9 @@ func (s *ffSession) settle(ctx context.Context) error {
 }
 
 func (s *ffSession) Navigate(ctx context.Context, url, action string) error {
+	if url != "" {
+		s.url = url
+	}
 	if _, err := s.do(ctx, 30*time.Second, "pNav", map[string]any{"url": url, "action": action}); err != nil {
 		return err
 	}
@@ -451,6 +509,9 @@ func (s *ffSession) Snapshot(ctx context.Context, quick bool) (*Snapshot, error)
 		return nil, err
 	}
 	sn := &Snapshot{URL: info.URL, Title: info.Title, W: s.width}
+	if strings.HasPrefix(info.URL, "http") {
+		s.url = info.URL
+	}
 	sn.Focus = Focus{ID: info.Focus.ID, Kind: info.Focus.Kind, Type: info.Focus.Type, Value: info.Focus.Value,
 		Start: info.Focus.Start, End: info.Focus.End, InputMode: info.Focus.IM, EnterKey: info.Focus.Enter}
 	if sn.Focus.Kind == "" {

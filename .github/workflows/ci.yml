@@ -187,6 +187,8 @@ jobs:
           cache-to: type=gha,mode=max,scope=phecloud-browser
       - name: Run the suite
         run: sh web/test/browser.sh
+      - name: The phone link on the same Firefox
+        run: sh web/test/phonebrowser.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02   # v4
         if: always()
         with:
