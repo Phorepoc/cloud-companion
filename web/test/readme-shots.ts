@@ -54,6 +54,24 @@ await owner.waitForTimeout(500)
 await owner.screenshot({ path: `${OUT}/readme-chats.png`, clip: { x: 0, y: 0, width: 1440, height: 740 } })
 step('chats')
 
+// Wikipedia sometimes shows its donation banner (a dark purple box). It is dismissed with its "Maybe later" (and its X) in the
+// stream, found by the colour of the page behind them, so the article fills the shot.
+const bannerUp = (page: typeof owner, sel: string) => page.evaluate((sel) => {
+  const c = document.querySelector(sel + ' canvas') as HTMLCanvasElement | null
+  if (!c) return false
+  const px = c.getContext('2d')?.getImageData(Math.floor(c.width * 0.35), Math.floor(c.height * 0.45), 1, 1).data
+  return !!px && px[0] > 70 && px[0] < 130 && px[1] < 70 && px[2] > 70 && px[2] < 130
+}, sel).catch(() => false)
+async function noBanner(page: typeof owner, sel: string) {
+  for (let i = 0; i < 3 && (await bannerUp(page, sel)); i++) {
+    const b = (await page.locator(sel).first().boundingBox())!
+    await page.mouse.click(b.x + b.width * 0.86, b.y + b.height * 0.665) // Maybe later
+    await page.waitForTimeout(1500)
+    if (await bannerUp(page, sel)) { await page.mouse.click(b.x + b.width * 0.964, b.y + b.height * 0.22); await page.waitForTimeout(1500) } // the X
+  }
+  assert(!(await bannerUp(page, sel)), 'the donation banner is dismissed')
+}
+
 // Browser: Firefox on the server, on a real site
 await owner.goto(BASE + '/#/browse')
 await owner.waitForSelector('.x-bf__row input', { timeout: 30000 })
@@ -62,6 +80,7 @@ await owner.waitForTimeout(6000)
 const addr = '.x-bf__row input'
 await owner.fill(addr, SITE); await owner.press(addr, 'Enter')
 await owner.waitForTimeout(Number(process.env.SITE_WAIT || 15000))
+await noBanner(owner, '[data-test=stage]')
 
 await owner.screenshot({ path: `${OUT}/readme-browser.png` })
 step('browser: ' + await owner.inputValue(addr) + ' / ' + await owner.locator('[data-test=title]').textContent({ timeout: 2000 }).catch(() => '?'))
@@ -80,6 +99,7 @@ await owner.waitForSelector(`${win('browse')} .x-bf__row input`, { timeout: 3000
 await owner.waitForTimeout(3000)
 await owner.fill(`${win('browse')} .x-bf__row input`, SITE); await owner.press(`${win('browse')} .x-bf__row input`, 'Enter')
 await owner.waitForTimeout(12000)
+await noBanner(owner, `${win('browse')} [data-test=stage]`)
 const snap = async (id: string, x: number) => {
   const b = (await owner.locator(`${win(id)} .x-win__drag`).boundingBox())!
   await owner.mouse.move(b.x + 120, b.y + 10); await owner.mouse.down(); await owner.mouse.move(x, 450, { steps: 20 }); await owner.mouse.up()
