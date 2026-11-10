@@ -95,7 +95,7 @@ jobs:
           docker run -d --name ci-cloud -p 127.0.0.1:8080:8080 phe-cloud:dev
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/ >/dev/null && break; sleep 1; done
           curl -fsSI http://127.0.0.1:8080/ | grep -i "content-security-policy"
-          docker exec ci-cloud test -s /etc/ssl/certs/ca-certificates.crt
+          docker cp ci-cloud:/etc/ssl/certs/ca-certificates.crt ca.crt && test -s ca.crt   # the image is FROM scratch: no shell or test inside
           docker logs ci-cloud | tail -5
       - name: Save images
         run: docker save phe-cloud:dev phe-fakes:dev | gzip -1 > images.tar.gz
