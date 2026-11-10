@@ -61,6 +61,7 @@ func main() {
 	quality := flag.Int("q", 0, "byte budget: JPEG quality 1-100 (0 = default)")
 	gray := flag.Bool("gray", false, "byte budget: grayscale tiles")
 	typ := flag.String("type", "", "after the first page, type this text into the first input")
+	flag.BoolVar(&acceptCert, "accept-cert", false, "answer \"continue anyway\" to a refused certificate")
 	var us urls
 	flag.Var(&us, "url", "URL to open (repeatable)")
 	flag.Parse()
@@ -237,11 +238,17 @@ func main() {
 					proto.Write(nc, proto.Input{T: proto.TInput, V: view, Kind: "select", ID: r.ID, Index: 2})
 				})
 			}
-			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "ask" }); r != nil {
-				tapRegion("dialog", *r)
-			}
 			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "dl" }); r != nil {
 				tapRegion("download", *r)
+			}
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "dl2" }); r != nil {
+				tapRegion("download2", *r)
+			}
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "trust" }); r != nil {
+				tapRegion("trust", *r)
+			}
+			if r := find(sum.regions, func(r proto.Region) bool { return r.Label == "ask" }); r != nil {
+				tapRegion("dialog", *r)
 			}
 		}
 	}
@@ -249,6 +256,8 @@ func main() {
 }
 
 var wconn io.Writer
+
+var acceptCert bool
 
 // view is the view (tab) the requests are about.
 var view = 1
@@ -325,7 +334,7 @@ func collect(r *counter, dir string, start time.Time) *summary {
 			case "auth":
 				ans.Text, ans.Pass = "zed", "pw"
 			case "cert":
-				ans.OK = false
+				ans.OK = acceptCert
 			}
 			proto.Write(wconn, ans)
 			proto.Write(wconn, proto.DialogReply{T: proto.TDialogReply, ID: d.ID, OK: true, Text: "Zed"})

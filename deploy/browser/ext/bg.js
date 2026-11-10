@@ -7,7 +7,7 @@ const mobile = new Set()
 const MOBILE_UA = navigator.userAgent.replace(/\([^)]*rv:([\d.]+)\) Gecko\/\d+/, '(Android 14; Mobile; rv:$1) Gecko/$1')
 const send = (m) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(m)) }
 async function tabs() {
-  const all = (await browser.tabs.query({})).filter((x) => !isPhoneTab(x.id)) // the phone link's views are not the page's tabs
+  const all = (await browser.tabs.query({})).filter((x) => !isPhoneTab(x.id) && !phoneStores.has(x.cookieStoreId)) // the phone link's views are not the page's tabs
   const marked = new Set()
   for (const x of all) if (x.url && /^https?:/.test(x.url) && (await browser.bookmarks.search({ url: x.url }).catch(() => [])).length) marked.add(x.id)
   send({ t: 'tabs', tabs: all.map((x) => ({ starred: marked.has(x.id), id: x.id, title: x.title, url: x.url, security: security.get(x.id) || (x.url && x.url.startsWith('https:') ? 'secure' : 'none'), active: x.active, loading: x.status === 'loading', mobile: mobile.has(x.id), asleep: !!x.discarded })) })
@@ -36,7 +36,7 @@ async function fit() {
   if (fitting) return
   fitting = true
   try {
-    const all = (await browser.tabs.query({})).filter((t) => !isPhoneTab(t.id)) // a phone's view is in use: never unloaded
+    const all = (await browser.tabs.query({})).filter((t) => !isPhoneTab(t.id) && !phoneStores.has(t.cookieStoreId)) // a phone's view is in use: never unloaded
     const loaded = all.filter((t) => !t.discarded)
     const spare = loaded.filter((t) => !t.active).sort((a, b) => a.lastAccessed - b.lastAccessed)
     const drop = spare.slice(0, Math.max(0, loaded.length - budget()))
@@ -69,8 +69,10 @@ browser.webNavigation.onBeforeNavigate.addListener(nav('start'))
 browser.webNavigation.onCommitted.addListener(nav('commit'))
 browser.webNavigation.onCompleted.addListener(nav('done'))
 browser.webNavigation.onErrorOccurred.addListener(nav('error'))
-browser.downloads.onCreated.addListener((d) => send({ t: 'download', state: 'start', id: d.id, url: d.url }))
+const phoneStores = new Set() // the containers of the phone link's views (phone.js): their tabs and downloads are the phones'
+browser.downloads.onCreated.addListener((d) => { if (phoneStores.has(d.cookieStoreId)) return phoneDownload(d); send({ t: 'download', state: 'start', id: d.id, url: d.url }) })
 browser.downloads.onChanged.addListener(async (d) => {
+  if (phoneDownloads.has(d.id)) return phoneDownloadChanged(d)
   if (!d.state) return
   const [it] = await browser.downloads.search({ id: d.id }).catch(() => [])
   send({ t: 'download', state: d.state.current, id: d.id, name: it ? it.filename.split('/').pop() : '' })

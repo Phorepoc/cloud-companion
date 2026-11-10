@@ -1,0 +1,5 @@
+[{"namespace":"phe","functions":[
+ {"name":"click","type":"function","async":true,"description":"A trusted tap at a point of the tab's page (css px of the page area).",
+  "parameters":[{"name":"tabId","type":"integer"},{"name":"x","type":"number"},{"name":"y","type":"number"}]},
+ {"name":"acceptCert","type":"function","async":true,"description":"Accept the certificate of the failed load the tab shows (temporary, this site).",
+  "parameters":[{"name":"tabId","type":"integer"}]}]}]

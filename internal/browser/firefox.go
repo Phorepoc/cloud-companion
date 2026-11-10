@@ -9,10 +9,13 @@ package browser
 // the Browser page streams, laid out at the phone's width. The profile is the one Firefox profile: sign-ins are shared with
 // the Browser page.
 //
-// What the extension can't do the way the old Chromium backend did:
-//   - taps are clicks made inside the page (isTrusted false); typing goes through the editor and is trusted;
-//   - a certificate Firefox refuses shows Firefox's error page (no "continue anyway");
-//   - downloads go to Files, Downloads, and the phone is not told.
+// Each paired device gets its own Firefox container (its own cookies: Cookies and SetCookies are that container's jar, in the shape
+// the old engine exported), so sign-ins do not cross between devices or into the Browser page. Taps are Firefox's own input events
+// (trusted), made through the extension's privileged half (deploy/browser/ext/phe-parent.js, a WebExtension experiment that
+// mozilla.cfg allows); typing goes through the editor and is trusted too. A certificate Firefox refuses is put to the phone (a
+// "cert" Dialog), and on OK Firefox's own temporary exception for that site is made and the page loads. Downloads of a device's
+// container are reported to its phone (Handlers.Download) and saved to Files, Downloads. Without the privileged half (the
+// extension is told by pClick returning false) a tap falls back to events dispatched inside the page (isTrusted false).
 
 import (
 	"bytes"
@@ -108,6 +111,26 @@ func (f *Firefox) Handle(m []byte) bool {
 			}
 		}
 		return true
+	case bytes.Contains(head, []byte(`"t":"pdl"`)):
+		var q struct {
+			Tab  int    `json:"tab"`
+			URL  string `json:"url"`
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(m, &q) == nil {
+			f.mu.Lock()
+			s := f.tabs[q.Tab]
+			f.mu.Unlock()
+			if s != nil {
+				s.hmu.Lock()
+				h := s.h
+				s.hmu.Unlock()
+				if h.Download != nil {
+					go h.Download(Download{URL: q.URL, Name: q.Name})
+				}
+			}
+		}
+		return true
 	case bytes.Contains(head, []byte(`"t":"pask"`)):
 		var q struct {
 			ID   string `json:"id"`
@@ -177,8 +200,11 @@ func (f *Firefox) call(ctx context.Context, d time.Duration, cmd map[string]any)
 	}
 }
 
-func (f *Firefox) New(ctx context.Context) (Session, error) {
-	v, err := f.call(ctx, 20*time.Second, map[string]any{"c": "pOpen", "w": 360, "h": viewH})
+func (f *Firefox) New(ctx context.Context) (Session, error) { return f.NewFor(ctx, "") }
+
+// NewFor opens a view for a device: its tabs share the device's own container (cookies).
+func (f *Firefox) NewFor(ctx context.Context, dev string) (Session, error) {
+	v, err := f.call(ctx, 20*time.Second, map[string]any{"c": "pOpen", "w": 360, "h": viewH, "dev": dev})
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +212,7 @@ func (f *Firefox) New(ctx context.Context) (Session, error) {
 	if err := json.Unmarshal(v, &tab); err != nil || tab == 0 {
 		return nil, fmt.Errorf("opening a tab: %s", v)
 	}
-	s := &ffSession{f: f, tab: tab, maxH: f.MaxH, width: 360, height: viewH}
+	s := &ffSession{f: f, tab: tab, dev: dev, maxH: f.MaxH, width: 360, height: viewH}
 	f.mu.Lock()
 	f.tabs[tab] = s
 	f.mu.Unlock()
@@ -200,6 +226,7 @@ const viewH = 640
 type ffSession struct {
 	f      *Firefox
 	tab    int
+	dev    string // the device: its container
 	gone   bool // its Firefox went away (f.mu): the next command opens the view again, on the same page
 	closed bool
 	url    string
@@ -213,6 +240,43 @@ type ffSession struct {
 	opened        bool
 	pct           int
 	sy            int
+	cert          *certErr // a main-frame load failed on a certificate (from the last pNav / pSettle)
+}
+
+type certErr struct{ URL, Text string }
+
+// noteReply keeps what pNav and pSettle say about a refused certificate.
+func (s *ffSession) noteReply(v json.RawMessage) {
+	var r struct {
+		Cert *struct{ URL, Text string }
+	}
+	if len(v) > 0 && v[0] == '{' && json.Unmarshal(v, &r) == nil && r.Cert != nil {
+		s.cert = &certErr{r.Cert.URL, r.Cert.Text}
+	}
+}
+
+// certFlow: a main-frame load failed on a certificate. Ask the phone (a "cert" Dialog, as the old engine did); on OK Firefox makes
+// its temporary exception for the site and the page loads again.
+func (s *ffSession) certFlow(ctx context.Context) error {
+	ce := s.cert
+	s.cert = nil
+	s.hmu.Lock()
+	h := s.h
+	s.hmu.Unlock()
+	if ce == nil || h.Dialog == nil || ce.URL == "" {
+		return nil
+	}
+	if !h.Dialog(Dialog{Kind: "cert", Message: ce.Text + " " + ce.URL, URL: ce.URL}).OK {
+		return nil
+	}
+	if _, err := s.do(ctx, 10*time.Second, "pCert", nil); err != nil {
+		return err
+	}
+	if _, err := s.do(ctx, 30*time.Second, "pNav", map[string]any{"action": "reload"}); err != nil {
+		return err
+	}
+	s.cert = nil
+	return s.settle(ctx)
 }
 
 // alive opens the view again after Firefox restarted: same size, zoom and site version, the last page.
@@ -226,7 +290,7 @@ func (s *ffSession) alive(ctx context.Context) error {
 	if s.closed {
 		return errNoFirefox
 	}
-	v, err := s.f.call(ctx, 20*time.Second, map[string]any{"c": "pOpen", "w": 360, "h": viewH})
+	v, err := s.f.call(ctx, 20*time.Second, map[string]any{"c": "pOpen", "w": 360, "h": viewH, "dev": s.dev})
 	if err != nil {
 		return err
 	}
@@ -317,26 +381,61 @@ func (s *ffSession) Open(ctx context.Context, url string, width int, dpr float64
 
 // settle: nothing in flight for 60 ms, the page loaded, two animation frames (capped at 15 s), as the old engine waited.
 func (s *ffSession) settle(ctx context.Context) error {
-	_, err := s.do(ctx, 20*time.Second, "pSettle", nil)
-	return err
+	v, err := s.do(ctx, 20*time.Second, "pSettle", nil)
+	if err != nil {
+		return err
+	}
+	s.noteReply(v)
+	return nil
 }
 
 func (s *ffSession) Navigate(ctx context.Context, url, action string) error {
 	if url != "" {
 		s.url = url
 	}
-	if _, err := s.do(ctx, 30*time.Second, "pNav", map[string]any{"url": url, "action": action}); err != nil {
+	v, err := s.do(ctx, 30*time.Second, "pNav", map[string]any{"url": url, "action": action})
+	if err != nil {
 		return err
 	}
+	s.noteReply(v)
 	s.sy = 0
-	return s.settle(ctx)
+	if err := s.settle(ctx); err != nil {
+		return err
+	}
+	return s.certFlow(ctx)
 }
 
-// Cookies: the one Firefox profile keeps the sign-ins (and Cloud Companion keeps the profile); nothing to carry per device.
-func (s *ffSession) Cookies(ctx context.Context) ([]byte, error)       { return nil, nil }
-func (s *ffSession) SetCookies(ctx context.Context, data []byte) error { return nil }
+// Cookies exports the device's container jar (JSON, the shape the old engine exported); SetCookies imports one.
+func (s *ffSession) Cookies(ctx context.Context) ([]byte, error) {
+	v, err := s.do(ctx, 10*time.Second, "pCookies", nil)
+	if err != nil {
+		return nil, err
+	}
+	return []byte(v), nil
+}
 
-// Tap clicks at (x, y). sy < 0: viewport coordinates (fixed layers). Otherwise y is a document coordinate: scroll to sy (or
+func (s *ffSession) SetCookies(ctx context.Context, data []byte) error {
+	var cs json.RawMessage
+	if json.Unmarshal(data, &cs) != nil || len(cs) == 0 {
+		return nil
+	}
+	_, err := s.do(ctx, 20*time.Second, "pSetCookies", map[string]any{"cookies": cs})
+	return err
+}
+
+// click taps at viewport point (x, y): Firefox's own (trusted) input events, or, without the privileged path, events in the page.
+func (s *ffSession) click(ctx context.Context, x, y int) error {
+	v, err := s.do(ctx, 10*time.Second, "pClick", map[string]any{"x": x, "y": y})
+	if err != nil {
+		return err
+	}
+	if string(v) == "true" {
+		return nil
+	}
+	return s.eval(ctx, 10*time.Second, fmt.Sprintf(clickJS, x, y), nil)
+}
+
+// Tap clicks (a trusted tap) at (x, y). sy < 0: viewport coordinates (fixed layers). Otherwise y is a document coordinate: scroll to sy (or
 // centre the target if it would be off screen), then click there.
 func (s *ffSession) Tap(ctx context.Context, x, y, sy int) error {
 	vy := y
@@ -357,13 +456,16 @@ func (s *ffSession) Tap(ctx context.Context, x, y, sy int) error {
 			sy = max(0, y-ch/2)
 		}
 	}
-	if err := s.eval(ctx, 10*time.Second, fmt.Sprintf(clickJS, x, vy), nil); err != nil {
+	if err := s.click(ctx, x, vy); err != nil {
 		return err
 	}
-	return s.settle(ctx)
+	if err := s.settle(ctx); err != nil {
+		return err
+	}
+	return s.certFlow(ctx)
 }
 
-// clickJS clicks what is at viewport point (x, y) as a finger would: pointer and mouse events, focus, then click (whose
+// clickJS (the fallback of click) clicks what is at viewport point (x, y) as a finger would: pointer and mouse events, focus, then click (whose
 // default action follows links, ticks boxes, submits forms).
 const clickJS = `(()=>{const X=%d,Y=%d;let e=document.elementFromPoint(X,Y);if(!e)return false;
  const o={bubbles:true,cancelable:true,composed:true,clientX:X,clientY:Y,screenX:X,screenY:Y,view:window,button:0};
@@ -631,11 +733,14 @@ func (s *ffSession) TapScroll(ctx context.Context, layer, x, y int) error {
 	if err := s.eval(ctx, 5*time.Second, js, &pt); err != nil || len(pt) != 2 {
 		return fmt.Errorf("no scroll layer %d", layer)
 	}
-	if err := s.eval(ctx, 10*time.Second, fmt.Sprintf(clickJS, pt[0], pt[1]), nil); err != nil {
+	if err := s.click(ctx, pt[0], pt[1]); err != nil {
 		return err
 	}
 	s.sy = 0
-	return s.settle(ctx)
+	if err := s.settle(ctx); err != nil {
+		return err
+	}
+	return s.certFlow(ctx)
 }
 
 // ---- size and scale ----

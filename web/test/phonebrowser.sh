@@ -11,7 +11,12 @@ $DC down -v >/dev/null 2>&1 || true
 $DC up -d ${PHE_UP:---build} phecloud browser site >/dev/null 2>&1
 trap '$DC down -v >/dev/null 2>&1' EXIT
 for i in $(seq 60); do docker logs phe-cloud-pk 2>&1 | grep -q 'browser' && docker exec phe-browser true 2>/dev/null && break; sleep 1; done
-sleep 12 # Firefox up, its extension connected
+# Firefox up, its extension connected: a view opens (a fresh profile's first start can take a while)
+for i in $(seq 40); do
+  C=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null)
+  docker exec phe-cloud-pk phecloud-client -addr 127.0.0.1:7400 -code "$C" -state /tmp/ready.json -out /tmp/ready -url http://site/two.html 2>&1 | grep -q 'tiles' && break
+  sleep 3
+done
 CODE=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null)
 docker exec phe-cloud-pk phecloud-client -addr 127.0.0.1:7400 -code "$CODE" -state /tmp/phone.json -out /tmp/tiles \
   -url http://site/phone.html -scenario gaps -tap-first-link -summary | tee "$OUT/phone.log"
@@ -25,6 +30,18 @@ curl -s -o /o/phone-stream.jpg -H "Authorization: Bearer $T" http://browser:8080
 wait
 rm -rf "$OUT/phone-tiles"; docker cp phe-cloud-pk:/tmp/tiles "$OUT/phone-tiles" >/dev/null
 docker logs phe-cloud-pk 2>&1 | grep -iE 'update|error|warn' | tail -25
+# a client of its own device (state file $1, tiles $2, log $3), more arguments after
+client() {
+  st=$1; ot=$2; lg=$3; shift 3
+  CODE=$(docker exec phe-cloud-pk phecloud paircode 2>/dev/null)
+  docker exec phe-cloud-pk phecloud-client -addr 127.0.0.1:7400 -code "$CODE" -state "$st" -out "$ot" -summary "$@" > "$lg" 2>&1 || true
+}
+# cookies are per device: alice's device sets one, bob's device does not see it, alice's still does
+client /tmp/pa.json /tmp/ta "$OUT/cookie-a.log" -url http://site/cookie.html?alice
+client /tmp/pb.json /tmp/tb "$OUT/cookie-b.log" -url http://site/cookie.html
+client /tmp/pa.json /tmp/ta2 "$OUT/cookie-a2.log" -url http://site/cookie.html
+# a certificate Firefox refuses: the phone is asked, and says continue anyway
+client /tmp/pc.json /tmp/tc "$OUT/cert.log" -accept-cert -url https://site-bad/phone.html
 # what the phone saw, step by step (SUMMARY lines of the test client)
 fail=0
 check() { if grep "^SUMMARY step=$1 " "$OUT/phone.log" | grep -q -- "$2"; then echo "ok - $3"; else echo "not ok - $3"; fail=1; fi; }
@@ -35,5 +52,12 @@ check text 'fvalue=abc ' 'typing goes into the focused field'
 check key 'fvalue=ab ' 'Backspace'
 check select 'sel=2 ' 'a select option'
 check dialog 'dlgkind=confirm ' "a page's confirm is asked on the phone"
+check trust 'title=tap:true' 'a tap is a trusted event (isTrusted)'
+check download 'dl=1 dlname=hello.txt' 'a download is reported to the phone'
+for f in cookie-a cookie-b cookie-a2 cert; do grep -q '^SUMMARY' "$OUT/$f.log" || { echo "not ok - no summary in $f.log"; fail=1; }; done
+if grep '^SUMMARY step=open ' "$OUT/cookie-a.log" | grep -q 'title=cookie:who=alice'; then echo 'ok - alice sets a cookie'; else echo 'not ok - alice sets a cookie'; fail=1; fi
+if grep '^SUMMARY step=open ' "$OUT/cookie-b.log" | grep -q 'title=cookie: '; then echo 'ok - another device does not see it'; else echo 'not ok - another device does not see it'; fail=1; fi
+if grep '^SUMMARY step=open ' "$OUT/cookie-a2.log" | grep -q 'title=cookie:who=alice'; then echo 'ok - the first device still has it'; else echo 'not ok - the first device still has it'; fail=1; fi
+if grep '^SUMMARY step=open ' "$OUT/cert.log" | grep -q 'url=https://site-bad/phone.html .*dlgkind=cert'; then echo 'ok - a refused certificate can be continued'; else echo 'not ok - a refused certificate can be continued'; fail=1; fi
 if grep '^SUMMARY' "$OUT/phone.log" | grep -qv ' err=-$'; then echo 'not ok - a step failed'; fail=1; else echo 'ok - no step failed'; fi
 exit $fail

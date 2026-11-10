@@ -34,8 +34,20 @@ The page needs a secure address (https, or localhost): its requests are signed w
 Phones that can't run a modern web page (the Nokia 701 and its kind) use the same Firefox through the phone link instead of the
 stream: Cloud Companion lays the page out at the phone's width and sends it as tiles, with its fixed parts, scroll boxes and tap
 regions; the phone scrolls and highlights on its own (`client/`, `docs/status.md`). Each phone view is a tab in a small window of
-its own, behind the window the Browser page streams, so the two never get in each other's way, and it shares the profile: you are
-signed in on the phone where you are signed in here.
+its own, behind the window the Browser page streams (it opens beyond the screen's edge and is titled before it comes in, so it
+never shows in the picture), so the two never get in each other's way.
+
+Each paired device has **its own Firefox container** (its own cookies): a sign-in on one phone is not on another phone, nor in the
+Browser page. The phone's cookies are kept by Cloud Companion per device as before. What else is the phone's own:
+
+- **Taps** are Firefox's own input events (`isTrusted` is true, with user activation, so downloads, popups and the clipboard work),
+  made by the bridge extension's privileged half (`deploy/browser/ext/phe-parent.js`, a WebExtension experiment that
+  `deploy/browser/mozilla.cfg` allows; no remote-control port is open). Typing goes through the editor and is trusted too. If a
+  Firefox did not allow the privileged half, a tap falls back to events made inside the page (`isTrusted` false).
+- **A certificate Firefox refuses** is put to the phone ("continue anyway?"); on yes, Firefox makes its temporary exception for that
+  site (it lasts until the container restarts, and applies to every device) and the page loads.
+- **Downloads** started in a phone's view are reported to that phone and saved to Files, Downloads. A navigation that is itself a
+  download (a link to an attachment) leaves the view on the page it was on.
 
 The phone link's browser is part of this add-on: without it (no `docker-compose.browser.yml`, Browser off in Features) the rest of
 Cloud Companion runs as before and a phone's browser says it is not set up.
@@ -44,7 +56,7 @@ Cloud Companion runs as before and a phone's browser says it is not set up.
 
 Everything stays with Cloud Companion; the container itself keeps nothing:
 
-- the Firefox profile (sign-ins, cookies, settings, bookmarks, history) is the `phecloud-browser` volume;
+- the Firefox profile (sign-ins, cookies (one container per phone, plus the Browser page's own), settings, bookmarks, history) is the `phecloud-browser` volume;
 - downloads go to Files, **Downloads** (the `phecloud-downloads` volume, the only part of Cloud Companion's data Firefox sees);
 - on a board, the nightly backup copies both, with every other volume.
 

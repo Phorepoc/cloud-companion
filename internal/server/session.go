@@ -141,7 +141,15 @@ func (s *session) startBrowser(ctx context.Context, t *tab) error {
 	if t.br != nil {
 		return nil
 	}
-	b, err := s.srv.Browser.New(ctx)
+	var b browser.Session
+	var err error
+	if df, ok := s.srv.Browser.(interface {
+		NewFor(context.Context, string) (browser.Session, error)
+	}); ok {
+		b, err = df.NewFor(ctx, s.dev) // the device's own container: its own cookies
+	} else {
+		b, err = s.srv.Browser.New(ctx)
+	}
 	if err != nil {
 		return err
 	}

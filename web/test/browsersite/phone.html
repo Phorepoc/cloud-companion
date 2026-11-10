@@ -9,7 +9,8 @@ main{padding:64px 12px 12px}.bar{position:sticky;top:44px;background:#ffd;paddin
 <form action="/two.html"><input name="q" placeholder="type here" autocomplete="off"></form>
 <select id="pick"><option>one</option><option>two</option><option>three</option></select>
 <button id="ask" onclick="document.getElementById('said').textContent=confirm('Sure?')?'yes':'no'">ask</button> <span id="said"></span>
-<a href="data:application/octet-stream,hello" download="hello.txt">dl</a>
+<button id="tr" onclick="document.title='tap:'+event.isTrusted">trust</button>
+<a href="data:application/octet-stream,hello" download="hello.txt">dl</a> <a href="/phe-download.txt" download>dl2</a>
 <div class="bar">Sticky bar</div>
 <div class="box"><p>Scroll box line 1</p><p>line 2</p><p>line 3</p><p>line 4</p><p>line 5</p><p>line 6</p><p><a href="/two.html">link in box</a></p></div>
 <div class="s" style="background:#c0392b">Stripe 1: red</div><div class="s" style="background:#27ae60">Stripe 2: green</div>

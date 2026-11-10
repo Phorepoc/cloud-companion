@@ -1,4 +1,5 @@
-{"manifest_version":2,"name":"Cloud Companion bridge","version":"1.0",
+{"manifest_version":2,"name":"Cloud Companion bridge","version":"1.1",
 "browser_specific_settings":{"gecko":{"id":"bridge@cloud-companion.local"}},
-"permissions":["bookmarks","history","tabs","webNavigation","webRequest","webRequestBlocking","downloads","storage","<all_urls>"],"background":{"scripts":["bg.js","phone.js"]},
+"permissions":["bookmarks","history","tabs","webNavigation","webRequest","webRequestBlocking","downloads","storage","cookies","contextualIdentities","<all_urls>"],"background":{"scripts":["bg.js","phone.js"]},
+"experiment_apis":{"phe":{"schema":"phe-schema.json","parent":{"scopes":["addon_parent"],"paths":[["phe"]],"script":"phe-parent.js"}}},
 "content_scripts":[{"matches":["<all_urls>"],"js":["pick.js","passkey.js"],"all_frames":true,"run_at":"document_start"}]}
