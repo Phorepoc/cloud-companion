@@ -23,12 +23,16 @@ if (browser.contextualIdentities) browser.contextualIdentities.query({}).then((l
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 // the certificate exceptions a view made go with it (unless another view still has the same site)
 function dropCerts(p) {
-  if (!p.certs || !browser.phe || !browser.phe.clearCert) return
+  if (!p.certs || !browser.phe || !browser.phe.clearCert) return Promise.resolve()
+  const all = []
   for (const hp of p.certs) {
     if ([...phone.values()].some((q) => q !== p && q.certs && q.certs.has(hp))) continue
     const i = hp.lastIndexOf(':')
-    browser.phe.clearCert(hp.slice(0, i), Number(hp.slice(i + 1))).catch(() => {})
+    all.push(browser.phe.clearCert(hp.slice(0, i), Number(hp.slice(i + 1)))
+      .then((n) => console.log('phone: certificate exception for ' + hp + ' cleared (' + n + ')'),
+        (e) => console.warn('phone: clearing the exception for ' + hp + ': ' + e)))
   }
+  return Promise.all(all)
 }
 const tabOf = (m) => { const p = phone.get(m.tab); if (!p) throw new Error('no such view'); return p }
 
@@ -133,7 +137,8 @@ Object.assign(cmds, {
   async pClose(m) {
     const p = phone.get(m.tab)
     if (!p) return true
-    phone.delete(m.tab); phoneWins.delete(p.win); mobile.delete(m.tab); dropCerts(p)
+    phone.delete(m.tab); phoneWins.delete(p.win); mobile.delete(m.tab)
+    await dropCerts(p)
     await browser.windows.remove(p.win).catch(() => {})
     return true
   },

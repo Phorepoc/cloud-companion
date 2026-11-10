@@ -57,8 +57,16 @@ this.phe = class extends ExtensionAPI {
     // takes the temporary exception for a site away again (what acceptCert made)
     const clearCert = async (host, port) => {
       const svc = Cc['@mozilla.org/security/certoverride;1'].getService(Ci.nsICertOverrideService)
-      svc.clearValidityOverride(host, port, {})
-      return true
+      // the exception was taken in the phone's container tab, so it is keyed by that tab's origin attributes, not the
+      // default ones: clear every override of this host and port
+      let n = 0
+      for (const o of svc.getOverrides()) {
+        if (o.asciiHost !== host || o.port !== port) continue
+        svc.clearValidityOverride(host, port, o.originAttributes)
+        n++
+      }
+      if (!n) svc.clearValidityOverride(host, port, {})
+      return n
     }
     return { phe: { click: guard(click), acceptCert: guard(acceptCert), clearCert: guard(clearCert) } }
   }

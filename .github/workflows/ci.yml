@@ -31,7 +31,13 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Lint pushed commits
         if: github.event_name == 'push'
-        run: npx commitlint --from ${{ github.event.before }} --to ${{ github.sha }} --verbose
+        # a force push leaves "before" outside the new history: lint from where the two histories meet then
+        run: |
+          from=${{ github.event.before }}
+          if ! git merge-base --is-ancestor "$from" ${{ github.sha }} 2>/dev/null; then
+            from=$(git merge-base "$from" ${{ github.sha }} 2>/dev/null || git rev-parse ${{ github.sha }}~1)
+          fi
+          npx commitlint --from "$from" --to ${{ github.sha }} --verbose
       - name: Lint PR commits
         if: github.event_name == 'pull_request'
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
