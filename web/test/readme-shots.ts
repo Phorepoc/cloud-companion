@@ -1,0 +1,96 @@
+// Copyright The Phorepoc Authors
+// SPDX-License-Identifier: Apache-2.0
+
+// The README screenshots, with DEMO data only (invented numbers and messages). A fake phone (a second paired context) uploads a few
+// text messages; the owner's browser (1440 x 900) shows Chats, the Browser page on a real site, and the desktop with windows open.
+//   BASE=http://localhost:8080 CODES=<admin>,<plain> SITE_URL=https://example.com OUT=/out node --experimental-strip-types readme-shots.ts
+import { chromium } from 'playwright'
+import assert from 'node:assert/strict'
+import { openApp } from './chrome.ts'
+
+const BASE = process.env.BASE || 'http://localhost:8080'
+const OUT = process.env.OUT || '.'
+const SITE = process.env.SITE_URL || 'https://en.wikipedia.org/wiki/Nokia_701'
+const [ADMIN, PLAIN] = (process.env.CODES || '').split(',')
+assert(ADMIN && PLAIN, 'CODES=<admin>,<plain> is required')
+const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
+const errors: string[] = []
+const step = (s: string) => console.log('ok -', s)
+
+async function pairIn(code: string, name: string, viewport: { width: number; height: number }) {
+  const ctx = await browser.newContext({ viewport, colorScheme: 'light', bypassCSP: true })
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto(BASE + '/#/pair')
+  await page.fill('[data-test=code]', code)
+  await page.fill('[data-test=name]', name).catch(() => {})
+  await page.click('[data-test=pair]')
+  for (let i = 0; !(await page.evaluate(() => window.__phe?.state.status === 'online')); i++) { assert(i < 150, 'online'); await page.waitForTimeout(200) }
+  return page
+}
+const owner = await pairIn(ADMIN, 'Laptop', { width: 1440, height: 900 })
+const phone = await pairIn(PLAIN, 'Phone', { width: 400, height: 700 })
+const sync = (body: Record<string, unknown>) => phone.evaluate((b) => window.__phe.apiCall('POST', '/sms/sync', b), body)
+const now = Math.floor(Date.now() / 1000)
+const m = (id: string, number: string, dir: 'in' | 'out', body: string, ago: number) => ({ id, number, dir, body, ts: now - ago, ...(dir === 'out' ? { status: 'delivered' } : {}) })
+await sync({ messages: [
+  m('d1', '+49 171 5550100', 'in', 'Are you coming to the barbecue on Saturday?', 7200),
+  m('d2', '+49 171 5550100', 'out', 'Yes! I can bring the salad.', 7100),
+  m('d3', '+49 171 5550100', 'in', 'Perfect. We start around four.', 7000),
+  m('d4', '+49 171 5550100', 'out', 'See you then. Should I get ice on the way?', 3600),
+  m('d5', '+49 171 5550100', 'in', 'Yes please, two bags. Thank you!', 3500),
+  m('d6', '+49 176 5550123', 'in', 'Your parcel is out for delivery today.', 10000),
+  m('d7', '+49 160 5550177', 'in', 'Dinner at eight at the Italian place?', 90000),
+  m('d8', '+49 160 5550177', 'out', 'Sounds great, I booked a table.', 89000),
+  m('d9', 'LIBRARY', 'in', 'Your book is ready for pickup until Friday.', 200000),
+] })
+
+// Chats
+await owner.goto(BASE + '/#/chats')
+await owner.waitForSelector('[data-test=conv]', { timeout: 15000 })
+await owner.locator('[data-test=conv]', { hasText: 'two bags' }).click()
+await owner.waitForFunction(() => document.querySelectorAll('[data-test=msg]').length === 5)
+await owner.waitForTimeout(500)
+await owner.screenshot({ path: `${OUT}/readme-chats.png`, clip: { x: 0, y: 0, width: 1440, height: 740 } })
+step('chats')
+
+// Browser: Firefox on the server, on a real site
+await owner.goto(BASE + '/#/browse')
+await owner.waitForSelector('.x-bf__row input', { timeout: 30000 })
+const live = () => owner.evaluate(() => { const v = document.querySelector('[data-test=screen] video') as HTMLVideoElement | null; return !!v && v.videoWidth > 0 && v.currentTime > 0 })
+await owner.waitForTimeout(6000)
+const addr = '.x-bf__row input'
+await owner.fill(addr, SITE); await owner.press(addr, 'Enter')
+await owner.waitForTimeout(Number(process.env.SITE_WAIT || 15000))
+
+await owner.screenshot({ path: `${OUT}/readme-browser.png` })
+step('browser: ' + await owner.inputValue(addr) + ' / ' + await owner.locator('[data-test=title]').textContent({ timeout: 2000 }).catch(() => '?'))
+
+// the desktop, with a few windows: Chats (the conversation), Browser on a real site, Calendar
+await owner.goto(BASE + '/#/chats')
+await owner.waitForSelector('[data-test=conv]')
+await openApp(owner, 'Desktop')
+await owner.waitForSelector('[data-test=desktop]')
+const win = (id: string) => `.x-win[data-win=${id}]`
+const dockBtn = (label: string) => owner.locator(`.x-shell-dock button[aria-label="${label}"], .x-shell-dock button[aria-label^="${label}, "]`).first()
+await owner.waitForSelector(win('chats'))
+await dockBtn('Browser').click()
+await owner.waitForSelector(win('browse'))
+await owner.waitForSelector(`${win('browse')} .x-bf__row input`, { timeout: 30000 })
+await owner.waitForTimeout(3000)
+await owner.fill(`${win('browse')} .x-bf__row input`, SITE); await owner.press(`${win('browse')} .x-bf__row input`, 'Enter')
+await owner.waitForTimeout(12000)
+const snap = async (id: string, x: number) => {
+  const b = (await owner.locator(`${win(id)} .x-win__drag`).boundingBox())!
+  await owner.mouse.move(b.x + 120, b.y + 10); await owner.mouse.down(); await owner.mouse.move(x, 450, { steps: 20 }); await owner.mouse.up()
+  await owner.waitForTimeout(800)
+}
+await snap('browse', 1438)
+await owner.locator(`${win('chats')} .x-win__drag`).click({ position: { x: 300, y: 10 }, force: true }).catch(() => {})
+await snap('chats', 2)
+await owner.locator(`${win('chats')} [data-test=conv]`, { hasText: 'two bags' }).click()
+await owner.waitForTimeout(1500)
+await owner.mouse.move(720, 890)
+await owner.screenshot({ path: `${OUT}/readme-desktop.png` })
+assert.deepEqual(errors, [], 'no page errors')
+await browser.close()
