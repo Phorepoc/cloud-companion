@@ -227,7 +227,7 @@ type ffSession struct {
 	f      *Firefox
 	tab    int
 	dev    string // the device: its container
-	gone   bool // its Firefox went away (f.mu): the next command opens the view again, on the same page
+	gone   bool   // its Firefox went away (f.mu): the next command opens the view again, on the same page
 	closed bool
 	url    string
 	maxH   int

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The privileged half of the bridge (a WebExtension experiment, allowed by deploy/browser/mozilla.cfg): what the phone link needs and
 // the WebExtension APIs do not give: a tap Firefox itself delivers (isTrusted), and the "continue anyway" of a refused certificate.
-/* global ExtensionAPI, ChromeUtils */
+/* global ExtensionAPI, ChromeUtils, Cc, Ci */
 const { ExtensionError } = ChromeUtils.importESModule('resource://gre/modules/ExtensionUtils.sys.mjs').ExtensionUtils
 const { setTimeout, clearTimeout } = ChromeUtils.importESModule('resource://gre/modules/Timer.sys.mjs')
 this.phe = class extends ExtensionAPI {
@@ -54,6 +54,12 @@ this.phe = class extends ExtensionAPI {
         else d.addCertException(true).then(() => sendAsyncMessage('phe:r', 'ok'), (e) => sendAsyncMessage('phe:r', 'error ' + e))`)
       return r
     }
-    return { phe: { click: guard(click), acceptCert: guard(acceptCert) } }
+    // takes the temporary exception for a site away again (what acceptCert made)
+    const clearCert = async (host, port) => {
+      const svc = Cc['@mozilla.org/security/certoverride;1'].getService(Ci.nsICertOverrideService)
+      svc.clearValidityOverride(host, port, {})
+      return true
+    }
+    return { phe: { click: guard(click), acceptCert: guard(acceptCert), clearCert: guard(clearCert) } }
   }
 }

@@ -21,6 +21,15 @@ async function storeFor(dev) {
 }
 if (browser.contextualIdentities) browser.contextualIdentities.query({}).then((l) => { for (const c of l) if (c.name.startsWith('Phone ')) phoneStores.add(c.cookieStoreId) }).catch(() => {})
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+// the certificate exceptions a view made go with it (unless another view still has the same site)
+function dropCerts(p) {
+  if (!p.certs || !browser.phe || !browser.phe.clearCert) return
+  for (const hp of p.certs) {
+    if ([...phone.values()].some((q) => q !== p && q.certs && q.certs.has(hp))) continue
+    const i = hp.lastIndexOf(':')
+    browser.phe.clearCert(hp.slice(0, i), Number(hp.slice(i + 1))).catch(() => {})
+  }
+}
 const tabOf = (m) => { const p = phone.get(m.tab); if (!p) throw new Error('no such view'); return p }
 
 // what the pages are doing: nothing in flight for 60 ms is part of "settled"
@@ -124,7 +133,7 @@ Object.assign(cmds, {
   async pClose(m) {
     const p = phone.get(m.tab)
     if (!p) return true
-    phone.delete(m.tab); phoneWins.delete(p.win); mobile.delete(m.tab)
+    phone.delete(m.tab); phoneWins.delete(p.win); mobile.delete(m.tab); dropCerts(p)
     await browser.windows.remove(p.win).catch(() => {})
     return true
   },
@@ -176,10 +185,14 @@ Object.assign(cmds, {
   },
   // "continue anyway" for the refused certificate the view shows (this site, until Firefox restarts)
   async pCert(m) {
-    tabOf(m)
+    const p = tabOf(m)
     if (!browser.phe) throw new Error('no privileged path')
+    const t = await browser.tabs.get(m.tab).catch(() => null)
     const r = await browser.phe.acceptCert(m.tab)
     if (r !== 'ok') throw new Error('certificate: ' + r)
+    // the exception is the phone's, not the profile's: it goes again when the view closes, so the Browser page (the same Firefox
+    // profile) still sees the certificate as refused
+    try { let u = new URL((t && t.url) || ''); if (u.protocol === 'about:') u = new URL(u.searchParams.get('u')); (p.certs = p.certs || new Set()).add(u.hostname + ':' + (u.port || 443)) } catch (e) {}
     return true
   },
   async pCookies(m) {
@@ -225,4 +238,4 @@ Object.assign(cmds, {
     return true
   },
 })
-browser.tabs.onRemoved.addListener((id) => { const p = phone.get(id); if (p) { phone.delete(id); phoneWins.delete(p.win); mobile.delete(id) } })
+browser.tabs.onRemoved.addListener((id) => { const p = phone.get(id); if (p) { phone.delete(id); phoneWins.delete(p.win); mobile.delete(id); dropCerts(p) } })

@@ -224,7 +224,12 @@ const shown = (u?: string) => (!u || u.startsWith('about:') ? '' : u)
 const address = computed(() => typed.value || shown(activeTab()?.url))
 watch(() => activeTab()?.url, () => { typed.value = '' })
 // Firefox's view of the connection (a refused certificate is not secure, whatever the address says); while typing, the address
-const secure = computed(() => !address.value || (typed.value ? typed.value.startsWith('https:') : activeTab()?.security ? activeTab()!.security !== 'broken' && activeTab()!.security !== 'insecure' : address.value.startsWith('https:')))
+const secure = computed(() => {
+  if (typed.value) return typed.value.startsWith('https:')
+  const s = activeTab()?.security
+  if (s === 'broken') return false // Firefox's error page has no address of its own to show, but the connection is refused
+  return !address.value || (s ? s !== 'insecure' : address.value.startsWith('https:'))
+})
 function toggleSide() { setBrowserPref('tabsAt', browserPrefs.tabsAt === 'side' ? 'top' : 'side') }
 // a phone-sized window opens tabs with the phone version of sites, as a phone's browser does; "Desktop site" changes one tab
 const narrow = () => (stage.value?.getBoundingClientRect().width ?? window.innerWidth) < 600

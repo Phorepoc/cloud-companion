@@ -91,7 +91,7 @@ try {
   const notSecure = () => p.locator(".x-bf__row [aria-label='Not secure']").count().then((n) => n > 0)
   await go('https://site-bad/two.html')
   await until(() => p.evaluate(() => (window as any).__pheBrowser.tabs.find((t: any) => t.active)?.security === 'broken'), 'certificate refused')
-  assert(await notSecure(), 'a refused certificate shows Not secure'); await p.waitForTimeout(2000); await p.screenshot({ path: OUT + '/browser-cert.png' }); step('a refused certificate shows Not secure, not a lock')
+  await until(notSecure, 'the bar shows Not secure'); assert(await notSecure(), 'a refused certificate shows Not secure'); await p.waitForTimeout(2000); await p.screenshot({ path: OUT + '/browser-cert.png' }); step('a refused certificate shows Not secure, not a lock')
   // the star bookmarks the page; Bookmarks and history lists it, with the pages visited, and removes it
   const starred = () => p.evaluate(() => !!(window as any).__pheBrowser.tabs.find((t: any) => t.active)?.starred)
   await go(SITE + 'two.html'); await until(async () => (await title()) === 'probe two', 'two again')
