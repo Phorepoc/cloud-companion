@@ -1,4 +1,30 @@
-# Cloud Companion
+<p align="center">
+  <img src=".github/readme/desktop.png" width="860" alt="The Cloud Companion web desktop in a browser: a Chats window with a text conversation on the left, and the Browser showing a Wikipedia page on the right, with the dock beside them">
+</p>
+
+<h1 align="center">Cloud Companion</h1>
+
+<p align="center">
+  <b>Your own small cloud, for the devices that lost their services.</b><br>
+  A browser, your text messages, mail, calendar, contacts and even Android, on a server you run yourself.
+</p>
+
+<p align="center">
+  <a href="https://github.com/Phorepoc/cloud-companion/releases/latest">Download</a> ·
+  <a href="#getting-started">Getting started</a> ·
+  <a href="docs/browser.md">Browser</a> ·
+  <a href="docs/messaging.md">Messaging</a> ·
+  <a href="https://github.com/Phorepoc">Phorepoc</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Phorepoc/cloud-companion/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Phorepoc/cloud-companion?color=4591FF"></a>
+  <img alt="Licence: Apache 2.0" src="https://img.shields.io/badge/licence-Apache%202.0-4591FF">
+  <a href="https://github.com/orgs/Phorepoc/packages"><img alt="Docker: ghcr.io/phorepoc/phecloud" src="https://img.shields.io/badge/docker-ghcr.io%2Fphorepoc%2Fphecloud-2496ED"></a>
+  <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-EF5500">
+</p>
+
+---
 
 Cloud Companion is a small server you run yourself, so your devices can keep doing what you need them to, whatever their
 age. It's for one person: you, your devices and your accounts, on a machine you control.
@@ -12,8 +38,10 @@ Cloud Companion is a [Phorepoc](https://github.com/Phorepoc) project, and one of
 revival) and [Etesian](https://etesian-design.com) (the design language) meet: its web desktop wears the Etesian look,
 and Phorepoc OS phones get a few extras, like pairing and the Catalogue store. Neither is needed to use it.
 
-- **A browser in the cloud** (being replaced, not available right now). Old phone browsers can't open most websites
-  anymore, so the server is to open them for you.
+- **A browser in the cloud**, an optional add-on. Firefox runs on your server, and its page is shown in the web app or, for phones too old to run a
+  modern web page, sent to the phone through the phone link. You get tabs, bookmarks and history, zoom, downloads into your Files,
+  passkeys (answered by the device you are using), a shared clipboard and a "Desktop site" switch. Your sign-ins stay on your
+  server, and a page you open on one device is there on the next. See [docs/browser.md](docs/browser.md).
 - **A messaging gateway.** Your SIP or XMPP phone, or the web app, can reach SMS, Matrix, XMPP, IRC, Nextcloud Talk,
   Signal and Telegram, and you decide which address goes where.
 - **A web app** you can install on any device, with a browser, your text messages (sent through your own phone), mail,
@@ -22,6 +50,11 @@ and Phorepoc OS phones get a few extras, like pairing and the Catalogue store. N
   and CardDAV, so phones that understand any of those just work.
 - **Android in a browser tab**, also optional. An Android system runs on your server and streams to a web page, with
   touch, keyboard, sound and clipboard.
+
+<p align="center">
+  <img src=".github/readme/browser.png" width="760" alt="The Browser page of Cloud Companion showing the Wikipedia article on the Nokia 701, with tabs, back and forward buttons and an address bar above it">
+  <br><sub>The Browser page: Firefox on your own server, with the tabs and address bar of the web app.</sub>
+</p>
 
 This is an experimental service. The software works but it's young, so please read the security section before you put
 it on the internet. (You'll still see its working name, `phecloud`, on the server program, the Docker service and the
@@ -143,6 +176,11 @@ Cloud Companion passes messages between your devices and your services: SMS thro
 planned. You decide in Connections â†’ Messaging which address goes where. Phones with a SIP or XMPP (Jabber) client (the Nokia N9,
 Symbian, softphones) can sign in and chat through it: set `PHECLOUD_SIP_LISTEN=:5060` and/or `PHECLOUD_XMPP_LISTEN=:5222` and make
 a login per phone. [docs/messaging.md](docs/messaging.md) explains the rules and has the phone settings.
+
+<p align="center">
+  <img src=".github/readme/chats.png" width="760" alt="The Chats page: four conversations on the left, and on the right a text conversation about a barbecue with the message box below">
+  <br><sub>Chats: your phone's text messages in the browser, sent through your own phone (demo messages).</sub>
+</p>
 
 ## Your other clouds
 
