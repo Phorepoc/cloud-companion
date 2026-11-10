@@ -61,13 +61,16 @@ this.phe = class extends ExtensionAPI {
       // default ones: clear every override of this host and port
       let n = 0
       for (const o of svc.getOverrides()) {
-        if (o.asciiHost !== host || o.port !== port) continue
+        if (o.asciiHost !== host || (o.port !== port && !(o.port === -1 && port === 443))) continue
         svc.clearValidityOverride(host, port, o.originAttributes)
         n++
       }
       if (!n) svc.clearValidityOverride(host, port, {})
       // an open connection already passed the handshake: drop the idle ones so the next visit is checked again
       Services.obs.notifyObservers(null, 'net:prune-all-connections')
+      // pages the view loaded under the exception are in the HTTP cache and would show again without any certificate check (the
+      // cache cannot be cleared by a host name without a dot, so all of it goes; this runs only for a phone view that continued)
+      Services.cache2.clear()
       return n
     }
     return { phe: { click: guard(click), acceptCert: guard(acceptCert), clearCert: guard(clearCert) } }

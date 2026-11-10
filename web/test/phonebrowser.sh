@@ -47,6 +47,8 @@ client /tmp/pc.json /tmp/tc "$OUT/cert.log" -accept-cert -url https://site-bad/p
 # the exception goes with the view: once the server has closed that device's views, opening the page again asks again
 for i in $(seq 30); do [ "$(closed)" -gt "$n" ] && break; sleep 1; done
 client /tmp/pc.json /tmp/tc2 "$OUT/cert2.log" -accept-cert -url https://site-bad/phone.html
+# on a miss, what the two devices saw
+for f in cert cert2; do grep "^SUMMARY step=open " "$OUT/$f.log" | cut -c1-400 | sed "s/^/$f: /"; done
 # what the phone saw, step by step (SUMMARY lines of the test client)
 fail=0
 check() { if grep "^SUMMARY step=$1 " "$OUT/phone.log" | grep -q -- "$2"; then echo "ok - $3"; else echo "not ok - $3"; fail=1; fi; }

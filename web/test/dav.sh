@@ -11,7 +11,10 @@ $DC down -v >/dev/null 2>&1 || true
 sh web/test/pull.sh $DC
 $DC up -d ${PHE_UP:---build} phecloud > "$OUT/dav-up.log" 2>&1 || { tail -20 "$OUT/dav-up.log"; exit 1; }
 trap '$DC down -v >/dev/null 2>&1' EXIT
-A=$(docker exec phe-cloud-pk phecloud paircode --admin 2>/dev/null)
+# the server takes a moment to open its database after "up -d": wait until it hands out a code, and say so if it never does
+A=
+for i in $(seq 30); do A=$(docker exec phe-cloud-pk phecloud paircode --admin 2>/dev/null) && [ -n "$A" ] && break; A=; sleep 1; done
+[ -n "$A" ] || { echo "FAIL: the server gave no pairing code"; docker logs phe-cloud-pk 2>&1 | tail -15 | cut -c1-240; exit 1; }
 rm -f "$OUT/dav-login"
 docker run --rm --name phe-playwright-dav --cpus 2 --memory 2g --network container:phe-cloud-pk --ipc=host \
     -v "$ROOT/web/test":/t -v "$OUT":/out -w /t -e HOME=/tmp -e BASE=http://localhost:8080 -e CODE="$A" -e OUT=/out \
