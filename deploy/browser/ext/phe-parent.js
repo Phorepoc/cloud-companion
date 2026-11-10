@@ -66,6 +66,8 @@ this.phe = class extends ExtensionAPI {
         n++
       }
       if (!n) svc.clearValidityOverride(host, port, {})
+      // an open connection already passed the handshake: drop the idle ones so the next visit is checked again
+      Services.obs.notifyObservers(null, 'net:prune-all-connections')
       return n
     }
     return { phe: { click: guard(click), acceptCert: guard(acceptCert), clearCert: guard(clearCert) } }

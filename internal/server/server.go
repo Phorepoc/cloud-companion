@@ -121,7 +121,7 @@ func (s *Server) ServeConn(fio FrameIO, remote string) {
 	ses.devName = s.Store.DeviceName(dev)
 	s.register(ses)
 	defer s.unregister(ses)
-	defer ses.close()
+	defer func() { ses.close(); log.Info("device views closed") }()
 
 	type frameMsg struct {
 		t   string

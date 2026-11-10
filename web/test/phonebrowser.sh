@@ -41,8 +41,11 @@ client /tmp/pa.json /tmp/ta "$OUT/cookie-a.log" -url http://site/cookie.html?ali
 client /tmp/pb.json /tmp/tb "$OUT/cookie-b.log" -url http://site/cookie.html
 client /tmp/pa.json /tmp/ta2 "$OUT/cookie-a2.log" -url http://site/cookie.html
 # a certificate Firefox refuses: the phone is asked, and says continue anyway
+closed() { docker logs phe-cloud-pk 2>&1 | grep -c 'device views closed' || true; }
+n=$(closed)
 client /tmp/pc.json /tmp/tc "$OUT/cert.log" -accept-cert -url https://site-bad/phone.html
-# the exception goes with the view: the same device opening the page again is asked again
+# the exception goes with the view: once the server has closed that device's views, opening the page again asks again
+for i in $(seq 30); do [ "$(closed)" -gt "$n" ] && break; sleep 1; done
 client /tmp/pc.json /tmp/tc2 "$OUT/cert2.log" -accept-cert -url https://site-bad/phone.html
 # what the phone saw, step by step (SUMMARY lines of the test client)
 fail=0
