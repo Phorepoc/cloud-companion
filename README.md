@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/readme/desktop.png" width="860" alt="The Cloud Companion web desktop in a browser: a Chats window with a text conversation on the left, and the Browser showing a Wikipedia page on the right, with the dock beside them">
+  <img src=".github/readme/desktop.png" width="860" alt="The Cloud Companion web desktop in a browser: a Chats window with a text conversation in front, partly over the Browser showing the Wikipedia article on Symbian and a Files window, with the dock beside them">
 </p>
 
 <h1 align="center">Cloud Companion</h1>

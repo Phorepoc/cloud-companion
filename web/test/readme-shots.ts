@@ -10,7 +10,7 @@ import { openApp } from './chrome.ts'
 
 const BASE = process.env.BASE || 'http://localhost:8080'
 const OUT = process.env.OUT || '.'
-const SITE = process.env.SITE_URL || 'https://en.wikipedia.org/wiki/Nokia_701'
+const SITE = process.env.SITE_URL || 'https://en.wikipedia.org/wiki/Symbian'
 const [ADMIN, PLAIN] = (process.env.CODES || '').split(',')
 assert(ADMIN && PLAIN, 'CODES=<admin>,<plain> is required')
 const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] })
@@ -85,7 +85,8 @@ await noBanner(owner, '[data-test=stage]')
 await owner.screenshot({ path: `${OUT}/readme-browser.png` })
 step('browser: ' + await owner.inputValue(addr) + ' / ' + await owner.locator('[data-test=title]').textContent({ timeout: 2000 }).catch(() => '?'))
 
-// the desktop, with a few windows: Chats (the conversation), Browser on a real site, Calendar
+// the desktop (1280 x 800), with overlapping windows: Chats (the conversation), the Browser on a real site, Files
+await owner.setViewportSize({ width: 1280, height: 800 })
 await owner.goto(BASE + '/#/chats')
 await owner.waitForSelector('[data-test=conv]')
 await openApp(owner, 'Desktop')
@@ -100,17 +101,27 @@ await owner.waitForTimeout(3000)
 await owner.fill(`${win('browse')} .x-bf__row input`, SITE); await owner.press(`${win('browse')} .x-bf__row input`, 'Enter')
 await owner.waitForTimeout(12000)
 await noBanner(owner, `${win('browse')} [data-test=stage]`)
-const snap = async (id: string, x: number) => {
-  const b = (await owner.locator(`${win(id)} .x-win__drag`).boundingBox())!
-  await owner.mouse.move(b.x + 120, b.y + 10); await owner.mouse.down(); await owner.mouse.move(x, 450, { steps: 20 }); await owner.mouse.up()
-  await owner.waitForTimeout(800)
-}
-await snap('browse', 1438)
-await owner.locator(`${win('chats')} .x-win__drag`).click({ position: { x: 300, y: 10 }, force: true }).catch(() => {})
-await snap('chats', 2)
+// the windows have no resize handles: their places, sizes and stacking (z) go to the desktop's stored layout, and the desktop is
+// opened again with it -- the Browser at the back, Files over its corner, Chats in front, partly over both
+const layout = [
+  { id: 'browse', x: 300, y: 10, w: 960, h: 600, z: 1 },
+  { id: 'files', x: 790, y: 400, w: 460, h: 356, z: 2 },
+  { id: 'chats', x: 90, y: 250, w: 740, h: 500, z: 3 },
+].map((l) => ({ ...l, snap: null, min: false }))
+await owner.evaluate((v) => window.__phe.apiCall('PUT', '/phe/prefs/desktop.windows', { value: v }), JSON.stringify(layout))
+await owner.waitForTimeout(1000)
+await owner.reload()
+await owner.waitForSelector(win('files'), { timeout: 20000 })
+await owner.waitForSelector(`${win('chats')} [data-test=conv]`, { timeout: 20000 })
 await owner.locator(`${win('chats')} [data-test=conv]`, { hasText: 'two bags' }).click()
-await owner.waitForTimeout(1500)
-await owner.mouse.move(720, 890)
+// the Browser window comes back on a new tab: the site again
+await owner.waitForSelector(`${win('browse')} .x-bf__row input`, { timeout: 30000 })
+await owner.waitForTimeout(3000)
+await owner.fill(`${win('browse')} .x-bf__row input`, SITE); await owner.press(`${win('browse')} .x-bf__row input`, 'Enter')
+await owner.locator(`${win('chats')} [data-test=conv]`, { hasText: 'two bags' }).click()
+await owner.waitForTimeout(12000)
+await noBanner(owner, `${win('browse')} [data-test=stage]`)
+await owner.mouse.move(640, 790)
 await owner.screenshot({ path: `${OUT}/readme-desktop.png` })
 assert.deepEqual(errors, [], 'no page errors')
 await browser.close()
