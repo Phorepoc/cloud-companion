@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Theme choice, stored on this device only: "hybrid" (default, the N9 look), "light", "dark" or "system" (light or dark, following
 // the operating system). Quasar's Dark plugin tracks dark; the Etesian tokens follow data-hd-mode on <html> (docs/15-colour-modes.md

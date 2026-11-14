@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package xmpp is a fake XMPP server for web/test/xmpp.sh, in place of Prosody: port 5222, the domain "localhost" with the one
 // account the suite signs in as (cc@localhost, password pw-cc). It does what internal/xmpp needs: STARTTLS (required, a certificate

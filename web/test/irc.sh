@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # IRC account through the real UI against the fake IRC server (internal/fakes/irc; the real Ergo is in testdata/irc/test.sh).
 # Docker, repo root. Screenshots: web/test/out/irc-*.png
 set -eu

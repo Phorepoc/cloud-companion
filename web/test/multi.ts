@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Two browsers (two paired devices) at once: signing one out from the other.
 //   BASE=http://phecloud:8080 CODES=AAAA-BBBB,CCCC-DDDD OUT=/out node --experimental-strip-types multi.ts

@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Updates (owner only, on a board set up by the host manager): which version runs, whether a newer one is out (from the
      project's GitHub releases, internal/host/update.go), installing it now or at night after the backup. A failed update puts
      the board back as it was; the page says so in plain words. A server set up by hand updates with git and compose. -->

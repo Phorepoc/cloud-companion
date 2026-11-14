@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The music player: one audio element for the whole app, so music keeps playing while you move between sections and windows.
 // Songs stream from the owner's files (Range requests: seeking works at once). The system's media keys and lock-screen controls

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → Signal against the fake signal-cli-rest-api (internal/fakes/signal) with nothing linked, as a fresh real one is: that is
 // all a test can do without a phone: "Link this device" shows the QR code from the API, Test says the number is not linked yet, and Add

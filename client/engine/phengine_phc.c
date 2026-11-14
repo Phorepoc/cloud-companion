@@ -1,12 +1,12 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: Apache-2.0 */
+ * SPDX-License-Identifier: AGPL-3.0-only */
 
 /*
  * phengine_phc.c -- the Cloud Companion web engine for the Phorepoc browser: phewebengine.h implemented over the portable phc client
  * core (../phc*.c) and its mbedTLS 1.3 adapter. The page is rendered by the user's own phecloud server (Chromium); this engine
  * receives tiles, keeps them, composes the visible part into a BGRA view buffer, scrolls locally and sends taps and text.
  *
- * Licence: Apache-2.0. Links only permissive code: mbedTLS (Apache-2.0), libpng (libpng licence), libjpeg (IJG), Open C.
+ * Licence: AGPL-3.0-only. Links only permissive code: mbedTLS (Apache-2.0), libpng (libpng licence), libjpeg (IJG), Open C.
  *
  * Threads: the seam calls (UI thread) only queue a request or read cached state under a mutex. Each view has ONE network
  * thread that owns its phc object: connect, TLS 1.3 + pin, pair/authenticate, then loop { send queued requests; phc_pump

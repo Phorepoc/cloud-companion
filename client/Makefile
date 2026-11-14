@@ -1,5 +1,5 @@
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Host build of the phc core and its tests (gcc or clang, C99). The core itself has no OS dependency.
 #   make all check fuzz                       plain build, offline self-test, sanitizer fuzz run

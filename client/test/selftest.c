@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: Apache-2.0 */
+ * SPDX-License-Identifier: AGPL-3.0-only */
 
 /* Offline self-test of the phc core: SHA-256/HMAC vectors, CBOR round trip, a canned server conversation, hit-testing. */
 #include "../phc.h"

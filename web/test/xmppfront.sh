@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The XMPP front (Docker, repo root): logins made through the real UI (xmppfront.ts), then two Jabber clients (slixmpp, BSD-3/MIT)
 # chat through the front, once over modern TLS and once over TLS 1.0 as the N9. Own compose project, no host ports.
 set -eu

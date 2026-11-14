@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The board files of a release (deploy/board/install.sh fetches them): phehost for arm64 and amd64, cloud-board.tar.gz (the
 # compose files and deploy/) and SHA256SUMS.board, in OUT. Needs Go; run from the repository root.
 # VERSION (vX.Y.Z) goes in the bundle: the manager runs the images of that release (PHECLOUD_VERSION).

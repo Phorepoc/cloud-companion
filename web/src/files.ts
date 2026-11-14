@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Files and Music on the server (internal/webui/files.go): the owner's own storage, shared by every paired device.
 import { apiCall, apiUpload } from './cloud'

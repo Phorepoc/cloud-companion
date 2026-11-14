@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The README screenshots, DEMO data only (Docker, repo root): own compose project (pheshots), fresh volumes, released images, nothing
 # is built. Writes web/test/out/readme-{chats,browser,desktop}.png (copy them to .github/readme/ as chats, browser, desktop).
 #   PHE_SITE_URL=<page>   the page the Browser shots open (default https://en.wikipedia.org/wiki/Symbian; needs the internet)

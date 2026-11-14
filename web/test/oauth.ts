@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // "Sign in with Google" on the Connections page against a fake OAuth provider (started here on 127.0.0.1:9099): the provider button appears only because the
 // server is configured, the browser is redirected to the provider, comes back to /phe/oauth/callback, and the new accounts show up.

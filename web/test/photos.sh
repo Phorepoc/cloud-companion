@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Photos through the real UI against a fake Immich (internal/fakes/immich, seeded) and a photo folder (Docker, repo root).
 # The real Immich is in testdata/immich/test.sh. Screenshots: web/test/out/photos-*.png
 set -eu

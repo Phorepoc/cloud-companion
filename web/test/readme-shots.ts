@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The README screenshots, with DEMO data only (invented numbers and messages). A fake phone (a second paired context) uploads a few
 // text messages; the owner's browser (1440 x 900) shows Chats, the Browser page on a real site, and the desktop with windows open.

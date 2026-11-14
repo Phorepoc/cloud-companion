@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package immich is a stand-in Immich for the Photos browser suite (web/test/photos.sh): the owner Ann with one API key, two photos
 // (sea.png, July 2024, in the album "Summer"; snow.png, January 2023), and just the API calls Cloud Companion makes for them

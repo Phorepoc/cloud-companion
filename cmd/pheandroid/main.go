@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // pheandroid streams an Android instance (Redroid, or any adb device) to a browser page, with touch and keyboard going back.
 //

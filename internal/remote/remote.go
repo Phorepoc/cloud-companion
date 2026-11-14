@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package remote reads the files of other services, so the Files section (and every paired device through its API) shows them
 // next to the owner's own: a WebDAV server (Nextcloud and most others) or a Seafile server. Read-only for now: list, look at,

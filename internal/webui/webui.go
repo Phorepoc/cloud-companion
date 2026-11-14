@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package webui embeds the built web app (web/ -> internal/webui/dist) and serves it with the WebSocket endpoint.
 package webui

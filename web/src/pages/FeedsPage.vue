@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Feeds, after the Etesian phone's Feeds app: the feeds (All posts first), then the posts of all of them or of one, then one
      post in the reader. A post opens here, never straight to its web page: Open in browser (or a link in the post) does that.
      Read and unread follow the person between browsers (desktop/feeds.ts). Only the owner adds and removes feeds. -->

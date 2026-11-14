@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The web app under its Content-Security-Policy and security headers (Docker, repo root): own compose project (phepk6), fresh volume.
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

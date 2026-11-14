@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Resource parking: after the last viewer leaves, the bridge stops the Android container (PHE_ANDROID_PARK_AFTER); the next viewer sees "Starting Android" and gets the screen.
 // Measures RAM saved and the cold start to the first frame. Runs against the bridge's standalone page (BASE) with the hooks of android.sh.
 import { chromium, type Page } from 'playwright'

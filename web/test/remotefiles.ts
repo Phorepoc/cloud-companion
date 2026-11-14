@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Files of other services through the real UI, against a throwaway Nextcloud (remotefiles.sh: user ann with a folder "CC Photos"
 // holding sea.png): Connections → Add → Files: Nextcloud → Sign in with Nextcloud opens Nextcloud, where ann logs in and grants

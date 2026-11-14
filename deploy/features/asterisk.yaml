@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 id: asterisk
 title: Phone calls (SIP)
 about: "Your own SIP server (Asterisk) for calls between your phones over the internet."

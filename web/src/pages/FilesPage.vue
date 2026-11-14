@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Files: the owner's own storage on the server, the same on every device (internal/webui/files.go). Folders and files with their
      type on a squircle tile; upload with the button or by dropping files on the page; a file opens in the browser (songs play in
      the music player), downloads, gets a public link to share, or is renamed or deleted (Undo while the toast shows). -->

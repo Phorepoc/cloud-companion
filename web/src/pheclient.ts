@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The phecloud protocol over a WebSocket: every message is one binary CBOR frame (no length prefix). Same pairing and
 // HMAC authentication as the phone clients; the device key lives in IndexedDB (see idb.ts).

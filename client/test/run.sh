@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Cross-check the C client core against the Go test client on a live server (Docker, run from the repo root):
 #   sh client/test/run.sh

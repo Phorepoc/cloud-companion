@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of Settings → Features on a board: Cloud Companion started by the host manager (phehost), run by features.sh
 //   BASE=http://127.0.0.1:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types features.ts

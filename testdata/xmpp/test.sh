@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The XMPP connection against a real server (repo root): Prosody (MIT) on its own network with its localhost certificate, users
 # alice, bob, carol and dave, a group chat service (conference.localhost), and the Go test tagged "xmpp" next to it.
 set -eu

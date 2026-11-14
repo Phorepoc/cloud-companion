@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Desktop widgets (after the Etesian Belle widgets): what kinds there are, their size on the 90 px grid, and where they are.
 // The arrangement is kept on the server (prefs.ts), like the windows, so every browser shows the same desktop.

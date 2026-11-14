@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 id: hub-legacy
 title: Mail sync for older phones
 about: "Lets phones that only support TLS 1.0 sync mail. Newer phones don't need this."

@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # One-time setup of the personal hub: starts Stalwart in bootstrap mode, completes the bootstrap (host name, mail domain), creates
 # the single owner account and raises the app-password limit. Writes deploy/hub/.env.hub (mode 600) with every secret.
 # Safe to re-run: it stops when .env.hub already says the hub was initialised.

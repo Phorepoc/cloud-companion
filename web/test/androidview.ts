@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The display follows the viewing device (desktop window -> large landscape display, phone window -> phone display, and back when the window changes), and the page's own
 // context menu: what it offers follows Android's state (text field focused, selection). Runs against the bridge's standalone page with the hooks of android.sh.
 import { chromium } from 'playwright'

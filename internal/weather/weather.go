@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package weather is the weather behind the desktop's Weather widget and /phe/weather: the current conditions and the next days
 // for a place, and the place search of the place picker, from one of several sources the owner picks:

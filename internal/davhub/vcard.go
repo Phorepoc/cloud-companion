@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package davhub talks CardDAV (contacts) and CalDAV (calendar) to the personal hub (Stalwart) over HTTP. It reads and writes
 // vCard 3.0 and iCalendar 2.0 with just the fields the web app edits and keeps every other line of an item as it was.

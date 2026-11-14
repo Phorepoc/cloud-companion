@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Browser test of the Android stream page: decoded video on the canvas, touch and keys going back, latency numbers.
 import { chromium } from 'playwright'
 import fs from 'fs'

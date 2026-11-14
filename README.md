@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://github.com/Phorepoc/cloud-companion/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/Phorepoc/cloud-companion?color=4591FF"></a>
-  <img alt="Licence: Apache 2.0" src="https://img.shields.io/badge/licence-Apache%202.0-4591FF">
+  <img alt="Licence: AGPL-3.0-only" src="https://img.shields.io/badge/licence-AGPL--3.0--only-4591FF">
   <a href="https://github.com/orgs/Phorepoc/packages"><img alt="Docker: ghcr.io/phorepoc/phecloud" src="https://img.shields.io/badge/docker-ghcr.io%2Fphorepoc%2Fphecloud-2496ED"></a>
   <img alt="Status: experimental" src="https://img.shields.io/badge/status-experimental-EF5500">
 </p>
@@ -310,6 +310,12 @@ with [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) for the setup hotspot
 [rclone](https://rclone.org), [async-upnp-client](https://github.com/StevenLooman/async_upnp_client)
 with [Python](https://www.python.org), and [slixmpp](https://codeberg.org/poezio/slixmpp).
 
-## License
+## Licensing
 
-Apache-2.0. The optional containers the compose files can start keep their own licenses, which `NOTICE` lists.
+This is Phorepoc code, licensed under the [GNU Affero General Public License, version 3 only](LICENSE) (`AGPL-3.0-only`), with the [additional terms](ADDITIONAL-TERMS.md) its section 7 allows: keep the attribution "Phorepoc, founded by Kyriakos Bompotis" and the legal notices (also where your version shows notices, such as an About screen), and no rights to the Phorepoc names and logos ([TRADEMARKS.md](TRADEMARKS.md)). If you run a modified version for users over a network, AGPL section 13 asks you to offer them its source.
+
+The third-party modules built in keep their own licences, and the optional containers the compose files can start are separate programs under their own licences; `NOTICE` lists them.
+
+Phorepoc is dual-licensed. Commercial licences or licence exceptions (for example to ship it inside a closed product without the AGPL obligations) are available on request from the founder, Kyriakos Bompotis.
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md) for the licence grant they need.

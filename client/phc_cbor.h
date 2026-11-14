@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: Apache-2.0 */
+ * SPDX-License-Identifier: AGPL-3.0-only */
 
 /* A tiny CBOR subset: what the phecloud protocol uses. Definite lengths only (the server never sends others).
  * Writer: maps/arrays with known counts, text, unsigned/signed ints, bytes, bool. Reader: a cursor; every call

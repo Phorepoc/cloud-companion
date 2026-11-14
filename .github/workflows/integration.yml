@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Against the real outside services (Asterisk, a Matrix homeserver, Prosody, Ergo, Nextcloud, Immich, DLNA, signal-cli): run by hand
 # when one of them has a new version. CI does not run these: its browser suites use stand-ins (cmd/fakesvc), as the replies they
 # need do not change.

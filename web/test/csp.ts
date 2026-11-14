@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The app must work under its own Content-Security-Policy: pair as admin, open every section, and fail on any CSP violation or page error. (The other browser tests run with the policy
 // bypassed because Playwright evaluates code inside the page; this one runs with it enforced.) Also checks the security headers.
 import { chromium } from 'playwright'

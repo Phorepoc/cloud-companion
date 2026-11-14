@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Connections → Messaging test (Docker, repo root): own compose project, no host ports. Screenshots: web/test/out/routing-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

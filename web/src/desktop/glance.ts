@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The short summaries the desktop shows at a glance, in the Events panel and in the desktop widgets: the calendar around today,
 // unread mail and the latest chats. Each loader throws a readable error; `quiet` turns "not set up" into one muted line.

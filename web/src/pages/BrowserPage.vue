@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <template>
   <q-page class="ph-browse">
     <!-- the Etesian browser frame around Firefox's picture: the tabs, address and buttons are ours and follow Firefox live -->

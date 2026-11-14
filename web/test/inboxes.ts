@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Unit test (plain node, no server): the mail widgets, Events and the menu bar read every inbox, the hub's own and each outside
 // account's "<account> / INBOX" folder (regression 2026-10-31: only the hub's own inbox was read, so other accounts' mail never showed).

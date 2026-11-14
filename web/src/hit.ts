@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Layer geometry and hit-testing: the same rules as the C core (phc_hit_test): the topmost layer under the point wins,
 // then the smallest tap region inside it. Fixed layers are tapped in layer coordinates, scroll layers in content

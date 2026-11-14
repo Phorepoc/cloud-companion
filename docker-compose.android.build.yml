@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Developers: build the Android bridge image from this checkout instead of pulling the released one (use with docker-compose.android.yml).
 services:
   android:

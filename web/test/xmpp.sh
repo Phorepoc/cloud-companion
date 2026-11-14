@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # XMPP account through the real UI against the fake XMPP server (internal/fakes/xmpp; the real Prosody is in testdata/xmpp/test.sh).
 # Docker, repo root. Screenshots: web/test/out/xmpp-*.png
 set -eu

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The pages of Settings (SettingsPage.vue) and which one is open. The classic layout follows the address (/settings/connections); the
 // desktop has no addresses of its own, so a link to a page of Settings opens the Settings window and sets the page here.

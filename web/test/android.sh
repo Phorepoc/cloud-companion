@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Android stream test on a small x86 server: a Redroid container and the pheandroid bridge in their OWN network (phepa, containers phe-redroid-t / phe-android-t, so a
 # running stack's phe-redroid is not touched), capped, then a Playwright browser. A small loop runs the adb hooks the browser test asks for (settings, rotate, ...).
 # Needs: image phe-redroid-native:13 (deploy/android/Dockerfile.redroid-native, see docs/android.md), the scrcpy server jar (JAR=/path), an APK for the upload test

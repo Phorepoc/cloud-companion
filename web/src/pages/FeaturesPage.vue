@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Features (owner only): on a board set up by the host manager (docs/host-manager.md), the parts of Cloud Companion that run as their
      own containers, each with a switch. Switching asks for the feature's settings if it has any, then shows the manager's progress
      until it is running or put back. A server set up by hand has no manager: the page says how its features are chosen there. -->

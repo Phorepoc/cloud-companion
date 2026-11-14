@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The Android stream as a module (TypeScript): the web app (AndroidScreen.vue) and the bridge's own standalone page (cmd/pheandroid/index.html) both
 // use it; the bridge serves cmd/pheandroid/stream.js, compiled from this file by `npm run emit` (npm run check fails when it is out of date). No framework, no dependencies: WebCodecs for video and audio, a WebSocket to the bridge, pointer / wheel /

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Firefox and Neko's server, without Neko's web client: the Browser page of the web app is the only way in.
 # Only Neko's own files come from its image; everything else is the least Debian that runs them (no LLVM, FFmpeg, python, font packs).
 # Pinned by the Debian release the Neko files were built on.

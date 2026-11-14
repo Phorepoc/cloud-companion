@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package matrix connects a Matrix account as a chat connection (docs/messaging.md): Cloud Companion signs in as its own device of
 // your account, end-to-end encryption included (mautrix-go, its pure-Go olm: build with -tags goolm), takes the messages of your

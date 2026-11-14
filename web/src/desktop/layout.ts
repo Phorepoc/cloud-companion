@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Layout choice: "classic" (pages with navigation, the default) or "desktop" (the sections as windows on a desktop, from 1024 px).
 // Stored on this device only, like the theme; the window arrangement is stored next to it (DesktopView.vue).

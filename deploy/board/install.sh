@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Installs Cloud Companion's host manager (docs/host-manager.md) on a Debian or Ubuntu machine (arm64 or amd64), as root:
 # Docker with compose, the manager as a systemd service, and Cloud Companion's compose files in /opt/cloud. Cloud Companion
 # itself is downloaded when it is set up, on the setup page (http://<this machine>/).

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → SIP service against a SIP service (the fake Asterisk, internal/fakes/sip): a wrong password fails the test, the right one passes,
 // the account registers (Connected) and shows up as a connection the Messaging rules can send to; removed, it is gone from there.

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Releases. Every push to main runs the checks (ci.yml). When they pass, go-semantic-release reads the Conventional Commits since the last tag
 # (feat = minor, fix = patch, breaking = major; with allow-initial-development-versions a breaking change is only a minor bump below 1.0; docs, chore, ci, ... release nothing;
 # the first release is v0.1.0), makes the tag and the GitHub release with generated notes, and only when it published a version are both container images built and pushed
@@ -96,7 +96,7 @@ jobs:
             type=semver,pattern=v{{major}}.{{minor}},value=${{ needs.release.outputs.version }}
             type=raw,value=latest
           labels: |
-            org.opencontainers.image.licenses=Apache-2.0
+            org.opencontainers.image.licenses=AGPL-3.0-only
             org.opencontainers.image.version=v${{ needs.release.outputs.version }}
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9   # v3
         with:

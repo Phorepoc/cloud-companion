@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The desktop view (1024 px and up): the app's sections as windows, as if the server were a computer you are sitting at. It is the
      shared Etesian desktop (@etesian-design/shell XShell, the one on etesian-design.com): a menu bar, the dock (Overview, the pinned
      and running sections, the recycle bin), overlapping windows that snap and fill the screen, the full-screen Overview (Events | the

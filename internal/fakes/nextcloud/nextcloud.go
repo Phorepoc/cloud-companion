@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package nextcloud is a stand-in Nextcloud for the browser suites (web/test/nctalk.sh, web/test/remotefiles.sh), on port 80 under
 // the alias host "nextcloud". It answers what Cloud Companion sends (internal/nctalk, internal/remote) the way Nextcloud 35 does:

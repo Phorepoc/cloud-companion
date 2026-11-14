@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- A page another of your devices sent here (Browser, More, Send to device): open it in the Browser, in this device's own
      browser, or not at all. One at a time, oldest first. -->
 <template>

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // The XMPP front, first half: two phone logins made through the real Messaging section, which shows each one's XMPP address.
 // Their passwords go to OUT/xmppfront-logins.json for the Jabber clients of xmppfront.py.

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The desktop's weather (the Weather widget), from the server's /phe/weather (internal/webui/weather.go), whichever source the
 // owner picked in Settings. The place is this device's own pick (kept here, like the widgets); without one the server's default

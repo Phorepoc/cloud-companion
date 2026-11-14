@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package xmpp connects an XMPP (Jabber) account as a chat connection (docs/messaging.md): Cloud Companion signs in as one more
 // resource of your account (TLS required), takes the chat messages sent to you into the chat inbox and sends your answers back.

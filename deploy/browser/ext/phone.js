@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The phone link's views (the cloud browser of old phones, internal/browser/firefox.go): each is a tab in its own small popup
 // window behind the window the Browser page streams, laid out at the phone's width. Cloud Companion reads and drives the page
 // from here; Firefox has no remote control turned on. Shares bg.js's scope (send, cmds, mobile, httpBase, secret).

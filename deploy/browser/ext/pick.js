@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // A page's "choose a file" opens the picker of the device you are on (through the Browser page), not one of the server's disk.
 // (in a block: the content scripts share one scope)
 {

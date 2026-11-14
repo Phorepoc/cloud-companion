@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Playwright test of Files and Music, against a live server (files.sh): two browsers paired as two devices.
 //   BASE=http://localhost:8080 CODE=... CODE2=... OUT=/out node --experimental-strip-types files.ts

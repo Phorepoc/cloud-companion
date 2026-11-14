@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # phecloud behind Traefik (TLS terminated there, plain HTTP to phecloud). Own project (phepk3), fixed addresses so that ONLY Traefik is a
 # trusted proxy: the test container reaches phecloud directly as an untrusted peer.
 services:

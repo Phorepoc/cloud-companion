@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The frames and objects of the phecloud protocol as the web app sees them: the TypeScript side of internal/proto/proto.go.
 // Field names are the CBOR keys. Keep this in step with proto.go: a field the server adds is invisible here until it is added.

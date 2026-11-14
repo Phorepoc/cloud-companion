@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Waits for a started Nextcloud container ($1) to finish its first install (up to 10 minutes: slow on a busy CI runner). On a timeout it
 # says so and prints the container's state and its last log lines, instead of letting the next occ command fail with nothing to go on.
 set -eu

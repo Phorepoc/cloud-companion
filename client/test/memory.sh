@@ -1,6 +1,6 @@
 #!/bin/bash
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Memory per open tab: starts the server, opens 1, 2, 3 tabs through one connection (client scenario "mem") and samples the
 # container after each (cgroup usage and the summed RSS of the Chromium processes). Run from the repo root on a Docker host:

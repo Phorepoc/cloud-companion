@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # First start: a small CA and an RSA-2048 / SHA-256 server certificate for $LEGACY_TLS_CN (install /data/ca.crt on the phone;
 # it is also served at https://<host>:8443/ca.crt). Plain RSA, because old stacks have no EC.
 set -e

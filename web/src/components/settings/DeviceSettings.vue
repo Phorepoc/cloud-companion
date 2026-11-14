@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The settings of this device and the server's own (weather, security): one part at a time, a page of Settings (SettingsPage.vue). -->
 <template>
   <div class="ph-dev-settings">

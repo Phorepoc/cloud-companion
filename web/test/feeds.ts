@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of Feeds, against a live server that can reach this container's port 8099 (feeds.sh):
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types feeds.ts

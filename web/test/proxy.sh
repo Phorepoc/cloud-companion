@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # phecloud behind Traefik (Docker, repo root): project phepk3, only Traefik (172.31.77.10) is a trusted proxy. Screenshot: web/test/out/proxy-traefik.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

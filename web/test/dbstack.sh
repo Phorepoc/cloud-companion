@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The WHOLE app on an external database: phecloud with PHECLOUD_DB=postgres://... or mysql://... (own compose project phedb, db container from
 # docker-compose.db.yml), then the browser tests that touch the database most: pairing, passkeys, SMS conversations (chats.ts, passkey.ts).
 # Usage: sh web/test/dbstack.sh postgres|mariadb

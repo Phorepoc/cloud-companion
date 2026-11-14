@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // A look at a RUNNING server's Settings, "Pair a new device": pairs a throwaway admin browser with an admin code, makes a code in the page, checks it against the server's own
 // fingerprint, pairs a second throwaway device with it, and saves screenshots. The devices it makes are named "paircode-live-*": revoke them afterwards (`phecloud devices`, `phecloud revoke <id>`).

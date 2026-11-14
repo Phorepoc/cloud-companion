@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # How Settings, Backups (backupsui.ts) or another host manager page (UI_TEST=updatesui) looks: Cloud Companion (phe-cloud:dev) with a real host manager beside it and no board;
 # the manager's backup.json is written here to show the page's other states. (Docker; repo root)
 set -eu

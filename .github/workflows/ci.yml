@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # CI on a plain Linux runner. Everything here runs without Redroid, a GPU, a phone or any secret. (The Android stream suite, web/test/android.sh, needs the binder kernel module and
 # a Docker host you control: run it there, see docs/android.md.)
 name: CI

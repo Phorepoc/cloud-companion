@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → XMPP against the fake XMPP server (user cc@localhost, password pw-cc, internal/fakes/xmpp): a wrong password fails the
 // test, the right one passes, group chats need their service (room@conference.localhost), the account signs in (Connected) and shows up as a connection the Messaging rules can send to;

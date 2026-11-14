@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package catalogue is the self-hosted software catalogue (docs/catalogue.md): the owner uploads installation files, and Cloud Companion serves
 // them, together with the listings of other catalogues it federates, as an index.json in the format of Phorepoc's official index

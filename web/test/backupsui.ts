@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of how Settings, Backups looks and reads, run by backupsui.sh: Cloud Companion with a real host
 // manager and no board. Every state is screenshotted at phone width, light and dark (OUT/backups-*.png):

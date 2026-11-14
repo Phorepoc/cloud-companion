@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: Apache-2.0 */
+ * SPDX-License-Identifier: AGPL-3.0-only */
 
 /*
  * phc_mbedtls -- a TLS 1.3 transport for the phc core on top of mbedTLS 3.6 (Apache-2.0; an external dependency, not vendored).

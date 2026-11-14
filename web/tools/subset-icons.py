@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 """Subset the Material Symbols (Apache-2.0) variable font to the icons the app uses.
 
 Scans src/ (and Quasar's own icon set) for `sym_o_<name>`, freezes the variable axes to the regular, unfilled, 24 px design,

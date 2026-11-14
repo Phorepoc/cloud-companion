@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Feeds (Firefox): the Feeds page, the reader, read state, and a feeds widget for one feed (Docker, repo root): own compose project (phefd). Screenshots: web/test/out/feeds-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

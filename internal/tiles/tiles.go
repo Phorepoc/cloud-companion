@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package tiles cuts an image into fixed-size tiles, hashes them and encodes each as PNG (text-like, lossless,
 // paletted when it has <= 256 colours) or JPEG (photo-like).

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package connectors pulls outside accounts into the hub. The hub (Stalwart) is only the local cache: mail is IMPORTED from the
 // accounts' IMAP servers (never delivered over SMTP, no MX, no DKIM), outgoing mail is relayed through the matching account's own

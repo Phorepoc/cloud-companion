@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The phone link's cloud browser on the browser container's Firefox (Docker, repo root): the test client pairs over the phone
 # port, opens the test site's phone page and taps, types, selects, answers a dialog, follows a link. Tiles: web/test/out/phone-tiles
 set -eu

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 """Hub test: seed Stalwart with contacts, events and mail (CardDAV PUT, CalDAV PUT, IMAP APPEND, SMTP), then read them back
 through Z-Push with the EAS 14.1 client in eas.py (Provision, FolderSync, Sync for contacts, calendar and mail), add a contact over
 EAS and check it in CardDAV. Environment: HUB_STALWART (http://stalwart:8080), HUB_IMAP (stalwart), HUB_USER, HUB_PASSWORD (the

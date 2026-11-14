@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of backups and a restore on a fresh board, run by backup.sh in two phases with the same browser
 // (its storage is kept in OUT between them):

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // A look at a RUNNING server: the cloud browser and Android at full size, the Desktop site switch, the Android mode buttons, wide and narrow, light and dark.
 // Pairs a throwaway admin browser named "viewport-live" (revoke it afterwards: `phecloud devices`, `phecloud revoke <id>`).

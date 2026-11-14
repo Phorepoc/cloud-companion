@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Passkeys for sites in the Browser: Firefox asks the device you are using (deploy/browser/ext/passkey.js). A web page can't make
 // or use a passkey for another site (the browser binds it to the page's own origin), so the device's app offers a provider:
 //

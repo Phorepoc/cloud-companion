@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → Nextcloud Talk against a throwaway Nextcloud (user cc, made by setup.sh): a wrong password fails
 // the test, the right one passes, the account connects (Connected) and shows up as a connection the Messaging rules can send to;

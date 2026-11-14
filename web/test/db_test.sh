@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The SQL against PostgreSQL and MariaDB, and the whole Go suite on SQLite (Docker, repo root). The SQL is all in internal/store, but most of its
 # queries are tested through the packages that use it, so the external databases run every package that opens a store (DBPKGS); both start at once. Throwaway containers phe-pg-t and phe-maria-t on their own
 # network, capped; every test makes and drops its own database (store.OpenTest). Usage: sh web/test/db_test.sh [sqlite|postgres|mariadb|external|all]

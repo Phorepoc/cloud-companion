@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Date helpers for the calendar. Event times are ISO 8601 strings: "2026-10-24" (all day), "2026-10-24T09:00:00" (floating local
 // time) or with a trailing Z (UTC). The inputs of the form work in local date ("YYYY-MM-DD") and time ("HH:MM").

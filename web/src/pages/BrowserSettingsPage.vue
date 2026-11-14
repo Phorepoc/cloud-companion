@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Browser (owner only): how many tabs Firefox keeps loaded. Tabs are never refused; above this number the background tabs used
      longest ago are unloaded and load again when picked. By default the number follows the browser container's memory. -->
 <template>

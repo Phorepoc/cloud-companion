@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 """A small Exchange ActiveSync 14.1 test client (stdlib only): WBXML encode/decode for the code pages the hub test needs,
 Provision / FolderSync / Sync (protocol 12.1 by default, EAS_VER to change). Written from the public MS-ASWBXML and MS-ASCMD documents; not a general client."""
 import base64, http.client, os, ssl, urllib.parse

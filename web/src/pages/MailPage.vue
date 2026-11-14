@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Mail over the hub (JMAP through the server): folders, a message list, a reader with actions (mark read/unread, move, delete with
      Undo, reply) and a composer. Messages are shown as plain text; "Formatted view" shows the server-sanitised HTML in a sandboxed
      frame with no network access (no pictures, scripts or styles of the message load). Sending only reaches the hub's own addresses

@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The IRC connection against a real server (repo root): Ergo (MIT) on its own network with its default configuration (TLS on 6697
 # with a self-made certificate, account registration open), and the Go test tagged "irc" next to it.
 set -eu

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // v-scroll-thumb: no scrollbar on a widget's list, only a small position indicator over it while it scrolls, as on the phone.
 import type { Directive } from 'vue'

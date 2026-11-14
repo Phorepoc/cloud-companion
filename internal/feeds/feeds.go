@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package feeds is the news behind the desktop's Feeds widget and the Feeds part of Events (after the Etesian phone's and
 // Plasma's Feeds): the owner's RSS 2.0 and Atom feeds, read by the server (a browser cannot read most feeds itself) and merged

@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The desktop's widgets (after the Etesian Belle widgets): clocks, unread mail, the agenda and the latest chats, on the wallpaper
      under every window. A row opens its section as a window. View → Edit widgets turns on the phone's edit chrome: an accent
      outline, a red ✕ squircle to remove, a faint 90 px grid to snap to, and the Add widgets sheet. In edit mode a widget moves by

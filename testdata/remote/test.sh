@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Files of other services against real servers (repo root), on their own network: Nextcloud (the official image with SQLite;
 # user ann, who signs in as ann@example.org) and Seafile 14 (the official image with MariaDB and Redis, as Seafile's own
 # compose file runs it, as seafile.test: it wants a host name with a dot), and the Go test tagged "remote" next to them.

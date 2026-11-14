@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # web/test/run.sh: the app publishes no host ports (the test browser joins its network), so the test runs beside anything else on the machine
 services:
   phecloud:

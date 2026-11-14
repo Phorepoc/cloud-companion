@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Compiles the two files served as plain JavaScript from their TypeScript (tsconfig.emit.json, tsconfig.sw.json) and puts them where they are served:
 // the Android stream into cmd/pheandroid (the bridge embeds it for its own page) and the service worker into public/.

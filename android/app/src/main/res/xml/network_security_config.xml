@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright The Phorepoc Authors, SPDX-License-Identifier: Apache-2.0 -->
+<!-- Copyright The Phorepoc Authors, SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Release builds: HTTPS only. (The hub's certificate is checked against the pin by the app itself; this only forbids http://.) -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Passkey / recovery-code / Security-page test with a virtual authenticator (Docker, from the repo root), in its OWN compose project
 # (phepk, container phe-cloud-pk, no published ports, fresh volume) so a running stack is not touched. Screenshots: web/test/out/passkey-*.png
 set -eu

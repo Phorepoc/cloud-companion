@@ -1,5 +1,5 @@
 /* Copyright The Phorepoc Authors
- * SPDX-License-Identifier: Apache-2.0
+ * SPDX-License-Identifier: AGPL-3.0-only
  *
  * Design tokens (see web/STYLE.md). The look is the Etesian design language (the N9's, carried to the web): its tokens are vendored
  * in css/etesian/ and the app's own names below point at them, so pages keep using --ph-* and never a literal.

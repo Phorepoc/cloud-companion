@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # TLS 1.0-1.2 terminator with RSA key exchange and CBC/SHA-1 ciphers for old phones (OpenSSL 0.9.8-era stacks), in front of
 # Z-Push only. Not for the internet: reach it over the LAN or a tunnel. Caddy (Go crypto/tls) cannot offer TLS 1.0.
 FROM nginx:1.28-bookworm

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package telegram connects a Telegram account as a chat connection (docs/messaging.md) with gotd/td, a pure-Go client of Telegram's
 // own API (MTProto): Cloud Companion signs in as one more device of your account, the way Telegram Desktop does (a QR code you scan

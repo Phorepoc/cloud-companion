@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package host is the host manager (docs/host-manager.md): the one program on the board that touches Docker and the system. It
 // switches Cloud Companion's features on and off, keeps what was chosen, and answers Cloud Companion over a local socket.

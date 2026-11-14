@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Photos on the server (internal/webui/photos.go): Immich accounts and the owner's photo folders, in one timeline and albums.
 import { apiCall } from './cloud'

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # signal-cli-rest-api (MIT; signal-cli, GPL-3.0, inside) for the Signal connection (docs/messaging.md): it holds the keys of
 # Cloud Companion's linked device. No host ports: its API has no login and can read and send your messages, so only Cloud
 # Companion reaches it, on Docker's network.

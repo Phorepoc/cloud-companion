@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Logs in RAM on a board that runs from an SD card (deploy/board/install.sh --board): /var/log becomes a RAM disk, copied to
 # the card by cloud-ram-logs-sync.timer (hourly) and at shutdown, so the card is not written for every log line.
 #   ram-logs.sh start | sync | stop

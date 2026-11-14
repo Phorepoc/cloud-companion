@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Run the end-to-end connector test against the throwaway hub (web/test/hubtest-up.sh up) and the spike's Radicale.
 set -eu
 T=${HUBTEST_DIR:-$HOME/phecloud-spike/hubtest}

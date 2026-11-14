@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Desktop widgets (Firefox): adding one, using it, and what it keeps after a reload (Docker, repo root): own compose project (phewg). Screenshots: web/test/out/widgets-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

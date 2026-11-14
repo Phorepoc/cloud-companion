@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Firefox's policies, with the way back to Cloud Companion, then Neko's own start.
 set -eu
 : "${PHE_BROWSER_SECRET:?}"; : "${PHE_BROWSER_BRIDGE:?}"

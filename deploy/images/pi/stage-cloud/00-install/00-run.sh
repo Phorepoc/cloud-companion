@@ -1,5 +1,5 @@
 #!/bin/bash -e
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # the board files (deploy/board/bundle.sh, put in files/ by build.sh) into the image, and an example setup code on the boot
 # partition
 install -d "${ROOTFS_DIR}/var/tmp/cloud"

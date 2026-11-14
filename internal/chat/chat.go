@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package chat joins the services a message can go through (docs/messaging.md). Each is a Conn: SMS through your phones, your own
 // SIP devices, and later Matrix, XMPP, IRC, Nextcloud Talk, Signal, Telegram. The Hub picks the connection for an address from your

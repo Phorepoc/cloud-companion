@@ -1,8 +1,8 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // phesmssync.mmp -- the Phorepoc SMS service for Cloud Companion: mirrors the phone's SMS (message server Inbox and Sent) into the owner's hub and
-// sends what the web app queues. Apache-2.0; links mbedTLS, the phc core and the Open C libc (the build supplies mbedTLS' headers/archive
+// sends what the web app queues. AGPL-3.0-only; links mbedTLS, the phc core and the Open C libc (the build supplies mbedTLS' headers/archive
 // and the Messaging headers: the Phorepoc build registry, key phesmssync).
 TARGET			phesmssync.exe
 TARGETTYPE		exe

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Shape audit of the app (Firefox, the user's browser): every section in the classic layout (wide and phone) and in the desktop, with
 // the Etesian shape rules: buttons, text fields, chips and badges take squircle-half ends, icon-only buttons and highlights full

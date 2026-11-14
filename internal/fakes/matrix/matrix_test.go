@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The fake homeserver's replies, through mautrix-go as the app uses it: a wrong password is refused, the right one signs in, and the
 // encryption set-up (key upload and query) and a sync work.

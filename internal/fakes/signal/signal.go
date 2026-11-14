@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package signal fakes signal-cli-rest-api (https://github.com/bbernhard/signal-cli-rest-api) as its README and Swagger describe
 // it: /v1/about, /v1/accounts, /v1/qrcodelink, /v1/groups/{number}, /v2/send, and /v1/receive/{number} as a websocket (json-rpc

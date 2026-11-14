@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # testdata/dlna/test.sh: the media server on, on the test network only (no host ports)
 services:
   phecloud:

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # SIP service account through the real UI against a fake Asterisk (internal/fakes/sip; Docker, repo root). The real Asterisk is
 # checked in deploy/asterisk/test.sh. Screenshots: web/test/out/sipservice-*.png
 set -eu

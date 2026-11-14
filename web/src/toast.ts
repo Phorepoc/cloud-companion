@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Toasts, as STYLE.md section 5 describes them: only for the result of something the person just did, 4 seconds, an optional
 // "Undo". Errors are never toasts (they are inline banners). Rendered by components/ToastHost.vue.

@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Backups (owner only, on a board set up by the host manager). For people who are not technical: at the top, in plain words,
      whether their data is safe; turning backups on is three questions (where, the details of that place, a password); once on,
      a short list (where, when, how to restore, turn off). Underneath it is restic (internal/host/backup.go); its words stay out

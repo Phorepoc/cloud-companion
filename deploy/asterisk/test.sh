@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The SIP service connection against the real Asterisk of the compose profile (repo root): builds the image, starts it on its own
 # network with a fresh configuration, and runs the Go test tagged "asterisk" next to it.
 set -eu

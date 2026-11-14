@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package xmppgw is the XMPP front (docs/messaging.md): phones whose chat app speaks XMPP (the Nokia N9's, Symbian's, any Jabber
 // client) sign in with a login from the Messaging section, the same as the SIP front's, and chat through your connections.

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The app's single connection to the cloud and the state of the current page. Components read `state`; the canvas view
 // registers `onTile`/`onRedraw` hooks.

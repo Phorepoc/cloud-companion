@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The Browser page's connection to Firefox: the picture and input through Neko's client, the tabs and navigation through
 // our own extension (deploy/browser/ext). Anything the user does shows at once in `busy`, before the answer comes.
 import { reactive } from 'vue'

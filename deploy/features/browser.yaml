@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 id: browser
 title: Browser
 about: "Firefox on your server, shown on the Browser page of every device, with your sign-ins, tabs and downloads kept here."

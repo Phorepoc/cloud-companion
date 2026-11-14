@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Snapshot the running phecloud database before an update. Every call writes a NEW timestamped file (never overwrites) and keeps the newest KEEP (default 10).
 #   sh deploy/hub/snapshot.sh [backup-dir] [container]        defaults: ./backups, phe-cloud
 set -eu

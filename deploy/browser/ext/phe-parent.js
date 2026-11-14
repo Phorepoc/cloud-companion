@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The privileged half of the bridge (a WebExtension experiment, allowed by deploy/browser/mozilla.cfg): what the phone link needs and
 // the WebExtension APIs do not give: a tap Firefox itself delivers (isTrusted), and the "continue anyway" of a refused certificate.
 /* global ExtensionAPI, ChromeUtils, Cc, Ci */

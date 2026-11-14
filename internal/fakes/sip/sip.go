@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package sip fakes the asterisk profile (deploy/asterisk) for web/test/sipservice.sh: a registrar and proxy on port 5060 (UDP and
 // TCP) that knows one account, cloud-companion with the password ui-test-secret, asks for an MD5 digest like Asterisk does, refuses a

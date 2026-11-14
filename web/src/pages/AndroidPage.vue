@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <template>
   <q-page class="ph-android" :class="{ 'is-phone-mode': kind === 'phone' }">
     <!-- the controls live in the title bar (the window's, or the app's top bar); the screen gets everything else -->

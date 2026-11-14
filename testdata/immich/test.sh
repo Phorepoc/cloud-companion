@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Immich against a real server (repo root): the official server image with its Postgres (VectorChord) and Valkey, machine learning
 # off, as Immich's own compose file runs it; and the Go test tagged "immich" next to it, which signs up the owner, makes an API key,
 # uploads photos and makes an album through Immich's API, then reads them through ours.

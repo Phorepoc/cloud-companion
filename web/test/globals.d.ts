@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // What the web app exposes to the browser tests on `window` (src/cloud.ts, src/pages/BrowserPage.vue, src/android/stream.ts).
 // The protocol shapes come from src/proto.ts (the app's own types).

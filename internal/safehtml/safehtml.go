@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package safehtml makes HTML from outside (mail bodies, feed posts) safe to show in the web app.
 package safehtml

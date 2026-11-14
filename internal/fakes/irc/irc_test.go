@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The fake against the app's own IRC client (internal/irc): a password for no account is refused, the nick alone connects, and a
 // second client with the same nick gets another one.

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 include:
   - docker-compose.hub.yml   # profile "hub" (Stalwart + Z-Push) and "hub-legacy"; see README, "Hub"
   - docker-compose.asterisk.yml   # profile "asterisk": a SIP service for your phones (docs/messaging.md)

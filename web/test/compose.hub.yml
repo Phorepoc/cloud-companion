@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Test overlay: connect phecloud to a running hub (Stalwart) so the Contacts and Calendar pages have something to talk to.
 #   HUB_ENV_FILE=/path/to/deploy/hub/.env.phecloud HUB_NETWORK=phehub_default docker compose -f docker-compose.yml -f web/test/compose.hub.yml up -d
 services:

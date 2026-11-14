@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The fake against the app's own XMPP client (internal/xmpp): a wrong password is refused, the right one signs in and stays
 // connected with its group chats.

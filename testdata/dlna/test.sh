@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The DLNA media server with a real client (repo root): Cloud Companion with PHECLOUD_DLNA_LISTEN on a Docker network, a song and
 # a PDF in its files, and async-upnp-client (Home Assistant's UPnP library) next to it finding it by multicast and browsing it.
 set -eu

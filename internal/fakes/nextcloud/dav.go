@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // WebDAV under remote.php/dav/files/<user>/: PROPFIND (depth 0 and 1) and GET, read-only (Cloud Companion only reads).
 package nextcloud

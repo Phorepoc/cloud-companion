@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Command phehost: the host manager (docs/host-manager.md). It runs on the board as a system service, outside Docker, and
 // switches Cloud Companion's features on and off for Cloud Companion, which asks over a Unix socket.

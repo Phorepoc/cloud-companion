@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Builds the Raspberry Pi 4/5 image (deploy/images/pi/deploy/*.img.xz) with pi-gen in Docker, from the board files in BUNDLE
 # (deploy/board/bundle.sh). On an x86 machine Docker needs arm64 emulation:
 #   docker run --privileged --rm tonistiigi/binfmt --install arm64

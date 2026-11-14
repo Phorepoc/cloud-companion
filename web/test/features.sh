@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Settings → Features on a board: the host manager (phehost) in its own Docker daemon starts Cloud Companion with its socket, and
 # the owner switches Signal on and off in the web app; the containers are checked in between (Docker, privileged; repo root)
 set -eu

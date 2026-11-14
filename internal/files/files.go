@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package files is the owner's own storage behind the Files section and the Music library: a folder on the server
 // (PHECLOUD_FILES_DIR, by default <data>/files), shared by every paired device. Paths are always slash paths relative to the

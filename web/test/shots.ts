@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Screenshots of every page in light and dark, on a phone (390 px) and a desktop (1280 px) viewport:
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out/before ROUTES=pair,browse,devices,settings,desktop node --experimental-strip-types shots.ts

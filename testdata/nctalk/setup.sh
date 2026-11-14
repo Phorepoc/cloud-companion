@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Makes a started Nextcloud container ($1) ready for the Talk tests: waits for its install, adds Talk (spreed, AGPL-3.0, from the
 # Nextcloud app store) and the users alice, bob, carol (password pw-<name>-12345) and cc (pw-cc-12345).
 set -eu

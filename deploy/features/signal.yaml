@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 id: signal
 title: Signal
 about: "Send and receive Signal messages in Chats, linked to the Signal app on your phone."

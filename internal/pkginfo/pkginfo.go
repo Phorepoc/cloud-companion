@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package pkginfo reads the metadata a software package carries about itself, with the Go standard library only: from a Symbian SIS/SISX the
 // names, vendor, UID, version, target platforms, languages and the application icon (an MBM bitmap, decoded to PNG); from an Android APK the

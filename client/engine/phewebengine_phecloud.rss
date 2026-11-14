@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // phewebengine_phecloud.rss -- the ECom registration of the Cloud Companion engine package (interface PHE_WEBENGINE_ECOM_IFACE_UID).
 #include <ecom/registryinfo.rh>
 

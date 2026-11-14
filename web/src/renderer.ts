@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The cloud page on a canvas: tiles of the page, layers on top (fixed, sticky, scroll boxes), local scrolling, local
 // pinch/ctrl-wheel/button zoom, and the tap -> region -> input frame path. Nothing here talks to the server except

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Matrix account through the real UI against the fake homeserver (internal/fakes/matrix; Docker, repo root). The real Conduit is in
 # testdata/matrix/test.sh. Screenshots: web/test/out/matrix-*.png
 set -eu

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package nctalk connects a Nextcloud Talk account as a chat connection (docs/messaging.md), through Talk's documented OCS API
 // (https://nextcloud-talk.readthedocs.io/en/latest/): Cloud Companion looks at your conversations every few seconds, takes the new

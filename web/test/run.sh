@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Web app smoke test (Docker, from the repo root): builds the server image (which builds the Quasar app), starts it, and runs the
 # Playwright test in a container on the same network. Screenshots land in web/test/out/.

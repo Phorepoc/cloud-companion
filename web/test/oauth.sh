@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # "Sign in with Google" against a fake provider (Docker, repo root): own compose project (phepk5), fresh volume. Screenshots: web/test/out/oauth-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

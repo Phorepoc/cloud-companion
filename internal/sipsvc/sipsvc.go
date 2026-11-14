@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package sipsvc connects Cloud Companion to a SIP service as one of its accounts (docs/messaging.md): your own Asterisk (the compose
 // profile "asterisk") or a provider. Cloud Companion registers there like a phone, sends your messages through it and takes the

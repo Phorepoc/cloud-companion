@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Nextcloud Talk account through the real UI against a fake Nextcloud (internal/fakes/nextcloud: users alice, bob, carol, cc; Docker,
 # repo root); the real Nextcloud is in testdata/nctalk/test.sh. Screenshots: web/test/out/nctalk-*.png
 set -eu

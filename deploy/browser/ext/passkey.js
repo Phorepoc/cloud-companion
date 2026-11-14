@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Passkeys: Firefox here has no authenticator of its own (a security key would have to be plugged into the server). A page's
 // navigator.credentials.create/get for a passkey goes to the device you are using, through Cloud Companion, whose passkey
 // provider (the OS, a hardware key or a password manager there) answers. Cloud Companion keeps no keys.

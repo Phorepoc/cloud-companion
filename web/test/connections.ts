@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections page: add / test / sync / remove accounts through the real UI against a CardDAV server (Radicale) and an IMAP server
 // (the go-imap in-memory server), no hub configured here (so the copy itself is covered by the Go tests).

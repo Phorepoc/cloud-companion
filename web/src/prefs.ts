@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The app's state that follows the person from browser to browser (the desktop's windows, dock, widgets and notes), kept on
 // the server (internal/webui/prefs.go). loadPrefs() reads it all once; setPref() changes it here at once and on the server

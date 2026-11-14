@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The desktop's Events panel (the Etesian desktop's Super+N view, after the N9 Events screen and Plasma's Events): the date (a click
      unfolds the month, days with entries dotted; a click on a day picks it), the time with the weather (a click picks the place), the
      picked day's calendar (today and tomorrow by default), unread mail, the latest chats and the newest posts of the feeds, in one dark panel at the right edge under the menu bar. Each row opens its section

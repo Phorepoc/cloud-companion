@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Shows the toasts from toast.ts in the Etesian toast stack: bottom centre, above the phone's bottom bar, paused while hovered or focused. -->
 <template>
   <HdToastStack class="ph-toasts" :toasts="shown" data-test="toasts" @close="(id, undo) => closeToast(Number(id), undo)" />

@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The app shell, in the Etesian style for web pages. Phone (under 600 px): a slim top bar and the N9 dark toolbar at the bottom with
      four sections and "More". Tablet (600-1023 px): an icon rail. Desktop (1024 px and up): a labelled navigation drawer, and a way
      into the desktop view (DesktopView.vue), where the sections open as windows. The sections come from nav.ts. -->

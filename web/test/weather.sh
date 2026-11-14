@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The weather: settings, the desktop widget and the place picker (Docker, repo root): own compose project (phepk7), fresh volume. Screenshots: web/test/out/weather-*.png
 set -eu
 ROOT=$(pwd); OUT=$ROOT/web/test/out; mkdir -p "$OUT"

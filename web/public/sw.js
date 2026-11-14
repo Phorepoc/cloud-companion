@@ -1,6 +1,6 @@
 "use strict";
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The service worker (TypeScript; public/sw.js is compiled from it by `npm run emit`). Minimal: cache the app shell so the installed PWA starts offline; the cloud itself needs the network.
 const sw = self; // a script, not a module: tsconfig.sw.json gives it the worker's types only
 const CACHE = 'phecloud-shell-v1';

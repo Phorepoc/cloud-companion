@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The two display shapes: a large (desktop) viewer gets a landscape display, a phone-sized window a portrait one, and back. The home app is the image's own
 // (Etesian's launcher) in both: the bridge never swaps it and never installs anything. Runs against the bridge's standalone page with the hooks of android.sh.
 import { chromium } from 'playwright'

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The web app (Quasar, MIT) is built first and embedded into the Go binary.
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da AS web
 WORKDIR /web

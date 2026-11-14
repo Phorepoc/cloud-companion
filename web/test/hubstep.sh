@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Contacts and Calendar through a running hub (Docker, from the repo root):
 #   HUB_ENV_FILE=<the hub's deploy/hub/.env.phecloud> HUB_NETWORK=phehub_default sh web/test/hubstep.sh

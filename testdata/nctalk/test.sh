@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The Nextcloud Talk connection against a real Nextcloud (repo root): the official image with SQLite and Talk on its own network,
 # and the Go test tagged "nctalk" next to it.
 set -eu

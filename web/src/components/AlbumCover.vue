@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- An album's art, shown as it is: square, edge to edge, never rounded or cropped into a shape. An album without art gets the
      Etesian generated cover (as the phone's Music): its name in heavy capitals in a bright colour, then the name again without
      spaces in a dark shade of it, filling the square, on black. The colour stays the same for the album; an unknown album is purple. -->

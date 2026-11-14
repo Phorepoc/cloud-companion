@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // phesmssync.cpp -- the Phorepoc SMS service for Cloud Companion (docs/sms.md, hub-design.md section 2).
 //

@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package browser is the cloud-browser backend. Everything that talks to Chromium (DevTools protocol, whose
 // domains we use are partly experimental) sits behind the Factory/Session interfaces, so a backend can be swapped.

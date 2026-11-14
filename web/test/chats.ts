@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Chats page with a FAKE PHONE: a second paired browser context plays the phone's SMS service (it signs /sms/sync calls with its device
 // key). The owner's browser lists the conversation, sends a message through that phone, and watches the status follow the phone's acks.

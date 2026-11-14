@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Playwright test of the weather (internal/weather, /phe/weather), run against a live server whose network this test shares:
 //   BASE=http://localhost:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types weather.ts

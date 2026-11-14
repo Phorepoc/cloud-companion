@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Connections page test (Docker, repo root): own compose project (phepk2), a go-imap in-memory IMAP server container (phe-imapmem) and
 # the Radicale of the spike (DAV_URL, required). Screenshots: web/test/out/connections-*.png
 set -eu

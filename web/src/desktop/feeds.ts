@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The feeds (the Feeds page, the Feeds widget and the Feeds part of Events, after the Etesian phone's and Plasma's Feeds), from the
 // server's /phe/feeds (internal/webui/feeds.go): the owner's RSS and Atom feeds, newest posts first. Only the owner changes the list.

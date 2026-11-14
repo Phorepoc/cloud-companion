@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package fakes holds stand-ins for the outside services Cloud Companion talks to (Nextcloud, Immich, Matrix, XMPP, IRC, Signal, SIP),
 // for the browser suites (web/test): each answers just what the suites send, the way the real service does, so CI downloads and starts

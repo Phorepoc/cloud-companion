@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The sections of the app, in navigation order. Add a section here and in router.ts; the desktop drawer and the phone's bottom bar
 // both read this list. `primary` sections get a place in the phone's bottom bar (four at most); the rest sit under "More".

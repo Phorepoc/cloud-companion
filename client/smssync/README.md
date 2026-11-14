@@ -1,7 +1,7 @@
 # phesmssync: the Phorepoc SMS service
 
 A background program for a Phorepoc phone. It mirrors the phone's text messages into your own phecloud server (shown in **Chats**) and sends
-the messages you write there. Apache-2.0. Files: `phesmssync.cpp` (the Symbian side), `ss_net.c` (the TLS link, plain C), `../phc*.c` (the
+the messages you write there. AGPL-3.0-only. Files: `phesmssync.cpp` (the Symbian side), `ss_net.c` (the TLS link, plain C), `../phc*.c` (the
 protocol core), `group/phesmssync.mmp`.
 
 ## What it does

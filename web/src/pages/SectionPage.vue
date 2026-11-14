@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- A section that does not exist yet: the empty state from STYLE.md, with the section's purpose in one sentence. The section comes
      from the route, or from `sectionId` when the page sits in a desktop window. -->
 <template>

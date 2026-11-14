@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → Matrix against the fake homeserver (internal/fakes/matrix, seeded with
 // @cc:test.local / pw-cc-123): a wrong password fails the test, the right one passes, the

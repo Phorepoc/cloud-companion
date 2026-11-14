@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of how Settings, Updates looks and reads, run by backupsui.sh (UI_TEST=updatesui): Cloud Companion
 // with a real host manager and no board. The manager's update.json is written here for each state (nothing reaches GitHub);

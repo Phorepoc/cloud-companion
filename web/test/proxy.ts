@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // phecloud behind Traefik: passkeys must get the PUBLIC host as relying party id and origin (https://phecloud.test), and a client that
 // reaches phecloud directly must not be able to choose them with forwarded headers.

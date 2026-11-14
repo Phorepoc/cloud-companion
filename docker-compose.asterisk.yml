@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Asterisk as a SIP service Cloud Companion connects to (docs/messaging.md): your own extensions for phones and softphones, messages
 # between them and through your routing rules, calls between extensions. GPL-2.0, a separate container.
 # Use:  PHECLOUD_ASTERISK_SECRET=<a password> docker compose --profile asterisk up -d --build

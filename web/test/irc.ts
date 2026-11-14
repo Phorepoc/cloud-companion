@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → IRC against the fake IRC server (internal/fakes/irc, no accounts registered): a password for an account nobody registered fails the test, the nick
 // alone passes, the account connects (Connected) and shows up as a connection the Messaging rules can send to; removed, it is gone.

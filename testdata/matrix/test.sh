@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The Matrix connection against a real homeserver (repo root): Conduit (Apache-2.0) on its own network, open registration, no
 # federation, and the Go test tagged "matrix" next to it.
 set -eu

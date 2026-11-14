@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # A DLNA player's side, with async-upnp-client (Home Assistant's UPnP library): find media servers by SSDP multicast, pick
 # Cloud Companion by name, browse it down to a song and play part of it. Prints "ok ..." lines; exits 1 on a failure.
 import asyncio, sys, re, html

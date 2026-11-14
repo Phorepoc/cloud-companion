@@ -1,7 +1,7 @@
 Phorepoc Cloud Companion
 Copyright The Phorepoc Authors
 
-This product is licensed under the Apache License, Version 2.0 (see LICENSE). Every source file carries an SPDX-License-Identifier header; test fixtures (testdata/, web/test/site/)
+This product is licensed under the GNU Affero General Public License, version 3 only (AGPL-3.0-only, LICENSE), with the additional terms in ADDITIONAL-TERMS.md (section 7(b) attributions, section 7(e) names and logos). Every source file carries an SPDX-License-Identifier header; test fixtures (testdata/, web/test/site/)
 are part of the project and under the same licence.
 
 Third-party software built into the phecloud binary (Go modules, as reported by google/go-licenses for ./cmd/...; re-run in CI, see .github/workflows/ci.yml; test-only modules such as go-smtp are not shipped):
@@ -26,3 +26,9 @@ Radicale (GPL-3.0), Conduit (Apache-2.0, Matrix tests only), Prosody (MIT, XMPP 
 Optional runtime downloads, never shipped by us: the scrcpy server jar (Apache-2.0), adb from Debian (Apache-2.0), and the apps a user installs.
 
 The services in the Docker images are separate programs that talk to phecloud over network protocols; nothing AGPL or GPL is linked into the phecloud binary.
+
+Licensing. The Phorepoc code is AGPL-3.0-only with additional terms under its section 7 (ADDITIONAL-TERMS.md):
+the attribution "Phorepoc, founded by Kyriakos Bompotis" and these notices must be kept, also where a work based on
+it shows legal notices; no rights are granted to the Phorepoc names and logos (TRADEMARKS.md). It is dual-licensed:
+commercial licences are available from the founder (see README.md, "Licensing"). Third-party code keeps its own
+licence and header.

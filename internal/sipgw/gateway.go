@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package sipgw is the SIP front of Cloud Companion (docs/messaging.md): phones register with it as with any SIP service and chat
 // through it. It is not a SIP service of its own but a front for the chat connections (package chat): a message goes to the

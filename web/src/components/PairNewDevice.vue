@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Settings, "Pair a new device": makes a single-use pairing code on the server (POST /phe/pair/code, admin devices only) and shows it large, with a live countdown to its expiry and the
      server certificate fingerprint the new device can check. The same codes `phecloud paircode` prints. -->
 <template>

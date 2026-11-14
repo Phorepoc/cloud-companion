@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package dlna makes Cloud Companion a UPnP/DLNA media server on the home network: TVs, consoles, receivers and players (VLC,
 // Kodi, BubbleUPnP, the N9's and Symbian's media apps) find it on their own and play the music, videos and photos in Files.

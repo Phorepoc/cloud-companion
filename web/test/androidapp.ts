@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // The web app's own Android page (#/android): a native component, not an iframe. Pairs as admin, streams (VP8 in this headless Chromium), checks layout at phone and
 // desktop widths in light and dark, input through the page, rotation (the frame follows), the app's own controls, reconnect. Screenshots: OUT/androidapp-*.png
 import { chromium } from 'playwright'

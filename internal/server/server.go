@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package server is the phone-protocol endpoint: auth by paired device key, then a cloud-browser session. The same CBOR
 // frames travel over a length-prefixed TCP/TLS connection (phones) or binary WebSocket messages (the web app).

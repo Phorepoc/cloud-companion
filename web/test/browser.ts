@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // What a person does on the Browser page, against real Firefox, with the web app's real CSP.
 import { chromium } from 'playwright'
 import assert from 'node:assert/strict'

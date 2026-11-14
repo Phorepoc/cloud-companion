@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # Self-hosted catalogues
 
 Catalogue is the software store on a Phorepoc phone. By default it reads the official list,

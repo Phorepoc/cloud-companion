@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Firefox's state for the Browser page, and the page's commands for Firefox, through Cloud Companion's server.
 let ws
 // "Desktop site" off: these tabs get the phone version of sites (Firefox for Android's user agent, in the requests and to scripts)

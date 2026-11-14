@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Optional external databases for phecloud (default: SQLite in the data volume). Pick one profile and point PHECLOUD_DB at it:
 #   PostgreSQL: docker compose -f docker-compose.yml -f docker-compose.db.yml --profile db-postgres up -d
 #               PHECLOUD_DB=postgres://phecloud:${PHECLOUD_DB_PASSWORD}@postgres:5432/phecloud?sslmode=disable

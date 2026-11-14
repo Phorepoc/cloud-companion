@@ -1,5 +1,5 @@
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # The XMPP front, second half: two Jabber clients (slixmpp, not the Go library the front uses) sign in with the logins xmppfront.ts
 # made, chat device to device both ways, and get an error for an address no connection takes. TLS=1.0 forces what the Nokia N9 can

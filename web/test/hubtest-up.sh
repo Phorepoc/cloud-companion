@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Bring up the throwaway hub (project phetest: phe-stalwart-t + phe-cloud-t) from a private copy of the repo in ~/phecloud-spike/hubtest
 # (so its .env files never touch another stack). Usage: sh web/test/hubtest-up.sh up|down   (run from a repo checkout)
 set -eu

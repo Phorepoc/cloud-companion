@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package signal connects a Signal account as a chat connection (docs/messaging.md) through signal-cli-rest-api
 // (https://github.com/bbernhard/signal-cli-rest-api, the compose profile "signal"): Cloud Companion is linked as one more device of

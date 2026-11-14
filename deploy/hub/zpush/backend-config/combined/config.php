@@ -1,5 +1,5 @@
 <?php
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 // Combined backend: mail from IMAP, calendar and tasks from CalDAV, contacts from CardDAV (all Stalwart).
 class BackendCombinedConfig {
     public static function GetBackendCombinedConfig() {

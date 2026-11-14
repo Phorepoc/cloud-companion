@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Helpers for the Etesian header the suites drive like a person: the classic bar's apps menu, a page's actions (in the header, or in
 // its ⋮ when they do not fit), and the title's menu of views. The same in a desktop window.

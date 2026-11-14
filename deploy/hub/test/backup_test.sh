@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Backup and restore test (Docker host, from the repo root). Needs the hub running (phe-stalwart on the network HUB_NETWORK) and phe-cloud
 # running with the hub environment, plus the phe-cloud:dev image:

@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Settings → Weather (owner only): where the weather comes from (internal/weather: Open-Meteo, MET Norway, OpenWeatherMap), the
      unit, the default place for devices that have not picked one, and each source's own options. The server tries the source
      before keeping anything. An API key is write-only: it is sealed on the server and never sent back. -->

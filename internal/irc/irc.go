@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package irc connects an IRC network as a chat connection (docs/messaging.md): Cloud Companion stays connected with your nick
 // (TLS by default, SASL when you have an account), joins your channels, takes private messages and the channel lines that name

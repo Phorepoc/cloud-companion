@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The host manager (docs/host-manager.md): Cloud Companion's features, the setup and recovery page. Installed by install.sh.
 [Unit]
 Description=Cloud Companion host manager

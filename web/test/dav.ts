@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Files over WebDAV, the part in the browser (dav.sh runs rclone against it after): Connections → Messaging → Phone logins →
 // add "laptop" and note the password; Files → upload hello.txt; Files → Use from other apps shows the address (this site's /dav/).

@@ -1,7 +1,7 @@
 # Cloud Companion SMS for Android
 
 An Android app that makes a phone the SMS connector of its own SIM for a Cloud Companion hub (hub-design.md section 2, `docs/sms.md`):
-it uploads the inbox and sent box, sends what the web app queued, and reports sent / delivered / failed back. Apache-2.0,
+it uploads the inbox and sent box, sends what the web app queued, and reports sent / delivered / failed back. AGPL-3.0-only,
 Kotlin, **no libraries at run time** (platform JobScheduler, SmsManager, HttpURLConnection, org.json). Not derived from any other SMS sync
 app.
 

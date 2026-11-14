@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Hub test: run test_hub.py in a python container on the hub compose network (default project name phehub).
 #   sh deploy/hub/test/run.sh [seed|eas|all]     needs a running hub (deploy/hub/hub-init.sh); EAS_PASSWORD = an app password (optional)
 set -eu

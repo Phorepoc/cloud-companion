@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Android in the browser (docs/android.md): a Redroid container and the pheandroid stream bridge. Optional; start with  --profile android
 #   docker compose -f docker-compose.yml -f docker-compose.hub.yml -f docker-compose.android.yml --profile hub --profile tls --profile android up -d --build
 # Needs on the host: the binder_linux kernel module; an image from deploy/android/Dockerfile.redroid-native (build it from the upstream Redroid image yourself);

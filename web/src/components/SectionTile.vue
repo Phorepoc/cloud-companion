@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- A section's icon on its lit N9 squircle tile (Etesian icon lighting, css/etesian/base.css), in the section's colour (nav.ts).
      Decorative: the label next to it, or the control around it, names the section. -->
 <template>

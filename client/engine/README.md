@@ -1,7 +1,7 @@
 # Cloud Companion engine plug-in
 
 `phewebengine_phecloud.dll`: the cloud browser as an engine for the Phorepoc browser, one ECom implementation (uid
-`0xE7016B21`) of interface `0xE7016B01` (`phewebengine.h`, version 1). Apache-2.0; it links only mbedTLS, libpng, libjpeg
+`0xE7016B21`) of interface `0xE7016B01` (`phewebengine.h`, version 1). AGPL-3.0-only; it links only mbedTLS, libpng, libjpeg
 and the Open C libc (no GPL code).
 
 | file | role |

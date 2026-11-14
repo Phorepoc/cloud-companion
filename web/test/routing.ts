@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Messaging through the real UI: make a phone login (its password shown once), add rules, reorder and save them, choose
 // who gets SMS, and find all of it again after a reload; a rule without a prefix is refused.

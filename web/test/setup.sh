@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # A board's first boot and recovery: the host manager (phehost) in its own Docker daemon with a setup code on its "card"; the
 # owner sets up in the browser, becomes Cloud Companion's owner, and after Cloud Companion is stopped uses the recovery page
 # (Docker, privileged; repo root)

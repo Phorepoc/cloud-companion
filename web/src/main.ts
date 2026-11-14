@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 import { createApp } from 'vue'
 import { Quasar, Dark } from 'quasar'
 import iconSet from 'quasar/icon-set/material-symbols-outlined'

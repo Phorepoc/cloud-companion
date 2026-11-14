@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Looks at the Chats page of a server that a REAL (emulated) phone syncs with, and optionally sends a message through that phone.
 //   BASE=http://localhost:8085 CODE=<admin code> OUT=/out SEND="reply text" node --experimental-strip-types chatslive.ts

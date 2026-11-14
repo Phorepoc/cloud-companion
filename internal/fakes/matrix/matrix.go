@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package matrix is a stand-in Matrix homeserver (as Conduit answers) for the browser suite web/test/matrix.sh: password login for the
 // seeded user @cc:test.local (a wrong password is M_FORBIDDEN), logout, whoami, sync filters, an empty long-poll sync, and the device

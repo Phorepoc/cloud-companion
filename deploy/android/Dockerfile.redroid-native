@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Redroid without any ARM translation layer (x86_64 apps only). The upstream image has no shell, so edit a copy in a stage and rebuild from scratch.
 ARG BASE=redroid/redroid:13.0.0_64only-240527
 FROM ${BASE} AS base

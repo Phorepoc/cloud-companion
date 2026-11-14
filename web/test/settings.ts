@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of Settings, run against a live server:
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types settings.ts

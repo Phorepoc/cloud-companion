@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # CalDAV / CardDAV with a standard client (vdirsyncer, BSD-3-Clause) against the hub through Caddy (https, internal CA: Caddy root CA pinned),
 # discovery through /.well-known, then app-password revocation: the revoked password must stop working.
 #   DAV_URL=https://hub.example:8444/ sh deploy/hub/test/dav_test.sh     (run on the host that runs the hub)

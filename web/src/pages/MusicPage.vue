@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Music: the songs in your files (any folder; Artist/Album/NN Title or the files' own tags), by album, artist or song. The
      player keeps playing across sections and windows; the bar at the bottom has the song, seeking, previous / play / next as lit
      squircles, and "Play on" to hand the music to another of your devices. Album art is shown as it is; an album without art gets

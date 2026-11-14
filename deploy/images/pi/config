@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # pi-gen settings for the Cloud Companion board image (build.sh): Raspberry Pi OS Lite 64-bit (trixie) plus stage-cloud.
 IMG_NAME=cloud-companion
 PI_GEN_RELEASE="Cloud Companion"

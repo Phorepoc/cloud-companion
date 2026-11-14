@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Pulls a compose project's images before it starts, trying again with a growing wait when the registry turns us away (on CI many
 # suites pull at once: "toomanyrequests"). Usage: sh web/test/pull.sh docker compose -p x -f ... [services]
 for i in 1 2 3 4 5; do

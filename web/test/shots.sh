@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 #
 # Style screenshots (Docker, from the repo root): sh web/test/shots.sh before|after [routes]
 # Starts the server image as built (use `docker compose build` first for the "after" set), pairs four fresh browsers (phone and

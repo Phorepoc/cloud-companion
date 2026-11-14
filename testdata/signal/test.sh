@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # The Signal connection against a real signal-cli-rest-api with no account linked (repo root): the link QR code and "not linked
 # yet". The rest (messages both ways, groups, both receive modes) runs against a mock in `go test ./internal/signal`; linking a real
 # phone is checked by hand (docs/messaging.md).

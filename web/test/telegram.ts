@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Connections → Add an account → Telegram through the real UI, without reaching Telegram (a real sign-in needs your phone and is
 // checked by hand, docs/messaging.md): the sign-in button waits for the API ID and hash; Test and Add refuse an account that is not

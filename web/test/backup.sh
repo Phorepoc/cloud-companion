@@ -1,5 +1,5 @@
 #!/bin/sh
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Backups and a restore on a fresh board (backup.ts): board A (its own Docker daemon, the host manager) is set up and backs up
 # to a restic REST server, then is thrown away; board B, new, restores from the server on its setup page.
 # (Docker, privileged; repo root)

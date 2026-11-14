@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of a board's first boot and recovery, run by setup.sh: the host manager's page at BASE (port 80),
 // Cloud Companion at :8080.

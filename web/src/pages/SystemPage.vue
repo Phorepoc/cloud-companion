@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- System (owner only, on a board set up by the host manager): what the board is, and remote login (SSH) for looking into it,
      off by default (internal/host/ssh.go). The first time it goes on, the owner chooses its password; after that the switch
      alone. A server set up by hand has its own login: the page says so. -->

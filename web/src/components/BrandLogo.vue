@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- The logo mark from the brand token (src/brand.ts), drawn in the accent colour on the N9 squircle (the Etesian icon shape, never a
      rounded square). -->
 <template>

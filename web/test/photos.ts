@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Photos through the real UI (photos.sh: a fake Immich next to Cloud Companion). Immich comes with an owner, an API key, two photos
 // (2024 in the album "Summer", 2023). Then, as a person would: Connections → Add →

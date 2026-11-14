@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Signal account through the real UI against the fake signal-cli-rest-api (internal/fakes/signal, nothing linked; Docker, repo root).
 # The real API is in testdata/signal/test.sh. Screenshots: web/test/out/signal-*.png
 set -eu

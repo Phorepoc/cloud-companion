@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Only the newest reply counts. A page that loads on a tap (a folder, a month, a conversation) can be tapped again before the
 // first answer is back; the slower answer then landed last and showed the wrong folder's list under the new folder's name. Each

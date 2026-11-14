@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package tlsutil makes the server's self-signed certificate (once, at first start) and its pin fingerprint.
 package tlsutil

@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Settings: one place for this device and, for the owner, the server (Connections, Devices, Features, Catalogue, Weather, Security). The Etesian
      Settings split (@etesian-design/shell XSettingsSplit): on a wide window or screen a side panel of grouped pages with search
      and the page beside it, as iPad and macOS settings; narrower, the list drills down and the page has Back. Each page has its address

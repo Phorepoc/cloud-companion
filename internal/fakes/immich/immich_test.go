@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The fake Immich through the app's own client (internal/remote): key check, timeline, albums, thumbnails.
 package immich

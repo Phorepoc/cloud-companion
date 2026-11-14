@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Owner sign-in (passkeys + recovery code) with a Chromium VIRTUAL authenticator:
 //   BASE=http://phecloud:8080 CODES=<admin>,<plain>,<plain> OUT=/out node --experimental-strip-types passkey.ts

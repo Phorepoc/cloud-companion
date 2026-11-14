@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // The test/debug hook: cloud.ts and BrowserPage.vue put their state and helpers here for the browser tests (typed for the tests in
 // web/test/globals.d.ts), and the Android stream the phone's clipboard.

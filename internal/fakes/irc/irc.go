@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Package irc is a fake IRC server for web/test/irc.sh, in place of Ergo: TLS on 6697 (a certificate made at start; the suite
 // accepts any) and plain on 6667. It does what internal/irc needs: CAP negotiation (server-time, message-tags, sasl), SASL PLAIN

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Asterisk (GPL-2.0, a separate container: nothing links it into phecloud) from Alpine's package, for the compose profile "asterisk"
 # (docs/messaging.md). The first start writes a starting configuration into the asterisk-etc volume; it is yours to edit after that.
 FROM alpine:3.22

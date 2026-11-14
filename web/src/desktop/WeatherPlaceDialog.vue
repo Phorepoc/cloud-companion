@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Belle Weather's place picker (as on the phone, WeatherPlaceActivity): type a town, pick it from the matches (each with its
      region and country, as two towns can share a name), or go back to the server's default place. The pick is this device's. -->
 <template>

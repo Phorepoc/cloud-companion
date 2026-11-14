@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Which hub folders are inboxes: the hub's own (role inbox) and each outside account's, which the connectors import into hub folders
 // called "<account> / INBOX" (internal/connectors/mail.go). No imports, so web/test/inboxes.ts can test it with plain node.

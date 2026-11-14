@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Files over WebDAV (Docker, repo root): dav.ts makes a phone login in Connections and finds the address in Files → Use from other
 # apps; then rclone (a real WebDAV client, its official image) lists, writes, reads back, moves and deletes with that login,
 # and is refused with a wrong password. Screenshots: web/test/out/dav-*.png

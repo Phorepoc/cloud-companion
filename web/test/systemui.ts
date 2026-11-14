@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 
 // Playwright test (Firefox) of Settings, System, run by backupsui.sh (UI_TEST=systemui) against a host manager on a board-like
 // container with a real sshd: remote login off by default; on the first time asks for a password (mistakes said on the page);

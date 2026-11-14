@@ -1,5 +1,5 @@
 <!-- Copyright The Phorepoc Authors
-     SPDX-License-Identifier: Apache-2.0 -->
+     SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Messaging routing (docs/messaging.md): the logins your phones use (SIP and XMPP fronts), which connection an address goes to (first rule that
      matches wins; numbers go out as SMS and logins to that device when no rule says otherwise), and who gets each connection's
      messages. -->

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Copyright The Phorepoc Authors
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Files of other services through the real UI: a Nextcloud account added with its own sign-in, its folder in Files, against a fake
 # Nextcloud (internal/fakes/nextcloud: user ann, pw-ann-12345, with "CC Photos/sea.png"; Docker, repo root); the real Nextcloud is in
 # testdata/remote/test.sh. Screenshots: web/test/out/remotefiles-*.png

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 id: hub
 title: Mail, contacts and calendar
 about: "Your own mail server (Stalwart) with Exchange ActiveSync (Z-Push), so phones sync mail, contacts and calendar."

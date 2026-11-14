@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # how often the logs in RAM reach the card: change with a drop-in (systemctl edit cloud-ram-logs-sync.timer)
 [Unit]
 Description=Copy the logs in RAM to the SD card every hour

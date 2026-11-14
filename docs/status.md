@@ -1,4 +1,4 @@
-<!-- SPDX-License-Identifier: Apache-2.0 -->
+<!-- SPDX-License-Identifier: AGPL-3.0-only -->
 # phecloud: status, details and measurements
 
 The developer-facing description of what the server does, how the web app is built, measurements from the test runs and what is not done yet.

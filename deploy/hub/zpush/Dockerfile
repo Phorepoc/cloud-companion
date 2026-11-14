@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-only
 # Z-Push (AGPL-3.0, https://github.com/Z-Hub/Z-Push) in its own container: an Exchange ActiveSync 14.1 bridge in front of
 # Stalwart (IMAP + CalDAV + CardDAV through Z-Push's "combined" backend). Never linked into phecloud; spoken to over HTTP only.
 FROM php:8.3-apache-bookworm

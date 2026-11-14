@@ -1,5 +1,5 @@
 // Copyright The Phorepoc Authors
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 //
 // Duplicate review in the browser against a REAL hub: two pairs of duplicate contacts are made, the review proposes them, "Keep" merges
 // one pair (the other contact disappears from the hub, the kept one has both phone numbers), "Not the same" hides the other pair.
