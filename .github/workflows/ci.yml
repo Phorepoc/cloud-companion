@@ -61,8 +61,9 @@ jobs:
       - name: Check licenses
         run: |
           # segmentio/asm (via gotd/td) is MIT-0, which go-licenses does not recognise; checked by hand
+          # github.com/phorepoc/cloud-companion is this repository itself (AGPL-3.0-only), not a third-party dependency
           go install github.com/google/go-licenses@v1.6.0
-          go-licenses check ./cmd/... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0 --ignore modernc.org/mathutil --ignore github.com/segmentio/asm
+          go-licenses check ./cmd/... --allowed_licenses=Apache-2.0,MIT,BSD-2-Clause,BSD-3-Clause,ISC,MPL-2.0 --ignore modernc.org/mathutil --ignore github.com/segmentio/asm --ignore github.com/phorepoc/cloud-companion
 
   images:
     name: Docker images
