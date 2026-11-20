@@ -170,7 +170,7 @@ async function forgetIt() {
 .ph-section h3 { margin-top: var(--ph-s3); }
 .ph-h3 { font-size: var(--ph-text-h3, 1.1rem); margin: var(--ph-s2) 0 0; }
 .ph-keys { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
-.ph-keys li { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); padding: var(--ph-s3); border: 1px solid var(--ph-border); border-radius: var(--ph-r-control); }
+.ph-keys li { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); padding: var(--ph-s3) 0; border-bottom: 1px solid var(--hd-c-divider); }
 .ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--hd-radius-card); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
 .ph-dialog { width: min(92vw, 440px); background: var(--ph-surface); color: var(--ph-text); }

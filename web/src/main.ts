@@ -15,6 +15,7 @@ import './css/etesian/fonts.css'
 import './css/etesian/quasar-theme.css'
 import './css/tokens.css'
 import './css/app.css'
+import './css/panes.css'
 import App from './App.vue'
 import router from './router'
 import { connectAtStart, loadCreds } from './cloud'
@@ -22,6 +23,16 @@ import { initTheme } from './theme'
 import { brand } from './brand'
 
 document.title = brand.name
+
+// a pane that scrolls shows its thin bar for a moment, then hides it again (css/panes.css): no scrollbar at rest
+const scrolling = new WeakMap<Element, number>()
+document.addEventListener('scroll', (e) => {
+  const el = e.target
+  if (!(el instanceof HTMLElement)) return
+  el.classList.add('is-scrolling')
+  clearTimeout(scrolling.get(el))
+  scrolling.set(el, window.setTimeout(() => el.classList.remove('is-scrolling'), 900))
+}, { capture: true, passive: true })
 loadCreds().then(() => {
   createApp(App).use(Quasar, { plugins: { Dark }, iconSet, config: { ripple: false } }).use(router).mount('#app')
   initTheme()

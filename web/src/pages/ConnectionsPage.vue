@@ -459,7 +459,7 @@ watch(adding, (open) => { if (!open) { tgReset(); ncReset() } }) // a closed dia
 .ph-section p { margin: 0; }
 .ph-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); flex-wrap: wrap; }
 .ph-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
-.ph-list li { display: flex; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3); border: 1px solid var(--ph-border); border-radius: var(--ph-r-control); flex-wrap: wrap; }
+.ph-list li { display: flex; align-items: center; gap: var(--ph-s2); padding: var(--ph-s3) 0; border-bottom: 1px solid var(--hd-c-divider); flex-wrap: wrap; }
 .ph-grow { flex: 1 1 220px; min-width: 0; }
 .ph-chip { display: inline-block; margin-left: var(--ph-s2); padding: 2px var(--ph-s2); font-size: var(--ph-text-small); background: var(--ph-surface-2, var(--ph-bg)); }
 .ph-ok { color: var(--ph-positive, #1b7f3b); display: flex; gap: var(--ph-s2); align-items: flex-start; }

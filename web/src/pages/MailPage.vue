@@ -304,6 +304,4 @@ onMounted(init)
 .ph-body { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--ph-font); font-size: var(--ph-text-body); margin: var(--ph-s3) 0 0; max-height: 50vh; overflow: auto; }
 .ph-frame { width: 100%; height: 50vh; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); background: #fff; }
 .ph-err { color: var(--ph-negative); margin: 0; display: flex; gap: var(--ph-s2); }
-.ph-note { background: var(--ph-surface-2); color: var(--ph-text); border: 1px solid var(--ph-divider); }
-.ph-note.is-error { border-color: var(--ph-negative); }
 </style>

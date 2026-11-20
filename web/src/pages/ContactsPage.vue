@@ -211,7 +211,5 @@ onMounted(load)
 .ph-facts { list-style: none; padding: 0; margin: var(--ph-s2) 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
 .ph-facts a { color: var(--ph-accent); }
 .ph-note-text { white-space: pre-wrap; overflow-wrap: anywhere; }
-.ph-note { background: var(--ph-surface-2); color: var(--ph-text); border: 1px solid var(--ph-divider); }
-.ph-note.is-error { border-color: var(--ph-negative); }
 .ph-error { display: flex; gap: var(--ph-s2); color: var(--ph-negative); margin: 0; }
 </style>

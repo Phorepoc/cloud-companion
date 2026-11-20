@@ -287,7 +287,6 @@ onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); ro?.discon
 .ph-url :deep(.q-field__control) { border-radius: 0; }
 .ph-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .ph-note { flex: none; border-radius: 0; background: var(--ph-surface-2); color: var(--ph-text); border-bottom: 1px solid var(--ph-divider); }
-.ph-note.is-error { border-color: var(--ph-negative); }
 .ph-note.is-error :deep(.q-icon) { color: var(--ph-negative); }
 .ph-stage { flex: 1 1 auto; min-height: 0; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--ph-bg); }
 .ph-dialog { width: min(92vw, 420px); }

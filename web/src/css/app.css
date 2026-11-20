@@ -37,12 +37,16 @@ b, strong { font-weight: var(--hd-font-weight-bold); }
 .ph-small { font-size: var(--ph-text-small); }
 .ph-page { padding: var(--ph-s4); max-width: var(--ph-content-max); margin: 0 auto; }
 @media (max-width: 599px) { .ph-page { padding: var(--ph-s3); } }
-.ph-card {
-  background: var(--ph-surface);
-  border: 1px solid var(--ph-divider);
-  border-radius: var(--ph-r-card);
-  padding: var(--ph-s4);
+/* A group of a page (a "card" in the code): N9 pages are flat, so a group is a section, not a bordered box. Its heading is the N9
+   section header (Storybook Lists: HdSectionHeader, small bold secondary type at the end of a thin rule); the page's own h1 stays the
+   large light title. */
+.ph-card { background: none; border: 0; border-radius: 0; padding: 0; margin-top: var(--ph-s4); }
+.ph-card > h2, .ph-card > .ph-row > h2, .ph-card > header > h2, .ph-card > div:first-child > h2:first-child {
+  flex: 1; display: flex; align-items: center; gap: var(--hd-space-double); margin: 0 0 var(--ph-s2);
+  font: var(--hd-font-weight-bold) var(--hd-font-size-xsmall)/1.2 var(--hd-font-family-base); color: var(--hd-c-fg-secondary);
 }
+.ph-card > h2::before, .ph-card > .ph-row > h2::before, .ph-card > header > h2::before, .ph-card > div:first-child > h2:first-child::before { content: ''; flex: 1; height: 1px; background: var(--hd-c-divider); }
+.ph-card h3 { font: var(--hd-font-weight-bold) var(--hd-font-size-default)/1.3 var(--hd-font-family-base); }
 /* a lit N9 squircle tile behind an icon: set --hd-icon-accent (the section colour) and --hd-icon-size */
 .ph-tile { display: inline-grid; place-items: center; flex: none; width: var(--hd-icon-size, 32px); height: var(--hd-icon-size, 32px); }
 
@@ -50,8 +54,6 @@ b, strong { font-weight: var(--hd-font-weight-bold); }
 .q-btn { min-height: var(--ph-tap); letter-spacing: 0; text-transform: none; }
 .q-btn--round { min-width: var(--ph-tap); min-height: var(--ph-tap); }
 .q-btn.bg-primary { color: var(--ph-on-accent) !important; }
-/* the dark colour mode's negative is a light salmon: white text on it fails contrast, so banners use the dark ink there */
-:root[data-hd-mode="dark"] .q-banner.bg-negative.text-white { color: var(--ph-on-accent) !important; }
 .q-toggle__inner, .q-checkbox__inner, .q-radio__inner { min-width: var(--ph-tap); min-height: var(--ph-tap); }
 .q-field--outlined .q-field__control { min-height: var(--ph-tap); }
 .q-field__native, .q-field__input { font-size: var(--ph-text-body); }

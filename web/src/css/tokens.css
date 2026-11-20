@@ -94,12 +94,14 @@
   --ph-focus: var(--hd-c-focus);
 }
 [data-hd-mode="dark"], .hd-mode-dark {
-  --ph-accent: #7FB0FF;
-  --ph-on-accent: #0b1220;
+  /* the Etesian accent (N9 camera blue): 5.6:1 as text on black, and a filled button darkens it (the theme's lit overlay) to 5:1
+     under white. A pale blue with dark ink read as a disabled button. */
+  --ph-accent: #268CE1;
+  --ph-on-accent: #ffffff;
   --ph-accent-soft: color-mix(in srgb, var(--ph-accent) 18%, var(--hd-c-surface));
   --ph-positive: #8FD65A;
   --ph-warning: #f2c36b;
-  --ph-negative: #FF8A80;
+  --ph-negative: #F0564B;    /* 5.6:1 as text on black; white on a filled (darkened) button */
   --ph-elev-2: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 

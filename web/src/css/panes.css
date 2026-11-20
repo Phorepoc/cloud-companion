@@ -1,0 +1,69 @@
+/* Copyright The Phorepoc Authors
+ * SPDX-License-Identifier: AGPL-3.0-only
+ *
+ * The parts every app page shares, from the Etesian stories (Web/Classic layout, Quasar/Examples, Desktop/Settings split):
+ * list and detail side by side when there is room (each pane scrolling on its own), the app's coloured list header, rows with
+ * squircle avatars, notices as banners, the light N9 toolbar strip under a conversation.
+ */
+
+/* ---- scrolling: no scrollbar at rest (the N9 shows its position only while a list moves). A pane that is scrolling gets
+   .is-scrolling from main.ts for a moment; the thin bar fades in, then out again. ---- */
+.ph-scroll, .x-sset__side, .x-sset__page, .ph-classic__layout .scroll, .ph-win__layout .scroll {
+  overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: transparent transparent;
+}
+.ph-scroll.is-scrolling, .x-sset__side.is-scrolling, .x-sset__page.is-scrolling, .ph-classic__layout .scroll.is-scrolling, .ph-win__layout .scroll.is-scrolling,
+.ph-scroll:focus-visible { scrollbar-color: rgba(128, 128, 133, .6) transparent; }
+.ph-scroll::-webkit-scrollbar, .x-sset__side::-webkit-scrollbar, .x-sset__page::-webkit-scrollbar { width: 4px; }
+.ph-scroll::-webkit-scrollbar-thumb, .x-sset__side::-webkit-scrollbar-thumb, .x-sset__page::-webkit-scrollbar-thumb { background: transparent; border-radius: 2px; }
+.is-scrolling::-webkit-scrollbar-thumb { background: rgba(128, 128, 133, .6); }
+
+/* ---- list and detail (SplitView.vue): side by side from 760 px of room (the page, or a desktop window), else one at a time ---- */
+.ph-split-box { container-type: inline-size; height: 100%; min-height: 0; display: flex; }
+.ph-split { flex: 1; min-width: 0; min-height: 0; display: grid; grid-template-columns: 1fr; background: var(--hd-c-bg); color: var(--hd-c-fg); }
+.ph-split__list, .ph-split__detail { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.ph-split__list { border-right: 1px solid var(--hd-c-divider); }
+.ph-split.is-detail .ph-split__list, .ph-split:not(.is-detail) .ph-split__detail { display: none; }
+@container (min-width: 760px) {
+  .ph-split { grid-template-columns: minmax(300px, 38%) 1fr; }
+  .ph-split.is-detail .ph-split__list, .ph-split:not(.is-detail) .ph-split__detail { display: flex; }
+  .ph-split__back { display: none !important; }
+}
+/* the list pane: the app's coloured header, a search field, the rows */
+.ph-split__list .hd-page-header { flex: none; }
+.ph-split__list .hd-page-header .q-btn { color: #fff; }
+.ph-list-search { flex: none; padding: 8px 11px; }
+.ph-rows { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; }
+/* a row: avatar, name (bold) with the time at the right, one line of preview (as the N9 Messages and Mail lists) */
+.ph-row2 { display: flex; align-items: center; gap: 11px; width: 100%; min-height: 64px; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--hd-c-divider);
+  background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.ph-row2:hover, .ph-row2.is-selected { background: var(--hd-c-pressed); }
+.ph-row2.is-unread { box-shadow: inset 4px 0 0 var(--hd-accent); }
+.ph-row2__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ph-row2__top { display: flex; align-items: baseline; gap: 8px; }
+.ph-row2__title { flex: 1; min-width: 0; font: 700 1rem/1.25 var(--hd-font-family-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-row2.is-unread .ph-row2__title { color: var(--hd-c-accent-text, var(--hd-accent)); }
+.ph-row2__time { flex: none; font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
+.ph-row2__sub { font: 400 var(--hd-font-size-small)/1.3 var(--hd-font-family-base); color: var(--hd-c-fg-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ph-row2__line { font: 400 var(--hd-font-size-default)/1.3 var(--hd-font-family-base); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the detail pane's head: Back (one pane), avatar, name and a line under it */
+.ph-detail-head { flex: none; display: flex; gap: 11px; align-items: center; min-height: 64px; padding: 10px 16px; border-bottom: 1px solid var(--hd-c-divider);
+  font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+.ph-detail-head b { display: block; color: var(--hd-c-fg); font: 700 var(--hd-font-size-default)/1.3 var(--hd-font-family-base); }
+.ph-detail-head__text { flex: 1; min-width: 0; }
+.ph-detail-title { margin: 0; font: var(--hd-font-weight-light) var(--hd-font-size-xlarge)/1.2 var(--hd-font-family-light); color: var(--hd-c-fg); overflow-wrap: anywhere; }
+.ph-split__empty { flex: 1; display: grid; place-items: center; padding: 24px; color: var(--hd-c-fg-secondary); text-align: center; }
+
+/* ---- notices: a banner on the page (the design's notification surface), not a red box. A problem gets the warning stripe. ---- */
+.hd-quasar .ph-banner, .hd-quasar .q-banner.ph-note {
+  display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border: 0; border-radius: var(--hd-radius-card);
+  background: var(--hd-c-surface-raised); color: var(--hd-c-fg); font: 400 var(--hd-font-size-small)/1.4 var(--hd-font-family-base); min-height: 0;
+}
+.hd-quasar .ph-banner .q-icon, .hd-quasar .q-banner.ph-note .q-banner__avatar .q-icon { color: var(--hd-c-accent-text, var(--hd-accent)); font-size: 20px; }
+.hd-quasar .ph-banner.is-error, .hd-quasar .q-banner.ph-note.is-error { box-shadow: inset 3px 0 0 var(--hd-color-palette-warning, #E2701C); }
+.hd-quasar .ph-banner.is-error .q-icon, .hd-quasar .q-banner.ph-note.is-error .q-banner__avatar .q-icon { color: var(--hd-color-palette-warning, #E2701C); }
+.hd-quasar .q-banner.ph-note .q-banner__avatar { align-self: flex-start; padding-top: 1px; }
+.hd-quasar .q-banner.ph-note .q-banner__actions { padding: 0; }
+
+/* ---- the conversation's composer: the N9 light toolbar strip (Quasar/Examples, Messaging app) ---- */
+.ph-strip { flex: none; display: flex; gap: 8px; align-items: center; padding: 8px; background: linear-gradient(#D6D6D8, #ADADB0); box-shadow: inset 0 1px 0 #6E6E72; color: #1A1A1A; }
+[data-hd-mode="dark"] .ph-strip, .hd-mode-dark .ph-strip { background: linear-gradient(#2A2A2C, #0E0E10); box-shadow: inset 0 1px 0 #48484C; color: #fff; }

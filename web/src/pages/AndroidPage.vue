@@ -15,7 +15,7 @@
     <p v-if="loaded && !configured" class="ph-note" role="note" data-test="android-off">
       <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> Android is not set up on this server. See docs/android.md for the two extra containers it needs.
     </p>
-    <q-banner v-if="problem" class="bg-negative text-white" role="alert" data-test="android-error">{{ problem }}</q-banner>
+    <q-banner v-if="problem" class="ph-note is-error" role="alert" data-test="android-error">{{ problem }}</q-banner>
 
     <div v-show="configured" ref="stage" class="ph-stage" data-test="android-stage">
       <div class="ph-frame" :style="frameStyle">
