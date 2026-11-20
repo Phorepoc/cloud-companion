@@ -1,8 +1,8 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: AGPL-3.0-only -->
 <!-- Music: the songs in your files (any folder; Artist/Album/NN Title or the files' own tags), by album, artist or song. The
-     player keeps playing across sections and windows; the bar at the bottom has the song, seeking, previous / play / next as lit
-     squircles, and "Play on" to hand the music to another of your devices. Album art is shown as it is; an album without art gets
+     player keeps playing across sections and windows; the library is the music-app story (cover collage, then Artists / Albums / Songs / Playlists);
+     the bar at the bottom is its now playing (song n/m, artist, album, previous / play / next, the pink progress line), and "Play on" to hand the music to another of your devices. Album art is shown as it is; an album without art gets
      the generated cover. -->
 <template>
   <q-page class="ph-page ph-music" data-test="music-page">
@@ -10,7 +10,7 @@
     <div v-if="!chrome.hosted" class="ph-head">
       <h1>Music</h1>
       <q-btn-toggle v-model="tab" no-caps unelevated toggle-color="primary" data-test="music-tabs"
-                    :options="[{ label: 'Albums', value: 'albums' }, { label: 'Artists', value: 'artists' }, { label: 'Songs', value: 'songs' }]" @update:model-value="album = null; artist = ''" />
+                    :options="[{ label: 'Library', value: 'library' }, { label: 'Albums', value: 'albums' }, { label: 'Artists', value: 'artists' }, { label: 'Songs', value: 'songs' }]" @update:model-value="album = null; artist = ''" />
     </div>
     <q-banner v-if="error" inline-actions class="ph-note is-error q-mb-md" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
@@ -25,13 +25,30 @@
 
     <!-- one album or one artist -->
     <template v-if="album">
-      <q-btn flat no-caps icon="sym_o_arrow_back" :label="tab === 'artists' ? artist : 'Albums'" class="q-mb-sm ph-back" @click="album = null" />
+      <q-btn flat no-caps icon="sym_o_arrow_back" :label="tab === 'artists' ? artist : tab === 'library' ? 'Library' : 'Albums'" class="q-mb-sm ph-back" @click="album = null" />
       <div class="ph-albumhead">
         <AlbumCover :album="album.name" :cover="album.cover" :size="160" />
         <div><h2>{{ album.name }}</h2><p class="ph-muted">{{ album.artist }} · {{ album.tracks.length }} songs</p>
           <q-btn unelevated no-caps color="primary" icon="sym_o_play_arrow" label="Play" data-test="album-play" @click="play(album.tracks, 0)" /></div>
       </div>
       <SongList :list="album.tracks" />
+    </template>
+    <!-- the library (music-app story): a collage of the album covers, the newest big with its name on a pink strip, then the
+         Artists / Albums / Songs / Playlists rows -->
+    <template v-else-if="tab === 'library' && tracks.length">
+      <div class="ph-collage" data-test="music-collage">
+        <button v-for="(a, i) in albums.slice(0, 6)" :key="a.key" type="button" class="ph-collage__tile" :class="{ 'is-big': i === 0 }"
+                :data-test="'album-' + a.name" :aria-label="a.name + ', ' + a.artist" @click="album = a">
+          <AlbumCover :album="a.name" :cover="a.cover" :size="i === 0 ? 240 : 120" />
+          <span v-if="i === 0" class="ph-collage__label"><svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><path d="M7 5v14l12-7z" fill="currentColor" /></svg>{{ a.name }}</span>
+        </button>
+      </div>
+      <ul class="ph-libmenu" data-test="music-library">
+        <li><button type="button" @click="tab = 'artists'">Artists<span class="ph-libmenu__n">{{ artists.length }}</span><q-icon name="sym_o_chevron_right" size="24px" /></button></li>
+        <li><button type="button" @click="tab = 'albums'">Albums<span class="ph-libmenu__n">{{ albums.length }}</span><q-icon name="sym_o_chevron_right" size="24px" /></button></li>
+        <li><button type="button" @click="tab = 'songs'">Songs<span class="ph-libmenu__n">{{ tracks.length }}</span><q-icon name="sym_o_chevron_right" size="24px" /></button></li>
+        <li><span class="ph-libmenu__off">Playlists<span class="ph-libmenu__n">none yet</span></span></li>
+      </ul>
     </template>
     <template v-else-if="tab === 'albums' && tracks.length">
       <div class="ph-albums" data-test="music-albums">
@@ -56,21 +73,25 @@
     </template>
     <SongList v-else-if="tab === 'songs' && tracks.length" :list="tracks" />
 
-    <!-- now playing -->
+    <!-- now playing (music-app story): title and n/m, artist and album, previous / play / next, the pink progress line with times -->
     <div v-if="now" class="ph-nowbar" data-test="music-now">
-      <AlbumCover :album="now.album" :cover="now.cover" :size="56" />
+      <AlbumCover class="ph-nowbar__cover" :album="now.album" :cover="now.cover" :size="72" />
       <div class="ph-nowbar__main">
-        <span class="ph-nowbar__t"><b data-test="music-now-title">{{ now.title }}</b> <span class="ph-muted">{{ now.artist }}</span></span>
-        <div class="ph-nowbar__seek"><span class="ph-small">{{ mmss(player.pos) }}</span>
-          <q-slider :model-value="player.pos" :min="0" :max="player.dur || 1" :step="1" aria-label="Position" dense @update:model-value="(v) => seek(v ?? 0)" />
-          <span class="ph-small">{{ mmss(player.dur) }}</span></div>
+        <div class="ph-nowbar__l1"><b data-test="music-now-title">{{ now.title }}</b><span class="ph-nowbar__n">{{ player.i + 1 }}/{{ player.queue.length }}</span></div>
+        <div class="ph-nowbar__l2">{{ now.artist }}</div>
+        <div class="ph-nowbar__l2">{{ now.album }}</div>
         <span v-if="player.error" class="text-negative ph-small" role="alert">{{ player.error }}</span>
       </div>
       <div class="ph-nowbar__ctl">
-        <button type="button" class="ph-lit hd-squircle" aria-label="Previous" @click="prev"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" fill="currentColor" /></svg></button>
-        <button type="button" class="ph-lit ph-lit--big hd-squircle" :aria-label="player.playing ? 'Pause' : 'Play'" data-test="music-toggle" @click="toggle()">
-          <svg viewBox="0 0 24 24" width="22" height="22"><path :d="player.playing ? 'M6 5h4v14H6zm8 0h4v14h-4z' : 'M8 5v14l11-7z'" fill="currentColor" /></svg></button>
-        <button type="button" class="ph-lit hd-squircle" aria-label="Next" @click="next"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z" fill="currentColor" /></svg></button>
+        <button type="button" class="ph-np" aria-label="Previous" @click="prev"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M7 5v14M18 5 9 12l9 7z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" /></svg></button>
+        <button type="button" class="ph-np" :aria-label="player.playing ? 'Pause' : 'Play'" data-test="music-toggle" @click="toggle()">
+          <svg viewBox="0 0 24 24" width="24" height="24"><path :d="player.playing ? 'M8 5v14M16 5v14' : 'M8 5v14l11-7z'" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linejoin="round" /></svg></button>
+        <button type="button" class="ph-np" aria-label="Next" @click="next"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M17 5v14M6 5l9 7-9 7z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round" /></svg></button>
+      </div>
+      <div class="ph-nowbar__seek">
+        <q-slider :model-value="player.pos" :min="0" :max="player.dur || 1" :step="1" aria-label="Position" dense color="pink-8" track-color="grey-9" thumb-size="8px"
+                  @update:model-value="(v) => seek(v ?? 0)" />
+        <div class="ph-nowbar__times"><span>{{ mmss(player.pos) }}</span><span>{{ mmss(player.dur) }}</span></div>
       </div>
       <q-btn v-if="targets.length" flat no-caps icon="sym_o_cast" label="Play on" data-test="music-playon">
         <q-menu auto-close><q-list dense style="min-width: 200px">
@@ -97,11 +118,11 @@ import { toast } from '../toast'
 interface Album { key: string; name: string; artist: string; cover: string; tracks: Track[] }
 const tracks = ref<Track[]>([])
 const loading = ref(false), error = ref('')
-const tab = ref<'albums' | 'artists' | 'songs'>('albums')
+const tab = ref<'library' | 'albums' | 'artists' | 'songs'>('library')
 const album = ref<Album | null>(null)
 const artist = ref('')
 
-const VIEWS: Record<string, 'albums' | 'artists' | 'songs'> = { Albums: 'albums', Artists: 'artists', Songs: 'songs' }
+const VIEWS: Record<string, 'library' | 'albums' | 'artists' | 'songs'> = { Library: 'library', Albums: 'albums', Artists: 'artists', Songs: 'songs' }
 const chrome = useChrome(() => ({ title: 'Music', views: Object.keys(VIEWS), view: tab.value[0]!.toUpperCase() + tab.value.slice(1) }))
 chrome.on('view', (v) => { const t = v ? VIEWS[v] : undefined; if (t) { tab.value = t; album.value = null; artist.value = '' } })
 const now = computed(() => current())
@@ -176,16 +197,45 @@ watch(() => state.status === 'online' && state.admin, (on) => { if (on) api.devi
 :deep(.ph-row-title) { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 :deep(.ph-n) { width: 22px; text-align: right; }
 .ph-ftile { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: var(--ph-accent-soft); color: var(--ph-accent); }
-.ph-nowbar { position: sticky; bottom: 0; z-index: 50; margin: auto calc(-1 * var(--ph-s4)) calc(-1 * var(--ph-s4)); display: flex; align-items: center; gap: var(--ph-s3); padding: 10px var(--ph-s4);
-  background: linear-gradient(#2A2A2E, #0E0E10); color: #fff; box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.35); }
-.ph-nowbar .ph-muted { color: #B8B8BC; }
-.ph-nowbar__main { flex: 1; min-width: 0; }
-.ph-nowbar__t { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-nowbar__seek { display: flex; align-items: center; gap: var(--ph-s2); }
+/* library: covers edge to edge, the first one 2x2 with its name on the pink strip */
+.ph-collage { display: grid; grid-template-columns: repeat(3, 1fr); margin: calc(-1 * var(--ph-s4)) calc(-1 * var(--ph-s4)) 0; max-width: 480px; }
+@media (min-width: 600px) { .ph-collage { margin: 0; } }
+.ph-collage__tile { position: relative; padding: 0; border: 0; background: #000; cursor: pointer; aspect-ratio: 1; overflow: hidden; }
+.ph-collage__tile.is-big { grid-column: span 2; grid-row: span 2; }
+.ph-collage__tile :deep(.ph-cover) { width: 100% !important; height: 100% !important; }
+.ph-collage__label { position: absolute; left: 4px; right: 4px; bottom: 4px; display: flex; align-items: center; gap: 8px; padding: 2px 10px; border-radius: 4px;
+  background: #C8008C; color: #fff; font: var(--hd-font-weight-bold) 13px/1.4 var(--hd-font-family-base); text-align: left; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ph-libmenu { list-style: none; margin: 8px 0 0; padding: 0; max-width: 480px; }
+.ph-libmenu button, .ph-libmenu__off { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 49px; padding: 0 4px; border: 0; background: none; color: var(--hd-c-fg);
+  font: var(--hd-font-weight-bold) var(--hd-font-size-large)/1.2 var(--hd-font-family-base); text-align: left; cursor: pointer; }
+.ph-libmenu button:hover { background: var(--hd-c-pressed); }
+.ph-libmenu__n { margin-left: auto; font: 400 var(--hd-font-size-small) var(--hd-font-family-base); color: var(--hd-c-fg-secondary); }
+.ph-libmenu__off { cursor: default; color: var(--hd-c-fg-secondary); }
+.ph-nowbar { position: sticky; bottom: 0; z-index: 50; margin: auto calc(-1 * var(--ph-s4)) calc(-1 * var(--ph-s4)); display: grid; align-items: center; column-gap: 16px;
+  grid-template-columns: auto 1fr auto auto; grid-template-areas: "cover main ctl playon" "cover seek seek seek"; padding: 12px var(--ph-s4) 8px;
+  background: #000; color: #fff; border-top: 1px solid #333; }
+.ph-nowbar__cover { grid-area: cover; }
+.ph-nowbar__main { grid-area: main; }
+.ph-nowbar__ctl { grid-area: ctl; }
+.ph-nowbar > .q-btn { grid-area: playon; }
+.ph-nowbar__seek { grid-area: seek; }
+.ph-nowbar__l1 { display: flex; gap: 8px; align-items: baseline; font: var(--hd-font-weight-bold) 17px/1.3 var(--hd-font-family-base); }
+.ph-nowbar__l1 b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-nowbar__n { margin-left: auto; font-size: 13px; font-weight: 400; color: #9A9A9E; }
+.ph-nowbar__l2 { color: #9A9A9E; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-nowbar__times { display: flex; justify-content: space-between; font-size: 13px; color: #9A9A9E; margin-top: -4px; }
+.ph-nowbar :deep(.q-slider__selection) { background: #C8008C !important; }
+.ph-nowbar :deep(.q-slider__thumb) { color: #C8008C !important; }
+.ph-nowbar :deep(.q-slider__track) { background: #3A3A3C; }
+.ph-nowbar > .q-btn { color: #fff !important; }
+.ph-nowbar__l2 { color: #9A9A9E !important; }
+.ph-np { width: 44px; height: 44px; display: grid; place-items: center; border: 0; background: none; color: #fff; cursor: pointer; border-radius: 8px; }
+.ph-np:hover { background: rgba(255, 255, 255, .12); }
+@media (max-width: 599px) {
+  .ph-nowbar { grid-template-columns: 1fr auto; grid-template-areas: "main playon" "ctl ctl" "seek seek"; }
+  .ph-nowbar__cover { display: none; }
+  .ph-nowbar__ctl { justify-content: space-between; padding: 4px 8px; }
+}
+.ph-nowbar__main { min-width: 0; }
 .ph-nowbar__ctl { display: flex; align-items: center; gap: 10px; }
-/* Belle lit squircle buttons (dark glossy, top-lit) */
-.ph-lit { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 0; color: #fff; cursor: pointer;
-  background: linear-gradient(#4A4A4F, #1E1E21 50%, #0C0C0D); }
-.ph-lit--big { width: 46px; height: 46px; }
-.ph-lit:hover { background: linear-gradient(#5A5A60, #2A2A2E 50%, #141416); }
 </style>
