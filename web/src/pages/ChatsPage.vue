@@ -1,65 +1,79 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: AGPL-3.0-only -->
 <template>
-  <q-page class="ph-page">
-    <h1 v-if="!chrome.hosted">Chats</h1>
-    <p class="ph-muted">Text messages (SMS) from your own phones. Each phone syncs its own messages here; a message you send goes out through the phone you pick.</p>
-
-    <div v-if="error" class="ph-error" role="alert" data-test="chat-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</div>
-
-    <p v-if="loaded && !devices.length" class="ph-note" role="note" data-test="no-sms-devices">
-      <q-icon name="sym_o_info" size="20px" aria-hidden="true" /> No phone is sharing its text messages yet. Pair a phone that has the Cloud Companion app, and its messages will appear here.
-    </p>
-
-    <div class="ph-chat" :class="{ 'ph-open': !!current }">
-      <section class="ph-card ph-conv" aria-label="Conversations">
-        <div class="ph-row">
-          <h2>Conversations</h2>
-          <q-btn flat dense icon="sym_o_edit_square" label="New" no-caps data-test="new-chat" @click="startNew" />
+  <q-page class="ph-chats" :style-fn="fillPage">
+    <SplitView :detail="!!current" list-label="Conversations" detail-label="Messages">
+      <template #list>
+        <div class="ph-chats__head">
+          <HdPageHeader title="Chats" :subtitle="subtitle" colored accent="#09A7CC" />
+          <q-btn flat round icon="sym_o_edit_square" aria-label="New message" data-test="new-chat" @click="startNew" />
         </div>
-        <p v-if="loaded && !convs.length" class="ph-muted" data-test="no-convs">No messages yet.</p>
-        <ul class="ph-list">
-          <li v-for="c in convs" :key="c.key">
-            <button type="button" class="ph-conv-item" :class="{ 'ph-sel': current && current.key === c.key }" data-test="conv" @click="open(c)">
-              <span class="ph-conv-name">{{ c.name || c.number }}</span>
-              <span class="ph-muted ph-small ph-conv-last">{{ c.last_dir === 'out' ? 'You: ' : '' }}{{ c.last }}</span>
-              <span v-if="c.last_failed" class="ph-error ph-small">Not sent</span>
-            </button>
-          </li>
-        </ul>
-      </section>
+        <div v-if="convs.length > 4" class="ph-list-search"><HdSearchField v-model="q" placeholder="Search chats" label="Search chats" /></div>
+        <div class="ph-scroll ph-chats__list">
+          <div v-if="error" class="ph-banner is-error ph-chats__note" role="alert" data-test="chat-error"><q-icon name="sym_o_error" aria-hidden="true" /><span>{{ error }}</span></div>
+          <p v-if="loaded && !devices.length" class="ph-banner ph-chats__note" role="note" data-test="no-sms-devices">
+            <q-icon name="sym_o_info" aria-hidden="true" /><span>No phone is sharing its text messages yet. Pair a phone that has the Cloud Companion app, and its messages will appear here.</span>
+          </p>
+          <HdEmptyState v-if="loaded && devices.length && !convs.length" text="No messages yet" data-test="no-convs" />
+          <ul class="ph-rows">
+            <li v-for="c in shown" :key="c.key">
+              <button type="button" class="ph-row2" :class="{ 'is-selected': current && current.key === c.key }" data-test="conv" @click="open(c)">
+                <HdAvatar v-if="c.name || !/\d/.test(c.number)" :name="c.name || c.number" :size="43" /><HdThumbnail v-else icon="person" :size="43" :color="tint(c.number)" />
+                <span class="ph-row2__text">
+                  <span class="ph-row2__top"><span class="ph-row2__title">{{ c.name || c.number }}</span><span class="ph-row2__time">{{ shortWhen(c.last_ts) }}</span></span>
+                  <span class="ph-row2__sub">{{ c.last_dir === 'out' ? 'You: ' : '' }}{{ c.last }}</span>
+                  <span v-if="c.last_failed" class="ph-chats__failed">Not sent</span>
+                </span>
+              </button>
+            </li>
+          </ul>
+        </div>
+        <p class="ph-chats__about">Text messages (SMS) from your own phones. Each phone syncs its own messages here; a message you send goes out through the phone you pick.</p>
+      </template>
 
-      <section v-if="current" class="ph-card ph-thread" aria-label="Messages" data-test="thread">
-        <div class="ph-row">
-          <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back to the conversations" class="ph-back" @click="current = null" />
-          <h2>{{ current.name || current.number || 'New message' }}</h2>
+      <template #detail>
+        <template v-if="current">
+          <header class="ph-detail-head" data-test="thread">
+            <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back to the conversations" class="ph-split__back" @click="current = null" />
+            <template v-if="current.key"><HdAvatar v-if="current.name || !/\d/.test(current.number)" :name="current.name || current.number" :size="43" /><HdThumbnail v-else icon="person" :size="43" :color="tint(current.number)" /></template>
+            <div class="ph-detail-head__text">
+              <b>{{ current.name || current.number || 'New message' }}</b>
+              <span>{{ current.name ? current.number + ' · ' : '' }}<template v-if="deviceOptions.length === 1">sent through <span data-test="send-via">{{ deviceOptions[0].label }}</span></template><template v-else>text messages</template></span>
+            </div>
+          </header>
+          <div v-if="!current.key" class="ph-chats__to"><q-input v-model="newNumber" outlined dense label="To (phone number)" type="tel" data-test="new-number" /></div>
+          <ul ref="list" class="ph-msgs ph-scroll" aria-live="polite">
+            <li v-for="m in messages" :key="m.id" :class="m.dir === 'out' ? 'ph-out' : 'ph-in'" data-test="msg">
+              <span class="ph-bubble">{{ m.body }}<span class="ph-stamp">{{ when(m.ts) }}<template v-if="devices.length > 1"> · {{ deviceName(m.device) }}</template></span></span>
+              <span v-if="m.dir === 'out'" class="ph-state" :class="{ 'is-failed': m.status === 'failed' }" data-test="msg-status">{{ statusText(m) }}</span>
+            </li>
+          </ul>
+          <div class="ph-strip ph-chats__compose">
+            <q-select v-if="deviceOptions.length > 1" v-model="sendVia" :options="deviceOptions" emit-value map-options outlined dense options-dense class="ph-chats__via" aria-label="Send from" data-test="send-via" />
+            <q-input v-model="text" outlined dense autogrow class="col ph-chats__text" placeholder="Write a message" aria-label="Message (Ctrl+Enter sends)" data-test="sms-text" @keyup.ctrl.enter="send" />
+            <q-btn unelevated color="primary" icon="sym_o_send" aria-label="Send" :disable="!text.trim() || !sendVia" :loading="sending" data-test="sms-send" @click="send" />
+          </div>
+        </template>
+        <div v-else class="ph-split__empty">
+          <div><q-icon name="sym_o_chat" size="48px" aria-hidden="true" /><p>Pick a conversation, or start a new one.</p></div>
         </div>
-        <q-input v-if="!current.key" v-model="newNumber" outlined dense label="To (phone number)" data-test="new-number" />
-        <ul ref="list" class="ph-msgs" aria-live="polite">
-          <li v-for="m in messages" :key="m.id" :class="m.dir === 'out' ? 'ph-out' : 'ph-in'" data-test="msg">
-            <span class="ph-bubble">{{ m.body }}</span>
-            <span class="ph-muted ph-small">{{ when(m.ts) }} · {{ deviceName(m.device) }}<template v-if="m.dir === 'out'"> · <span :class="m.status === 'failed' ? 'ph-error' : ''" data-test="msg-status">{{ statusText(m) }}</span></template></span>
-          </li>
-        </ul>
-        <div class="ph-compose">
-          <q-select v-model="sendVia" :options="deviceOptions" emit-value map-options outlined dense label="Send from" data-test="send-via" :disable="!deviceOptions.length" />
-          <q-input v-model="text" outlined dense autogrow label="Message" hint="Ctrl+Enter to send" data-test="sms-text" @keyup.ctrl.enter="send" />
-          <q-btn unelevated color="primary" icon="sym_o_send" label="Send" :disable="!text.trim() || !sendVia" :loading="sending" data-test="sms-send" @click="send" />
-        </div>
-      </section>
-    </div>
+      </template>
+    </SplitView>
   </q-page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useChrome } from '@etesian-design/shell'
+import { HdAvatar, HdEmptyState, HdPageHeader, HdSearchField, HdThumbnail } from '@etesian-design/vue'
+import SplitView from '../components/SplitView.vue'
+import { fillPage } from '../fillPage'
 import { apiCall } from '../cloud'
 import { latest } from '../latest'
 import type { SmsConversation, SmsDevice, SmsMessage } from '../proto'
 
 // the title is in the host's header (the classic bar, a desktop window)
-const chrome = useChrome(() => ({ title: 'Chats' }))
+useChrome(() => ({ title: 'Chats' }))
 
 /** The open conversation: a stored one, or a new message (empty key) still to be addressed. */
 type Current = Pick<SmsConversation, 'key' | 'number'> & Partial<SmsConversation>
@@ -84,6 +98,22 @@ const deviceOptions = computed(() => devices.value.map((d) => ({ label: d.name |
 const statusText = (m: SmsMessage) => {
   const text: Partial<Record<SmsMessage['status'], string>> = { queued: 'waiting for the phone', sent: 'sent', delivered: 'delivered', failed: 'not sent' + (m.error ? ' (' + m.error + ')' : '') }
   return text[m.status] || m.status
+}
+const q = ref('')
+const shown = computed(() => {
+  const w = q.value.trim().toLowerCase()
+  return w ? convs.value.filter((c) => [c.name, c.number, c.last].some((x) => x && x.toLowerCase().includes(w))) : convs.value
+})
+const subtitle = computed(() => !devices.value.length ? 'Text messages from your phones'
+  : `${convs.value.length} conversation${convs.value.length === 1 ? '' : 's'} · ${devices.value.map((d) => d.name || 'phone').join(', ')}`)
+/** a number without a name gets the person glyph on a squircle, in one of the avatar colours (HdAvatar's palette) picked by the number */
+const TINTS = ['#007DC9', '#09A7CC', '#62B700', '#821DDE', '#CC09BA', '#EF5500', '#ED9507', '#0067BC']
+const tint = (n: string) => TINTS[[...n.replace(/\D/g, '')].reduce((a, c) => a + c.charCodeAt(0), 0) % TINTS.length]
+const shortWhen = (t: number) => {
+  const d = new Date(t * 1000), now = new Date()
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  if (now.getTime() - d.getTime() < 6 * 86400000) return d.toLocaleDateString(undefined, { weekday: 'short' })
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
 }
 const when = (t: number) => new Date(t * 1000).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 
@@ -156,27 +186,33 @@ onBeforeUnmount(() => { alive = false; clearTimeout(timer); document.removeEvent
 </script>
 
 <style scoped>
-.ph-chat { display: grid; grid-template-columns: minmax(220px, 320px) 1fr; gap: var(--ph-s4); margin-top: var(--ph-s4); align-items: start; }
-.ph-conv, .ph-thread { display: flex; flex-direction: column; gap: var(--ph-s3); }
-.ph-row { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s2); }
-.ph-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s1, 4px); }
-.ph-conv-item { display: flex; flex-direction: column; align-items: flex-start; width: 100%; text-align: left; padding: var(--ph-s3); border: 1px solid var(--ph-border); border-radius: var(--ph-r-control); background: transparent; color: inherit; cursor: pointer; }
-.ph-conv-item.ph-sel { border-color: var(--ph-accent, #0b5cab); }
-.ph-conv-name { font-weight: 600; }
-.ph-conv-last { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-msgs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--ph-s3); max-height: 50vh; overflow: auto; }
-.ph-msgs li { display: flex; flex-direction: column; gap: 2px; max-width: 80%; }
+.ph-chats { display: flex; flex-direction: column; }
+.ph-chats__list { flex: 1; min-height: 0; }
+.ph-chats__head { position: relative; flex: none; }
+.ph-chats__head .hd-page-header { padding-right: 60px; }
+.ph-chats__head > .q-btn { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); color: #fff; }
+.ph-chats__note { margin: 10px 11px; }
+.ph-chats__failed { font-size: var(--hd-font-size-xsmall); color: var(--ph-negative); }
+.ph-chats__about { flex: none; margin: 0; padding: 8px 12px; border-top: 1px solid var(--hd-c-divider); font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
+.ph-chats__to { flex: none; padding: 10px 16px; border-bottom: 1px solid var(--hd-c-divider); }
+/* the conversation: bubbles as Quasar/Examples Messaging (q-chat-message in the Etesian theme), newest at the bottom */
+.ph-msgs { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.ph-msgs > :first-child { margin-top: auto; }
+.ph-msgs li { display: flex; flex-direction: column; gap: 2px; max-width: min(80%, 560px); }
 .ph-in { align-self: flex-start; }
 .ph-out { align-self: flex-end; align-items: flex-end; }
-.ph-bubble { padding: var(--ph-s2) var(--ph-s3); border-radius: var(--ph-r-control); background: var(--ph-surface-2, var(--ph-bg)); white-space: pre-wrap; overflow-wrap: anywhere; }
-.ph-out .ph-bubble { background: var(--ph-accent, #0b5cab); color: var(--ph-on-accent, #fff); }
-.ph-compose { display: flex; flex-direction: column; gap: var(--ph-s2); }
-.ph-error { display: flex; gap: var(--ph-s2); align-items: flex-start; color: var(--ph-negative); }
-.ph-note { display: flex; gap: var(--ph-s2); align-items: flex-start; padding: var(--ph-s3); border-radius: var(--hd-radius-card); background: var(--ph-surface-2, var(--ph-bg)); }
-.ph-back { display: none; }
-@media (max-width: 719px) {
-  .ph-chat { grid-template-columns: 1fr; }
-  .ph-chat.ph-open .ph-conv { display: none; }
-  .ph-back { display: inline-flex; }
-}
+.ph-bubble { display: flex; flex-direction: column; gap: 2px; padding: 7px 11px; border-radius: 12px; background: var(--hd-surface-card, var(--hd-c-surface)); color: var(--hd-surface-card-fg, var(--hd-c-fg));
+  box-shadow: 0 0 0 1px var(--hd-c-divider); font: 400 var(--hd-font-size-default)/1.35 var(--hd-font-family-base); white-space: pre-wrap; overflow-wrap: anywhere; }
+.ph-in .ph-bubble { border-bottom-left-radius: 3px; }
+.ph-out .ph-bubble { background: var(--ph-accent); color: var(--ph-on-accent); box-shadow: none; border-bottom-right-radius: 3px; }
+.ph-stamp { font-size: var(--hd-font-size-xsmall); opacity: .75; white-space: nowrap; }
+.ph-state { font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
+.ph-state.is-failed { color: var(--ph-negative); }
+/* the composer strip: the phone to send from (when there are several), the message, Send */
+.ph-chats__compose { align-items: flex-end; }
+.ph-chats__compose :deep(.q-field__control) { background: var(--hd-c-surface); }
+.ph-chats__via { flex: 0 1 160px; min-width: 96px; }
+@container (max-width: 480px) { .ph-chats__via { flex-basis: 110px; } }
+.ph-chats__text { min-width: 0; }
+.ph-chats__compose .q-btn { min-width: 48px; }
 </style>
