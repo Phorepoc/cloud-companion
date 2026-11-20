@@ -4,7 +4,7 @@
      server certificate fingerprint the new device can check. The same codes `phecloud paircode` prints. -->
 <template>
   <section class="ph-card ph-pair" aria-labelledby="set-pair" data-test="pair-device">
-    <h2 id="set-pair">Pair a new device</h2>
+    <h2 id="set-pair" class="ph-set-title">Pair a new device</h2>
     <p v-if="!state.admin" class="ph-muted" data-test="pair-denied">
       <q-icon name="sym_o_lock" size="20px" aria-hidden="true" /> Only admin devices can pair new devices. Use an admin device, or run <span class="ph-mono">phecloud paircode</span> on the server.
     </p>

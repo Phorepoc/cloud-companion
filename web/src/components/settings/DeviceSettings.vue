@@ -5,7 +5,7 @@
   <div class="ph-dev-settings">
 
     <section v-if="part === 'appearance'" class="ph-card ph-section" aria-labelledby="set-appearance">
-      <h2 id="set-appearance">Appearance</h2>
+      <h2 id="set-appearance" class="ph-set-title">Appearance</h2>
       <p class="ph-muted">Hybrid is the N9 look: light pages with dark bars and menus, and dark Music, Photos, Android and Settings. Match system switches between light and dark with your device.</p>
       <q-btn-toggle v-model="choice" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph"
                     :options="[{ label: 'Hybrid', value: 'hybrid', icon: 'sym_o_routine' }, { label: 'Light', value: 'light', icon: 'sym_o_light_mode' }, { label: 'Dark', value: 'dark', icon: 'sym_o_dark_mode' }, { label: 'Match system', value: 'system', icon: 'sym_o_contrast' }]"
@@ -20,7 +20,7 @@
     </section>
 
     <section v-if="part === 'data'" class="ph-card ph-section" aria-labelledby="set-data">
-      <h2 id="set-data">Data use</h2>
+      <h2 id="set-data" class="ph-set-title">Data use</h2>
       <p class="ph-muted">Lower picture quality and grayscale use less data. Text always stays sharp. This only applies to this device.</p>
       <div id="q-label" class="ph-small">Picture quality: {{ q }}</div>
       <q-slider v-model="q" :min="10" :max="95" :step="5" label color="primary" aria-labelledby="q-label" data-test="quality" />
@@ -36,7 +36,7 @@
     <WeatherSettings v-if="part === 'weather' && state.admin" />
 
     <section v-if="part === 'security' && state.admin" class="ph-card ph-section" aria-labelledby="set-security" data-test="security">
-      <h2 id="set-security">Security</h2>
+      <h2 id="set-security" class="ph-set-title">Security</h2>
       <p v-if="blocker" class="ph-note" role="note" data-test="passkey-blocker"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> {{ blocker }}</p>
       <h3 class="ph-h3">Passkeys</h3>
       <p v-if="!keys.length" class="ph-muted" data-test="no-passkeys">No passkeys yet. Add one to sign in without a pairing code.</p>
@@ -88,7 +88,7 @@
     </q-dialog>
 
     <section v-if="part === 'browser'" class="ph-card ph-section" aria-labelledby="set-device">
-      <h2 id="set-device">This browser</h2>
+      <h2 id="set-device" class="ph-set-title">This browser</h2>
       <p class="ph-muted">Device ID: <span class="ph-mono">{{ state.dev || 'not connected' }}</span></p>
       <q-btn outline color="negative" label="Disconnect this browser" @click="forgetIt" />
     </section>

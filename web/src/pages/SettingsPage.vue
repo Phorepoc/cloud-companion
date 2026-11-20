@@ -63,5 +63,5 @@ useChrome(() => ({ title: 'Settings' }))
 .ph-settings__box :deep(.x-sset) { height: 100%; }
 /* the pages inside are pages of their own elsewhere: no second page height or margins */
 .ph-settings__box :deep(.q-page) { min-height: 0 !important; padding: 0; }
-.ph-settings__box :deep(.x-sset__page) { padding-top: 4px; }
+.ph-settings__box :deep(.x-sset__page) { padding-top: 14px; }
 </style>

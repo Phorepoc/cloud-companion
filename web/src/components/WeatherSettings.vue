@@ -5,7 +5,7 @@
      before keeping anything. An API key is write-only: it is sealed on the server and never sent back. -->
 <template>
   <section class="ph-card ph-section" aria-labelledby="set-weather" data-test="weather-settings">
-    <h2 id="set-weather">Weather</h2>
+    <h2 id="set-weather" class="ph-set-title">Weather</h2>
     <p class="ph-muted">Settings for the Weather widget on the desktop. Each device can choose its own location. Otherwise, the default location below is used.</p>
     <template v-if="cfg">
       <q-option-group v-model="cfg.provider" :options="providers.map((p) => ({ label: p.name, value: p.id }))" color="primary" data-test="weather-provider" />

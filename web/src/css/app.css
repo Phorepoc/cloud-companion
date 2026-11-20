@@ -83,3 +83,6 @@ b, strong { font-weight: var(--hd-font-weight-bold); }
 .text-on-accent { color: var(--ph-on-accent) !important; }
 .bg-surface-2 { background: var(--ph-surface-2) !important; }
 .text-ph { color: var(--ph-text) !important; }
+/* a settings page's own title, inside its first group: the large light page title (as the Settings split), not a section header */
+.ph-card > h2.ph-set-title { display: block; margin: 0 0 var(--ph-s2); font: var(--hd-font-weight-light) 28px/1.2 var(--hd-font-family-light); color: var(--hd-c-fg); }
+.ph-card > h2.ph-set-title::before { display: none; }

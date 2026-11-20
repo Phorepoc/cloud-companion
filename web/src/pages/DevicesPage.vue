@@ -8,8 +8,9 @@
                 text="The first device you connect is an admin. To add more, run phecloud paircode --admin on the server." />
     <q-banner v-if="state.adminError" inline-actions class="ph-note is-error q-mb-md" role="alert">{{ state.adminError }}</q-banner>
     <HdStatusState v-if="state.admin && !state.deviceList.length" state="loading" title="Loading devices" text="One moment…" />
-    <ul v-if="state.admin && state.deviceList.length" class="ph-list ph-card" data-test="device-list">
-      <li v-for="d in state.deviceList" :key="d.id" class="q-item ph-row" :data-test="'device-' + d.id">
+    <ul v-if="state.admin && state.deviceList.length" class="ph-list" data-test="device-list">
+      <li v-for="d in state.deviceList" :key="d.id" class="q-item ph-row" :class="{ 'is-revoked': d.revoked }" :data-test="'device-' + d.id">
+        <HdThumbnail :icon="/phone|n9|android|symbian/i.test(d.name || '') ? 'phone' : 'globe'" :size="32" :color="d.admin ? '#F77219' : '#4591FF'" />
         <div class="ph-row-main">
           <div class="ph-row-title">
             {{ d.name || d.id }}
@@ -27,14 +28,15 @@
 
     <section v-if="state.admin" class="ph-apppw" aria-labelledby="apppw-h">
       <div class="ph-head2">
-        <h2 id="apppw-h">App passwords</h2>
+        <HdSectionHeader id="apppw-h" title="App passwords" class="col" />
         <q-btn unelevated color="primary" icon="sym_o_add" label="Add a device" data-test="apppw-new" @click="addOpen = true; addName = ''; addDays = 0; addError = ''" />
       </div>
       <p class="ph-muted">Phones and apps that can't sign in the usual way (for mail, calendar and contacts) each get their own password. You can revoke it here at any time.</p>
       <q-banner v-if="apppwError" inline-actions class="ph-note is-error q-mb-md" role="alert">{{ apppwError }}</q-banner>
       <HdStatusState v-if="apppwLoaded && !apppws.length && !apppwError" icon="lock" title="No app passwords yet" text="Add a device to get a password for it." />
-      <ul v-if="apppws.length" class="ph-list ph-card" data-test="apppw-list">
+      <ul v-if="apppws.length" class="ph-list" data-test="apppw-list">
         <li v-for="p in apppws" :key="p.id" class="ph-row" :data-test="'apppw-row-' + p.id">
+          <HdThumbnail icon="lock" :size="32" color="#6A6A6A" />
           <div class="ph-row-main">
             <div class="ph-row-title">{{ p.name }}</div>
             <div class="ph-small ph-muted">Created {{ p.created ? new Date(p.created).toLocaleDateString() : 'earlier' }}. {{ p.expires ? 'Expires ' + new Date(p.expires).toLocaleDateString() + '.' : 'Does not expire.' }}</div>
@@ -96,7 +98,7 @@ import { ref, onMounted } from 'vue'
 import { state, api, connect, hubCall } from '../cloud'
 import type { AppPassword, DeviceInfo } from '../proto'
 import { toast } from '../toast'
-import { HdStatusState } from '@etesian-design/vue'
+import { HdSectionHeader, HdStatusState, HdThumbnail } from '@etesian-design/vue'
 
 const fmt = (t: number) => new Date(t * 1000).toLocaleString()
 // asking first, in the app's own dialog (the browser's pop-up looked foreign and can be switched off for a site)
@@ -176,12 +178,13 @@ onMounted(async () => {
 
 <style scoped>
 .ph-list { list-style: none; padding: 0; margin: var(--ph-s4) 0 0; }
-.ph-row { display: flex; align-items: center; gap: var(--ph-s3); padding: var(--ph-s3) var(--ph-s4); border-bottom: 1px solid var(--ph-divider); }
-.ph-row:last-child { border-bottom: 0; }
+.ph-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-bottom: 1px solid var(--hd-c-divider); }
+.ph-row.is-revoked { opacity: .6; }
 .ph-row-main { flex: 1; min-width: 0; }
-.ph-row-title { font-weight: 600; display: flex; flex-wrap: wrap; gap: var(--ph-s2); align-items: center; overflow-wrap: anywhere; }
+.ph-row-title { font: 400 var(--hd-font-size-large)/1.25 var(--hd-font-family-light); display: flex; flex-wrap: wrap; gap: var(--ph-s2); align-items: center; overflow-wrap: anywhere; }
 .ph-apppw { margin-top: var(--ph-s6); }
-.ph-head2 { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s2); }
+.ph-head2 { display: flex; align-items: center; gap: var(--ph-s3); margin-bottom: var(--ph-s2); }
+.ph-head2 .hd-section-header { padding-left: 0; }
 .ph-dialog { width: min(94vw, 480px); }
 .ph-formcol { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-err { color: var(--ph-negative); margin: 0; }

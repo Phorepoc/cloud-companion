@@ -4,7 +4,7 @@
      type on a squircle tile; upload with the button or by dropping files on the page; a file opens in the browser (songs play in
      the music player), downloads, gets a public link to share, or is renamed or deleted (Undo while the toast shows). -->
 <template>
-  <q-page class="ph-page" :class="{ 'is-drop': dropping }" data-test="files-page" @dragover.prevent="dropping = !readOnly" @dragleave.self="dropping = false" @drop.prevent="onDrop">
+  <q-page class="ph-files" :class="{ 'is-drop': dropping }" data-test="files-page" @dragover.prevent="dropping = !readOnly" @dragleave.self="dropping = false" @drop.prevent="onDrop">
     <!-- with a header (the classic bar, a desktop window) the title and the actions are there; the file picker stays in the page -->
     <input ref="picker" type="file" multiple hidden data-test="files-input" @change="onPick">
     <div v-if="!chrome.hosted" class="ph-head">
@@ -15,11 +15,16 @@
         <q-btn unelevated no-caps color="primary" icon="sym_o_upload" label="Upload" :loading="uploading" data-test="files-upload" @click="picker?.click()" />
       </span>
     </div>
-    <nav class="ph-crumbs" aria-label="Folder">
-      <button type="button" class="hd-sqh" data-test="files-crumb-root" @click="go('')">Files</button>
-      <template v-for="(c, i) in crumbs" :key="c.path"><q-icon name="sym_o_chevron_right" size="18px" aria-hidden="true" />
-        <button type="button" class="hd-sqh" :aria-current="i === crumbs.length - 1 ? 'page' : undefined" @click="go(c.path)">{{ c.name }}</button></template>
-    </nav>
+    <!-- the app's coloured header (as the N9 Files): the folder, and the way back up as links -->
+    <header class="ph-fhead">
+      <h2 class="ph-fhead__title">{{ crumbs.length ? crumbs[crumbs.length - 1].name : 'Files' }}</h2>
+      <nav class="ph-crumbs" aria-label="Folder">
+        <button type="button" class="hd-sqh" :aria-current="!crumbs.length ? 'page' : undefined" data-test="files-crumb-root" @click="go('')">Files</button>
+        <template v-for="(c, i) in crumbs" :key="c.path"><q-icon name="sym_o_chevron_right" size="16px" aria-hidden="true" />
+          <button type="button" class="hd-sqh" :aria-current="i === crumbs.length - 1 ? 'page' : undefined" @click="go(c.path)">{{ c.name }}</button></template>
+        <span class="ph-crumbs__n">{{ entries.length }} item{{ entries.length === 1 ? '' : 's' }}</span>
+      </nav>
+    </header>
 
     <p v-if="readOnly" class="ph-note q-mb-md" data-test="files-readonly"><q-icon name="sym_o_cloud" size="20px" aria-hidden="true" /> These files are in {{ mountName(path.split('/')[0]) }}. You can open and download them here; change them in that service.</p>
     <q-banner v-if="error" inline-actions class="ph-note is-error q-mb-md" rounded role="alert">
@@ -31,7 +36,7 @@
     <HdStatusState v-else-if="!loading && !entries.length && !error" icon="folder" :title="path ? 'This folder is empty' : 'No files yet'"
                 :text="readOnly ? '' : 'Upload files, or drop them here. They are kept on your server and reach every device you pair.'" data-test="files-empty" />
 
-    <ul v-if="entries.length" class="ph-list ph-card" data-test="files-list">
+    <ul v-if="entries.length" class="ph-list" data-test="files-list">
       <li v-for="e in entries" :key="e.path" class="ph-frow">
         <button type="button" class="ph-row" :data-test="'file-' + e.name" @click="openEntry(e)">
           <span class="ph-ftile hd-squircle" :class="{ 'is-dir': e.dir }" aria-hidden="true"><q-icon :name="e.source ? 'sym_o_cloud' : iconOf(e)" size="22px" /></span>
@@ -56,8 +61,8 @@
     </ul>
 
     <template v-if="shares.length && !path">
-      <h2 class="ph-sh">Shared links</h2>
-      <ul class="ph-list ph-card" data-test="files-shares">
+      <HdSectionHeader title="Shared links" />
+      <ul class="ph-list" data-test="files-shares">
         <li v-for="s in shares" :key="s.token" class="ph-frow">
           <span class="ph-row">
             <span class="ph-ftile hd-squircle" aria-hidden="true"><q-icon name="sym_o_link" size="22px" /></span>
@@ -110,7 +115,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { HdStatusState } from '@etesian-design/vue'
+import { HdSectionHeader, HdStatusState } from '@etesian-design/vue'
 import { useChrome } from '@etesian-design/shell'
 import { onResume, toast } from '../toast'
 import { latest } from '../latest'
@@ -257,22 +262,26 @@ onMounted(load)
 </script>
 
 <style scoped>
-.ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s2); }
+.ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); padding: 8px 12px; }
 .ph-head__acts { display: flex; gap: var(--ph-s2); }
-.ph-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-bottom: var(--ph-s3); color: var(--ph-text-muted); }
-.ph-crumbs button { padding: 4px 6px; border: 0; background: none; color: var(--ph-accent); font: inherit; cursor: pointer; }
-.ph-crumbs button[aria-current] { color: var(--ph-text); font-weight: 600; cursor: default; }
-.ph-page.is-drop { outline: 3px dashed var(--ph-accent); outline-offset: -8px; }
+.ph-fhead { padding: 10px 16px 8px; background: #EA650A; color: #fff; }
+.ph-fhead__title { margin: 0; font: var(--hd-font-weight-light) var(--hd-font-size-xlarge)/1.2 var(--hd-font-family-light); overflow-wrap: anywhere; }
+.ph-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 0 2px; margin: 2px 0 0 -6px; font-size: var(--hd-font-size-small); color: rgba(255,255,255,.85); }
+.ph-crumbs button { padding: 2px 6px; border: 0; background: none; color: #fff; font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ph-crumbs button[aria-current] { text-decoration: none; cursor: default; }
+.ph-crumbs__n { margin-left: auto; }
+.ph-files.is-drop { outline: 3px dashed var(--ph-accent); outline-offset: -8px; }
+.ph-files > .ph-note, .ph-files > .q-banner { margin: 10px 12px; }
 .ph-list { list-style: none; padding: 0; margin: 0; }
-.ph-list li { border-bottom: 1px solid var(--ph-divider); }
-.ph-list li:last-child { border-bottom: 0; }
+.ph-list li { border-bottom: 1px solid var(--hd-c-divider); }
 .ph-frow { display: flex; align-items: center; padding-right: var(--ph-s2); }
-.ph-row { flex: 1; min-width: 0; min-height: 56px; display: flex; align-items: center; gap: var(--ph-s3); padding: var(--ph-s2) var(--ph-s4); background: none; border: 0; text-align: left; font: inherit; color: var(--ph-text); cursor: pointer; }
-button.ph-row:hover { background: var(--ph-surface-2); }
+.ph-frow:hover { background: var(--hd-c-pressed); }
+.ph-row { flex: 1; min-width: 0; min-height: 60px; display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: none; border: 0; text-align: left; font: inherit; color: var(--hd-c-fg); cursor: pointer; }
 .ph-row-main { display: flex; flex-direction: column; min-width: 0; }
-.ph-row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-ftile { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: var(--ph-accent-soft); color: var(--ph-accent); }
-.ph-ftile.is-dir { background: #EA650A; color: #fff; }
-.ph-sh { margin: var(--ph-s5, 32px) 0 var(--ph-s2); }
+.ph-row-title { font: 700 1rem/1.25 var(--hd-font-family-base); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-row-main .ph-small { font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+/* the type on a lit squircle (folders in the Files colour, files in neutral) */
+.ph-ftile { flex: none; width: 43px; height: 43px; display: grid; place-items: center; background: linear-gradient(#8a8f98, #5a5f68); color: #fff; }
+.ph-ftile.is-dir { background: linear-gradient(#F7923F, #D9540A); }
 .ph-dialog { width: min(94vw, 480px); }
 </style>
