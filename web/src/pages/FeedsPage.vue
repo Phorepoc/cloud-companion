@@ -42,7 +42,15 @@ const when = (p: Post) => { const d = new Date(p.published); return isNaN(d.getT
 const asPost = (p: Post): FeedPost => ({ id: p.id, title: p.title || '(no title)', feed: p.feed, when: when(p), unread: isUnread(p), html: p.html, link: p.link })
 
 const hidden = ref<string[]>([]) // removed, Undo still possible
-const sources = computed<FeedSource[]>(() => feedList.value.filter((f) => !hidden.value.includes(f.url)).map((f) => ({ id: f.url, title: f.title || f.url, unread: unreadOf(f.url), error: feedErrors.value[f.url] ? "Can't update" : undefined })))
+// each feed its own colour, as in the feeds-app story (the same feed keeps it), and the time of its newest post on the right
+const TINTS = ['#FF6A00', '#2FA8CC', '#7A3FD0', '#3D9A36', '#D6222A', '#0067BC', '#C2185B', '#8A6D1F']
+const tintOf = (u: string) => TINTS[[...u].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % TINTS.length]
+const newest = (u: string) => posts.value.filter((p) => p.feedURL === u).reduce((m, p) => (p.published > m ? p.published : m), '')
+const updated = (u: string) => {
+  const t = newest(u); if (!t) return undefined
+  const d = new Date(t); return d.toDateString() === new Date().toDateString() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: '2-digit', month: '2-digit' })
+}
+const sources = computed<FeedSource[]>(() => feedList.value.filter((f) => !hidden.value.includes(f.url)).map((f) => ({ id: f.url, title: f.title || f.url, color: tintOf(f.url), updated: updated(f.url), unread: unreadOf(f.url), error: feedErrors.value[f.url] ? "Can't update" : undefined })))
 const feedTitle = computed(() => (feedsAt.feed === 'all' ? 'All posts' : feedList.value.find((f) => f.url === feedsAt.feed)?.title || feedsAt.feed))
 const inFeed = computed(() => posts.value.filter((p) => feedsAt.feed === 'all' || p.feedURL === feedsAt.feed))
 const shown = computed(() => inFeed.value.map(asPost))
