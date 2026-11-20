@@ -169,8 +169,12 @@ function friendly(m: string) {
 const openView = (c: Contact) => { current.value = c; viewOpen.value = true }
 function openNew() { form.value = blank(); formError.value = ''; editOpen.value = true }
 
-const chrome = useChrome(() => ({ title: 'Contacts', tools: [{ icon: 'add', label: 'New contact' }] }))
-chrome.on('tool', (l) => { if (l === 'New contact') openNew() })
+const chrome = useChrome(() => ({ title: 'Contacts', tools: [{ icon: 'add', label: 'New contact' }, { icon: 'search', label: 'Search' }, { icon: 'refresh', label: 'Refresh' }] }))
+chrome.on('tool', (l) => {
+  if (l === 'New contact') openNew()
+  else if (l === 'Refresh') load()
+  else if (l === 'Search') { viewOpen.value = false; (document.querySelector('[data-test=contacts-search] input') as HTMLInputElement | null)?.focus() }
+})
 function openEdit(c: Contact) {
   viewOpen.value = false
   form.value = { href: c.href, etag: c.etag, given: c.given || '', family: c.family || '', org: c.org || '', note: c.note || '',

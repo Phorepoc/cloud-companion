@@ -8,7 +8,7 @@
           <HdPageHeader :level="2" title="Chats" :subtitle="subtitle" colored accent="#09A7CC" />
           <q-btn flat round text-color="white" icon="sym_o_edit_square" aria-label="New message" data-test="new-chat" @click="startNew" />
         </div>
-        <div v-if="convs.length > 4" class="ph-list-search"><HdSearchField v-model="q" placeholder="Search chats" label="Search chats" /></div>
+        <div v-if="convs.length > 4 || showSearch" class="ph-list-search"><HdSearchField v-model="q" placeholder="Search chats" label="Search chats" /></div>
         <div class="ph-scroll ph-chats__list">
           <div v-if="error" class="ph-banner is-error ph-chats__note" role="alert" data-test="chat-error"><q-icon name="sym_o_error" aria-hidden="true" /><span>{{ error }}</span></div>
           <p v-if="loaded && !devices.length" class="ph-banner ph-chats__note" role="note" data-test="no-sms-devices">
@@ -82,7 +82,13 @@ import { latest } from '../latest'
 import type { SmsConversation, SmsDevice, SmsMessage } from '../proto'
 
 // the title is in the host's header (the classic bar, a desktop window)
-useChrome(() => ({ title: 'Chats' }))
+// the window's (or the classic bar's) actions, as the Mail window in Desktop/Window actions
+const chrome = useChrome(() => ({ title: 'Chats', tools: [{ icon: 'search', label: 'Search' }, { icon: 'refresh', label: 'Refresh' }] }))
+chrome.on('tool', (l) => {
+  if (l === 'Refresh') { convSeen = ''; threadSeen = ''; load() }
+  else if (l === 'Search') { current.value = null; showSearch.value = true; nextTick(() => (document.querySelector('.ph-chats .hd-search input') as HTMLInputElement | null)?.focus()) }
+})
+const showSearch = ref(false)
 
 /** The open conversation: a stored one, or a new message (empty key) still to be addressed. */
 type Current = Pick<SmsConversation, 'key' | 'number'> & Partial<SmsConversation>
