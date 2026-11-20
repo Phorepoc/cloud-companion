@@ -161,7 +161,8 @@ watch(() => state.status === 'online' && state.admin, (on) => { if (on) api.devi
 .ph-music { display: flex; flex-direction: column; }
 .ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s4); flex-wrap: wrap; }
 .ph-back { align-self: flex-start; }
-.ph-albums { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--ph-s4); }
+.ph-music { max-width: none; }
+.ph-albums { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--ph-s4) var(--ph-s3); }
 .ph-album { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 0; border: 0; background: none; color: var(--ph-text); font: inherit; text-align: left; cursor: pointer; min-width: 0; }
 .ph-album b { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
 .ph-albumhead { display: flex; gap: var(--ph-s4); align-items: flex-end; margin-bottom: var(--ph-s4); }
