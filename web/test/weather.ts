@@ -51,7 +51,7 @@ await page.waitForFunction(() => window.__phe && window.__phe.state.status === '
 
 step('desktop: the Events panel fills the shell panel (no black strip); Default place with none set opens Settings → Weather, in black')
 await page.goto(BASE + '/#/desktop')
-await page.click('.x-shell__clock')
+await page.click('.x-mbar__clock')
 await page.waitForSelector('.ph-events')
 const [evW, shellW] = await page.evaluate(() => [document.querySelector('.ph-events')!.getBoundingClientRect().width, document.querySelector('.x-shell-panel--events')!.getBoundingClientRect().width])
 assert.equal(evW, shellW, 'the Events panel leaves a strip of the shell panel showing')

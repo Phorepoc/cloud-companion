@@ -132,7 +132,7 @@ await page.waitForSelector(win('contacts'))
 assert.equal(await page.locator('.x-shell-ov').count(), 0)
 
 step('Events from the clock, full height; Escape closes')
-await page.click('.x-shell__clock')
+await page.click('.x-mbar__clock')
 await page.waitForSelector('[data-test=events]')
 await page.screenshot({ path: `${OUT}/desktop-3-events.png` })
 await page.keyboard.press('Escape')

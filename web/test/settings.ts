@@ -60,7 +60,12 @@ assert.equal(await page.evaluate(() => document.documentElement.dataset.hdMode),
 assert((await pageBg()) < 40, 'Settings is black in Hybrid')
 await openMusic()
 assert((await pageBg()) < 40, 'Music is dark in Hybrid')
-const barBg = await page.evaluate(() => getComputedStyle(document.querySelector('.x-cl__bar')!).backgroundColor.match(/\d+/g)!.slice(0, 3).map(Number).reduce((a, b) => a + b) / 3)
+// the bar is see-through (a color-mix with transparent: rgb() or color(srgb 0..1)), so read its channels either way
+const barBg = await page.evaluate(() => {
+  const c = getComputedStyle(document.querySelector('.x-cl__bar')!).backgroundColor
+  const n = c.match(/[\d.]+/g)!.slice(0, 3).map(Number)
+  return n.map((v) => (c.startsWith('color(') ? v * 255 : v)).reduce((a, b) => a + b) / 3
+})
 assert(barBg < 40, 'its bar is dark too')
 const btn = await page.evaluate(() => getComputedStyle(document.querySelector('[data-test=music-empty] .q-btn')!).color.match(/\d+/g)!.slice(0, 3).map(Number).reduce((a, b) => a + b) / 3)
 assert(btn > 120, 'the Open Files button is readable on black')
