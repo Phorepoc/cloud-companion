@@ -12,7 +12,8 @@
           <!-- with a header (the classic bar, a desktop window) New contact is there -->
           <q-btn v-if="!chrome.hosted" unelevated color="primary" icon="sym_o_add" aria-label="New contact" data-test="contact-new" @click="openNew" />
         </div>
-        <div class="ph-scroll ph-contacts__list">
+        <div class="ph-contacts__wrap">
+        <div ref="listEl" class="ph-scroll ph-contacts__list" :class="{ 'has-fast': fast }" @scroll.passive="onScroll">
           <q-banner v-if="error" inline-actions class="ph-note is-error ph-contacts__note" role="alert">
             <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
             {{ error }}
@@ -28,7 +29,7 @@
           <!-- the N9 Contacts list: each letter opens with a thin rule, dark squircle avatars with white initials, names in bold -->
           <ul v-if="shown.length" class="ph-rows" data-test="contact-list">
             <template v-for="(c, i) in shown" :key="c.href">
-              <li v-if="letter(c) !== (i ? letter(shown[i - 1]) : '')" class="ph-contacts__rule" aria-hidden="true"><span>{{ letter(c) }}</span></li>
+              <li v-if="letter(c) !== (i ? letter(shown[i - 1]) : '')" class="ph-contacts__rule" :data-letter="letter(c)" aria-hidden="true"><span>{{ letter(c) }}</span></li>
               <li>
                 <button type="button" class="ph-contacts__row" :class="{ 'is-selected': viewOpen && current && current.href === c.href }" :data-test="'contact-row-' + i" @click="openView(c)">
                   <span class="ph-contacts__av hd-squircle" aria-hidden="true">{{ initials(c) }}</span>
@@ -40,6 +41,9 @@
               </li>
             </template>
           </ul>
+        </div>
+        <!-- the N9 fast-scroll band (HdFastScroll): the letters down the right edge, drag to jump section by section -->
+        <HdFastScroll v-if="fast" :position="pos" :sections="secs" label="Fast scroll through the contacts" @jump="jump" />
         </div>
       </template>
 
@@ -55,7 +59,7 @@
               <q-btn v-if="current.phones && current.phones.length" unelevated no-caps color="positive" icon="sym_o_call" label="Call" :href="'tel:' + current.phones[0].value" />
               <q-btn v-if="current.emails && current.emails.length" unelevated no-caps color="primary" icon="sym_o_mail" label="Email" :href="'mailto:' + current.emails[0].value" />
               <q-btn outline no-caps icon="sym_o_edit" label="Edit" data-test="contact-edit" @click="openEdit(current)" />
-              <q-btn outline round icon="sym_o_delete" aria-label="Delete" data-test="contact-delete" @click="remove(current)" />
+              <q-btn flat round icon="sym_o_delete" aria-label="Delete" data-test="contact-delete" @click="remove(current)" />
             </div>
           </div>
           <template v-if="current.phones && current.phones.length">
@@ -110,14 +114,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { hubCall, NO_HUB } from '../cloud'
 import type { Contact, Labeled } from '../proto'
 
 /** The edit form: a contact's fields as plain strings and editable lists. */
 interface ContactForm { href?: string; etag?: string; given: string; family: string; org: string; note: string; phones: Required<Labeled>[]; emails: Required<Labeled>[] }
 import { toast } from '../toast'
-import { HdPageHeader, HdSectionHeader, HdStatusState } from '@etesian-design/vue'
+import { HdFastScroll, HdPageHeader, HdSectionHeader, HdStatusState } from '@etesian-design/vue'
 import SplitView from '../components/SplitView.vue'
 import { fillPage } from '../fillPage'
 import { useChrome } from '@etesian-design/shell'
@@ -148,6 +152,23 @@ const shown = computed(() => {
   const q = (filter.value || '').toLowerCase().trim()
   return sortedContacts.value.filter((x) => !q || x.text.includes(q)).map((x) => x.c)
 })
+
+// fast scroll: only for a long list that scrolls and is not being searched; the letters sit where their section is in the list
+const listEl = ref<HTMLElement | null>(null)
+const pos = ref(0)
+const secs = ref<{ letter: string; top: number }[]>([])
+const fast = computed(() => !filter.value && shown.value.length > 12)
+function measure() {
+  const el = listEl.value
+  if (!el) return
+  const h = el.scrollHeight
+  secs.value = [...el.querySelectorAll<HTMLElement>('.ph-contacts__rule')].map((r) => ({ letter: r.dataset.letter || '', top: Math.round(r.offsetTop / h * el.clientHeight) + 14 }))
+}
+function onScroll() { const el = listEl.value; if (el) pos.value = el.scrollHeight > el.clientHeight ? el.scrollTop / (el.scrollHeight - el.clientHeight) : 0 }
+function jump(i: number) { const r = listEl.value?.querySelectorAll<HTMLElement>('.ph-contacts__rule')[i]; if (r && listEl.value) listEl.value.scrollTop = r.offsetTop }
+watch([shown, fast], () => nextTick(measure))
+onMounted(() => window.addEventListener('resize', measure))
+onBeforeUnmount(() => window.removeEventListener('resize', measure))
 
 async function load() {
   loading.value = true
@@ -224,7 +245,10 @@ onMounted(load)
 <style scoped>
 .ph-contacts { display: flex; flex-direction: column; }
 .ph-contacts__search { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--hd-c-divider); }
+.ph-contacts__wrap { position: relative; flex: 1; min-height: 0; display: flex; }
 .ph-contacts__list { flex: 1; min-height: 0; }
+.ph-contacts__list.has-fast { padding-right: 47px; scrollbar-width: none; }
+.ph-contacts__list.has-fast::-webkit-scrollbar { display: none; }
 .ph-contacts__note { margin: 10px 11px; }
 .ph-contacts__none { margin: 16px; color: var(--hd-c-fg-secondary); }
 .ph-contacts__rule { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 12px; font: 700 var(--hd-font-size-xsmall)/1 var(--hd-font-family-base); color: var(--hd-c-fg-secondary); }
