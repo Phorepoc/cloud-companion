@@ -44,7 +44,7 @@
       <section v-for="g in groups" :key="g.title" class="ph-month">
         <h2 class="ph-small">{{ g.title }}</h2>
         <div class="ph-grid" data-test="photos-grid">
-          <button v-for="p in g.items" :key="p.src + p.id" type="button" class="ph-thumb hd-squircle" :aria-label="p.name" :data-test="'photo-' + p.name" @click="view(items.indexOf(p))">
+          <button v-for="p in g.items" :key="p.src + p.id" type="button" class="ph-thumb" :aria-label="p.name" :data-test="'photo-' + p.name" @click="view(items.indexOf(p))">
             <img v-if="hasThumb(p)" :src="photoURL(p)" alt="" loading="lazy">
             <q-icon v-else name="sym_o_movie" size="32px" aria-hidden="true" />
             <q-icon v-if="p.video" class="ph-thumb__play" name="sym_o_play_circle" size="24px" aria-hidden="true" />
@@ -187,7 +187,9 @@ async function removeFolder(p: string) {
 .ph-tabs button[aria-current] { background: #7A3FD0; color: #fff; font-weight: 600; }
 .ph-back { align-self: flex-start; margin-bottom: var(--ph-s3); }
 .ph-month h2 { margin: var(--ph-s4) 0 var(--ph-s2); font-weight: 600; color: var(--ph-muted, inherit); }
-.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.ph-photos { max-width: none; }
+/* the gallery-app story: square thumbnails edge to edge, 6px apart (the N9 grid), not squircles */
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
 .ph-thumb { position: relative; aspect-ratio: 1; padding: 0; border: 0; overflow: hidden; cursor: pointer; display: grid; place-items: center;
   background: var(--ph-surface-2); color: var(--ph-text); }
 .ph-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
