@@ -78,3 +78,13 @@
 :is([data-hd-mode="dark"], .hd-mode-dark) .ph-classic .hd-toolbar--light .hd-toolbar__back, .ph-classic.hd-mode-dark .hd-toolbar--light .hd-toolbar__back { --hd-sq-fill: linear-gradient(#3A3A3C, #262628 50%, #161618); --hd-sq-ring: rgba(255,255,255,.1); color: #EDEDED; }
 :root[data-hd-mode="dark"] .q-footer.ph-chats__compose, .hd-mode-dark .q-footer.ph-chats__compose { background: linear-gradient(#2A2A2C, #0E0E10); box-shadow: inset 0 1px 0 #48484C; color: #fff; --hd-c-pressed: rgba(255,255,255,.16); }
 :root[data-hd-mode="dark"] .hd-quasar .q-footer .q-btn.hd-q-back, .hd-quasar .hd-mode-dark .q-footer .q-btn.hd-q-back { --hd-sq-fill: linear-gradient(#3A3A3C, #262628 50%, #161618); --hd-sq-ring: rgba(255,255,255,.1); color: #EDEDED; }
+
+/* ---- settings lists (the Settings app story): rows with a 32px squircle, a light title and a grey line; "add" is a + row ---- */
+.ph-lrow { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 6px 0; }
+.ph-lrow .ph-grow { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ph-lrow__t { font: var(--hd-font-weight-light) var(--hd-font-size-large)/1.25 var(--hd-font-family-light); color: var(--hd-c-fg); overflow-wrap: anywhere; }
+.ph-lrow__s { font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+.ph-lrow--btn { width: 100%; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.ph-lrow--btn:hover { background: var(--hd-c-pressed); }
+.ph-lrow--add .q-field__native { font: var(--hd-font-weight-light) var(--hd-font-size-large)/1.25 var(--hd-font-family-light); }
+.ph-card h3.ph-sub { margin: var(--ph-s4) 0 0; font: var(--hd-font-weight-bold) var(--hd-font-size-small)/1.3 var(--hd-font-family-base); color: var(--hd-c-fg-secondary); }

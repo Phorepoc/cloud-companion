@@ -11,19 +11,13 @@
     <p v-if="!hubOn" class="ph-note" role="note" data-test="no-hub"><q-icon name="sym_o_info" size="20px" aria-hidden="true" /> Mail, contacts and calendar isn't set up on this server. You can add and test accounts, but nothing will be copied yet.</p>
 
     <section class="ph-card ph-section" aria-labelledby="acc-h">
-      <div class="ph-row">
-        <h2 id="acc-h">Your accounts</h2>
-        <q-btn unelevated color="primary" icon="sym_o_add" label="Add an account" data-test="add-account" @click="openAdd" />
-      </div>
-      <div v-if="providers.length" class="ph-oauth" data-test="oauth-box">
-        <q-btn v-for="p in providers" :key="p.id" outline color="primary" no-caps :icon="'sym_o_login'" :label="'Sign in with ' + p.label" :data-test="'oauth-' + p.id" @click="openOAuth(p)" />
-      </div>
+      <h2 id="acc-h">Your accounts</h2>
       <p v-if="oauthMsg" :class="oauthMsg.ok ? 'ph-ok' : 'ph-error'" role="status" data-test="oauth-result"><q-icon :name="oauthMsg.ok ? 'sym_o_check_circle' : 'sym_o_error'" size="20px" aria-hidden="true" /> {{ oauthMsg.text }}</p>
       <p v-if="!accounts.length" class="ph-muted" data-test="no-accounts">No accounts connected yet.</p>
       <ul v-else class="ph-list" aria-label="Connected accounts">
-        <li v-for="a in accounts" :key="a.id" data-test="account-row">
+        <li v-for="a in accounts" :key="a.id" class="ph-lrow" data-test="account-row">
           <div class="ph-grow">
-            <strong>{{ a.name }}</strong>
+            <span class="ph-lrow__t">{{ a.name }}</span>
             <span class="ph-chip hd-sqm" :class="'ph-' + a.status" data-test="account-status">{{ statusText(a) }}</span>
             <div class="ph-muted ph-small">{{ kindText(a.kind, a.provider) }} · {{ a.last_sync ? 'last sync ' + ago(a.last_sync) : 'not synced yet' }}</div>
             <div v-if="a.last_error" class="ph-error ph-small" role="alert">{{ a.last_error }}</div>
@@ -32,6 +26,15 @@
           <q-btn flat round color="negative" icon="sym_o_delete" :aria-label="'Remove ' + a.name" data-test="account-remove" @click="askRemove = a" />
         </li>
       </ul>
+      <!-- adding is the + rows at the end of the list (Settings app: "Add an account") -->
+      <button type="button" class="ph-lrow ph-lrow--add ph-lrow--btn" data-test="add-account" @click="openAdd">
+        <HdThumbnail icon="add" :size="32" /><span class="ph-lrow__t">Add an account</span>
+      </button>
+      <div v-if="providers.length" data-test="oauth-box">
+        <button v-for="p in providers" :key="p.id" type="button" class="ph-lrow ph-lrow--btn" :data-test="'oauth-' + p.id" @click="openOAuth(p)">
+          <HdThumbnail icon="globe" :size="32" /><span class="ph-lrow__t">Sign in with {{ p.label }}</span>
+        </button>
+      </div>
       <p v-if="error" class="ph-error" role="alert" data-test="conn-error"><q-icon name="sym_o_error" size="20px" aria-hidden="true" /> {{ error }}</p>
     </section>
 
@@ -250,6 +253,7 @@
 </template>
 
 <script setup lang="ts">
+import { HdThumbnail } from '@etesian-design/vue'
 import { ref, reactive, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiCall } from '../cloud'

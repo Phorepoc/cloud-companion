@@ -12,17 +12,20 @@
       through your phones and logins go to that device. Replies always go back the way the message came.
     </p>
 
-    <h3 class="ph-h3">Phone logins</h3>
+    <h3 class="ph-h3 ph-sub">Phone logins</h3>
     <ul v-if="logins.length" class="ph-list" aria-label="Phone logins">
-      <li v-for="l in logins" :key="l.name" data-test="sip-login">
-        <div class="ph-grow"><strong>{{ l.name }}</strong></div>
-        <q-btn flat no-caps color="negative" icon="sym_o_delete" :label="'Remove'" :aria-label="'Remove ' + l.name" data-test="sip-login-remove" @click="removeLogin(l.name)" />
+      <li v-for="l in logins" :key="l.name" class="ph-lrow" data-test="sip-login">
+        <HdThumbnail icon="phone" :size="32" color="#62B700" />
+        <div class="ph-grow"><span class="ph-lrow__t">{{ l.name }}</span><span class="ph-lrow__s">SIP, XMPP and WebDAV login</span></div>
+        <q-btn flat round icon="sym_o_delete" :aria-label="'Remove ' + l.name" data-test="sip-login-remove" @click="removeLogin(l.name)" />
       </li>
     </ul>
     <p v-else class="ph-muted" data-test="no-sip-logins">No logins yet.</p>
-    <div class="ph-row ph-row--start">
-      <q-input v-model="newLogin" dense outlined label="New login (for example n9)" data-test="sip-login-name" @keyup.enter="addLogin" />
-      <q-btn unelevated color="primary" no-caps icon="sym_o_add" label="Add login" :disable="!newLogin.trim()" data-test="sip-login-add" @click="addLogin" />
+    <!-- a new login: the + row of the list, with its name field in place (Settings app: "Add an account") -->
+    <div class="ph-lrow ph-lrow--add">
+      <HdThumbnail icon="add" :size="32" />
+      <q-input v-model="newLogin" dense borderless class="col" placeholder="New login, for example n9" aria-label="New login name" data-test="sip-login-name" @keyup.enter="addLogin" />
+      <q-btn flat no-caps color="primary" label="Add" :disable="!newLogin.trim()" data-test="sip-login-add" @click="addLogin" />
     </div>
     <p v-if="made" class="ph-note" role="status" data-test="sip-login-made">
       <q-icon name="sym_o_key" size="20px" aria-hidden="true" />
@@ -32,7 +35,7 @@
       down now. It won't be shown again.
     </p>
 
-    <h3 class="ph-h3">Rules</h3>
+    <h3 class="ph-h3 ph-sub">Rules</h3>
     <ol v-if="routes.length" class="ph-list" aria-label="Rules, first match wins">
       <li v-for="(r, i) in routes" :key="i" data-test="route-row">
         <q-select v-model="r.kind" dense outlined emit-value map-options :options="KINDS" label="Addresses" class="ph-route__kind" data-test="route-kind" />
@@ -44,12 +47,14 @@
       </li>
     </ol>
     <p v-else class="ph-muted" data-test="no-routes">No rules. Phone numbers are sent as SMS and logins go to their device.</p>
-    <q-btn outline color="primary" no-caps icon="sym_o_add" label="Add a rule" data-test="route-add" @click="routes.push({ kind: 'prefix', value: '', conn: conns[0]?.id || 'sms', opt: '' })" />
+    <button type="button" class="ph-lrow ph-lrow--add ph-lrow--btn" data-test="route-add" @click="routes.push({ kind: 'prefix', value: '', conn: conns[0]?.id || 'sms', opt: '' })">
+      <HdThumbnail icon="add" :size="32" /><span class="ph-lrow__t">Add a rule</span>
+    </button>
 
-    <h3 class="ph-h3">Who receives incoming messages</h3>
+    <h3 class="ph-h3 ph-sub">Who receives incoming messages</h3>
     <ul class="ph-list" aria-label="Who receives each connection's messages">
-      <li v-for="c in conns" :key="c.id" data-test="deliver-row">
-        <div class="ph-grow"><strong>{{ c.label }}</strong></div>
+      <li v-for="c in conns" :key="c.id" class="ph-lrow" data-test="deliver-row">
+        <div class="ph-grow"><span class="ph-lrow__t">{{ c.label }}</span></div>
         <q-select v-model="deliver[c.id]" dense outlined multiple emit-value map-options use-chips :options="loginOptions" label="Every login" class="ph-route__who" :data-test="'deliver-' + c.id" />
       </li>
     </ul>
@@ -65,6 +70,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { apiCall } from '../cloud'
+import { HdThumbnail } from '@etesian-design/vue'
 
 interface Opt { value: string; label: string }
 interface Conn { id: string; label: string; options?: Opt[] }
@@ -122,7 +128,8 @@ onMounted(load)
 </script>
 
 <style scoped>
-.ph-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ph-list { list-style: none; margin: 0; padding: 0; }
+.ph-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--hd-c-divider); }
 .ph-row--start { justify-content: flex-start; gap: 8px; margin-top: 8px; }
 .ph-route__kind { min-width: 170px; }
 .ph-route__value { width: 140px; }
