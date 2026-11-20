@@ -1,6 +1,6 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: AGPL-3.0-only -->
-<!-- A section's icon on its lit N9 squircle tile (Etesian icon lighting, css/etesian/base.css), in the section's colour (nav.ts).
+<!-- A section's icon on its lit N9 squircle tile (Etesian icon lighting, @etesian-design/tokens base.css), in the section's colour (nav.ts).
      Decorative: the label next to it, or the control around it, names the section. -->
 <template>
   <span class="ph-tile hd-squircle hd-icon-lit" :style="{ '--hd-icon-accent': section.color, '--hd-icon-size': size + 'px' }" aria-hidden="true">

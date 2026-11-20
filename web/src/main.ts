@@ -5,9 +5,12 @@ import { Quasar, Dark } from 'quasar'
 import iconSet from 'quasar/icon-set/material-symbols-outlined'
 import './css/symbols.css'
 import 'quasar/dist/quasar.css'
-// The Etesian design language (vendored, see css/etesian/), then the app's tokens and rules on top of it.
-import './css/etesian/tokens.css'
-import './css/etesian/base.css'
+// The Etesian design language: tokens and base from the package (here first, so the library's own import of them lands
+// before the overrides below), the vendored Quasar theme, then the app's fonts, tokens and rules on top of it.
+import '@etesian-design/tokens/styles/tokens.css'
+import '@etesian-design/tokens/styles/base.css'
+import '@etesian-design/vue/style.css'
+import '@etesian-design/shell/style.css'
 import './css/etesian/fonts.css'
 import './css/etesian/quasar-theme.css'
 import './css/tokens.css'

@@ -5,8 +5,8 @@ the browser with its tabs. That is personal data, used many times a day, mostly 
 tool that is already on your side, not like an app that wants attention.
 
 The look is the **Etesian design language**: the Nokia N9's (light type, lit squircle icons, dark chrome over light pages), carried to
-the web. Its tokens, base styles and Quasar theme are vendored in `src/css/etesian/` (MIT, from the etesian-design repo, never edited
-here); the app's own tokens in `src/css/tokens.css` point at them, the global rules are in `src/css/app.css`, the name and logo in
+the web. Its tokens and base styles come from `@etesian-design/tokens`, its Quasar theme is vendored in `src/css/etesian/` (MIT, from the
+etesian-design repo, never edited here); the app's own tokens in `src/css/tokens.css` point at them, the global rules are in `src/css/app.css`, the name and logo in
 `src/brand.ts`, the sections in `src/nav.ts`, the desktop view in `src/desktop/`. If this document and the code disagree, fix one of them
 in the same change.
 
@@ -270,7 +270,8 @@ Images and the page canvas are never recoloured; the cloud page keeps its own co
 * **Add a section:** `src/nav.ts` (label, icon, path, `primary` if it belongs in the phone's bottom bar), a route in `src/router.ts`, a page
   in `src/pages/`; until the page exists the `SectionPage` placeholder shows the empty state.
 * **Retune a colour:** change the token in `src/css/tokens.css` in both modes and update the contrast table here with the computed ratios.
-* **Update the Etesian design files:** copy `src/styles/tokens.css`, `src/styles/base.css` and `src/quasar/etesian-quasar.css` (as
-  `quasar-theme.css`) from the etesian-design repo into `src/css/etesian/`, keeping the header that names the commit; never edit them here.
+* **Update the Etesian design files:** bump the three `@etesian-design/*` packages together, and copy `src/quasar/etesian-quasar.css` of
+  the same tag (as `quasar-theme.css`) from the etesian-design repo into `src/css/etesian/`, keeping the header that names the commit;
+  never edit it here.
   App-specific changes go in `src/css/tokens.css` and `src/css/app.css`.
 * **New component:** build it from tokens, give it the states above (hover, focus, disabled, loading, error), test it in both themes.
