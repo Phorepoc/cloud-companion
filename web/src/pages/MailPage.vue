@@ -70,7 +70,7 @@
                   </q-list>
                 </q-menu>
               </q-btn>
-              <q-btn outline round icon="sym_o_delete" aria-label="Delete" data-test="mail-delete" @click="remove" />
+              <q-btn flat round icon="sym_o_delete" aria-label="Delete" data-test="mail-delete" @click="remove" />
             </div>
           </template>
         </article>
