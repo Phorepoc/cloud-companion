@@ -32,7 +32,7 @@
               <li v-if="letter(c) !== (i ? letter(shown[i - 1]) : '')" class="ph-contacts__rule" :data-letter="letter(c)" aria-hidden="true"><span>{{ letter(c) }}</span></li>
               <li>
                 <button type="button" class="ph-contacts__row" :class="{ 'is-selected': viewOpen && current && current.href === c.href }" :data-test="'contact-row-' + i" @click="openView(c)">
-                  <span class="ph-contacts__av hd-squircle" aria-hidden="true">{{ initials(c) }}</span>
+                  <span class="ph-contacts__av ph-avatar hd-squircle" aria-hidden="true">{{ initials(c) }}</span>
                   <span class="ph-row2__text">
                     <span class="ph-row2__title">{{ c.name }}</span>
                     <span v-if="secondary(c)" class="ph-row2__sub">{{ secondary(c) }}</span>
