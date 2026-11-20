@@ -1,59 +1,79 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: AGPL-3.0-only -->
 <template>
-  <q-page class="ph-page">
-    <!-- with a header (the classic bar, a desktop window) the title and New contact are there -->
-    <div v-if="!chrome.hosted" class="ph-head">
-      <h1>Contacts</h1>
-      <q-btn unelevated color="primary" icon="sym_o_add" label="New contact" data-test="contact-new" @click="openNew" />
-    </div>
-    <q-input v-model="filter" outlined clearable placeholder="Search contacts" aria-label="Search contacts" data-test="contacts-search" class="q-mb-md">
-      <template #prepend><q-icon name="sym_o_search" aria-hidden="true" /></template>
-    </q-input>
+  <q-page class="ph-contacts" :style-fn="fillPage" @keydown.esc="viewOpen = false">
+    <SplitView :detail="viewOpen && !!current" list-label="Contacts" detail-label="Contact">
+      <template #list>
+        <HdPageHeader title="Contacts" :subtitle="contacts.length ? contacts.length + (contacts.length === 1 ? ' contact' : ' contacts') : undefined" colored accent="#007DC9" />
+        <div class="ph-list-search ph-contacts__search">
+          <q-input v-model="filter" rounded outlined dense clearable placeholder="Search" aria-label="Search contacts" data-test="contacts-search" class="col">
+            <template #append><q-icon name="sym_o_search" aria-hidden="true" /></template>
+          </q-input>
+          <!-- with a header (the classic bar, a desktop window) New contact is there -->
+          <q-btn v-if="!chrome.hosted" unelevated color="primary" icon="sym_o_add" aria-label="New contact" data-test="contact-new" @click="openNew" />
+        </div>
+        <div class="ph-scroll ph-contacts__list">
+          <q-banner v-if="error" inline-actions class="ph-note is-error ph-contacts__note" role="alert">
+            <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
+            {{ error }}
+            <template #action><q-btn flat no-caps color="primary" label="Try again" @click="load" /></template>
+          </q-banner>
+          <HdStatusState v-if="loading && !contacts.length" state="loading" title="Loading contacts" text="This takes a moment." />
+          <HdStatusState v-else-if="!loading && !contacts.length && !error" icon="person" title="No contacts yet"
+                      text="Add your first contact. It will be available on every device that syncs with your hub.">
+            <q-btn outline no-caps color="primary" label="New contact" @click="openNew" />
+          </HdStatusState>
+          <p v-else-if="contacts.length && !shown.length" class="ph-contacts__none" data-test="contacts-none">No contact matches "{{ filter }}".</p>
 
-    <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
-      <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
-      {{ error }}
-      <template #action><q-btn flat label="Try again" @click="load" /></template>
-    </q-banner>
-    <HdStatusState v-if="loading && !contacts.length" state="loading" title="Loading contacts" text="This takes a moment." />
-    <HdStatusState v-else-if="!loading && !contacts.length && !error" icon="person" title="No contacts yet"
-                text="Add your first contact. It will be available on every device that syncs with your hub.">
-      <q-btn outline color="primary" label="New contact" @click="openNew" />
-    </HdStatusState>
-    <p v-else-if="contacts.length && !shown.length" class="ph-muted" data-test="contacts-none">No contact matches "{{ filter }}".</p>
-
-    <ul v-if="shown.length" class="ph-list ph-card" data-test="contact-list">
-      <li v-for="(c, i) in shown" :key="c.href">
-        <button type="button" class="ph-row" :data-test="'contact-row-' + i" @click="openView(c)">
-          <span class="ph-avatar hd-squircle" aria-hidden="true">{{ initials(c) }}</span>
-          <span class="ph-row-main">
-            <span class="ph-row-title">{{ c.name }}</span>
-            <span class="ph-small ph-muted">{{ secondary(c) }}</span>
-          </span>
-        </button>
-      </li>
-    </ul>
-
-    <!-- read view -->
-    <q-dialog v-model="viewOpen">
-      <q-card v-if="current" class="ph-dialog" data-test="contact-view">
-        <q-card-section>
-          <h2 data-test="contact-view-name">{{ current.name }}</h2>
-          <p v-if="current.org" class="ph-muted q-mb-sm">{{ current.org }}</p>
-          <ul class="ph-facts">
-            <li v-for="p in current.phones || []" :key="'p' + p.value"><q-icon name="sym_o_call" aria-hidden="true" /> <a :href="'tel:' + p.value">{{ p.value }}</a> <span v-if="p.type" class="ph-muted ph-small">{{ p.type }}</span></li>
-            <li v-for="e in current.emails || []" :key="'e' + e.value"><q-icon name="sym_o_mail" aria-hidden="true" /> <a :href="'mailto:' + e.value">{{ e.value }}</a> <span v-if="e.type" class="ph-muted ph-small">{{ e.type }}</span></li>
+          <!-- the N9 Contacts list: each letter opens with a thin rule, dark squircle avatars with white initials, names in bold -->
+          <ul v-if="shown.length" class="ph-rows" data-test="contact-list">
+            <template v-for="(c, i) in shown" :key="c.href">
+              <li v-if="letter(c) !== (i ? letter(shown[i - 1]) : '')" class="ph-contacts__rule" aria-hidden="true"><span>{{ letter(c) }}</span></li>
+              <li>
+                <button type="button" class="ph-contacts__row" :class="{ 'is-selected': viewOpen && current && current.href === c.href }" :data-test="'contact-row-' + i" @click="openView(c)">
+                  <span class="ph-contacts__av hd-squircle" aria-hidden="true">{{ initials(c) }}</span>
+                  <span class="ph-row2__text">
+                    <span class="ph-row2__title">{{ c.name }}</span>
+                    <span v-if="secondary(c)" class="ph-row2__sub">{{ secondary(c) }}</span>
+                  </span>
+                </button>
+              </li>
+            </template>
           </ul>
-          <p v-if="current.note" class="ph-note-text">{{ current.note }}</p>
-        </q-card-section>
-        <q-card-actions align="right">
-          <q-btn flat color="negative" label="Delete" data-test="contact-delete" @click="remove(current)" />
-          <q-btn flat label="Close" v-close-popup />
-          <q-btn unelevated color="primary" label="Edit" data-test="contact-edit" @click="openEdit(current)" />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+        </div>
+      </template>
+
+      <!-- the contact (Quasar/Examples, Contacts detail): the big squircle, the name in light type, Call and Message, the details -->
+      <template #detail>
+        <article v-if="viewOpen && current" class="ph-contacts__card ph-scroll" data-test="contact-view">
+          <q-btn flat no-caps icon="sym_o_arrow_back" label="Contacts" class="ph-split__back ph-contacts__back" @click="viewOpen = false" />
+          <div class="ph-contacts__hero">
+            <span class="ph-contacts__big hd-squircle" aria-hidden="true">{{ initials(current) }}</span>
+            <h2 class="ph-contacts__name" data-test="contact-view-name">{{ current.name }}</h2>
+            <p v-if="current.org" class="ph-contacts__org">{{ current.org }}</p>
+            <div class="ph-contacts__acts">
+              <q-btn v-if="current.phones && current.phones.length" unelevated no-caps color="positive" icon="sym_o_call" label="Call" :href="'tel:' + current.phones[0].value" />
+              <q-btn v-if="current.emails && current.emails.length" unelevated no-caps color="primary" icon="sym_o_mail" label="Email" :href="'mailto:' + current.emails[0].value" />
+              <q-btn outline no-caps icon="sym_o_edit" label="Edit" data-test="contact-edit" @click="openEdit(current)" />
+              <q-btn outline round icon="sym_o_delete" aria-label="Delete" data-test="contact-delete" @click="remove(current)" />
+            </div>
+          </div>
+          <template v-if="current.phones && current.phones.length">
+            <HdSectionHeader title="Phone" />
+            <a v-for="p in current.phones" :key="'p' + p.value" class="ph-contacts__fact" :href="'tel:' + p.value"><b>{{ p.value }}</b><span>{{ typeName(p.type) }}</span></a>
+          </template>
+          <template v-if="current.emails && current.emails.length">
+            <HdSectionHeader title="Email" />
+            <a v-for="e in current.emails" :key="'e' + e.value" class="ph-contacts__fact" :href="'mailto:' + e.value"><b>{{ e.value }}</b><span>{{ typeName(e.type) }}</span></a>
+          </template>
+          <template v-if="current.note">
+            <HdSectionHeader title="Note" />
+            <p class="ph-note-text">{{ current.note }}</p>
+          </template>
+        </article>
+        <div v-else class="ph-split__empty"><div><q-icon name="sym_o_contacts" size="48px" aria-hidden="true" /><p>Pick a contact to see the details.</p></div></div>
+      </template>
+    </SplitView>
 
     <!-- edit / create -->
     <q-dialog v-model="editOpen" persistent>
@@ -97,7 +117,9 @@ import type { Contact, Labeled } from '../proto'
 /** The edit form: a contact's fields as plain strings and editable lists. */
 interface ContactForm { href?: string; etag?: string; given: string; family: string; org: string; note: string; phones: Required<Labeled>[]; emails: Required<Labeled>[] }
 import { toast } from '../toast'
-import { HdStatusState } from '@etesian-design/vue'
+import { HdPageHeader, HdSectionHeader, HdStatusState } from '@etesian-design/vue'
+import SplitView from '../components/SplitView.vue'
+import { fillPage } from '../fillPage'
 import { useChrome } from '@etesian-design/shell'
 
 const contacts = ref<Contact[]>([])
@@ -115,6 +137,8 @@ const emailTypes = [{ label: 'Home', value: 'home' }, { label: 'Work', value: 'w
 
 function blank() { return { href: '', etag: '', given: '', family: '', org: '', note: '', phones: [], emails: [] } }
 const initials = (c: Contact) => (c.name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => (Array.from(w)[0] ?? '').toUpperCase()).join('')
+const letter = (c: Contact) => (Array.from(c.name || '#')[0] ?? '#').toLocaleUpperCase()
+const typeName = (t?: string) => ({ cell: 'Mobile', home: 'Home', work: 'Work', other: 'Other' } as Record<string, string>)[t || ''] || t || ''
 const secondary = (c: Contact) => c.org || (c.emails && c.emails[0] && c.emails[0].value) || (c.phones && c.phones[0] && c.phones[0].value) || ''
 // sorted once per change of the list (not on every key typed in the search), Ä next to A; the search text per contact made once too
 const byName = new Intl.Collator(undefined, { sensitivity: 'base' })
@@ -194,22 +218,33 @@ onMounted(load)
 </script>
 
 <style scoped>
-.ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s4); }
-.ph-list { list-style: none; padding: 0; margin: 0; }
-.ph-list li { border-bottom: 1px solid var(--ph-divider); }
-.ph-list li:last-child { border-bottom: 0; }
-.ph-row { width: 100%; min-height: 56px; display: flex; align-items: center; gap: var(--ph-s3); padding: var(--ph-s2) var(--ph-s4); background: none; border: 0; text-align: left; font: inherit; color: var(--ph-text); cursor: pointer; }
-.ph-row:hover { background: var(--ph-surface-2); }
-.ph-row-main { display: flex; flex-direction: column; min-width: 0; }
-.ph-row-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-avatar { flex: none; width: 40px; height: 40px; display: grid; place-items: center; background: var(--ph-accent-soft); color: var(--ph-accent); font-weight: 600; }
+.ph-contacts { display: flex; flex-direction: column; }
+.ph-contacts__search { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--hd-c-divider); }
+.ph-contacts__list { flex: 1; min-height: 0; }
+.ph-contacts__note { margin: 10px 11px; }
+.ph-contacts__none { margin: 16px; color: var(--hd-c-fg-secondary); }
+.ph-contacts__rule { display: flex; align-items: center; gap: 10px; height: 28px; padding: 0 12px; font: 700 var(--hd-font-size-xsmall)/1 var(--hd-font-family-base); color: var(--hd-c-fg-secondary); }
+.ph-contacts__rule::before { content: ''; flex: 1; height: 1px; background: var(--hd-c-divider); }
+.ph-contacts__row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; padding: 0 12px; border: 0; background: none; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.ph-contacts__row:hover, .ph-contacts__row.is-selected { background: var(--hd-c-pressed); }
+.ph-contacts__row .ph-row2__title { font-size: 1.0625rem; }
+.ph-contacts__av { flex: none; width: 43px; height: 43px; display: grid; place-items: center; background: linear-gradient(#3a3a3a, #0a0a0a); color: #fff; font: 700 1.125rem/1 var(--hd-font-family-base); }
+.ph-contacts__card { flex: 1; min-height: 0; padding: 16px 24px 24px; }
+.ph-contacts__back { margin: -8px 0 0 -12px; }
+.ph-contacts__hero { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px 0 8px; text-align: center; }
+.ph-contacts__big { width: 148px; height: 148px; display: grid; place-items: center; background: linear-gradient(135deg, #7fb0d8, #2a5b8a); color: #fff; font: 300 56px/1 var(--hd-font-family-light); }
+.ph-contacts__name { margin: 0; font: 300 2.25rem/1.1 var(--hd-font-family-light); overflow-wrap: anywhere; }
+.ph-contacts__org { margin: 0; font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+.ph-contacts__acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 6px; }
+.ph-contacts__fact { display: flex; flex-direction: column; padding: 8px 16px; color: inherit; text-decoration: none; }
+.ph-contacts__fact:hover { background: var(--hd-c-pressed); }
+.ph-contacts__fact b { font: 700 1rem/1.25 var(--hd-font-family-base); }
+.ph-contacts__fact span { font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+.ph-note-text { margin: 0; padding: 4px 16px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ph-dialog { width: min(94vw, 480px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); overflow-wrap: anywhere; }
 .ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }
 .ph-two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--ph-s3); }
 .ph-pair { display: grid; grid-template-columns: 1fr 120px; gap: var(--ph-s2); }
-.ph-facts { list-style: none; padding: 0; margin: var(--ph-s2) 0; display: flex; flex-direction: column; gap: var(--ph-s2); }
-.ph-facts a { color: var(--ph-accent); }
-.ph-note-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 .ph-error { display: flex; gap: var(--ph-s2); color: var(--ph-negative); margin: 0; }
 </style>

@@ -12,7 +12,7 @@
       <q-btn-toggle v-model="tab" no-caps unelevated toggle-color="primary" data-test="music-tabs"
                     :options="[{ label: 'Albums', value: 'albums' }, { label: 'Artists', value: 'artists' }, { label: 'Songs', value: 'songs' }]" @update:model-value="album = null; artist = ''" />
     </div>
-    <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
+    <q-banner v-if="error" inline-actions class="ph-note is-error q-mb-md" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="load" /></template>

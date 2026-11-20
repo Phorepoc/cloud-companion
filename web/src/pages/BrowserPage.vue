@@ -39,7 +39,7 @@
       </template>
       <div class="ph-bf__page">
         <span class="ph-sr" data-test="title">{{ activeTab()?.title }}</span>
-        <q-banner v-if="engine.note" class="ph-note" rounded role="status" data-test="browser-note">
+        <q-banner v-if="engine.note" inline-actions class="ph-note" rounded role="status" data-test="browser-note">
           <template #avatar><q-icon name="sym_o_download" aria-hidden="true" /></template>
           {{ engine.note }}
           <template #action>

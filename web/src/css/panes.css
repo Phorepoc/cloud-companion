@@ -55,7 +55,7 @@
 
 /* ---- notices: a banner on the page (the design's notification surface), not a red box. A problem gets the warning stripe. ---- */
 .hd-quasar .ph-banner, .hd-quasar .q-banner.ph-note {
-  display: flex; gap: 10px; align-items: flex-start; margin: 0; padding: 10px 14px; border: 0; border-radius: var(--hd-radius-card);
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border: 0; border-radius: var(--hd-radius-card);
   background: var(--hd-c-surface-raised); color: var(--hd-c-fg); font: 400 var(--hd-font-size-small)/1.4 var(--hd-font-family-base); min-height: 0;
 }
 .hd-quasar .ph-banner .q-icon, .hd-quasar .q-banner.ph-note .q-banner__avatar .q-icon { color: var(--hd-c-accent-text, var(--hd-accent)); font-size: 20px; }

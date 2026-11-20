@@ -6,7 +6,7 @@
     <p class="ph-muted">The phones, computers and browsers connected to your account.</p>
     <HdStatusState v-if="!state.admin" icon="lock" title="Only admin devices can manage devices"
                 text="The first device you connect is an admin. To add more, run phecloud paircode --admin on the server." />
-    <q-banner v-if="state.adminError" class="ph-note is-error q-mb-md" role="alert">{{ state.adminError }}</q-banner>
+    <q-banner v-if="state.adminError" inline-actions class="ph-note is-error q-mb-md" role="alert">{{ state.adminError }}</q-banner>
     <HdStatusState v-if="state.admin && !state.deviceList.length" state="loading" title="Loading devices" text="One moment…" />
     <ul v-if="state.admin && state.deviceList.length" class="ph-list ph-card" data-test="device-list">
       <li v-for="d in state.deviceList" :key="d.id" class="q-item ph-row" :data-test="'device-' + d.id">
@@ -31,7 +31,7 @@
         <q-btn unelevated color="primary" icon="sym_o_add" label="Add a device" data-test="apppw-new" @click="addOpen = true; addName = ''; addDays = 0; addError = ''" />
       </div>
       <p class="ph-muted">Phones and apps that can't sign in the usual way (for mail, calendar and contacts) each get their own password. You can revoke it here at any time.</p>
-      <q-banner v-if="apppwError" class="ph-note is-error q-mb-md" role="alert">{{ apppwError }}</q-banner>
+      <q-banner v-if="apppwError" inline-actions class="ph-note is-error q-mb-md" role="alert">{{ apppwError }}</q-banner>
       <HdStatusState v-if="apppwLoaded && !apppws.length && !apppwError" icon="lock" title="No app passwords yet" text="Add a device to get a password for it." />
       <ul v-if="apppws.length" class="ph-list ph-card" data-test="apppw-list">
         <li v-for="p in apppws" :key="p.id" class="ph-row" :data-test="'apppw-row-' + p.id">

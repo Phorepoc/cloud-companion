@@ -5,72 +5,78 @@
      frame with no network access (no pictures, scripts or styles of the message load). Sending only reaches the hub's own addresses
      unless the server operator allows more. -->
 <template>
-  <q-page class="ph-page">
-    <!-- in a window (or a host with a header) the title is a menu of the folders and the buttons sit in the header: useChrome below -->
-    <div v-if="!chrome.hosted" class="ph-head">
-      <h1>Mail</h1>
-      <div class="ph-actions">
-        <q-btn flat round icon="sym_o_refresh" aria-label="Refresh" data-test="mail-refresh" @click="refresh" />
-        <q-btn unelevated color="primary" icon="sym_o_edit" label="Write" data-test="mail-compose" @click="openCompose()" />
-      </div>
-    </div>
-    <q-select v-if="!chrome.hosted" v-model="folder" :options="folderOptions" emit-value map-options outlined label="Folder" class="q-mb-md" data-test="mail-folder"
-              @update:model-value="loadList(true)" />
+  <q-page class="ph-mail" :style-fn="fillPage" @keydown.esc="open = false">
+    <SplitView :detail="open" list-label="Messages" detail-label="Message">
+      <template #list>
+        <HdPageHeader :title="folderTitle" :subtitle="folderSub" colored accent="#0067BC" />
+        <!-- in a window (or a host with a header) the title is a menu of the folders and the buttons sit in the header: useChrome below -->
+        <div v-if="!chrome.hosted" class="ph-mail__bar">
+          <q-select v-model="folder" :options="folderOptions" emit-value map-options outlined dense label="Folder" class="col" data-test="mail-folder"
+                    @update:model-value="loadList(true)" />
+          <q-btn flat round icon="sym_o_refresh" aria-label="Refresh" data-test="mail-refresh" @click="refresh" />
+          <q-btn unelevated color="primary" icon="sym_o_edit" label="Write" data-test="mail-compose" @click="openCompose()" />
+        </div>
+        <div class="ph-scroll ph-mail__list">
+          <q-banner v-if="error" inline-actions class="ph-note is-error ph-mail__note" role="alert">
+            <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
+            {{ error }}
+            <template #action><q-btn flat no-caps color="primary" label="Try again" @click="init" /></template>
+          </q-banner>
+          <HdStatusState v-if="loading && !mails.length" state="loading" title="Loading mail" text="This takes a moment." />
+          <HdStatusState v-else-if="!loading && !mails.length && !error && folder" icon="mail" title="No messages here" text="This folder is empty." />
 
-    <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
-      <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
-      {{ error }}
-      <template #action><q-btn flat label="Try again" @click="init" /></template>
-    </q-banner>
-    <HdStatusState v-if="loading && !mails.length" state="loading" title="Loading mail" text="This takes a moment." />
-    <HdStatusState v-else-if="!loading && !mails.length && !error && folder" icon="mail" title="No messages here" text="This folder is empty." />
+          <ul v-if="mails.length" class="ph-rows" data-test="mail-list">
+            <li v-for="(m, i) in mails" :key="m.id">
+              <button type="button" class="ph-row2" :class="{ 'is-unread': m.unread, 'is-selected': open && current && current.id === m.id }" :data-test="'mail-row-' + i" @click="openMail(m)">
+                <HdAvatar :name="m.from || '?'" :size="32" />
+                <span class="ph-row2__text">
+                  <span class="ph-row2__top"><span class="ph-row2__title">{{ m.from || '(no sender)' }}</span><span class="ph-row2__time">{{ when(m.date) }}</span></span>
+                  <span class="ph-row2__line">{{ m.subject || '(no subject)' }}<q-icon v-if="m.attach" name="sym_o_attach_file" size="16px" aria-label="Has attachments" /></span>
+                  <span class="ph-row2__sub">{{ m.preview }}</span>
+                </span>
+                <span v-if="m.unread" class="ph-dot" aria-label="Unread" data-test="mail-unread"></span>
+              </button>
+            </li>
+          </ul>
+          <div v-if="mails.length && mails.length < total" class="ph-more">
+            <q-btn outline no-caps color="primary" label="Show older messages" :loading="loading" data-test="mail-more" @click="loadList(false)" />
+          </div>
+        </div>
+      </template>
 
-    <ul v-if="mails.length" class="ph-list ph-card" data-test="mail-list">
-      <li v-for="(m, i) in mails" :key="m.id">
-        <button type="button" class="ph-row" :class="{ 'is-unread': m.unread }" :data-test="'mail-row-' + i" @click="openMail(m)">
-          <span class="ph-row-main">
-            <span class="ph-row-top"><span class="ph-from">{{ m.from || '(no sender)' }}</span><span class="ph-small ph-muted">{{ when(m.date) }}</span></span>
-            <span class="ph-subject">{{ m.subject || '(no subject)' }}<q-icon v-if="m.attach" name="sym_o_attach_file" size="16px" aria-label="Has attachments" /></span>
-            <span class="ph-small ph-muted ph-preview">{{ m.preview }}</span>
-          </span>
-          <span v-if="m.unread" class="ph-dot" aria-label="Unread" data-test="mail-unread"></span>
-        </button>
-      </li>
-    </ul>
-    <div v-if="mails.length && mails.length < total" class="ph-more">
-      <q-btn outline color="primary" label="Show older messages" :loading="loading" data-test="mail-more" @click="loadList(false)" />
-    </div>
-
-    <!-- reader -->
-    <q-dialog v-model="open">
-      <q-card class="ph-dialog" data-test="mail-view">
-        <q-card-section v-if="reading"><HdStatusState state="loading" title="Opening the message" text="" /></q-card-section>
-        <q-card-section v-else-if="msg">
-          <h2 data-test="mail-view-subject">{{ msg.subject || '(no subject)' }}</h2>
-          <p class="ph-small ph-muted q-mb-xs">From {{ msg.from }}<span v-if="msg.date"> on {{ new Date(msg.date).toLocaleString() }}</span></p>
-          <p v-if="msg.to && msg.to.length" class="ph-small ph-muted">To {{ msg.to.join(', ') }}</p>
-          <q-btn-toggle v-if="msg.safe" v-model="formatted" no-caps unelevated dense toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph" class="q-mb-sm"
-                        :options="[{ label: 'Plain text', value: false }, { label: 'Formatted view', value: true }]" data-test="mail-format" />
-          <p v-if="msg.html && !formatted" class="ph-small ph-muted">Shown as plain text. Pictures and links in this message are not loaded.</p>
-          <iframe v-if="formatted && msg.safe" class="ph-frame" sandbox="allow-popups allow-popups-to-escape-sandbox" :srcdoc="frameDoc" title="Message, formatted" data-test="mail-frame"></iframe>
-          <pre v-else class="ph-body" data-test="mail-view-body">{{ msg.text }}</pre>
-        </q-card-section>
-        <q-card-actions v-if="msg" class="ph-reader-actions">
-          <q-btn flat icon="sym_o_reply" label="Reply" data-test="mail-reply" @click="reply" />
-          <q-btn flat :icon="current && current.unread ? 'sym_o_drafts' : 'sym_o_mark_email_unread'" :label="current && current.unread ? 'Mark as read' : 'Mark as unread'" data-test="mail-toggle-read" @click="toggleRead" />
-          <q-btn flat icon="sym_o_drive_file_move" label="Move to" data-test="mail-move">
-            <q-menu>
-              <q-list style="min-width: 180px">
-                <q-item v-for="t in moveTargets" :key="t.role" clickable v-close-popup :data-test="'mail-move-' + t.role" @click="move(t)"><q-item-section>{{ t.label }}</q-item-section></q-item>
-              </q-list>
-            </q-menu>
-          </q-btn>
-          <q-btn flat color="negative" icon="sym_o_delete" label="Delete" data-test="mail-delete" @click="remove" />
-          <q-space />
-          <q-btn flat label="Close" v-close-popup />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+      <!-- the reader: beside the list when there is room, else in its place with Back -->
+      <template #detail>
+        <article v-if="open" class="ph-mail__reader ph-scroll" data-test="mail-view">
+          <q-btn flat no-caps icon="sym_o_arrow_back" :label="folderTitle" class="ph-split__back ph-mail__back" @click="open = false" />
+          <HdStatusState v-if="reading" state="loading" title="Opening the message" text="" />
+          <template v-else-if="msg">
+            <h2 class="ph-detail-title" data-test="mail-view-subject">{{ msg.subject || '(no subject)' }}</h2>
+            <div class="ph-mail__from">
+              <HdAvatar :name="msg.from || '?'" :size="43" />
+              <div><b>{{ msg.from }}</b><span v-if="msg.to && msg.to.length">to {{ msg.to.join(', ') }}</span><span v-if="msg.date"> · {{ new Date(msg.date).toLocaleString() }}</span></div>
+            </div>
+            <q-btn-toggle v-if="msg.safe" v-model="formatted" no-caps unelevated dense toggle-color="primary" class="q-mb-sm"
+                          :options="[{ label: 'Plain text', value: false }, { label: 'Formatted view', value: true }]" data-test="mail-format" />
+            <p v-if="msg.html && !formatted" class="ph-small ph-muted">Shown as plain text. Pictures and links in this message are not loaded.</p>
+            <iframe v-if="formatted && msg.safe" class="ph-frame" sandbox="allow-popups allow-popups-to-escape-sandbox" :srcdoc="frameDoc" title="Message, formatted" data-test="mail-frame"></iframe>
+            <pre v-else class="ph-body" data-test="mail-view-body">{{ msg.text }}</pre>
+            <div class="ph-mail__actions">
+              <q-btn unelevated no-caps color="primary" icon="sym_o_reply" label="Reply" data-test="mail-reply" @click="reply" />
+              <q-btn outline no-caps :icon="current && current.unread ? 'sym_o_drafts' : 'sym_o_mark_email_unread'" :label="current && current.unread ? 'Mark as read' : 'Mark as unread'" data-test="mail-toggle-read" @click="toggleRead" />
+              <q-btn outline no-caps icon="sym_o_drive_file_move" label="Move to" data-test="mail-move">
+                <q-menu>
+                  <q-list style="min-width: 180px">
+                    <q-item v-for="t in moveTargets" :key="t.role" clickable v-close-popup :data-test="'mail-move-' + t.role" @click="move(t)"><q-item-section>{{ t.label }}</q-item-section></q-item>
+                  </q-list>
+                </q-menu>
+              </q-btn>
+              <q-btn outline round icon="sym_o_delete" aria-label="Delete" data-test="mail-delete" @click="remove" />
+            </div>
+          </template>
+        </article>
+        <div v-else class="ph-split__empty"><div><q-icon name="sym_o_mail" size="48px" aria-hidden="true" /><p>{{ mails.length ? 'Pick a message to read it.' : 'No message open.' }}</p></div></div>
+      </template>
+    </SplitView>
 
     <!-- composer -->
     <q-dialog v-model="composeOpen" persistent>
@@ -104,7 +110,9 @@ import type { MailAccount, MailBody, MailFolder, MailItem } from '../proto'
 /** The message being written: recipients, subject, text, the Message-ID it answers, and the account it goes out through. */
 interface Draft { rcpt: string; subject: string; body: string; replyTo: string; account: string }
 import { toast } from '../toast'
-import { HdStatusState } from '@etesian-design/vue'
+import { HdAvatar, HdPageHeader, HdStatusState } from '@etesian-design/vue'
+import SplitView from '../components/SplitView.vue'
+import { fillPage } from '../fillPage'
 import { useChrome } from '@etesian-design/shell'
 import { latest } from '../latest'
 
@@ -152,6 +160,12 @@ async function init() {
 }
 // the header: the folders as the title's view menu, then Write and Refresh (most important first; the host folds the rest into ⋮)
 const folderName = (id: string) => folderOptions.value.find((f) => f.value === id)?.label ?? 'Mail'
+const folderTitle = computed(() => folders.value.find((f) => f.id === folder.value)?.name ?? 'Mail')
+const folderSub = computed(() => {
+  const f = folders.value.find((x) => x.id === folder.value)
+  if (!f) return error.value ? 'Not available' : 'Loading'
+  return f.unread ? `${f.unread} unread · ${total.value} messages` : `${total.value} message${total.value === 1 ? '' : 's'}`
+})
 const chrome = useChrome(() => ({
   title: 'Mail',
   views: folderOptions.value.length ? folderOptions.value.map((f) => f.label) : undefined,
@@ -283,25 +297,23 @@ onMounted(init)
 </script>
 
 <style scoped>
-.ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s3); }
-.ph-actions { display: flex; align-items: center; gap: var(--ph-s2); }
-.ph-list { list-style: none; padding: 0; margin: 0; }
-.ph-list li { border-bottom: 1px solid var(--ph-divider); }
-.ph-list li:last-child { border-bottom: 0; }
-.ph-row { width: 100%; min-height: 64px; display: flex; align-items: center; gap: var(--ph-s3); padding: var(--ph-s3) var(--ph-s4); background: none; border: 0; text-align: left; font: inherit; color: var(--ph-text); cursor: pointer; }
-.ph-row:hover { background: var(--ph-surface-2); }
-.ph-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.ph-row-top { display: flex; justify-content: space-between; gap: var(--ph-s3); }
-.ph-from, .ph-subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.is-unread .ph-from, .is-unread .ph-subject { font-weight: 600; }
-.ph-preview { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--ph-accent); }
-.ph-more { display: flex; justify-content: center; margin-top: var(--ph-s4); }
+.ph-mail { display: flex; flex-direction: column; }
+.ph-mail__bar { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 11px; border-bottom: 1px solid var(--hd-c-divider); }
+.ph-mail__list { flex: 1; min-height: 0; }
+.ph-mail__note { margin: 10px 11px; }
+.ph-dot { flex: none; width: 10px; height: 10px; background: var(--hd-accent); -webkit-mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; }
+.ph-more { display: flex; justify-content: center; padding: 16px; }
+/* the reader (Web/Classic layout, Mail): light subject, the sender with a squircle avatar, the text, the actions */
+.ph-mail__reader { flex: 1; min-height: 0; padding: 20px 28px; }
+.ph-mail__back { margin: -12px 0 8px -12px; }
+.ph-mail__from { display: flex; gap: 11px; align-items: center; margin: 14px 0; font-size: var(--hd-font-size-small); color: var(--hd-c-fg-secondary); }
+.ph-mail__from b { display: block; color: var(--hd-c-fg); font: 700 var(--hd-font-size-default)/1.3 var(--hd-font-family-base); }
+.ph-mail__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.ph-body { max-width: 68ch; white-space: pre-wrap; overflow-wrap: anywhere; font: 400 var(--ph-text-body)/1.5 var(--ph-font); margin: var(--ph-s3) 0 0; }
+.ph-frame { width: 100%; height: 60vh; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); background: #fff; }
 .ph-dialog { width: min(96vw, 640px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); overflow-wrap: anywhere; }
 .ph-formcol { display: flex; flex-direction: column; gap: var(--ph-s3); }
-.ph-reader-actions { flex-wrap: wrap; }
-.ph-body { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--ph-font); font-size: var(--ph-text-body); margin: var(--ph-s3) 0 0; max-height: 50vh; overflow: auto; }
-.ph-frame { width: 100%; height: 50vh; border: 1px solid var(--ph-divider); border-radius: var(--ph-r-control); background: #fff; }
 .ph-err { color: var(--ph-negative); margin: 0; display: flex; gap: var(--ph-s2); }
+@container (max-width: 520px) { .ph-mail__reader { padding: 16px; } }
 </style>

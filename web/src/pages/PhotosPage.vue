@@ -20,7 +20,7 @@
     <q-btn v-else flat no-caps icon="sym_o_arrow_back" label="Albums" class="ph-back" data-test="photos-back" @click="closeAlbum" />
     </template>
 
-    <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
+    <q-banner v-if="error" inline-actions class="ph-note is-error q-mb-md" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="reload" /></template>

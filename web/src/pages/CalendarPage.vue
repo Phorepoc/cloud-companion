@@ -1,26 +1,29 @@
 <!-- Copyright The Phorepoc Authors
      SPDX-License-Identifier: AGPL-3.0-only -->
 <template>
-  <q-page class="ph-page">
-    <!-- with a header (the classic bar, a desktop window) the title and New event are there -->
-    <div v-if="!chrome.hosted" class="ph-head">
-      <h1>Calendar</h1>
-      <q-btn unelevated color="primary" icon="sym_o_add" label="New event" data-test="event-new" @click="openNew()" />
-    </div>
-    <div class="ph-months" role="group" aria-label="Month">
-      <q-btn flat round icon="sym_o_chevron_left" aria-label="Previous month" data-test="cal-prev" @click="shift(-1)" />
+  <q-page class="ph-cal-page" :style-fn="fillPage">
+   <div class="ph-cal-box">
+   <div class="ph-cal" :class="{ 'is-agenda': view === 'agenda' }">
+    <section class="ph-cal__month ph-scroll" aria-label="Month">
+    <!-- the app's coloured header: the month, with the arrows and Today (Quasar/Examples, Calendar) -->
+    <header class="ph-cal__head" role="group" aria-label="Month">
+      <q-btn flat round text-color="white" icon="sym_o_chevron_left" aria-label="Previous month" data-test="cal-prev" @click="shift(-1)" />
       <h2 class="ph-month" aria-live="polite" data-test="cal-month">{{ monthLabel(month) }}</h2>
-      <q-btn flat round icon="sym_o_chevron_right" aria-label="Next month" data-test="cal-next" @click="shift(1)" />
-      <q-btn flat label="Today" data-test="cal-today" @click="today" />
+      <q-btn flat round text-color="white" icon="sym_o_chevron_right" aria-label="Next month" data-test="cal-next" @click="shift(1)" />
+      <q-btn flat no-caps text-color="white" label="Today" data-test="cal-today" @click="today" />
+      <!-- with a header (the classic bar, a desktop window) New event is there -->
+      <q-btn v-if="!chrome.hosted" flat round text-color="white" icon="sym_o_add" aria-label="New event" data-test="event-new" @click="openNew()" />
+    </header>
+    <div class="ph-cal__bar">
+      <q-btn-toggle v-model="view" no-caps unelevated toggle-color="primary"
+                    :options="[{ label: 'Month', value: 'month', icon: 'sym_o_calendar_view_month' }, { label: 'Agenda', value: 'agenda', icon: 'sym_o_view_agenda' }]"
+                    data-test="cal-view" />
     </div>
-    <q-btn-toggle v-model="view" no-caps unelevated spread toggle-color="primary" toggle-text-color="on-accent" color="surface-2" text-color="ph" class="q-mb-md"
-                  :options="[{ label: 'Month', value: 'month', icon: 'sym_o_calendar_view_month' }, { label: 'Agenda', value: 'agenda', icon: 'sym_o_view_agenda' }]"
-                  data-test="cal-view" />
 
-    <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
+    <q-banner v-if="error" inline-actions class="ph-note is-error ph-cal__note" role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
       {{ error }}
-      <template #action><q-btn flat label="Try again" @click="load" /></template>
+      <template #action><q-btn flat no-caps color="primary" label="Try again" @click="load" /></template>
     </q-banner>
 
     <!-- month grid -->
@@ -36,10 +39,11 @@
         </button>
       </div>
     </div>
-    <section v-if="view === 'month'" class="ph-day" :aria-label="dayLabel(toDate(selected))" data-test="cal-selected">
+    </section>
+    <section v-if="view === 'month'" class="ph-day ph-cal__day ph-scroll" :aria-label="dayLabel(toDate(selected))" data-test="cal-selected">
       <h3 class="ph-day-head" :class="{ 'is-today': selected === ymd(new Date()) }">{{ dayLabel(toDate(selected)) }}</h3>
       <p v-if="!(byDay[selected] || []).length" class="ph-muted">Nothing planned.</p>
-      <ul v-else class="ph-card ph-list">
+      <ul v-else class="ph-list">
         <li v-for="e in byDay[selected]" :key="e.href">
           <button type="button" class="ph-row" data-test="event-row" @click="openView(e)">
             <span class="ph-when ph-small ph-muted">{{ whenLabel(e) }}</span>
@@ -51,7 +55,7 @@
     </section>
 
     <!-- agenda -->
-    <template v-if="view === 'agenda'">
+    <section v-if="view === 'agenda'" class="ph-cal__day ph-scroll" aria-label="Agenda">
       <HdStatusState v-if="loading && !events.length" state="loading" title="Loading events" text="This takes a moment." />
       <HdStatusState v-else-if="!loading && !events.length && !error" icon="calendar" title="Nothing on this month"
                   text="Add an event. It will show on every device that syncs with your hub.">
@@ -59,7 +63,7 @@
       </HdStatusState>
       <section v-for="g in groups" :key="g.key" class="ph-day" :aria-label="g.label">
         <h3 class="ph-day-head" :class="{ 'is-today': g.today }">{{ g.label }}<span v-if="g.today" class="ph-small"> (today)</span></h3>
-        <ul class="ph-card ph-list">
+        <ul class="ph-list">
           <li v-for="e in g.items" :key="e.href">
             <button type="button" class="ph-row" data-test="event-row" @click="openView(e)">
               <span class="ph-when ph-small ph-muted">{{ whenLabel(e) }}</span>
@@ -69,7 +73,9 @@
           </li>
         </ul>
       </section>
-    </template>
+    </section>
+   </div>
+   </div>
 
     <q-dialog v-model="viewOpen">
       <q-card v-if="current" class="ph-dialog" data-test="event-view">
@@ -131,6 +137,7 @@ interface EventForm extends EventFields { href?: string; etag?: string; title: s
 import { HdStatusState } from '@etesian-design/vue'
 import { latest } from '../latest'
 import { useChrome } from '@etesian-design/shell'
+import { fillPage } from '../fillPage'
 
 const $q = useQuasar()
 const phone = computed(() => $q.screen.lt.sm)
@@ -268,33 +275,54 @@ onMounted(load)
 </script>
 
 <style scoped>
-.ph-head { display: flex; align-items: center; justify-content: space-between; gap: var(--ph-s3); margin-bottom: var(--ph-s3); }
-.ph-months { display: flex; align-items: center; gap: var(--ph-s1); margin-bottom: var(--ph-s3); }
-.ph-month { flex: 1; text-align: center; font-size: var(--ph-text-title-s); }
-.ph-grid { background: var(--ph-surface); border: 1px solid var(--ph-divider); border-radius: var(--ph-r-card); overflow: hidden; margin-bottom: var(--ph-s4); }
+/* month and the chosen day side by side from 860 px of room (the page or a window), else one under the other; each scrolls on its own */
+.ph-cal-page { display: flex; flex-direction: column; }
+.ph-cal-box { flex: 1; min-height: 0; display: flex; container-type: inline-size; }
+.ph-cal { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; background: var(--hd-c-bg); }
+.ph-cal__month { flex: none; overflow: visible; }
+.ph-cal__day { flex: none; overflow: visible; padding: 8px 0 16px; }
+@container (min-width: 860px) {
+  .ph-cal { display: grid; grid-template-columns: 1fr minmax(300px, 34%); overflow: hidden; }
+  .ph-cal__month, .ph-cal__day { min-height: 0; overflow-y: auto; }
+  .ph-cal__day { border-left: 1px solid var(--hd-c-divider); }
+  /* the agenda is one list under the month bar */
+  .ph-cal.is-agenda { display: flex; overflow-y: auto; }
+  .ph-cal.is-agenda .ph-cal__month, .ph-cal.is-agenda .ph-cal__day { overflow: visible; border-left: 0; }
+}
+.ph-cal__head { display: flex; align-items: center; gap: 4px; min-height: var(--hd-size-header); padding: 6px 8px; background: #EF5500; color: #fff; }
+.ph-month { flex: 1; margin: 0 4px; font: var(--hd-font-weight-light) var(--hd-font-size-xlarge)/1.2 var(--hd-font-family-light); }
+.ph-cal__bar { display: flex; justify-content: center; padding: 10px 12px 4px; }
+.ph-cal__note { margin: 8px 12px; }
+/* the month: N9 Calendar figures in light type on the page, today on an accent squircle, events as small chips */
+.ph-grid { padding: 4px 8px 12px; }
 .ph-dow, .ph-week { display: grid; grid-template-columns: repeat(7, 1fr); }
-.ph-dow span { padding: var(--ph-s2) 0; text-align: center; font-size: var(--ph-text-caption); color: var(--ph-text-muted); font-weight: 600; border-bottom: 1px solid var(--ph-divider); }
-.ph-cell { min-height: 64px; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: stretch; padding: var(--ph-s1); background: none; border: 0; border-right: 1px solid var(--ph-divider); border-bottom: 1px solid var(--ph-divider); font: inherit; color: var(--ph-text); cursor: pointer; text-align: left; }
-.ph-week .ph-cell:last-child { border-right: 0; }
-@media (min-width: 600px) { .ph-cell { min-height: 92px; } }
-.ph-cell.is-out { color: var(--ph-text-muted); background: var(--ph-bg); }
-.ph-cell.is-sel { outline: 2px solid var(--ph-accent); outline-offset: -2px; }
-.ph-num { font-size: var(--ph-text-small); font-weight: 600; width: 24px; height: 24px; display: grid; place-items: center; }
-.ph-cell.is-today .ph-num { background: var(--ph-accent); color: var(--ph-on-accent); }
-.ph-chip { font-size: var(--ph-text-caption); line-height: 1.3; background: var(--ph-accent-soft); color: var(--ph-accent); padding: 0 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ph-chip-dot { width: 8px; height: 8px; padding: 0; border-radius: 50%; background: var(--ph-accent); display: inline-block; }
-.ph-more { font-size: var(--ph-text-caption); color: var(--ph-text-muted); }
-.ph-day { margin-bottom: var(--ph-s4); }
-.ph-day-head { font-size: var(--ph-text-small); color: var(--ph-text-muted); font-weight: 600; margin: 0 0 var(--ph-s2) var(--ph-s1); }
-.ph-day-head.is-today { color: var(--ph-accent); }
+.ph-dow span { padding: 8px 0 6px; text-align: center; font: 700 var(--hd-font-size-xsmall)/1 var(--hd-font-family-base); color: var(--hd-c-fg-secondary); }
+.ph-cell { min-height: 52px; min-width: 0; display: flex; flex-direction: column; gap: 2px; align-items: center; padding: 4px 2px; background: none; border: 0; border-top: 1px solid var(--hd-c-divider);
+  font: inherit; color: var(--hd-c-fg); cursor: pointer; }
+.ph-cell:hover { background: var(--hd-c-pressed); }
+@container (min-width: 600px) { .ph-cell { min-height: 84px; align-items: stretch; } .ph-cell .ph-num { align-self: flex-start; } }
+.ph-cell.is-out { color: var(--hd-c-fg-tertiary, var(--hd-c-fg-secondary)); }
+.ph-num { width: 32px; height: 32px; display: grid; place-items: center; font: 300 1.125rem/1 var(--hd-font-family-light); }
+.ph-cell.is-sel .ph-num { box-shadow: inset 0 0 0 2px var(--hd-accent); border-radius: 8px; }
+.ph-cell.is-today .ph-num { background: linear-gradient(color-mix(in srgb, var(--hd-accent) 82%, #fff), var(--hd-accent)); color: #fff; box-shadow: none;
+  -webkit-mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; }
+.ph-chip { font: 400 var(--hd-font-size-xsmall)/1.3 var(--hd-font-family-base); background: color-mix(in srgb, #EF5500 16%, transparent); color: var(--hd-c-fg);
+  box-shadow: inset 2px 0 0 #EF5500; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-chip-dot { width: 6px; height: 6px; padding: 0; background: #EF5500; box-shadow: none; display: inline-block; -webkit-mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; }
+.ph-more { font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
+/* the day: an N9 section header, then the events with their colour bar */
+.ph-day { margin-bottom: 8px; }
+.ph-day-head { display: flex; align-items: center; gap: 10px; margin: 0; padding: 10px 16px 6px; font: 700 var(--hd-font-size-xsmall)/1.2 var(--hd-font-family-base); color: var(--hd-c-fg-secondary); }
+.ph-day-head::before { content: ''; flex: 1; height: 1px; background: var(--hd-c-divider); order: -1; }
+.ph-day-head.is-today { color: var(--hd-c-accent-text, var(--hd-accent)); }
+.ph-day > .ph-muted { margin: 4px 16px; }
 .ph-list { list-style: none; padding: 0; margin: 0; }
-.ph-list li { border-bottom: 1px solid var(--ph-divider); }
-.ph-list li:last-child { border-bottom: 0; }
-.ph-row { width: 100%; min-height: 56px; display: flex; align-items: center; gap: var(--ph-s3); padding: var(--ph-s2) var(--ph-s4); background: none; border: 0; text-align: left; font: inherit; color: var(--ph-text); cursor: pointer; }
-.ph-row:hover { background: var(--ph-surface-2); }
-.ph-when { flex: none; width: 72px; }
+.ph-row { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 12px; padding: 6px 16px; background: none; border: 0; text-align: left; font: inherit; color: var(--hd-c-fg); cursor: pointer; }
+.ph-row:hover { background: var(--hd-c-pressed); }
+.ph-row::before { content: ''; align-self: stretch; width: 4px; flex: none; background: #EF5500; }
+.ph-when { flex: none; width: 64px; order: 2; text-align: right; }
 .ph-row-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.ph-row-title { font-weight: 600; overflow-wrap: anywhere; }
+.ph-row-title { font: 700 1rem/1.25 var(--hd-font-family-base); overflow-wrap: anywhere; }
 .ph-dialog { width: min(94vw, 480px); }
 .ph-dialog h2 { margin-bottom: var(--ph-s2); overflow-wrap: anywhere; }
 .ph-form { display: flex; flex-direction: column; gap: var(--ph-s3); }

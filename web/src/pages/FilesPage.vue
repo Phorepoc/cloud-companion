@@ -22,7 +22,7 @@
     </nav>
 
     <p v-if="readOnly" class="ph-note q-mb-md" data-test="files-readonly"><q-icon name="sym_o_cloud" size="20px" aria-hidden="true" /> These files are in {{ mountName(path.split('/')[0]) }}. You can open and download them here; change them in that service.</p>
-    <q-banner v-if="error" class="ph-note is-error q-mb-md" rounded role="alert">
+    <q-banner v-if="error" inline-actions class="ph-note is-error q-mb-md" rounded role="alert">
       <template #avatar><q-icon name="sym_o_error" aria-hidden="true" /></template>
       {{ error }}
       <template #action><q-btn flat label="Try again" @click="load" /></template>
