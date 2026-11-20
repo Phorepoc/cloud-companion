@@ -5,7 +5,7 @@
     <SplitView :detail="!!current" list-label="Conversations" detail-label="Messages">
       <template #list>
         <div class="ph-chats__head">
-          <HdPageHeader title="Chats" :subtitle="subtitle" colored accent="#09A7CC" />
+          <HdPageHeader :level="2" title="Chats" :subtitle="subtitle" colored accent="#09A7CC" />
           <q-btn flat round text-color="white" icon="sym_o_edit_square" aria-label="New message" data-test="new-chat" @click="startNew" />
         </div>
         <div v-if="convs.length > 4" class="ph-list-search"><HdSearchField v-model="q" placeholder="Search chats" label="Search chats" /></div>

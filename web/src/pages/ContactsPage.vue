@@ -4,7 +4,7 @@
   <q-page class="ph-contacts" :style-fn="fillPage" @keydown.esc="viewOpen = false">
     <SplitView :detail="viewOpen && !!current" list-label="Contacts" detail-label="Contact">
       <template #list>
-        <HdPageHeader title="Contacts" :subtitle="contacts.length ? contacts.length + (contacts.length === 1 ? ' contact' : ' contacts') : undefined" colored accent="#007DC9" />
+        <HdPageHeader :level="2" title="Contacts" :subtitle="contacts.length ? contacts.length + (contacts.length === 1 ? ' contact' : ' contacts') : undefined" colored accent="#007DC9" />
         <div class="ph-list-search ph-contacts__search">
           <q-input v-model="filter" rounded outlined dense clearable placeholder="Search" aria-label="Search contacts" data-test="contacts-search" class="col">
             <template #append><q-icon name="sym_o_search" aria-hidden="true" /></template>

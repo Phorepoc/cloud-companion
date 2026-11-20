@@ -8,7 +8,7 @@
   <q-page class="ph-mail" :style-fn="fillPage" @keydown.esc="open = false">
     <SplitView :detail="open" list-label="Messages" detail-label="Message">
       <template #list>
-        <HdPageHeader :title="folderTitle" :subtitle="folderSub" colored accent="#0067BC" />
+        <HdPageHeader :level="2" :title="folderTitle" :subtitle="folderSub" colored accent="#0067BC" />
         <!-- in a window (or a host with a header) the title is a menu of the folders and the buttons sit in the header: useChrome below -->
         <div v-if="!chrome.hosted" class="ph-mail__bar">
           <q-select v-model="folder" :options="folderOptions" emit-value map-options outlined dense label="Folder" class="col" data-test="mail-folder"
