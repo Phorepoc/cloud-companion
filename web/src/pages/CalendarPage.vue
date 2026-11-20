@@ -34,7 +34,7 @@
                 :class="{ 'is-out': d.getMonth() !== month.getMonth(), 'is-today': ymd(d) === ymd(new Date()), 'is-sel': ymd(d) === selected }"
                 :aria-label="cellLabel(d)" :aria-selected="ymd(d) === selected" :data-test="'cal-day-' + ymd(d)" @click="selected = ymd(d)">
           <span class="ph-num hd-sqm">{{ d.getDate() }}</span>
-          <span v-for="e in (byDay[ymd(d)] || []).slice(0, 2)" :key="e.href" class="ph-chip" :class="phone ? 'ph-chip-dot' : 'hd-sqm'">{{ phone ? '' : e.title }}</span>
+          <span v-for="e in (byDay[ymd(d)] || []).slice(0, 2)" :key="e.href" class="ph-chip" :class="{ 'ph-chip-dot': phone }">{{ phone ? '' : e.title }}</span>
           <span v-if="(byDay[ymd(d)] || []).length > 2" class="ph-more">+{{ byDay[ymd(d)].length - 2 }}</span>
         </button>
       </div>
@@ -94,6 +94,12 @@
       </q-card>
     </q-dialog>
 
+    <!-- the N9 time picker (HdTimePicker): hour and minute wheels, Done / Cancel -->
+    <q-dialog v-model="timeOpen">
+      <HdTimePicker v-model="timeValue" hour24 :title="timeField === 'startTime' ? 'Start time' : 'End time'" :minute-step="5"
+                    @accept="(v: string) => { form[timeField] = v; timeOpen = false }" @cancel="timeOpen = false" />
+    </q-dialog>
+
     <q-dialog v-model="editOpen" persistent>
       <q-card class="ph-dialog" data-test="event-form">
         <form @submit.prevent="save">
@@ -103,11 +109,15 @@
             <q-toggle v-model="form.allday" label="All day" data-test="event-allday" />
             <div class="ph-two">
               <q-input v-model="form.startDate" label="Starts" type="date" outlined data-test="event-start-date" />
-              <q-input v-if="!form.allday" v-model="form.startTime" label="Time" type="time" outlined data-test="event-start-time" />
+              <q-input v-if="!form.allday" v-model="form.startTime" label="Time" type="time" outlined data-test="event-start-time">
+                <template #append><q-btn flat round dense icon="sym_o_schedule" aria-label="Pick the start time" @click="pickTime('startTime')" /></template>
+              </q-input>
             </div>
             <div class="ph-two">
               <q-input v-model="form.endDate" label="Ends" type="date" outlined data-test="event-end-date" />
-              <q-input v-if="!form.allday" v-model="form.endTime" label="Time" type="time" outlined data-test="event-end-time" />
+              <q-input v-if="!form.allday" v-model="form.endTime" label="Time" type="time" outlined data-test="event-end-time">
+                <template #append><q-btn flat round dense icon="sym_o_schedule" aria-label="Pick the end time" @click="pickTime('endTime')" /></template>
+              </q-input>
             </div>
             <p v-if="!form.allday" class="ph-small ph-muted" data-test="event-zone">Times are in your time zone ({{ zone }}).</p>
             <q-input v-model="form.location" label="Place" outlined data-test="event-location" />
@@ -138,6 +148,7 @@ import { HdStatusState } from '@etesian-design/vue'
 import { latest } from '../latest'
 import { useChrome } from '@etesian-design/shell'
 import { fillPage } from '../fillPage'
+import { HdTimePicker } from '@etesian-design/vue'
 
 const $q = useQuasar()
 const phone = computed(() => $q.screen.lt.sm)
@@ -237,6 +248,11 @@ function openNew(ev?: CalendarEvent) {
   editOpen.value = true
 }
 
+const timeOpen = ref(false)
+const timeField = ref<'startTime' | 'endTime'>('startTime')
+const timeValue = ref('09:00')
+function pickTime(f: 'startTime' | 'endTime') { timeField.value = f; timeValue.value = form.value[f] || '09:00'; timeOpen.value = true }
+
 async function save() {
   const f = form.value
   if (!f.title.trim()) { formError.value = 'Enter a title for this event.'; return }
@@ -307,7 +323,7 @@ onMounted(load)
 .ph-cell.is-today .ph-num { background: linear-gradient(color-mix(in srgb, var(--hd-accent) 82%, #fff), var(--hd-accent)); color: #fff; box-shadow: none;
   -webkit-mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; }
 .ph-chip { font: 400 var(--hd-font-size-xsmall)/1.3 var(--hd-font-family-base); background: color-mix(in srgb, #EF5500 16%, transparent); color: var(--hd-c-fg);
-  box-shadow: inset 2px 0 0 #EF5500; padding: 0 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  border-left: 2px solid #EF5500; border-radius: 2px; padding: 0 5px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-chip-dot { width: 6px; height: 6px; padding: 0; background: #EF5500; box-shadow: none; display: inline-block; -webkit-mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; mask: var(--hd-squircle-mask) center / 100% 100% no-repeat; }
 .ph-more { font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
 /* the day: an N9 section header, then the events with their colour bar */
