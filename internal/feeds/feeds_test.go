@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 )
 
@@ -60,9 +61,9 @@ func TestPostContent(t *testing.T) {
 }
 
 func TestAll(t *testing.T) {
-	hits := 0
+	var hits atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		hits++
+		hits.Add(1)
 		switch r.URL.Path {
 		case "/rss":
 			w.Write([]byte(rss))
@@ -82,9 +83,9 @@ func TestAll(t *testing.T) {
 	if res.Errors[srv.URL+"/gone"] == "" || len(res.Errors) != 1 {
 		t.Errorf("errors: %v", res.Errors)
 	}
-	before := hits
+	before := hits.Load()
 	s.All(context.Background(), list[:2])
-	if hits != before {
+	if hits.Load() != before {
 		t.Error("a feed read in the last 30 minutes should come from the cache")
 	}
 	if Check("ftp://x") == nil || Check("https://x.test/f") != nil {

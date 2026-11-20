@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -37,16 +38,18 @@ type phone struct {
 	gw    string
 	cli   *sipgo.Client
 	got   chan *sip.Request
-	reply int // what it answers to a MESSAGE (200 by default)
+	reply atomic.Int32 // what it answers to a MESSAGE (200 by default)
 }
 
 func newPhone(t *testing.T, ctx context.Context, gwAddr, login, pw string) *phone {
-	p := &phone{t: t, login: login, pw: pw, port: freePort(t), gw: gwAddr, got: make(chan *sip.Request, 10), reply: 200}
+	p := &phone{t: t, login: login, pw: pw, port: freePort(t), gw: gwAddr, got: make(chan *sip.Request, 10)}
+	p.reply.Store(200)
 	ua, _ := sipgo.NewUA(sipgo.WithUserAgent("test phone"))
 	srv, _ := sipgo.NewServer(ua)
 	srv.OnMessage(func(req *sip.Request, tx sip.ServerTransaction) {
-		tx.Respond(sip.NewResponseFromRequest(req, p.reply, "x", nil))
-		if p.reply < 300 {
+		code := int(p.reply.Load())
+		tx.Respond(sip.NewResponseFromRequest(req, code, "x", nil))
+		if code < 300 {
 			p.got <- req
 		}
 	})
@@ -238,13 +241,13 @@ func TestDeviceToDeviceWaitsUntilRegistered(t *testing.T) {
 		t.Fatalf("to e7: %d", res.StatusCode)
 	}
 	b := newPhone(t, ctx, addr, "e7", pb)
-	b.reply = 480 // the device refuses at first: the message must stay
+	b.reply.Store(480) // the device refuses at first: the message must stay
 	b.register(600)
 	time.Sleep(600 * time.Millisecond)
 	if len(st.ChatFor("e7")) != 1 {
 		t.Fatal("a refused message was dropped")
 	}
-	b.reply = 200
+	b.reply.Store(200)
 	r := b.wait("message from n9")
 	if string(r.Body()) != "are you there?" || r.From().Address.User != "n9" {
 		t.Fatalf("got %q from %s", r.Body(), r.From().Value())

@@ -587,11 +587,11 @@ func (m *Manager) Restore(d Destination, snapshot string) (*Job, error) {
 			c := m.BackupConfig()
 			c.On, c.Dest = true, d
 			m.saveBackup(c) // backups go on to the same place
+			m.mu.Lock()     // Load replaces the state the API reads under mu
 			if err = m.Load(); err == nil {
-				m.mu.Lock()
 				err = m.apply(ctx, m.cloneState(), j)
-				m.mu.Unlock()
 			}
+			m.mu.Unlock()
 		}
 		j.finish(err)
 	}()

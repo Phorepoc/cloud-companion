@@ -73,7 +73,11 @@ type Manager struct {
 }
 
 func (m *Manager) Load() error {
-	m.jobs = map[string]*Job{}
+	m.jmu.Lock() // a restore calls Load while its own job is running: keep the job list
+	if m.jobs == nil {
+		m.jobs = map[string]*Job{}
+	}
+	m.jmu.Unlock()
 	m.state = State{Features: map[string]map[string]string{}}
 	b, err := os.ReadFile(filepath.Join(m.StateDir, "state.json"))
 	if errors.Is(err, os.ErrNotExist) {

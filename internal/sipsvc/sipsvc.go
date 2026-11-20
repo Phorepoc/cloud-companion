@@ -135,6 +135,7 @@ type Service struct {
 	from   map[string]bool // the service's addresses: only they may deliver
 	cancel context.CancelFunc
 	mu     sync.Mutex
+	hmu    sync.Mutex // guards Hub
 }
 
 func ConnID(acc string) string { return "sipsvc:" + acc }
@@ -155,7 +156,10 @@ func (s *Service) ID() string    { return ConnID(s.Acc) }
 func (s *Service) Label() string { return s.Name + " (SIP)" }
 
 // Start listens for the service's messages and keeps the registration until Stop.
-func (s *Service) SetHub(h *chat.Hub) { s.Hub = h }
+// The hub is usually attached after Start (chat.Hub.Add), while a message may already be arriving.
+func (s *Service) SetHub(h *chat.Hub) { s.hmu.Lock(); s.Hub = h; s.hmu.Unlock() }
+
+func (s *Service) hub() *chat.Hub { s.hmu.Lock(); defer s.hmu.Unlock(); return s.Hub }
 
 func (s *Service) Start() error {
 	if err := s.Cfg.norm(); err != nil {
@@ -306,7 +310,7 @@ func (s *Service) onMessage(req *sip.Request, tx sip.ServerTransaction) {
 	if name == "" {
 		name = peer
 	}
-	if err := s.Hub.In(store.ChatMessage{Conn: s.ID(), Peer: peer, PeerName: name, Body: string(req.Body()), TS: time.Now().Unix()}); err != nil {
+	if err := s.hub().In(store.ChatMessage{Conn: s.ID(), Peer: peer, PeerName: name, Body: string(req.Body()), TS: time.Now().Unix()}); err != nil {
 		tx.Respond(sip.NewResponseFromRequest(req, 500, "Could not keep the message", nil))
 		return
 	}
