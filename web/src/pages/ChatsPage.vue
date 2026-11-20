@@ -6,7 +6,7 @@
       <template #list>
         <div class="ph-chats__head">
           <HdPageHeader title="Chats" :subtitle="subtitle" colored accent="#09A7CC" />
-          <q-btn flat round icon="sym_o_edit_square" aria-label="New message" data-test="new-chat" @click="startNew" />
+          <q-btn flat round text-color="white" icon="sym_o_edit_square" aria-label="New message" data-test="new-chat" @click="startNew" />
         </div>
         <div v-if="convs.length > 4" class="ph-list-search"><HdSearchField v-model="q" placeholder="Search chats" label="Search chats" /></div>
         <div class="ph-scroll ph-chats__list">
@@ -32,8 +32,8 @@
       </template>
 
       <template #detail>
-        <template v-if="current">
-          <header class="ph-detail-head" data-test="thread">
+        <div v-if="current" class="ph-chats__thread" data-test="thread">
+          <header class="ph-detail-head">
             <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back to the conversations" class="ph-split__back" @click="current = null" />
             <template v-if="current.key"><HdAvatar v-if="current.name || !/\d/.test(current.number)" :name="current.name || current.number" :size="43" /><HdThumbnail v-else icon="person" :size="43" :color="tint(current.number)" /></template>
             <div class="ph-detail-head__text">
@@ -53,7 +53,7 @@
             <q-input v-model="text" outlined dense autogrow class="col ph-chats__text" placeholder="Write a message" aria-label="Message (Ctrl+Enter sends)" data-test="sms-text" @keyup.ctrl.enter="send" />
             <q-btn unelevated color="primary" icon="sym_o_send" aria-label="Send" :disable="!text.trim() || !sendVia" :loading="sending" data-test="sms-send" @click="send" />
           </div>
-        </template>
+        </div>
         <div v-else class="ph-split__empty">
           <div><q-icon name="sym_o_chat" size="48px" aria-hidden="true" /><p>Pick a conversation, or start a new one.</p></div>
         </div>
@@ -194,6 +194,7 @@ onBeforeUnmount(() => { alive = false; clearTimeout(timer); document.removeEvent
 .ph-chats__note { margin: 10px 11px; }
 .ph-chats__failed { font-size: var(--hd-font-size-xsmall); color: var(--ph-negative); }
 .ph-chats__about { flex: none; margin: 0; padding: 8px 12px; border-top: 1px solid var(--hd-c-divider); font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
+.ph-chats__thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ph-chats__to { flex: none; padding: 10px 16px; border-bottom: 1px solid var(--hd-c-divider); }
 /* the conversation: bubbles as Quasar/Examples Messaging (q-chat-message in the Etesian theme), newest at the bottom */
 .ph-msgs { flex: 1; min-height: 0; list-style: none; margin: 0; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
@@ -210,7 +211,6 @@ onBeforeUnmount(() => { alive = false; clearTimeout(timer); document.removeEvent
 .ph-state.is-failed { color: var(--ph-negative); }
 /* the composer strip: the phone to send from (when there are several), the message, Send */
 .ph-chats__compose { align-items: flex-end; }
-.ph-chats__compose :deep(.q-field__control) { background: var(--hd-c-surface); }
 .ph-chats__via { flex: 0 1 160px; min-width: 96px; }
 @container (max-width: 480px) { .ph-chats__via { flex-basis: 110px; } }
 .ph-chats__text { min-width: 0; }
