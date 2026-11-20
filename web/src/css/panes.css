@@ -68,7 +68,14 @@
 .ph-strip { flex: none; display: flex; gap: 8px; align-items: center; padding: 8px; background: linear-gradient(#D6D6D8, #ADADB0); box-shadow: inset 0 1px 0 #6E6E72; color: #1A1A1A; }
 [data-hd-mode="dark"] .ph-strip, .hd-mode-dark .ph-strip { background: linear-gradient(#2A2A2C, #0E0E10); box-shadow: inset 0 1px 0 #48484C; color: #fff; }
 
-/* Dark mode: the N9 toolbar goes dark (HdToolBar variant="dark", QFooter .hd-dark). XClassic (@etesian-design/shell 0.15) always
+/* The classic bar (XClassic's HdSiteHeader) is see-through with a backdrop blur, as on the website's classic page. XClassic stacks it
+   above the main area, so nothing would pass under it: lay it over the layout instead and pad the scrolled content by the bar's
+   height: App.vue gives the layout an empty, see-through q-header of the bar's height (56px bar + 1px line), so Quasar pads the
+   pages by it and sizes them without it, and the page scrolls under the bar and shows through it, blurred. */
+.ph-classic .x-cl__bar { position: absolute; top: 0; left: 0; right: 0; z-index: 3; }
+.ph-classic__layout .q-header.ph-classic__under { background: none; box-shadow: none; pointer-events: none; }
+
+/* Dark mode: the N9 toolbar goes dark (HdToolBar variant="dark", QFooter .hd-dark). XClassic (@etesian-design/shell) always
    renders its phone-width bottom bar with the light variant and has no prop for it, so the companion darkens it here; same for the
    QFooter-style strips the pages draw (the chats composer). Remove once XClassic follows the colour mode itself. */
 :is([data-hd-mode="dark"], .hd-mode-dark) .ph-classic .hd-toolbar--light, .ph-classic.hd-mode-dark .hd-toolbar--light {

@@ -13,6 +13,9 @@
             :status="statusText" :online="state.status === 'online'" data-test="classic" @open="openApp">
     <template #logo><BrandLogo :size="22" /></template>
     <q-layout view="hHh lpR fFf" container class="ph-classic__layout">
+      <!-- an empty header the size of the see-through classic bar (laid over the layout in panes.css): Quasar pads the pages by it
+           and sizes them without it, so the page scrolls under the bar and shows through it, blurred -->
+      <q-header class="ph-classic__under" :height-hint="57" aria-hidden="true"><div style="height: 57px"></div></q-header>
       <q-page-container id="main" tabindex="-1">
         <router-view />
       </q-page-container>
