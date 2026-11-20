@@ -12,9 +12,10 @@
         <div class="ph-scroll ph-chats__list">
           <div v-if="error" class="ph-banner is-error ph-chats__note" role="alert" data-test="chat-error"><q-icon name="sym_o_error" aria-hidden="true" /><span>{{ error }}</span></div>
           <p v-if="loaded && !devices.length" class="ph-banner ph-chats__note" role="note" data-test="no-sms-devices">
-            <q-icon name="sym_o_info" aria-hidden="true" /><span>No phone is sharing its text messages yet. Pair a phone that has the Cloud Companion app, and its messages will appear here.</span>
+            <q-icon name="sym_o_info" aria-hidden="true" /><span>Text messages (SMS) from your own phones show here: each phone syncs its own, and a message you send goes out through the phone you pick.
+              No phone is sharing its text messages yet. Pair a phone that has the Cloud Companion app, and its messages will appear here.</span>
           </p>
-          <HdEmptyState v-if="loaded && devices.length && !convs.length" text="No messages yet" data-test="no-convs" />
+          <HdEmptyState v-if="loaded && devices.length && !convs.length" text="No messages yet. Text messages from your phones show here; a message you send goes out through the phone you pick." data-test="no-convs" />
           <ul class="ph-rows">
             <li v-for="c in shown" :key="c.key">
               <button type="button" class="ph-row2" :class="{ 'is-selected': current && current.key === c.key }" data-test="conv" @click="open(c)">
@@ -28,17 +29,19 @@
             </li>
           </ul>
         </div>
-        <p class="ph-chats__about">Text messages (SMS) from your own phones. Each phone syncs its own messages here; a message you send goes out through the phone you pick.</p>
       </template>
 
       <template #detail>
         <div v-if="current" class="ph-chats__thread" data-test="thread">
           <header class="ph-detail-head">
-            <q-btn flat round dense icon="sym_o_arrow_back" aria-label="Back to the conversations" class="ph-split__back" @click="current = null" />
             <template v-if="current.key"><HdAvatar v-if="current.name || !/\d/.test(current.number)" :name="current.name || current.number" :size="43" /><HdThumbnail v-else icon="person" :size="43" :color="tint(current.number)" /></template>
             <div class="ph-detail-head__text">
               <b>{{ current.name || current.number || 'New message' }}</b>
-              <span>{{ current.name ? current.number + ' · ' : '' }}<template v-if="deviceOptions.length === 1">sent through <span data-test="send-via">{{ deviceOptions[0].label }}</span></template><template v-else>text messages</template></span>
+              <span>{{ current.name ? current.number + ' · ' : '' }}<template v-if="deviceOptions.length === 1">sent through <span data-test="send-via">{{ deviceOptions[0].label }}</span></template>
+                <!-- several phones: which one sends is a menu here, not a field in the composer -->
+                <button v-else-if="deviceOptions.length > 1" type="button" class="ph-chats__via hd-focusable" aria-haspopup="menu" data-test="send-via">sent through {{ deviceName(sendVia) }} <q-icon name="sym_o_expand_more" size="16px" aria-hidden="true" />
+                  <q-menu auto-close><q-list style="min-width: 180px"><q-item v-for="d in deviceOptions" :key="d.value" clickable :active="d.value === sendVia" @click="sendVia = d.value"><q-item-section>{{ d.label }}</q-item-section></q-item></q-list></q-menu>
+                </button><template v-else>text messages</template></span>
             </div>
           </header>
           <div v-if="!current.key" class="ph-chats__to"><q-input v-model="newNumber" outlined dense label="To (phone number)" type="tel" data-test="new-number" /></div>
@@ -48,10 +51,15 @@
               <span v-if="m.dir === 'out'" class="ph-state" :class="{ 'is-failed': m.status === 'failed' }" data-test="msg-status">{{ statusText(m) }}</span>
             </li>
           </ul>
-          <div class="ph-strip ph-chats__compose">
-            <q-select v-if="deviceOptions.length > 1" v-model="sendVia" :options="deviceOptions" emit-value map-options outlined dense options-dense class="ph-chats__via" aria-label="Send from" data-test="send-via" />
-            <q-input v-model="text" outlined dense autogrow class="col ph-chats__text" placeholder="Write a message" aria-label="Message (Ctrl+Enter sends)" data-test="sms-text" @keyup.ctrl.enter="send" />
-            <q-btn unelevated color="primary" icon="sym_o_send" aria-label="Send" :disable="!text.trim() || !sendVia" :loading="sending" data-test="sms-send" @click="send" />
+          <!-- the N9 Messages composer strip (Quasar/Examples, Messaging app): Back on a phone, the dark field, the grey squircle Send -->
+          <div class="q-footer ph-chats__compose">
+            <q-toolbar class="hd-q-free">
+              <q-btn flat class="hd-sq hd-q-back ph-split__back" aria-label="Back to the conversations" @click="current = null">
+                <svg width="33" height="33" viewBox="0 0 24 24" aria-hidden="true"><path :d="BACK_ARROW_PATH" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </q-btn>
+              <q-input v-model="text" dense outlined autogrow class="col ph-chats__field" placeholder="Write a message" aria-label="Message (Ctrl+Enter sends)" data-test="sms-text" @keyup.ctrl.enter="send" />
+              <q-btn flat class="hd-sq ph-chats__send" icon="sym_o_chat_bubble" aria-label="Send" :disable="!text.trim() || !sendVia" :loading="sending" data-test="sms-send" @click="send" />
+            </q-toolbar>
           </div>
         </div>
         <div v-else class="ph-split__empty">
@@ -67,6 +75,7 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useChrome } from '@etesian-design/shell'
 import { HdAvatar, HdEmptyState, HdPageHeader, HdSearchField, HdThumbnail } from '@etesian-design/vue'
 import SplitView from '../components/SplitView.vue'
+import { BACK_ARROW_PATH } from '@etesian-design/vue/components/backArrow'
 import { fillPage } from '../fillPage'
 import { apiCall } from '../cloud'
 import { latest } from '../latest'
@@ -193,7 +202,6 @@ onBeforeUnmount(() => { alive = false; clearTimeout(timer); document.removeEvent
 .ph-chats__head > .q-btn { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); color: #fff; }
 .ph-chats__note { margin: 10px 11px; }
 .ph-chats__failed { font-size: var(--hd-font-size-xsmall); color: var(--ph-negative); }
-.ph-chats__about { flex: none; margin: 0; padding: 8px 12px; border-top: 1px solid var(--hd-c-divider); font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
 .ph-chats__thread { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ph-chats__to { flex: none; padding: 10px 16px; border-bottom: 1px solid var(--hd-c-divider); }
 /* the conversation: bubbles as Quasar/Examples Messaging (q-chat-message in the Etesian theme), newest at the bottom */
@@ -204,15 +212,20 @@ onBeforeUnmount(() => { alive = false; clearTimeout(timer); document.removeEvent
 .ph-out { align-self: flex-end; align-items: flex-end; }
 .ph-bubble { display: flex; flex-direction: column; gap: 2px; padding: 7px 11px; border-radius: 12px; background: var(--hd-surface-card, var(--hd-c-surface)); color: var(--hd-surface-card-fg, var(--hd-c-fg));
   box-shadow: 0 0 0 1px var(--hd-c-divider); font: 400 var(--hd-font-size-default)/1.35 var(--hd-font-family-base); white-space: pre-wrap; overflow-wrap: anywhere; }
-.ph-in .ph-bubble { border-bottom-left-radius: 3px; }
-.ph-out .ph-bubble { background: var(--ph-accent); color: var(--ph-on-accent); box-shadow: none; border-bottom-right-radius: 3px; }
+.ph-in .ph-bubble { border-bottom-left-radius: 0; }
+.ph-out .ph-bubble { background: #268CE1; color: #fff; box-shadow: none; border-bottom-right-radius: 0; }
 .ph-stamp { font-size: var(--hd-font-size-xsmall); opacity: .75; white-space: nowrap; }
 .ph-state { font-size: var(--hd-font-size-xsmall); color: var(--hd-c-fg-secondary); }
 .ph-state.is-failed { color: var(--ph-negative); }
-/* the composer strip: the phone to send from (when there are several), the message, Send */
-.ph-chats__compose { align-items: flex-end; }
-.ph-chats__via { flex: 0 1 160px; min-width: 96px; }
-@container (max-width: 480px) { .ph-chats__via { flex-basis: 110px; } }
-.ph-chats__text { min-width: 0; }
-.ph-chats__compose .q-btn { min-width: 48px; }
+/* the composer strip: the light N9 toolbar (dark in dark mode), a dark rounded field, a grey lit squircle Send */
+.ph-chats__compose { position: relative; z-index: auto; flex: none; }
+.ph-chats__compose .q-toolbar { gap: 8px; padding: 6px 8px; min-height: 56px; align-items: center; }
+.ph-chats__field :deep(.q-field__control) { min-height: 38px; border-radius: 12px; background: #222; color: #fff; }
+.ph-chats__field :deep(.q-field__control::before) { border-color: rgba(0,0,0,.6) !important; border-radius: 12px; }
+.ph-chats__field :deep(.q-field__native) { color: #fff; }
+.ph-chats__field :deep(.q-field__native::placeholder) { color: #9a9a9a; opacity: 1; }
+.ph-chats__send.q-btn { --hd-sq-size: 44px; --hd-sq-fill: linear-gradient(#A6A6A8, #858587 50%, #6C6C6E); --hd-sq-ring: rgba(0,0,0,.3); color: #fff; width: 53px; min-width: 53px; height: 44px; }
+.ph-chats__send.q-btn .q-btn__content { position: relative; z-index: 1; }
+.ph-chats__send.q-btn.disabled { opacity: .55 !important; }
+.ph-chats__via { all: unset; display: inline-flex; align-items: center; gap: 2px; color: var(--hd-c-accent-text, var(--hd-accent)); cursor: pointer; }
 </style>
