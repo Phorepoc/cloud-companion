@@ -5,8 +5,8 @@ the browser with its tabs. That is personal data, used many times a day, mostly 
 tool that is already on your side, not like an app that wants attention.
 
 The look is the **Etesian design language**: the Nokia N9's (light type, lit squircle icons, dark chrome over light pages), carried to
-the web. Its tokens and base styles come from `@etesian-design/tokens`, its Quasar theme is vendored in `src/css/etesian/` (MIT, from the
-etesian-design repo, never edited here); the app's own tokens in `src/css/tokens.css` point at them, the global rules are in `src/css/app.css`, the name and logo in
+the web. Its tokens and base styles come from `@etesian-design/tokens`, its Quasar theme from `@etesian-design/quasar`
+(`theme.css`; change it in the etesian-design repo, never here); the app's own tokens in `src/css/tokens.css` point at them, the global rules are in `src/css/app.css`, the name and logo in
 `src/brand.ts`, the sections in `src/nav.ts`, the desktop view in `src/desktop/`. If this document and the code disagree, fix one of them
 in the same change.
 
