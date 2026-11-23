@@ -26,7 +26,10 @@ for f in srcs:
 if not names:
     sys.exit("no icon names found")
 
-fonts = sorted(glob.glob(os.path.join(ROOT, "node_modules", "@quasar", "extras", "material-symbols-outlined", "web-font", "*.woff2")), key=os.path.getsize)
+# @quasar/extras 2 keeps its fonts under exports/ (1.x: at its top level)
+extras = os.path.join(ROOT, "node_modules", "@quasar", "extras")
+fonts = sorted(glob.glob(os.path.join(extras, "exports", "material-symbols-outlined", "web-font", "*.woff2"))
+               or glob.glob(os.path.join(extras, "material-symbols-outlined", "web-font", "*.woff2")), key=os.path.getsize)
 if not fonts:
     sys.exit("material symbols font not found: run npm ci first")
 font = TTFont(fonts[-1])
