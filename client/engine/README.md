@@ -95,7 +95,7 @@ written ini carried the pin that was confirmed). An ini with a pin keeps the str
 ## Test note: the foreground after the cycler launch
 In the SSM regress image the boot list's cycler starts the app under test, then SSM starts Logs, which takes the foreground: a scripted
 run that starts driving as soon as the app logs its first event drives Logs instead. Put a throwaway line first (`*45|calcsoft`, then
-`*700|<app>`) so the app starts after SSM has settled. Not ours to fix; recorded here so the scripts keep the workaround.
+`*700|<app>`) so the app starts after SSM has settled. Not a Cloud Companion bug; recorded here so the scripts keep the workaround.
 
 ## VirtualBox
 The same ROM boots in VirtualBox (private VM, NAT e1000, the browser's own disk copy with the test files): the engine loads, the

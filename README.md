@@ -300,9 +300,9 @@ care they have put into their projects. If Cloud Companion is useful to you, ple
 [Raspberry Pi OS](https://www.raspberrypi.com/software/) and [pi-gen](https://github.com/RPi-Distro/pi-gen) for the board image,
 [Docker Engine](https://docs.docker.com/engine/) with [Compose](https://github.com/docker/compose), [NetworkManager](https://networkmanager.dev)
 with [dnsmasq](https://thekelleys.org.uk/dnsmasq/doc.html) for the setup hotspot, [Avahi](https://avahi.org) for `cloud-companion.local`,
-[systemd](https://systemd.io), [restic](https://restic.net) for backups (and its [REST server](https://github.com/restic/rest-server) in our tests), and [QEMU](https://www.qemu.org) with [binfmt](https://github.com/tonistiigi/binfmt) for building it on x86.
+[systemd](https://systemd.io), [restic](https://restic.net) for backups (and its [REST server](https://github.com/restic/rest-server) in the tests), and [QEMU](https://www.qemu.org) with [binfmt](https://github.com/tonistiigi/binfmt) for building it on x86.
 
-**The servers our tests run against**
+**The servers the tests run against**
 [Conduit](https://conduit.rs) (Matrix), [Prosody](https://prosody.im) (XMPP), [Ergo](https://ergo.chat) (IRC),
 [Nextcloud](https://nextcloud.com) and [Nextcloud Talk](https://github.com/nextcloud/spreed), [Seafile](https://www.seafile.com) (with
 [Redis](https://redis.io) beside it), [Immich](https://immich.app) (with [Valkey](https://valkey.io), and PostgreSQL with
