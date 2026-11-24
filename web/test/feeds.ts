@@ -5,7 +5,8 @@
 //   BASE=http://phecloud:8080 CODE=ABCD-EFGH OUT=/out node --experimental-strip-types feeds.ts
 //
 // Through the screen: add two feeds with +, browse one feed and all posts, read a post in the reader (it does not open its
-// page), follow a link from the post, keep read marks over a reload, then a desktop widget for one feed opens a post in Feeds.
+// page), follow a link from the post, keep read marks over a reload, then a desktop widget for one feed opens a post in Feeds;
+// share the feeds with feed readers (private, a new token, public, off).
 
 import { firefox, type Page } from 'playwright'
 import assert from 'node:assert/strict'
@@ -123,6 +124,35 @@ await page.screenshot({ path: `${OUT}/feeds-4-window.png` })
 const dot = page.locator('[data-test=widget-feed] .ph-wg__rssdot').first()
 for (let i = 0; i < 25 && (await dot.evaluate((e) => getComputedStyle(e).visibility)) !== 'hidden'; i++) await page.waitForTimeout(200)
 assert.equal(await dot.evaluate((e) => getComputedStyle(e).visibility), 'hidden', 'a read post has no dot in the widget')
+
+step('Share with feed readers: off, then private (the token in the address), then public, then off again')
+await page.goto(`${BASE}/#/feeds`); await page.reload(); await page.waitForSelector('.x-fl__row:has-text("Feed One"):visible')
+await tool('Share')
+await page.waitForSelector('[data-test=feeds-share]')
+const status = async (u: string) => (await fetch(u)).status
+assert.equal(await status(`${BASE}/feeds/index.json`), 404, 'nothing is shared until the owner turns it on')
+await page.click('[data-test=feeds-share-on]')
+await page.waitForSelector('[data-test=feeds-share-index]')
+const priv = (await page.textContent('[data-test=feeds-share-index]'))!.trim()
+assert.match(priv, /\/feeds\/[0-9a-f]{32}\/index\.json$/, 'private: a token in the address')
+const shared = await (await fetch(priv)).json() as { feeds: { title: string }[]; posts: { title: string }[] }
+assert.deepEqual(shared.feeds.map((f) => f.title).sort(), ['Feed One', 'Feed Two'], 'the shared feeds')
+assert(shared.posts.some((p) => p.title === 'Tram line opens'), 'with their posts')
+assert.equal(await status(`${BASE}/feeds/index.json`), 404, 'a private share is not at the plain address')
+const opml = await (await fetch((await page.textContent('[data-test=feeds-share-opml]'))!.trim())).text()
+assert(opml.includes('xmlUrl=') && opml.includes('Feed One'), 'the OPML list')
+await page.waitForTimeout(500); await page.screenshot({ path: `${OUT}/feeds-5-share.png` })
+await page.click('[data-test=feeds-share-rotate]')
+for (let i = 0; i < 20 && (await page.textContent('[data-test=feeds-share-index]'))!.trim() === priv; i++) await page.waitForTimeout(200)
+assert.notEqual((await page.textContent('[data-test=feeds-share-index]'))!.trim(), priv, 'New token changes the address')
+assert.equal(await status(priv), 404, 'the old address stops working')
+await page.click('[data-test=feeds-share-public]')
+await until(page, () => /\/feeds\/index\.json$/.test(document.querySelector('[data-test=feeds-share-index]')?.textContent?.trim() || ''), 'public: the plain address shown')
+assert.equal(await status(`${BASE}/feeds/atom.xml`), 200, 'public: the plain address')
+await page.click('[data-test=feeds-share-on]')
+await page.waitForSelector('[data-test=feeds-share-index]', { state: 'detached' })
+assert.equal(await status(`${BASE}/feeds/atom.xml`), 404, 'off again')
+await page.click('[data-test=feeds-share] button:has-text("Close")')
 
 step('Remove feed waits for the toast: Undo keeps it, otherwise it goes, also after a reload')
 await page.goto(`${BASE}/#/feeds`); await page.reload(); await page.waitForSelector('.x-fl__row:has-text("Feed Two"):visible')

@@ -8,6 +8,8 @@ package webui
 //
 //	GET  /phe/feeds          {feeds, posts, errors}: the owner's feeds and their posts merged, newest first
 //	POST /phe/feeds          (owner) {feeds: [{url, title}]}: replaces the list; each new address is read first
+//
+// Shared with feed readers, off unless the owner turns it on: feedshare.go.
 
 import (
 	"context"
@@ -37,6 +39,7 @@ func (fa *feedsAPI) list() []feeds.Feed {
 }
 
 func (fa *feedsAPI) routes(mux *http.ServeMux) {
+	fa.shareRoutes(mux) // feedshare.go: the feeds for readers, public or with a token
 	mux.HandleFunc("GET /phe/feeds", func(w http.ResponseWriter, r *http.Request) {
 		if _, _, ok := fa.a.signedDevice(r); !ok {
 			bad(w, 403, "pair this device first")
